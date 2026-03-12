@@ -258,8 +258,8 @@ public class UserServiceImpl implements UserService {
 
     private boolean isStaffRole(RoleName role) {
         return role == RoleName.DRIVER ||
-               role == RoleName.CLEANER ||
-               role == RoleName.SUPERVISOR;
+                role == RoleName.CLEANER ||
+                role == RoleName.SUPERVISOR;
     }
 
     private Long resolveTenantId(Long requestTenantId) {
@@ -296,10 +296,12 @@ public class UserServiceImpl implements UserService {
                 .bankName(request.getBankName())
                 .accountNumber(request.getAccountNumber())
                 .ifscCode(request.getIfscCode())
+                .designationId(request.getDesignationId())
                 .accountHolderName(request.getAccountHolderName())
                 .licenseNumber(request.getLicenseNumber())
                 .licenseExpiryDate(request.getLicenseExpiryDate())
                 .isActive(true)
+
                 .build();
 
         if (request.getEmploymentTypeId() != null) {
@@ -352,8 +354,7 @@ public class UserServiceImpl implements UserService {
                         .findFirst()
                         .orElse(null))
                 .tenantId(user.getTenant() != null ? user.getTenant().getId() : null)
-                .companyName(user.getTenant() != null ?
-                        user.getTenant().getCompanyName() : "FEROS")
+                .companyName(user.getTenant() != null ? user.getTenant().getCompanyName() : "FEROS")
                 .isActive(user.getIsActive())
                 .isPinResetRequired(user.getIsPinResetRequired())
                 .createdAt(user.getCreatedAt())
@@ -362,15 +363,13 @@ public class UserServiceImpl implements UserService {
 
         // Add staff profile if exists
         staffProfileRepository.findByUserId(user.getId()).ifPresent(profile -> {
-            response.setEmploymentType(profile.getEmploymentType() != null ?
-                    profile.getEmploymentType().getName() : null);
+            response.setEmploymentType(
+                    profile.getEmploymentType() != null ? profile.getEmploymentType().getName() : null);
             response.setDateOfBirth(profile.getDateOfBirth());
             response.setJoiningDate(profile.getJoiningDate());
             response.setAddress(profile.getAddress());
-            response.setCity(profile.getCity() != null ?
-                    profile.getCity().getName() : null);
-            response.setState(profile.getState() != null ?
-                    profile.getState().getName() : null);
+            response.setCity(profile.getCity() != null ? profile.getCity().getName() : null);
+            response.setState(profile.getState() != null ? profile.getState().getName() : null);
             response.setPincode(profile.getPincode());
             response.setEmergencyContactName(profile.getEmergencyContactName());
             response.setEmergencyContactPhone(profile.getEmergencyContactPhone());

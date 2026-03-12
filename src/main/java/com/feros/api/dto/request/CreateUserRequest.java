@@ -45,4 +45,6 @@ public class CreateUserRequest {
     // Required for DRIVER only
     private String licenseNumber;
     private LocalDate licenseExpiryDate;
+    private Long designationId;
+
 }
