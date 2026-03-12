@@ -3,9 +3,14 @@ package com.feros.api.service.impl;
 import com.feros.api.dto.request.CreateTenantRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.TenantResponse;
+import com.feros.api.entity.Designation;
 import com.feros.api.entity.Tenant;
+import com.feros.api.entity.master.*;
+import com.feros.api.enums.PayCycle;
+import com.feros.api.enums.RoleName;
 import com.feros.api.enums.SubscriptionStatus;
 import com.feros.api.exception.FerosException;
+import com.feros.api.repository.*;
 import com.feros.api.repository.TenantRepository;
 import com.feros.api.service.TenantService;
 import com.opencsv.CSVReader;
@@ -15,25 +20,31 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStreamReader;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class TenantServiceImpl implements TenantService {
 
     private final TenantRepository tenantRepository;
+    private final VehicleStatusRepository vehicleStatusRepository;
+    private final ClientTypeRepository clientTypeRepository;
+    private final PaymentTermsRepository paymentTermsRepository;
+    private final ChargeTypeRepository chargeTypeRepository;
+    private final DesignationRepository designationRepository;
+    private final TenantSettingsRepository tenantSettingsRepository;
 
     @Override
     public TenantResponse createTenant(CreateTenantRequest request) {
 
-        // Check duplicate email
         if (tenantRepository.existsByEmail(request.getEmail())) {
             throw new FerosException("Email already exists", HttpStatus.CONFLICT);
         }
-
-        // Check duplicate phone
         if (tenantRepository.existsByPhone(request.getPhone())) {
             throw new FerosException("Phone already exists", HttpStatus.CONFLICT);
         }
@@ -66,8 +77,9 @@ public class TenantServiceImpl implements TenantService {
                 .isActive(true)
                 .build();
 
-        Tenant saved = tenantRepository.save(tenant);
-        return mapToResponse(saved);
+        Tenant savedTenant = tenantRepository.save(tenant);
+        seedDefaultMasterData(savedTenant);
+        return mapToResponse(savedTenant);
     }
 
     @Override
@@ -111,8 +123,7 @@ public class TenantServiceImpl implements TenantService {
         tenant.setOwnerPhone(request.getOwnerPhone());
         tenant.setOwnerEmail(request.getOwnerEmail());
 
-        Tenant updated = tenantRepository.save(tenant);
-        return mapToResponse(updated);
+        return mapToResponse(tenantRepository.save(tenant));
     }
 
     @Override
@@ -133,8 +144,7 @@ public class TenantServiceImpl implements TenantService {
         try (CSVReader csvReader = new CSVReader(
                 new InputStreamReader(file.getInputStream()))) {
 
-            // Skip header row
-            csvReader.readNext();
+            csvReader.readNext(); // skip header
 
             String[] row;
             while ((row = csvReader.readNext()) != null) {
@@ -147,15 +157,15 @@ public class TenantServiceImpl implements TenantService {
                     }
 
                     String companyName = row[0].trim();
-                    String email = row[1].trim();
-                    String phone = row[2].trim();
-                    String address = row[3].trim();
-                    String city = row[4].trim();
-                    String state = row[5].trim();
-                    String pincode = row[6].trim();
-                    String gstin = row[7].trim();
-                    String panNumber = row[8].trim();
-                    String ownerName = row[9].trim();
+                    String email      = row[1].trim();
+                    String phone      = row[2].trim();
+                    String address    = row[3].trim();
+                    String city       = row[4].trim();
+                    String state      = row[5].trim();
+                    String pincode    = row[6].trim();
+                    String gstin      = row[7].trim();
+                    String panNumber  = row[8].trim();
+                    String ownerName  = row[9].trim();
                     String ownerPhone = row[10].trim();
                     String ownerEmail = row[11].trim();
 
@@ -164,7 +174,6 @@ public class TenantServiceImpl implements TenantService {
                         failureCount++;
                         continue;
                     }
-
                     if (tenantRepository.existsByPhone(phone)) {
                         errors.add("Row " + rowNum + ": Phone " + phone + " already exists");
                         failureCount++;
@@ -173,25 +182,19 @@ public class TenantServiceImpl implements TenantService {
 
                     Tenant tenant = Tenant.builder()
                             .companyName(companyName)
-                            .email(email)
-                            .phone(phone)
-                            .address(address)
-                            .city(city)
-                            .state(state)
-                            .pincode(pincode)
-                            .gstin(gstin)
-                            .panNumber(panNumber)
-                            .ownerName(ownerName)
-                            .ownerPhone(ownerPhone)
-                            .ownerEmail(ownerEmail)
-                            .lorryCount(0)
+                            .email(email).phone(phone)
+                            .address(address).city(city)
+                            .state(state).pincode(pincode)
+                            .gstin(gstin).panNumber(panNumber)
+                            .ownerName(ownerName).ownerPhone(ownerPhone)
+                            .ownerEmail(ownerEmail).lorryCount(0)
                             .subscriptionStatus(SubscriptionStatus.TRIAL)
                             .trialStartDate(LocalDate.now())
                             .trialEndDate(LocalDate.now().plusMonths(1))
-                            .isActive(true)
-                            .build();
+                            .isActive(true).build();
 
-                    tenantRepository.save(tenant);
+                    Tenant savedTenant = tenantRepository.save(tenant);
+                    seedDefaultMasterData(savedTenant);
                     successCount++;
 
                 } catch (Exception e) {
@@ -201,8 +204,7 @@ public class TenantServiceImpl implements TenantService {
             }
 
         } catch (Exception e) {
-            throw new FerosException("Failed to parse CSV: " + e.getMessage(),
-                    HttpStatus.BAD_REQUEST);
+            throw new FerosException("Failed to parse CSV: " + e.getMessage(), HttpStatus.BAD_REQUEST);
         }
 
         return BulkTenantUploadResponse.builder()
@@ -213,6 +215,69 @@ public class TenantServiceImpl implements TenantService {
                 .build();
     }
 
+    // ===================== SEED DEFAULT MASTER DATA =====================
+    private void seedDefaultMasterData(Tenant tenant) {
+
+        // Vehicle Statuses
+        List.of("Available", "On Trip", "Under Maintenance", "Breakdown", "Inactive")
+                .forEach(name -> vehicleStatusRepository.save(
+                        VehicleStatus.builder().tenant(tenant).name(name).isActive(true).build()));
+
+        // Client Types
+        List.of("Regular", "Spot", "Contract", "Government")
+                .forEach(name -> clientTypeRepository.save(
+                        ClientType.builder().tenant(tenant).name(name).isActive(true).build()));
+
+        // Payment Terms
+        Map<String, Integer> paymentTerms = new LinkedHashMap<>();
+        paymentTerms.put("Immediate", 0);
+        paymentTerms.put("Net 15", 15);
+        paymentTerms.put("Net 30", 30);
+        paymentTerms.put("Net 45", 45);
+        paymentTerms.put("Net 60", 60);
+        paymentTerms.forEach((name, days) -> paymentTermsRepository.save(
+                PaymentTerms.builder().tenant(tenant).name(name)
+                        .creditDays(days).isActive(true).build()));
+
+        // Charge Types
+        Map<String, String> chargeTypes = new LinkedHashMap<>();
+        chargeTypes.put("Loading Charge", "Charge for loading goods at source");
+        chargeTypes.put("Unloading Charge", "Charge for unloading goods at destination");
+        chargeTypes.put("Detention Charge", "Charge for vehicle detention beyond allowed time");
+        chargeTypes.put("Checkpost Fine", "Fines paid at checkposts during transit");
+        chargeTypes.put("Toll Charge", "Toll tax paid during transit");
+        chargeTypes.put("Halting Charge", "Charge for vehicle halting overnight");
+        chargeTypes.forEach((name, desc) -> chargeTypeRepository.save(
+                ChargeType.builder().tenant(tenant).name(name)
+                        .description(desc).isActive(true).build()));
+
+        // Designations
+        Map<String, RoleName> designations = new LinkedHashMap<>();
+        designations.put("Senior Driver", RoleName.DRIVER);
+        designations.put("Junior Driver", RoleName.DRIVER);
+        designations.put("Senior Cleaner", RoleName.CLEANER);
+        designations.put("Junior Cleaner", RoleName.CLEANER);
+        designations.put("Supervisor", RoleName.SUPERVISOR);
+        designations.put("Office Staff", RoleName.OFFICE_STAFF);
+        designations.forEach((name, role) -> designationRepository.save(
+                Designation.builder().tenant(tenant).name(name)
+                        .roleType(role).isActive(true).build()));
+
+        // Tenant Settings
+        tenantSettingsRepository.save(TenantSettings.builder()
+                .tenant(tenant)
+                .payCycle(PayCycle.MONTHLY)
+                .overtimeThresholdHours(BigDecimal.valueOf(8.00))
+                .overtimeRateMultiplier(BigDecimal.valueOf(1.50))
+                .maxAdvanceAmount(BigDecimal.valueOf(5000))
+                .maxAdvanceDeductionPerCycle(BigDecimal.valueOf(2000))
+                .isTripBonusEnabled(false)
+                .tripBonusAmount(BigDecimal.ZERO)
+                .isActive(true)
+                .build());
+    }
+
+    // ===================== MAPPER =====================
     private TenantResponse mapToResponse(Tenant tenant) {
         return TenantResponse.builder()
                 .id(tenant.getId())
