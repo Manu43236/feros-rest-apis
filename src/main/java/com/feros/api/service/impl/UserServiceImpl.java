@@ -13,13 +13,7 @@ import com.feros.api.entity.master.EmploymentType;
 import com.feros.api.entity.master.State;
 import com.feros.api.enums.RoleName;
 import com.feros.api.exception.FerosException;
-import com.feros.api.repository.CityRepository;
-import com.feros.api.repository.EmploymentTypeRepository;
-import com.feros.api.repository.RoleRepository;
-import com.feros.api.repository.StaffProfileRepository;
-import com.feros.api.repository.StateRepository;
-import com.feros.api.repository.TenantRepository;
-import com.feros.api.repository.UserRepository;
+import com.feros.api.repository.*;
 import com.feros.api.service.UserService;
 import com.feros.api.util.SecurityUtil;
 import com.opencsv.CSVReader;
@@ -65,11 +59,13 @@ public class UserServiceImpl implements UserService {
 
         // 3. Get tenant
         Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(tenantId)
-                .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new FerosException(
+                        "Tenant not found", HttpStatus.NOT_FOUND));
 
         // 4. Get role
         Role role = roleRepository.findByName(request.getRole())
-                .orElseThrow(() -> new FerosException("Role not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new FerosException(
+                        "Role not found", HttpStatus.NOT_FOUND));
 
         // 5. Generate PIN
         String rawPin = generatePin();
@@ -100,20 +96,21 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserResponse getUserById(Long id) {
         User user = userRepository.findByIdAndIsActiveTrue(id)
-                .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new FerosException(
+                        "User not found", HttpStatus.NOT_FOUND));
         validateTenantAccess(user);
         return mapToResponse(user, null);
     }
 
     @Override
     public List<UserResponse> getAllUsers() {
-        Long tenantId = SecurityUtil.getCurrentTenantId();
         if (SecurityUtil.isSuperAdmin()) {
             return userRepository.findAllByIsActiveTrue()
                     .stream()
                     .map(u -> mapToResponse(u, null))
                     .toList();
         }
+        Long tenantId = SecurityUtil.getCurrentTenantId();
         return userRepository.findAllByTenantIdAndIsActiveTrue(tenantId)
                 .stream()
                 .map(u -> mapToResponse(u, null))
@@ -124,7 +121,8 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserResponse updateUser(Long id, CreateUserRequest request) {
         User user = userRepository.findByIdAndIsActiveTrue(id)
-                .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new FerosException(
+                        "User not found", HttpStatus.NOT_FOUND));
         validateTenantAccess(user);
 
         user.setName(request.getName());
@@ -132,7 +130,6 @@ public class UserServiceImpl implements UserService {
 
         User updated = userRepository.save(user);
 
-        // Update staff profile if exists
         if (isStaffRole(request.getRole())) {
             staffProfileRepository.findByUserId(id).ifPresent(profile -> {
                 updateStaffProfile(profile, request);
@@ -146,7 +143,8 @@ public class UserServiceImpl implements UserService {
     @Override
     public void deleteUser(Long id) {
         User user = userRepository.findByIdAndIsActiveTrue(id)
-                .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new FerosException(
+                        "User not found", HttpStatus.NOT_FOUND));
         validateTenantAccess(user);
         user.setIsActive(false);
         userRepository.save(user);
@@ -156,7 +154,8 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public PinResponse resetPin(Long id) {
         User user = userRepository.findByIdAndIsActiveTrue(id)
-                .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new FerosException(
+                        "User not found", HttpStatus.NOT_FOUND));
         validateTenantAccess(user);
 
         String rawPin = generatePin();
@@ -186,7 +185,7 @@ public class UserServiceImpl implements UserService {
         try (CSVReader csvReader = new CSVReader(
                 new InputStreamReader(file.getInputStream()))) {
 
-            csvReader.readNext(); // skip header
+            csvReader.readNext();
 
             String[] row;
             while ((row = csvReader.readNext()) != null) {
@@ -210,10 +209,12 @@ public class UserServiceImpl implements UserService {
 
                     RoleName role = RoleName.valueOf(roleName.toUpperCase());
                     Role roleEntity = roleRepository.findByName(role)
-                            .orElseThrow(() -> new FerosException("Role not found", HttpStatus.NOT_FOUND));
+                            .orElseThrow(() -> new FerosException(
+                                    "Role not found", HttpStatus.NOT_FOUND));
 
                     Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(tenantId)
-                            .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+                            .orElseThrow(() -> new FerosException(
+                                    "Tenant not found", HttpStatus.NOT_FOUND));
 
                     String rawPin = generatePin();
                     String hashedPin = passwordEncoder.encode(rawPin);
@@ -283,7 +284,8 @@ public class UserServiceImpl implements UserService {
         }
     }
 
-    private void createStaffProfile(User user, Tenant tenant, CreateUserRequest request) {
+    private void createStaffProfile(User user, Tenant tenant,
+            CreateUserRequest request) {
         StaffProfile profile = StaffProfile.builder()
                 .user(user)
                 .tenant(tenant)
@@ -296,12 +298,10 @@ public class UserServiceImpl implements UserService {
                 .bankName(request.getBankName())
                 .accountNumber(request.getAccountNumber())
                 .ifscCode(request.getIfscCode())
-                .designationId(request.getDesignationId())
                 .accountHolderName(request.getAccountHolderName())
                 .licenseNumber(request.getLicenseNumber())
                 .licenseExpiryDate(request.getLicenseExpiryDate())
                 .isActive(true)
-
                 .build();
 
         if (request.getEmploymentTypeId() != null) {
@@ -329,7 +329,8 @@ public class UserServiceImpl implements UserService {
         staffProfileRepository.save(profile);
     }
 
-    private void updateStaffProfile(StaffProfile profile, CreateUserRequest request) {
+    private void updateStaffProfile(StaffProfile profile,
+            CreateUserRequest request) {
         profile.setDateOfBirth(request.getDateOfBirth());
         profile.setJoiningDate(request.getJoiningDate());
         profile.setAddress(request.getAddress());
@@ -350,18 +351,18 @@ public class UserServiceImpl implements UserService {
                 .name(user.getName())
                 .phone(user.getPhone())
                 .role(user.getRoles().stream()
-                        .map(r -> r.getName())
+                        .map(Role::getName)
                         .findFirst()
                         .orElse(null))
                 .tenantId(user.getTenant() != null ? user.getTenant().getId() : null)
                 .companyName(user.getTenant() != null ? user.getTenant().getCompanyName() : "FEROS")
                 .isActive(user.getIsActive())
                 .isPinResetRequired(user.getIsPinResetRequired())
+                .generatedPin(rawPin)
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
 
-        // Add staff profile if exists
         staffProfileRepository.findByUserId(user.getId()).ifPresent(profile -> {
             response.setEmploymentType(
                     profile.getEmploymentType() != null ? profile.getEmploymentType().getName() : null);

@@ -20,6 +20,7 @@ public class UserResponse {
     private String companyName;
     private Boolean isActive;
     private Boolean isPinResetRequired;
+    private String generatedPin;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
