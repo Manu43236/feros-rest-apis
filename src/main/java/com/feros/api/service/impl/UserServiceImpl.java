@@ -77,6 +77,7 @@ public class UserServiceImpl implements UserService {
                 .name(request.getName())
                 .phone(request.getPhone())
                 .pin(hashedPin)
+                .plainPin(rawPin)
                 .pinGeneratedAt(LocalDateTime.now())
                 .isPinResetRequired(true)
                 .isActive(true)
@@ -160,6 +161,7 @@ public class UserServiceImpl implements UserService {
 
         String rawPin = generatePin();
         user.setPin(passwordEncoder.encode(rawPin));
+        user.setPlainPin(rawPin);
         user.setPinGeneratedAt(LocalDateTime.now());
         user.setIsPinResetRequired(true);
         userRepository.save(user);
@@ -224,6 +226,7 @@ public class UserServiceImpl implements UserService {
                             .name(name)
                             .phone(phone)
                             .pin(hashedPin)
+                            .plainPin(rawPin)
                             .pinGeneratedAt(LocalDateTime.now())
                             .isPinResetRequired(true)
                             .isActive(true)
@@ -346,6 +349,7 @@ public class UserServiceImpl implements UserService {
     }
 
     private UserResponse mapToResponse(User user, String rawPin) {
+        String pinToReturn = rawPin != null ? rawPin : user.getPlainPin();
         UserResponse response = UserResponse.builder()
                 .id(user.getId())
                 .name(user.getName())
@@ -358,7 +362,7 @@ public class UserServiceImpl implements UserService {
                 .companyName(user.getTenant() != null ? user.getTenant().getCompanyName() : "FEROS")
                 .isActive(user.getIsActive())
                 .isPinResetRequired(user.getIsPinResetRequired())
-                .generatedPin(rawPin)
+                .generatedPin(pinToReturn)
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

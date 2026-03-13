@@ -33,6 +33,9 @@ public class User extends BaseEntity {
     @Column(name = "pin", nullable = false)
     private String pin;
 
+    @Column(name = "plain_pin", length = 10)
+    private String plainPin;
+
     @Column(name = "pin_generated_at")
     private LocalDateTime pinGeneratedAt;
 
