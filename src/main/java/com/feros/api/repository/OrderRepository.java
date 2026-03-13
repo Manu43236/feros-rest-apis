@@ -14,4 +14,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     boolean existsByOrderNumberAndTenantId(String orderNumber, Long tenantId);
     List<Order> findByTenantIdAndOrderStatusAndIsActiveTrue(Long tenantId, OrderStatus status);
+    long countByTenantIdAndIsActiveTrue(Long tenantId);
+    long countByTenantIdAndOrderStatusAndIsActiveTrue(Long tenantId, OrderStatus status);
 }

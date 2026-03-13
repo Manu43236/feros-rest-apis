@@ -2,8 +2,11 @@ package com.feros.api.repository;
 
 import com.feros.api.entity.VehicleDocument;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,4 +14,6 @@ import java.util.Optional;
 public interface VehicleDocumentRepository extends JpaRepository<VehicleDocument, Long> {
     List<VehicleDocument> findByVehicleIdAndTenantIdAndIsActiveTrue(Long vehicleId, Long tenantId);
     Optional<VehicleDocument> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
+    @Query("SELECT vd FROM VehicleDocument vd WHERE vd.tenant.id = :tenantId AND vd.isActive = true AND vd.expiryDate IS NOT NULL AND vd.expiryDate <= :alertDate")
+    List<VehicleDocument> findExpiringDocuments(@Param("tenantId") Long tenantId, @Param("alertDate") LocalDate alertDate);
 }

@@ -2,6 +2,8 @@ package com.feros.api.repository;
 
 import com.feros.api.entity.Payroll;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -18,4 +20,6 @@ public interface PayrollRepository extends JpaRepository<Payroll, Long> {
 
     boolean existsByUserIdAndTenantIdAndPayCycleStartDateAndIsActiveTrue(
             Long userId, Long tenantId, LocalDate startDate);
+    @Query("SELECT p FROM Payroll p WHERE p.tenant.id = :tenantId AND p.isActive = true AND p.payCycleStartDate >= :from AND p.payCycleEndDate <= :to ORDER BY p.payCycleStartDate DESC")
+    List<Payroll> findByTenantIdAndDateRange(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }
