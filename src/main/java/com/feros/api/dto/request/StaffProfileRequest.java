@@ -1,6 +1,5 @@
 package com.feros.api.dto.request;
 
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -10,7 +9,6 @@ import java.time.LocalDate;
 @Setter
 public class StaffProfileRequest {
 
-    @NotNull(message = "Employment type is required")
     private Long employmentTypeId;
 
     private Long designationId;

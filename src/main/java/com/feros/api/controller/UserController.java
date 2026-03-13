@@ -1,6 +1,7 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.request.CreateUserRequest;
+import com.feros.api.dto.request.UserStatusRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.PinResponse;
@@ -68,6 +69,17 @@ public class UserController {
         userService.deleteUser(id);
         return ResponseEntity.ok(
                 ApiResponse.success("User deleted successfully", null)
+        );
+    }
+
+    @PutMapping("/{userId}/status")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<UserResponse>> toggleUserStatus(
+            @PathVariable Long userId,
+            @Valid @RequestBody UserStatusRequest request) {
+        UserResponse response = userService.toggleUserStatus(userId, request);
+        return ResponseEntity.ok(
+                ApiResponse.success("User status updated successfully", response)
         );
     }
 

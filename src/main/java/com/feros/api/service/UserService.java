@@ -1,6 +1,7 @@
 package com.feros.api.service;
 
 import com.feros.api.dto.request.CreateUserRequest;
+import com.feros.api.dto.request.UserStatusRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.PinResponse;
 import com.feros.api.dto.response.UserResponse;
@@ -22,4 +23,6 @@ public interface UserService {
     PinResponse resetPin(Long id);
 
     BulkTenantUploadResponse bulkUpload(MultipartFile file);
+
+    UserResponse toggleUserStatus(Long userId, UserStatusRequest request);
 }

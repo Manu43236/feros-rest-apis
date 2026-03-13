@@ -1,6 +1,7 @@
 package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.CreateUserRequest;
+import com.feros.api.dto.request.UserStatusRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.PinResponse;
 import com.feros.api.dto.response.UserResponse;
@@ -149,6 +150,18 @@ public class UserServiceImpl implements UserService {
         validateTenantAccess(user);
         user.setIsActive(false);
         userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public UserResponse toggleUserStatus(Long userId, UserStatusRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new FerosException(
+                        "User not found", HttpStatus.NOT_FOUND));
+        validateTenantAccess(user);
+        user.setIsActive(request.getIsActive());
+        User updated = userRepository.save(user);
+        return mapToResponse(updated, null);
     }
 
     @Override
