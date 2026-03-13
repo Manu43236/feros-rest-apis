@@ -25,15 +25,13 @@ public class StaffProfile extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    
-    @JoinColumn(name = "designation_id", nullable = false, unique = true)
-    private Long designationId;
-
-    
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "designation_id")
+    private Designation designation;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employment_type_id", nullable = false)
@@ -47,7 +45,6 @@ public class StaffProfile extends BaseEntity {
 
     @Column(name = "address", columnDefinition = "TEXT")
     private String address;
-
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "city_id")

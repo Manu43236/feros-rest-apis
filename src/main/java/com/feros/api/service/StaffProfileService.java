@@ -1,0 +1,22 @@
+package com.feros.api.service;
+
+import com.feros.api.dto.request.DocumentRequest;
+import com.feros.api.dto.request.StaffProfileRequest;
+import com.feros.api.dto.response.DocumentResponse;
+import com.feros.api.dto.response.StaffProfileResponse;
+
+import java.util.List;
+
+public interface StaffProfileService {
+    StaffProfileResponse createOrUpdateProfile(Long userId, StaffProfileRequest request);
+    StaffProfileResponse getProfileByUserId(Long userId);
+    List<StaffProfileResponse> getAllProfiles();
+
+    DocumentResponse addStaffDocument(Long userId, DocumentRequest request);
+    List<DocumentResponse> getStaffDocuments(Long userId);
+    DocumentResponse verifyStaffDocument(Long documentId);
+
+    DocumentResponse addVehicleDocument(Long vehicleId, DocumentRequest request);
+    List<DocumentResponse> getVehicleDocuments(Long vehicleId);
+    DocumentResponse verifyVehicleDocument(Long documentId);
+}
