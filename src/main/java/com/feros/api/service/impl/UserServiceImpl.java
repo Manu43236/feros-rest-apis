@@ -13,6 +13,7 @@ import com.feros.api.entity.master.City;
 import com.feros.api.entity.master.EmploymentType;
 import com.feros.api.entity.master.State;
 import com.feros.api.enums.RoleName;
+import com.feros.api.enums.StaffAllocationStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.UserService;
@@ -45,6 +46,7 @@ public class UserServiceImpl implements UserService {
     private final CityRepository cityRepository;
     private final StateRepository stateRepository;
     private final EmploymentTypeRepository employmentTypeRepository;
+    private final OrderStaffAllocationRepository orderStaffAllocationRepository;
 
     @Override
     @Transactional
@@ -380,7 +382,13 @@ public class UserServiceImpl implements UserService {
                 .updatedAt(user.getUpdatedAt())
                 .build();
 
+        response.setCompletedTripsCount(
+                orderStaffAllocationRepository.countByUserIdAndAllocationStatusAndIsActiveTrue(
+                        user.getId(), StaffAllocationStatus.COMPLETED));
+
         staffProfileRepository.findByUserId(user.getId()).ifPresent(profile -> {
+            response.setDesignationName(
+                    profile.getDesignation() != null ? profile.getDesignation().getName() : null);
             response.setEmploymentType(
                     profile.getEmploymentType() != null ? profile.getEmploymentType().getName() : null);
             response.setDateOfBirth(profile.getDateOfBirth());

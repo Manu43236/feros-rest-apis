@@ -25,7 +25,9 @@ public class UserResponse {
     private LocalDateTime updatedAt;
 
     // Staff Profile fields
+    private String designationName;
     private String employmentType;
+    private Long completedTripsCount;
     private LocalDate dateOfBirth;
     private LocalDate joiningDate;
     private String address;
