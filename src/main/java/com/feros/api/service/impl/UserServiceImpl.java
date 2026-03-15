@@ -107,13 +107,13 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<UserResponse> getAllUsers() {
         if (SecurityUtil.isSuperAdmin()) {
-            return userRepository.findAllByIsActiveTrue()
+            return userRepository.findAll()
                     .stream()
                     .map(u -> mapToResponse(u, null))
                     .toList();
         }
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        return userRepository.findAllByTenantIdAndIsActiveTrue(tenantId)
+        return userRepository.findAllByTenantId(tenantId)
                 .stream()
                 .map(u -> mapToResponse(u, null))
                 .toList();
