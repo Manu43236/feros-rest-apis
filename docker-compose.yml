@@ -47,6 +47,7 @@ services:
       - "80:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /home/ubuntu/feros-web:/usr/share/nginx/html:ro
     depends_on:
       - api
     networks:

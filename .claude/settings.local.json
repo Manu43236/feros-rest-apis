@@ -74,7 +74,28 @@
       "Bash(ssh -i /Users/manu/Documents/FEROS/api/feros-aws-key-pair.pem -o StrictHostKeyChecking=no ubuntu@40.192.14.249 \"cd /home/ubuntu/feros && git pull && docker compose up -d --build api 2>&1 | tail -5\")",
       "Bash(echo \"Waiting for GitHub Actions to deploy...\" && sleep 60 && curl -s -X POST http://40.192.14.249/api/v1/auth/login -H \"Content-Type: application/json\" -d '{\"phone\":\"9876543211\",\"pin\":\"1234\"}' | python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Login:', d['success']\\)\")",
       "Bash(ssh -i /Users/manu/Documents/FEROS/api/feros-aws-key-pair.pem -o StrictHostKeyChecking=no ubuntu@40.192.14.249 << 'ENDSSH'\ndocker exec $\\(docker ps --filter name=mysql -q\\) mysql -u root -pFerosRoot@2024 feros_db -e \"\nSELECT u.id, u.name, u.phone, u.plain_pin, r.name as role, u.is_active FROM users u \nLEFT JOIN user_roles ur ON u.id = ur.user_id \nLEFT JOIN roles r ON ur.role_id = r.id\nWHERE u.phone = '9988123123';\n\" 2>&1 | grep -v Warning\nENDSSH)",
-      "Bash(ssh -i /Users/manu/Documents/FEROS/api/feros-aws-key-pair.pem -o StrictHostKeyChecking=no ubuntu@40.192.14.249 << 'ENDSSH'\ndocker exec $\\(docker ps --filter name=mysql -q\\) mysql -u root -pFerosRoot@2024 feros_db -e \"\nSELECT * FROM staff_profiles WHERE user_id = 7;\n\" 2>&1 | grep -v Warning\nENDSSH)"
+      "Bash(ssh -i /Users/manu/Documents/FEROS/api/feros-aws-key-pair.pem -o StrictHostKeyChecking=no ubuntu@40.192.14.249 << 'ENDSSH'\ndocker exec $\\(docker ps --filter name=mysql -q\\) mysql -u root -pFerosRoot@2024 feros_db -e \"\nSELECT * FROM staff_profiles WHERE user_id = 7;\n\" 2>&1 | grep -v Warning\nENDSSH)",
+      "Bash(git fetch origin && git log --oneline origin/main -5)",
+      "Bash(find /Users/manu/Documents/FEROS/api -name \"StaffAllocationStatus.java\" | xargs cat; grep -rn \"countBy\\\\|countAllBy\" /Users/manu/Documents/FEROS/api/src/main/java/com/feros/api/repository/ | head -10)",
+      "Bash(find /Users/manu/Documents/FEROS/api -name \"OrderStaffAllocationRepository.java\" | xargs cat 2>/dev/null)",
+      "Bash(find /Users/manu/Documents/FEROS/api -name \"UserResponse.java\" | xargs cat)",
+      "Bash(cd /Users/manu/Documents/FEROS/api && mvn compile -q 2>&1 | tail -15)",
+      "Bash(ls /Users/manu/Documents/FEROS/web/src/pages/orders/ && cat /Users/manu/Documents/FEROS/web/src/pages/orders/*.tsx)",
+      "mcp__ide__getDiagnostics",
+      "Bash(mysql -u root -pManu@512 feros_db -e \"SELECT u.id, u.name, u.phone, u.plain_pin, u.is_active, GROUP_CONCAT\\(r.role_name\\) as roles FROM users u JOIN user_roles r ON u.id = r.user_id GROUP BY u.id ORDER BY u.id;\" 2>/dev/null)",
+      "Bash(mysql -u root -pManu@512 feros_db -e \"SELECT u.id, u.name, u.phone, u.plain_pin, GROUP_CONCAT\\(r.role_name\\) as roles FROM users u LEFT JOIN user_roles r ON u.id = r.user_id GROUP BY u.id;\" 2>/dev/null)",
+      "Bash(mysql -u root -pManu@512 -e \"SHOW DATABASES;\" 2>/dev/null && mysql -u root -pManu@512 feros_db -e \"SHOW TABLES;\" 2>/dev/null)",
+      "Bash(mysql -u root -pManu@512 feros_db -e \"SELECT u.id, u.name, u.phone, u.plain_pin, GROUP_CONCAT\\(r.role_name SEPARATOR ', '\\) as roles FROM users u LEFT JOIN user_roles r ON u.id = r.user_id GROUP BY u.id, u.name, u.phone, u.plain_pin;\" 2>/dev/null)",
+      "Bash(mysql -u root -pManu@512 feros_db 2>/dev/null <<'EOF'\nSELECT u.id, u.name, u.phone, u.plain_pin FROM users u LIMIT 20;\nEOF)",
+      "Bash(mysql -uroot -pManu@512 feros_db -e \"SELECT id, name, phone, plain_pin FROM users LIMIT 20\" 2>/dev/null)",
+      "Bash(python3 -c \"import bcrypt; pin='1234'; h=bcrypt.hashpw\\(pin.encode\\(\\), bcrypt.gensalt\\(10\\)\\); print\\(h.decode\\(\\)\\)\" 2>/dev/null || python3 -c \"\nimport subprocess, sys\nsubprocess.check_call\\([sys.executable, '-m', 'pip', 'install', 'bcrypt', '-q']\\)\nimport bcrypt\npin='1234'\nh=bcrypt.hashpw\\(pin.encode\\(\\), bcrypt.gensalt\\(10\\)\\)\nprint\\(h.decode\\(\\)\\)\n\")",
+      "Bash(aws ec2 describe-instances --filters \"Name=instance-state-name,Values=running\" --query \"Reservations[*].Instances[*].[InstanceId,PublicIpAddress,PublicDnsName,Tags[?Key=='Name'].Value|[0]]\" --output table 2>/dev/null)",
+      "Bash(aws configure list 2>/dev/null; aws sts get-caller-identity 2>/dev/null)",
+      "Bash(aws ec2 describe-instances --region ap-south-2 --filters \"Name=instance-state-name,Values=running\" --query \"Reservations[*].Instances[*].[InstanceId,PublicIpAddress,PublicDnsName,Tags[?Key=='Name'].Value|[0]]\" --output table 2>/dev/null)",
+      "Bash(AWS_DEFAULT_REGION=ap-south-2 aws ec2 describe-instances --filters \"Name=instance-state-name,Values=running\" --query \"Reservations[*].Instances[*].[InstanceId,PublicIpAddress,PublicDnsName,Tags[?Key=='Name'].Value|[0]]\" --output table)",
+      "Bash(find /Users/manu/Documents/FEROS -name \"*.yml\" -path \"*github*\" -o -name \"*.yaml\" -path \"*github*\" 2>/dev/null | head -20)",
+      "Bash(find /Users/manu/Documents/FEROS/api -name \"docker-compose*\" -o -name \"Dockerfile*\" 2>/dev/null | grep -v node_modules)",
+      "Bash(ls /Users/manu/Documents/FEROS/web/.github 2>/dev/null || echo \"No .github in web\"\ngit -C /Users/manu/Documents/FEROS/web remote -v 2>/dev/null || echo \"Not a git repo or no remote\")"
     ]
   }
 }
