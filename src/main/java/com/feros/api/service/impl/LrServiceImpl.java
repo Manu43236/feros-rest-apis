@@ -10,6 +10,7 @@ import com.feros.api.dto.response.LrResponse;
 import com.feros.api.entity.*;
 import com.feros.api.entity.master.ChargeType;
 import com.feros.api.enums.LrStatus;
+import com.feros.api.enums.OrderStatus;
 import com.feros.api.enums.VehicleAllocationStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
@@ -135,18 +136,44 @@ public class LrServiceImpl implements LrService {
 
             // Sync vehicle allocation status
             OrderVehicleAllocation allocation = lr.getVehicleAllocation();
+            Order order = lr.getOrder();
+
             if (request.getLrStatus() == LrStatus.IN_TRANSIT) {
                 allocation.setAllocationStatus(VehicleAllocationStatus.IN_TRANSIT);
+                // At least one vehicle is on the road → order is IN_TRANSIT
+                order.setOrderStatus(OrderStatus.IN_TRANSIT);
+                orderRepository.save(order);
+
             } else if (request.getLrStatus() == LrStatus.DELIVERED) {
                 allocation.setAllocationStatus(VehicleAllocationStatus.DELIVERED);
+
                 // Update order fulfilled weight
                 if (request.getDeliveredWeight() != null) {
-                    Order order = lr.getOrder();
                     order.setTotalWeightFulfilled(
                         order.getTotalWeightFulfilled().add(request.getDeliveredWeight()));
-                    orderRepository.save(order);
                 }
+
+                // Recalculate order status based on all sibling LRs for this order.
+                // Current LR is already set to DELIVERED in memory — check all others in DB.
+                List<Lr> siblingLrs = lrRepository.findByOrderIdAndIsActiveTrue(order.getId())
+                        .stream()
+                        .filter(l -> !l.getId().equals(lr.getId())
+                                  && l.getLrStatus() != LrStatus.CANCELLED)
+                        .toList();
+
+                boolean allSiblingsDelivered = siblingLrs.stream()
+                        .allMatch(l -> l.getLrStatus() == LrStatus.DELIVERED);
+
+                if (allSiblingsDelivered) {
+                    // Current LR + all others are DELIVERED → fully done
+                    order.setOrderStatus(OrderStatus.DELIVERED);
+                } else {
+                    // Some still in progress
+                    order.setOrderStatus(OrderStatus.PARTIALLY_DELIVERED);
+                }
+                orderRepository.save(order);
             }
+
             vehicleAllocationRepository.save(allocation);
         }
 
