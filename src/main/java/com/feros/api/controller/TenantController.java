@@ -1,14 +1,17 @@
 package com.feros.api.controller;
 
+import com.feros.api.config.UserPrincipal;
 import com.feros.api.dto.request.CreateTenantRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
+import com.feros.api.dto.response.LoginResponse;
 import com.feros.api.dto.response.TenantResponse;
 import com.feros.api.service.TenantService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -72,5 +75,15 @@ public class TenantController {
         BulkTenantUploadResponse response = tenantService.bulkUpload(file);
         return ResponseEntity.ok(
                 ApiResponse.success("Bulk upload completed", response));
+    }
+
+    @PostMapping("/{id}/impersonate")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<LoginResponse>> impersonate(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        LoginResponse response = tenantService.impersonateTenant(id, principal.getUserId(), principal.getPhone());
+        return ResponseEntity.ok(
+                ApiResponse.success("Impersonation token issued", response));
     }
 }

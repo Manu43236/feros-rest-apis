@@ -2,6 +2,7 @@ package com.feros.api.service;
 
 import com.feros.api.dto.request.CreateTenantRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
+import com.feros.api.dto.response.LoginResponse;
 import com.feros.api.dto.response.TenantResponse;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -14,4 +15,5 @@ public interface TenantService {
     TenantResponse updateTenant(Long id, CreateTenantRequest request);
     void deleteTenant(Long id);
     BulkTenantUploadResponse bulkUpload(MultipartFile file);
+    LoginResponse impersonateTenant(Long tenantId, Long saUserId, String saPhone);
 }

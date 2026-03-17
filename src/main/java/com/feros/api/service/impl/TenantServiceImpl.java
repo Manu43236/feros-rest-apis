@@ -2,6 +2,7 @@ package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.CreateTenantRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
+import com.feros.api.dto.response.LoginResponse;
 import com.feros.api.dto.response.TenantResponse;
 import com.feros.api.entity.Designation;
 import com.feros.api.entity.Tenant;
@@ -13,6 +14,7 @@ import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.repository.TenantRepository;
 import com.feros.api.service.TenantService;
+import com.feros.api.util.JwtUtil;
 import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -38,6 +40,7 @@ public class TenantServiceImpl implements TenantService {
     private final ChargeTypeRepository chargeTypeRepository;
     private final DesignationRepository designationRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
+    private final JwtUtil jwtUtil;
 
     @Override
     public TenantResponse createTenant(CreateTenantRequest request) {
@@ -276,6 +279,26 @@ public class TenantServiceImpl implements TenantService {
                 .tripBonusAmount(BigDecimal.ZERO)
                 .isActive(true)
                 .build());
+    }
+
+    // ===================== IMPERSONATION =====================
+    @Override
+    public LoginResponse impersonateTenant(Long tenantId, Long saUserId, String saPhone) {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+
+        String token = jwtUtil.generateToken(saUserId, tenant.getId(), saPhone, "ADMIN");
+
+        return LoginResponse.builder()
+                .token(token)
+                .userId(saUserId)
+                .name("Super Admin")
+                .phone(saPhone)
+                .role("ADMIN")
+                .tenantId(tenant.getId())
+                .companyName(tenant.getCompanyName())
+                .isPinResetRequired(false)
+                .build();
     }
 
     // ===================== MAPPER =====================
