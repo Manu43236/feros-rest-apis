@@ -85,6 +85,9 @@ public class Tenant extends BaseEntity {
     private String ownerEmail;
 
     // Branding
+    @Column(name = "prefix", length = 20)
+    private String prefix;
+
     @Column(name = "logo_url")
     private String logoUrl;
 

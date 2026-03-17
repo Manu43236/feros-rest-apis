@@ -21,6 +21,7 @@ public class CreateTenantRequest {
     @Pattern(regexp = "^[0-9]{10}$", message = "Phone must be 10 digits")
     private String phone;
 
+    private String prefix;
     private String address;
     private String city;
     private String state;

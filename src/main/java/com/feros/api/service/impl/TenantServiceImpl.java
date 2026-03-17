@@ -103,6 +103,7 @@ public class TenantServiceImpl implements TenantService {
                 .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
 
         tenant.setCompanyName(request.getCompanyName());
+        if (request.getPrefix() != null) tenant.setPrefix(request.getPrefix());
         tenant.setEmail(request.getEmail());
         tenant.setPhone(request.getPhone());
         tenant.setAddress(request.getAddress());
@@ -301,6 +302,7 @@ public class TenantServiceImpl implements TenantService {
                 .ownerName(tenant.getOwnerName())
                 .ownerPhone(tenant.getOwnerPhone())
                 .ownerEmail(tenant.getOwnerEmail())
+                .prefix(tenant.getPrefix())
                 .logoUrl(tenant.getLogoUrl())
                 .lorryCount(tenant.getLorryCount())
                 .subscriptionStatus(tenant.getSubscriptionStatus())
