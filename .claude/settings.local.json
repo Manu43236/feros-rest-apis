@@ -98,7 +98,11 @@
       "Bash(ls /Users/manu/Documents/FEROS/web/.github 2>/dev/null || echo \"No .github in web\"\ngit -C /Users/manu/Documents/FEROS/web remote -v 2>/dev/null || echo \"Not a git repo or no remote\")",
       "Bash(python3 - << 'EOF'\nwith open\\('/Users/manu/Documents/FEROS/web/src/pages/staff/StaffPage.tsx', 'r'\\) as f:\n    lines = f.readlines\\(\\)\n\n# Find the line ranges to delete\n# Delete lines 206-522 \\(StaffProfileForm, __ = unused profile form\\)\n# Delete lines 532-703 \\(StaffDetail\\)\n# Keep everything else\n\noutput = []\ni = 0\nwhile i < len\\(lines\\):\n    line_num = i + 1  # 1-based\n    if 206 <= line_num <= 522:\n        i += 1\n        continue\n    if 532 <= line_num <= 703:\n        i += 1\n        continue\n    output.append\\(lines[i]\\)\n    i += 1\n\nwith open\\('/Users/manu/Documents/FEROS/web/src/pages/staff/StaffPage.tsx', 'w'\\) as f:\n    f.writelines\\(output\\)\n\nprint\\(f\"Done. Original: {len\\(lines\\)} lines, New: {len\\(output\\)} lines\"\\)\nEOF)",
       "Bash(cd /Users/manu/Documents/FEROS/web && npm run build 2>&1 | tail -20)",
-      "Bash(cd /Users/manu/Documents/FEROS/web && npm run build 2>&1 | tail -15)"
+      "Bash(cd /Users/manu/Documents/FEROS/web && npm run build 2>&1 | tail -15)",
+      "Bash(find /Users/manu/Documents/FEROS/api/src -type f -name \"*vehicle*\" 2>/dev/null | head -20)",
+      "Bash(find /Users/manu/Documents/FEROS/web/src -type f -name \"*vehicle*\" 2>/dev/null | head -20)",
+      "Bash(find /Users/manu/Documents/FEROS/web/src/pages/vehicles -type f -name \"*.tsx\" -o -name \"*.ts\" | xargs ls -la 2>/dev/null)",
+      "Bash(cd /Users/manu/Documents/FEROS/web && npm run build 2>&1 | tail -30)"
     ]
   }
 }
