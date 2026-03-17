@@ -16,8 +16,10 @@ public class OrderRequest {
     @NotNull(message = "Client is required")
     private Long clientId;
 
-    @NotNull(message = "Material type is required")
+    // Either materialTypeId (existing master) or customMaterialName (free-text "Other") must be provided
     private Long materialTypeId;
+
+    private String customMaterialName;
 
     @NotNull(message = "Total weight is required")
     private BigDecimal totalWeight;

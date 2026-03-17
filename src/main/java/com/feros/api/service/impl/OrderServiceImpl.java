@@ -59,6 +59,21 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
     }
 
+    /** Resolves materialType from either a known ID or a free-text custom name ("Other"). */
+    private MaterialType resolveMaterialType(OrderRequest request) {
+        if (request.getMaterialTypeId() != null) {
+            return materialTypeRepository.findById(request.getMaterialTypeId())
+                    .orElseThrow(() -> new FerosException("Material type not found", HttpStatus.NOT_FOUND));
+        }
+        if (request.getCustomMaterialName() != null && !request.getCustomMaterialName().isBlank()) {
+            String name = request.getCustomMaterialName().trim();
+            return materialTypeRepository.findByNameIgnoreCase(name)
+                    .orElseGet(() -> materialTypeRepository.save(
+                            MaterialType.builder().name(name).isActive(true).build()));
+        }
+        throw new FerosException("Material type is required", HttpStatus.BAD_REQUEST);
+    }
+
     private String generateOrderNumber(Long tenantId) {
         String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         long count = orderRepository.findByTenantIdAndIsActiveTrue(tenantId).size() + 1;
@@ -75,8 +90,7 @@ public class OrderServiceImpl implements OrderService {
                 .findByIdAndTenantIdAndIsActiveTrue(request.getClientId(), tenant.getId())
                 .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
 
-        MaterialType materialType = materialTypeRepository.findById(request.getMaterialTypeId())
-                .orElseThrow(() -> new FerosException("Material type not found", HttpStatus.NOT_FOUND));
+        MaterialType materialType = resolveMaterialType(request);
 
         City sourceCity = cityRepository.findById(request.getSourceCityId())
                 .orElseThrow(() -> new FerosException("Source city not found", HttpStatus.NOT_FOUND));
@@ -150,8 +164,7 @@ public class OrderServiceImpl implements OrderService {
                 .findByIdAndTenantIdAndIsActiveTrue(request.getClientId(), getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
 
-        MaterialType materialType = materialTypeRepository.findById(request.getMaterialTypeId())
-                .orElseThrow(() -> new FerosException("Material type not found", HttpStatus.NOT_FOUND));
+        MaterialType materialType = resolveMaterialType(request);
 
         City sourceCity = cityRepository.findById(request.getSourceCityId())
                 .orElseThrow(() -> new FerosException("Source city not found", HttpStatus.NOT_FOUND));
