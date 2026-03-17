@@ -23,6 +23,9 @@ public class Client extends BaseEntity {
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
 
+    @Column(name = "client_number", unique = true)
+    private String clientNumber;
+
     @Column(name = "client_name", nullable = false)
     private String clientName;
 

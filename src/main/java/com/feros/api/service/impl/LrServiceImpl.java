@@ -15,6 +15,7 @@ import com.feros.api.enums.VehicleAllocationStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.LrService;
+import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,7 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -52,10 +52,8 @@ public class LrServiceImpl implements LrService {
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
     }
 
-    private String generateLrNumber(Long tenantId) {
-        String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long count = lrRepository.findByTenantIdAndIsActiveTrue(tenantId).size() + 1;
-        return String.format("LR-%s-%04d", date, count);
+    private String generateLrNumber(Tenant tenant) {
+        return NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.LR);
     }
 
     @Override
@@ -79,7 +77,7 @@ public class LrServiceImpl implements LrService {
 
         Lr lr = Lr.builder()
                 .tenant(tenant)
-                .lrNumber(generateLrNumber(tenantId))
+                .lrNumber(generateLrNumber(tenant))
                 .order(order)
                 .vehicleAllocation(allocation)
                 .lrDate(request.getLrDate() != null ? request.getLrDate() : LocalDate.now())

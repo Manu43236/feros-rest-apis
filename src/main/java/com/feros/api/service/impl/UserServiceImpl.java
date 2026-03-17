@@ -17,6 +17,7 @@ import com.feros.api.enums.StaffAllocationStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.UserService;
+import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
@@ -77,6 +78,7 @@ public class UserServiceImpl implements UserService {
         // 6. Create user
         User user = User.builder()
                 .tenant(tenant)
+                .userNumber(NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.USR))
                 .name(request.getName())
                 .phone(request.getPhone())
                 .pin(hashedPin)
@@ -367,6 +369,7 @@ public class UserServiceImpl implements UserService {
         String pinToReturn = rawPin != null ? rawPin : user.getPlainPin();
         UserResponse response = UserResponse.builder()
                 .id(user.getId())
+                .userNumber(user.getUserNumber())
                 .name(user.getName())
                 .phone(user.getPhone())
                 .role(user.getRoles().stream()

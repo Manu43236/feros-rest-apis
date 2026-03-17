@@ -17,6 +17,7 @@ import com.feros.api.enums.VehicleAllocationStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.OrderService;
+import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -74,10 +74,8 @@ public class OrderServiceImpl implements OrderService {
         throw new FerosException("Material type is required", HttpStatus.BAD_REQUEST);
     }
 
-    private String generateOrderNumber(Long tenantId) {
-        String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long count = orderRepository.findByTenantIdAndIsActiveTrue(tenantId).size() + 1;
-        return String.format("ORD-%s-%04d", date, count);
+    private String generateOrderNumber(Tenant tenant) {
+        return NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.ORD);
     }
 
     @Override
@@ -106,7 +104,7 @@ public class OrderServiceImpl implements OrderService {
 
         Order order = Order.builder()
                 .tenant(tenant)
-                .orderNumber(generateOrderNumber(tenant.getId()))
+                .orderNumber(generateOrderNumber(tenant))
                 .orderDate(request.getOrderDate() != null ? request.getOrderDate() : LocalDate.now())
                 .expectedDeliveryDate(request.getExpectedDeliveryDate())
                 .createdBy(createdBy)

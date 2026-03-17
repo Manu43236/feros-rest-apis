@@ -8,6 +8,7 @@ import com.feros.api.entity.master.*;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.ClientService;
+import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -46,6 +47,7 @@ public class ClientServiceImpl implements ClientService {
 
         Client client = Client.builder()
                 .tenant(tenant)
+                .clientNumber(NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.CLNT))
                 .clientName(request.getClientName())
                 .clientType(clientType)
                 .phone(request.getPhone())
@@ -146,6 +148,7 @@ public class ClientServiceImpl implements ClientService {
         return ClientResponse.builder()
                 .id(c.getId())
                 .tenantId(c.getTenant().getId())
+                .clientNumber(c.getClientNumber())
                 .clientName(c.getClientName())
                 .clientTypeId(c.getClientType().getId())
                 .clientTypeName(c.getClientType().getName())

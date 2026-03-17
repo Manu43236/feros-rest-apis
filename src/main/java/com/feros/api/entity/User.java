@@ -24,6 +24,9 @@ public class User extends BaseEntity {
     @JoinColumn(name = "tenant_id")
     private Tenant tenant;
 
+    @Column(name = "user_number", unique = true)
+    private String userNumber;
+
     @Column(name = "name", nullable = false)
     private String name;
 

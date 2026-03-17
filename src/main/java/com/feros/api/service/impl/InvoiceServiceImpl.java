@@ -13,6 +13,7 @@ import com.feros.api.enums.InvoiceStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.InvoiceService;
+import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -53,10 +53,8 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
     }
 
-    private String generateInvoiceNumber(Long tenantId) {
-        String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long count = invoiceRepository.findByTenantIdAndIsActiveTrue(tenantId).size() + 1;
-        return String.format("INV-%s-%04d", date, count);
+    private String generateInvoiceNumber(Tenant tenant) {
+        return NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.INV);
     }
 
     @Override
@@ -88,7 +86,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         // Create invoice
         Invoice invoice = Invoice.builder()
                 .tenant(tenant)
-                .invoiceNumber(generateInvoiceNumber(tenantId))
+                .invoiceNumber(generateInvoiceNumber(tenant))
                 .client(client)
                 .invoiceDate(request.getInvoiceDate() != null ?
                         request.getInvoiceDate() : LocalDate.now())
