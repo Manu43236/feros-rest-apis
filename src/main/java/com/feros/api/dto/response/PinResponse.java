@@ -1,5 +1,4 @@
 package com.feros.api.dto.response;
-
 import lombok.*;
 
 @Getter
