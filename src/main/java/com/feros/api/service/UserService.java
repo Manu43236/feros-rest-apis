@@ -22,7 +22,7 @@ public interface UserService {
 
     PinResponse resetPin(Long id);
 
-    BulkTenantUploadResponse bulkUpload(MultipartFile file);
+    BulkTenantUploadResponse bulkUpload(MultipartFile file, Long tenantId);
 
     UserResponse toggleUserStatus(Long userId, UserStatusRequest request);
 }

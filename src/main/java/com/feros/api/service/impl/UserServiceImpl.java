@@ -193,13 +193,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public BulkTenantUploadResponse bulkUpload(MultipartFile file) {
+    public BulkTenantUploadResponse bulkUpload(MultipartFile file, Long tenantId) {
         int successCount = 0;
         int failureCount = 0;
         List<String> errors = new ArrayList<>();
         int rowNum = 1;
 
-        Long tenantId = resolveTenantId(null);
+        Long resolvedTenantId = resolveTenantId(tenantId);
 
         try (CSVReader csvReader = new CSVReader(
                 new InputStreamReader(file.getInputStream()))) {
@@ -231,7 +231,7 @@ public class UserServiceImpl implements UserService {
                             .orElseThrow(() -> new FerosException(
                                     "Role not found", HttpStatus.NOT_FOUND));
 
-                    Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(tenantId)
+                    Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(resolvedTenantId)
                             .orElseThrow(() -> new FerosException(
                                     "Tenant not found", HttpStatus.NOT_FOUND));
 
@@ -240,6 +240,7 @@ public class UserServiceImpl implements UserService {
 
                     User user = User.builder()
                             .tenant(tenant)
+                            .userNumber(NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.USR))
                             .name(name)
                             .phone(phone)
                             .pin(hashedPin)
