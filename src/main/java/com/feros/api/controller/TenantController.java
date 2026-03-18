@@ -2,11 +2,14 @@ package com.feros.api.controller;
 
 import com.feros.api.config.UserPrincipal;
 import com.feros.api.dto.request.CreateTenantRequest;
+import com.feros.api.dto.request.CreateUserRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.LoginResponse;
 import com.feros.api.dto.response.TenantResponse;
+import com.feros.api.dto.response.UserResponse;
 import com.feros.api.service.TenantService;
+import com.feros.api.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +26,7 @@ import java.util.List;
 public class TenantController {
 
     private final TenantService tenantService;
+    private final UserService userService;
 
     @PostMapping
     @PreAuthorize("hasRole('SUPER_ADMIN')")
@@ -73,6 +77,27 @@ public class TenantController {
     public ResponseEntity<ApiResponse<BulkTenantUploadResponse>> bulkUpload(
             @RequestParam("file") MultipartFile file) {
         BulkTenantUploadResponse response = tenantService.bulkUpload(file);
+        return ResponseEntity.ok(
+                ApiResponse.success("Bulk upload completed", response));
+    }
+
+    @PostMapping("/{tenantId}/users")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<UserResponse>> createUserForTenant(
+            @PathVariable Long tenantId,
+            @Valid @RequestBody CreateUserRequest request) {
+        request.setTenantId(tenantId);
+        UserResponse response = userService.createUser(request);
+        return ResponseEntity.ok(
+                ApiResponse.success("User created successfully", response));
+    }
+
+    @PostMapping("/{tenantId}/users/bulk-upload")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<BulkTenantUploadResponse>> bulkUploadUsersForTenant(
+            @PathVariable Long tenantId,
+            @RequestParam("file") MultipartFile file) {
+        BulkTenantUploadResponse response = userService.bulkUpload(file, tenantId);
         return ResponseEntity.ok(
                 ApiResponse.success("Bulk upload completed", response));
     }
