@@ -1,0 +1,23 @@
+package com.feros.api.dto.response;
+
+import lombok.*;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
+public class SubscriptionInvoiceResponse {
+    private Long id;
+    private String invoiceNumber;
+    private Long tenantId;
+    private String companyName;
+    private String planName;
+    private String billingCycle;
+    private LocalDate periodStart;
+    private LocalDate periodEnd;
+    private BigDecimal amount;
+    private BigDecimal gstAmount;
+    private BigDecimal totalAmount;
+    private String paymentRef;
+    private LocalDateTime createdAt;
+}
