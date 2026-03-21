@@ -7,6 +7,7 @@ import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.OrderResponse;
 import com.feros.api.dto.response.StaffAllocationResponse;
 import com.feros.api.dto.response.VehicleAllocationResponse;
+import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -66,6 +67,14 @@ public class OrderController {
             @PathVariable Long id, @Valid @RequestBody AssignVehicleRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Vehicle assigned successfully", orderService.assignVehicle(id, request)));
+    }
+
+    @PatchMapping("/{id}/payment-status")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<OrderResponse>> updatePaymentStatus(
+            @PathVariable Long id, @RequestParam OrderPaymentStatus status) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Payment status updated successfully", orderService.updatePaymentStatus(id, status)));
     }
 
     @PostMapping("/{id}/assign-staff")

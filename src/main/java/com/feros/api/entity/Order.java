@@ -6,6 +6,7 @@ import com.feros.api.entity.master.Route;
 import com.feros.api.entity.master.State;
 import com.feros.api.enums.BillingOn;
 import com.feros.api.enums.FreightRateType;
+import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.enums.OrderStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -100,6 +101,10 @@ public class Order extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "order_status")
     private OrderStatus orderStatus = OrderStatus.PENDING;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_payment_status")
+    private OrderPaymentStatus orderPaymentStatus = OrderPaymentStatus.UNPAID;
 
     @Column(name = "special_instructions", columnDefinition = "TEXT")
     private String specialInstructions;

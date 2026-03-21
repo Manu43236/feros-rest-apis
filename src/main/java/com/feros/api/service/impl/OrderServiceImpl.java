@@ -12,6 +12,7 @@ import com.feros.api.entity.master.MaterialType;
 import com.feros.api.entity.master.Route;
 import com.feros.api.entity.master.State;
 import com.feros.api.enums.BillingOn;
+import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.enums.OrderStatus;
 import com.feros.api.enums.VehicleAllocationStatus;
 import com.feros.api.exception.FerosException;
@@ -220,7 +221,8 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new FerosException("Order not found", HttpStatus.NOT_FOUND));
 
         if (order.getOrderStatus() == OrderStatus.CANCELLED ||
-                order.getOrderStatus() == OrderStatus.DELIVERED) {
+                order.getOrderStatus() == OrderStatus.DELIVERED ||
+                order.getOrderStatus() == OrderStatus.COMPLETED) {
             throw new FerosException("Cannot assign vehicle to a " +
                     order.getOrderStatus() + " order", HttpStatus.BAD_REQUEST);
         }
@@ -314,6 +316,26 @@ public class OrderServiceImpl implements OrderService {
         return mapToStaffAllocationResponse(staffAllocationRepository.save(staffAllocation));
     }
 
+    @Override
+    @Transactional
+    public OrderResponse updatePaymentStatus(Long id, OrderPaymentStatus paymentStatus) {
+        Order order = orderRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Order not found", HttpStatus.NOT_FOUND));
+
+        if (order.getOrderStatus() == OrderStatus.CANCELLED) {
+            throw new FerosException("Cannot update payment status of a cancelled order", HttpStatus.BAD_REQUEST);
+        }
+
+        order.setOrderPaymentStatus(paymentStatus);
+
+        if (paymentStatus == OrderPaymentStatus.PAID) {
+            order.setOrderStatus(OrderStatus.COMPLETED);
+        }
+
+        return mapToOrderResponse(orderRepository.save(order));
+    }
+
     // ===================== MAPPERS =====================
     private OrderResponse mapToOrderResponse(Order o) {
         List<VehicleAllocationResponse> vehicleAllocations = vehicleAllocationRepository
@@ -350,6 +372,7 @@ public class OrderServiceImpl implements OrderService {
                 .billingOn(o.getBillingOn())
                 .totalFreightAmount(o.getTotalFreightAmount())
                 .orderStatus(o.getOrderStatus())
+                .orderPaymentStatus(o.getOrderPaymentStatus())
                 .specialInstructions(o.getSpecialInstructions())
                 .remarks(o.getRemarks())
                 .createdById(o.getCreatedBy().getId())

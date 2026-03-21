@@ -6,6 +6,7 @@ import com.feros.api.dto.request.OrderRequest;
 import com.feros.api.dto.response.OrderResponse;
 import com.feros.api.dto.response.StaffAllocationResponse;
 import com.feros.api.dto.response.VehicleAllocationResponse;
+import com.feros.api.enums.OrderPaymentStatus;
 
 import java.util.List;
 
@@ -17,4 +18,5 @@ public interface OrderService {
     void cancelOrder(Long id);
     VehicleAllocationResponse assignVehicle(Long orderId, AssignVehicleRequest request);
     StaffAllocationResponse assignStaff(Long orderId, AssignStaffRequest request);
+    OrderResponse updatePaymentStatus(Long id, OrderPaymentStatus paymentStatus);
 }

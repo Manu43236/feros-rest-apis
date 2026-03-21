@@ -2,6 +2,7 @@ package com.feros.api.dto.response;
 
 import com.feros.api.enums.BillingOn;
 import com.feros.api.enums.FreightRateType;
+import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.enums.OrderStatus;
 import lombok.*;
 
@@ -53,6 +54,7 @@ public class OrderResponse {
     private BigDecimal totalFreightAmount;
 
     private OrderStatus orderStatus;
+    private OrderPaymentStatus orderPaymentStatus;
     private String specialInstructions;
     private String remarks;
 
