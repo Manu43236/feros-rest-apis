@@ -22,7 +22,7 @@ services:
       retries: 10
 
   api:
-    build: .
+    image: ${API_IMAGE}
     container_name: feros_api
     restart: unless-stopped
     environment:

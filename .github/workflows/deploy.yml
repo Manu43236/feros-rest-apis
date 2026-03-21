@@ -10,6 +10,9 @@ jobs:
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout code
@@ -25,27 +28,48 @@ jobs:
       - name: Build JAR
         run: mvn package -DskipTests -q
 
-      - name: Copy files to EC2
-        uses: appleboy/scp-action@v0.1.7
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "target/api-0.0.1-SNAPSHOT.jar,docker-compose.yml,Dockerfile,nginx.conf"
-          target: /home/ubuntu/feros
-          rm: false
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
+
+      - name: Copy config files to EC2
+        run: |
+          echo "${{ secrets.EC2_SSH_KEY }}" > /tmp/ec2_key
+          chmod 600 /tmp/ec2_key
+          rsync -az -e "ssh -i /tmp/ec2_key -o StrictHostKeyChecking=no" \
+            docker-compose.yml nginx.conf \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ubuntu/feros/
+          rm -f /tmp/ec2_key
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          API_IMAGE: ghcr.io/${{ github.repository }}:latest
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_ACTOR: ${{ github.actor }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: API_IMAGE,GHCR_TOKEN,GHCR_ACTOR
           script: |
             sudo mkdir -p /home/ubuntu/feros-web/dist
             sudo chown -R ubuntu:ubuntu /home/ubuntu/feros-web
             cd /home/ubuntu/feros
-            sudo docker compose up -d --build --force-recreate api nginx
+            echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
+            sudo sed -i '/^API_IMAGE=/d' .env 2>/dev/null; echo "API_IMAGE=$API_IMAGE" | sudo tee -a .env
+            sudo docker compose pull api
+            sudo docker compose up -d --no-build --force-recreate api nginx
             sudo docker image prune -f
             echo "==> Deployed successfully!"
             sudo docker compose ps
