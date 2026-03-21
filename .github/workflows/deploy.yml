@@ -46,13 +46,13 @@ jobs:
           tags: ${{ env.IMAGE }}
 
       - name: Copy config files to EC2
-        run: |
-          echo "${{ secrets.EC2_SSH_KEY }}" > /tmp/ec2_key
-          chmod 600 /tmp/ec2_key
-          rsync -az -e "ssh -i /tmp/ec2_key -o StrictHostKeyChecking=no" \
-            docker-compose.yml nginx.conf \
-            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ubuntu/feros/
-          rm -f /tmp/ec2_key
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.yml,nginx.conf"
+          target: /home/ubuntu/feros
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
