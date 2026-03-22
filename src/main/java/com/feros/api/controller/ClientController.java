@@ -1,6 +1,7 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.request.ClientRequest;
+import com.feros.api.dto.request.UserStatusRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.ClientResponse;
@@ -51,11 +52,12 @@ public class ClientController {
                 "Client updated successfully", clientService.updateClient(id, request)));
     }
 
-    @DeleteMapping("/{id}")
+    @PutMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deleteClient(@PathVariable Long id) {
-        clientService.deleteClient(id);
-        return ResponseEntity.ok(ApiResponse.success("Client deleted successfully", null));
+    public ResponseEntity<ApiResponse<ClientResponse>> toggleStatus(
+            @PathVariable Long id, @Valid @RequestBody UserStatusRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Client status updated successfully", clientService.toggleStatus(id, request.getIsActive())));
     }
 
     @PostMapping("/bulk-upload")

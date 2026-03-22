@@ -10,6 +10,8 @@ import java.util.Optional;
 @Repository
 public interface ClientRepository extends JpaRepository<Client, Long> {
     List<Client> findByTenantIdAndIsActiveTrue(Long tenantId);
+    List<Client> findByTenantId(Long tenantId);
     Optional<Client> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
+    Optional<Client> findByIdAndTenantId(Long id, Long tenantId);
     boolean existsByPhoneAndTenantId(String phone, Long tenantId);
 }

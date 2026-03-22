@@ -13,5 +13,6 @@ public interface ClientService {
     List<ClientResponse> getAllClients();
     ClientResponse updateClient(Long id, ClientRequest request);
     void deleteClient(Long id);
+    ClientResponse toggleStatus(Long id, Boolean isActive);
     BulkTenantUploadResponse bulkUpload(MultipartFile file);
 }

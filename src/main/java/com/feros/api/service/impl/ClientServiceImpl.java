@@ -94,7 +94,7 @@ public class ClientServiceImpl implements ClientService {
 
     @Override
     public List<ClientResponse> getAllClients() {
-        return clientRepository.findByTenantIdAndIsActiveTrue(getCurrentTenantId())
+        return clientRepository.findByTenantId(getCurrentTenantId())
                 .stream().map(this::mapToResponse).toList();
     }
 
@@ -147,6 +147,15 @@ public class ClientServiceImpl implements ClientService {
                 .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
         client.setIsActive(false);
         clientRepository.save(client);
+    }
+
+    @Override
+    public ClientResponse toggleStatus(Long id, Boolean isActive) {
+        Client client = clientRepository
+                .findByIdAndTenantId(id, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
+        client.setIsActive(isActive);
+        return mapToResponse(clientRepository.save(client));
     }
 
     @Override
