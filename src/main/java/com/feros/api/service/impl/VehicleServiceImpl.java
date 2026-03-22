@@ -246,6 +246,15 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     @Override
+    public VehicleResponse toggleVehicleActive(Long id) {
+        Vehicle vehicle = vehicleRepository
+                .findByIdAndTenantId(id, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+        vehicle.setIsActive(!vehicle.getIsActive());
+        return mapToResponse(vehicleRepository.save(vehicle));
+    }
+
+    @Override
     public void deleteVehicle(Long id) {
         Vehicle vehicle = vehicleRepository
                 .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())

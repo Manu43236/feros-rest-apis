@@ -53,6 +53,13 @@ public class VehicleController {
                 "Vehicle updated successfully", vehicleService.updateVehicle(id, request)));
     }
 
+    @PatchMapping("/{id}/active")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<VehicleResponse>> toggleVehicleActive(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Vehicle active status updated", vehicleService.toggleVehicleActive(id)));
+    }
+
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<VehicleResponse>> updateVehicleStatus(
