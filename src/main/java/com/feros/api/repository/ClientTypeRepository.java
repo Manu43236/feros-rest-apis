@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface ClientTypeRepository extends JpaRepository<ClientType, Long> {
     List<ClientType> findByTenantIdAndIsActiveTrue(Long tenantId);
     Optional<ClientType> findByIdAndTenantId(Long id, Long tenantId);
+    Optional<ClientType> findByNameIgnoreCaseAndTenantId(String name, Long tenantId);
 }

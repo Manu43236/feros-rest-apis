@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface PaymentTermsRepository extends JpaRepository<PaymentTerms, Long> {
     List<PaymentTerms> findByTenantIdAndIsActiveTrue(Long tenantId);
     Optional<PaymentTerms> findByIdAndTenantId(Long id, Long tenantId);
+    Optional<PaymentTerms> findByNameIgnoreCaseAndTenantId(String name, Long tenantId);
 }

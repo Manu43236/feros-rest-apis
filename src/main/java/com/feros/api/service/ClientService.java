@@ -1,7 +1,9 @@
 package com.feros.api.service;
 
 import com.feros.api.dto.request.ClientRequest;
+import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.ClientResponse;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -11,4 +13,5 @@ public interface ClientService {
     List<ClientResponse> getAllClients();
     ClientResponse updateClient(Long id, ClientRequest request);
     void deleteClient(Long id);
+    BulkTenantUploadResponse bulkUpload(MultipartFile file);
 }

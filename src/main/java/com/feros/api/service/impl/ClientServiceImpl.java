@@ -1,6 +1,7 @@
 package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.ClientRequest;
+import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.ClientResponse;
 import com.feros.api.entity.Client;
 import com.feros.api.entity.Tenant;
@@ -10,11 +11,15 @@ import com.feros.api.repository.*;
 import com.feros.api.service.ClientService;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
+import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -142,6 +147,104 @@ public class ClientServiceImpl implements ClientService {
                 .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
         client.setIsActive(false);
         clientRepository.save(client);
+    }
+
+    @Override
+    public BulkTenantUploadResponse bulkUpload(MultipartFile file) {
+        int successCount = 0;
+        int failureCount = 0;
+        List<String> errors = new ArrayList<>();
+        int rowNum = 1;
+
+        Tenant tenant = getCurrentTenant();
+
+        try (CSVReader csvReader = new CSVReader(new InputStreamReader(file.getInputStream()))) {
+            csvReader.readNext(); // skip header
+
+            String[] row;
+            while ((row = csvReader.readNext()) != null) {
+                rowNum++;
+                try {
+                    if (row.length < 1 || row[0].isBlank()) {
+                        errors.add("Row " + rowNum + ": Client name is required");
+                        failureCount++;
+                        continue;
+                    }
+                    if (row.length < 2 || row[1].isBlank()) {
+                        errors.add("Row " + rowNum + ": Client type is required");
+                        failureCount++;
+                        continue;
+                    }
+                    if (row.length < 3 || row[2].isBlank()) {
+                        errors.add("Row " + rowNum + ": Phone is required");
+                        failureCount++;
+                        continue;
+                    }
+
+                    String phone = row[2].trim();
+                    if (clientRepository.existsByPhoneAndTenantId(phone, tenant.getId())) {
+                        errors.add("Row " + rowNum + ": Client with phone " + phone + " already exists");
+                        failureCount++;
+                        continue;
+                    }
+
+                    ClientType clientType = clientTypeRepository
+                            .findByNameIgnoreCaseAndTenantId(row[1].trim(), tenant.getId())
+                            .orElse(null);
+                    if (clientType == null) {
+                        errors.add("Row " + rowNum + ": Client type '" + row[1].trim() + "' not found");
+                        failureCount++;
+                        continue;
+                    }
+
+                    Client.ClientBuilder builder = Client.builder()
+                            .tenant(tenant)
+                            .clientNumber(NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.CLNT))
+                            .clientName(row[0].trim())
+                            .clientType(clientType)
+                            .phone(phone)
+                            .creditLimit(BigDecimal.ZERO)
+                            .openingBalance(BigDecimal.ZERO)
+                            .isActive(true);
+
+                    if (row.length > 3 && !row[3].isBlank()) builder.email(row[3].trim());
+                    if (row.length > 4 && !row[4].isBlank()) builder.address(row[4].trim());
+                    if (row.length > 5 && !row[5].isBlank()) builder.pincode(row[5].trim());
+                    if (row.length > 6 && !row[6].isBlank()) builder.gstin(row[6].trim());
+                    if (row.length > 7 && !row[7].isBlank()) builder.panNumber(row[7].trim());
+                    if (row.length > 8 && !row[8].isBlank()) builder.contactPersonName(row[8].trim());
+                    if (row.length > 9 && !row[9].isBlank()) builder.contactPersonPhone(row[9].trim());
+
+                    if (row.length > 10 && !row[10].isBlank())
+                        paymentTermsRepository.findByNameIgnoreCaseAndTenantId(row[10].trim(), tenant.getId())
+                                .ifPresent(builder::paymentTerms);
+
+                    if (row.length > 11 && !row[11].isBlank()) {
+                        try { builder.creditLimit(new BigDecimal(row[11].trim())); } catch (NumberFormatException ignored) {}
+                    }
+                    if (row.length > 12 && !row[12].isBlank()) {
+                        try { builder.openingBalance(new BigDecimal(row[12].trim())); } catch (NumberFormatException ignored) {}
+                    }
+
+                    clientRepository.save(builder.build());
+                    successCount++;
+
+                } catch (Exception e) {
+                    errors.add("Row " + rowNum + ": " + e.getMessage());
+                    failureCount++;
+                }
+            }
+
+        } catch (Exception e) {
+            throw new FerosException("Failed to parse CSV: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+
+        return BulkTenantUploadResponse.builder()
+                .totalRows(rowNum - 1)
+                .successCount(successCount)
+                .failureCount(failureCount)
+                .errors(errors)
+                .build();
     }
 
     private ClientResponse mapToResponse(Client c) {

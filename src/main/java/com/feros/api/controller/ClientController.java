@@ -2,6 +2,7 @@ package com.feros.api.controller;
 
 import com.feros.api.dto.request.ClientRequest;
 import com.feros.api.dto.response.ApiResponse;
+import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.ClientResponse;
 import com.feros.api.service.ClientService;
 import jakarta.validation.Valid;
@@ -9,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -54,5 +56,13 @@ public class ClientController {
     public ResponseEntity<ApiResponse<Void>> deleteClient(@PathVariable Long id) {
         clientService.deleteClient(id);
         return ResponseEntity.ok(ApiResponse.success("Client deleted successfully", null));
+    }
+
+    @PostMapping("/bulk-upload")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<BulkTenantUploadResponse>> bulkUpload(
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Bulk upload completed", clientService.bulkUpload(file)));
     }
 }
