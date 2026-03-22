@@ -43,19 +43,39 @@ public class VehicleServiceImpl implements VehicleService {
                 .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
     }
 
+    private boolean isOwnedVehicle(Long ownershipTypeId) {
+        if (ownershipTypeId == null) return false;
+        return ownershipTypeRepository.findById(ownershipTypeId)
+                .map(o -> o.getName().toUpperCase().contains("OWN"))
+                .orElse(false);
+    }
+
+    private boolean isOwnedVehicleByName(String ownershipTypeName) {
+        if (ownershipTypeName == null || ownershipTypeName.isBlank()) return false;
+        return ownershipTypeName.toUpperCase().contains("OWN");
+    }
+
     @Override
     public VehicleResponse createVehicle(VehicleRequest request) {
         Tenant tenant = getCurrentTenant();
 
-        if (vehicleRepository.existsByRegistrationNumberAndTenantId(
-                request.getRegistrationNumber().toUpperCase(), tenant.getId())) {
-            throw new FerosException("Vehicle with this registration number already exists",
-                    HttpStatus.CONFLICT);
+        String regNum = request.getRegistrationNumber().toUpperCase();
+        if (isOwnedVehicle(request.getOwnershipTypeId())) {
+            if (vehicleRepository.existsByRegistrationNumber(regNum))
+                throw new FerosException("This owned vehicle is already registered in another fleet",
+                        HttpStatus.CONFLICT);
+        } else {
+            if (!vehicleRepository.existsByRegistrationNumberAndOwnershipTypeNameContainingIgnoreCase(regNum, "OWN"))
+                throw new FerosException("Vehicle must be owned by a fleet before it can be hired",
+                        HttpStatus.BAD_REQUEST);
+            if (vehicleRepository.existsByRegistrationNumberAndTenantId(regNum, tenant.getId()))
+                throw new FerosException("Vehicle with this registration number already exists in your fleet",
+                        HttpStatus.CONFLICT);
         }
 
         Vehicle vehicle = Vehicle.builder()
                 .tenant(tenant)
-                .registrationNumber(request.getRegistrationNumber().toUpperCase())
+                .registrationNumber(regNum)
                 .capacityInTons(request.getCapacityInTons())
                 .manufactureYear(request.getManufactureYear())
                 .color(request.getColor())
@@ -135,7 +155,22 @@ public class VehicleServiceImpl implements VehicleService {
                 .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
 
-        vehicle.setRegistrationNumber(request.getRegistrationNumber().toUpperCase());
+        String newRegNum = request.getRegistrationNumber().toUpperCase();
+        if (!vehicle.getRegistrationNumber().equals(newRegNum)) {
+            if (isOwnedVehicle(request.getOwnershipTypeId())) {
+                if (vehicleRepository.existsByRegistrationNumberAndIdNot(newRegNum, id))
+                    throw new FerosException("This owned vehicle is already registered in another fleet",
+                            HttpStatus.CONFLICT);
+            } else {
+                if (!vehicleRepository.existsByRegistrationNumberAndOwnershipTypeNameContainingIgnoreCase(newRegNum, "OWN"))
+                    throw new FerosException("Vehicle must be owned by a fleet before it can be hired",
+                            HttpStatus.BAD_REQUEST);
+                if (vehicleRepository.existsByRegistrationNumberAndTenantIdAndIdNot(newRegNum, getCurrentTenantId(), id))
+                    throw new FerosException("Vehicle with this registration number already exists in your fleet",
+                            HttpStatus.CONFLICT);
+            }
+        }
+        vehicle.setRegistrationNumber(newRegNum);
         vehicle.setCapacityInTons(request.getCapacityInTons());
         vehicle.setManufactureYear(request.getManufactureYear());
         vehicle.setColor(request.getColor());
@@ -227,10 +262,27 @@ public class VehicleServiceImpl implements VehicleService {
 
                     String regNum = row[0].trim().toUpperCase();
 
-                    if (vehicleRepository.existsByRegistrationNumberAndTenantId(regNum, tenant.getId())) {
-                        errors.add("Row " + rowNum + ": Vehicle " + regNum + " already exists");
-                        failureCount++;
-                        continue;
+                    // ownershipType (col 4) — needed for duplicate check
+                    String ownershipName = (row.length > 4) ? row[4].trim() : "";
+                    boolean isOwned = isOwnedVehicleByName(ownershipName);
+
+                    if (isOwned) {
+                        if (vehicleRepository.existsByRegistrationNumber(regNum)) {
+                            errors.add("Row " + rowNum + ": Owned vehicle " + regNum + " is already registered in another fleet");
+                            failureCount++;
+                            continue;
+                        }
+                    } else {
+                        if (!vehicleRepository.existsByRegistrationNumberAndOwnershipTypeNameContainingIgnoreCase(regNum, "OWN")) {
+                            errors.add("Row " + rowNum + ": Vehicle " + regNum + " must be owned by a fleet before it can be hired");
+                            failureCount++;
+                            continue;
+                        }
+                        if (vehicleRepository.existsByRegistrationNumberAndTenantId(regNum, tenant.getId())) {
+                            errors.add("Row " + rowNum + ": Vehicle " + regNum + " already exists in your fleet");
+                            failureCount++;
+                            continue;
+                        }
                     }
 
                     Vehicle.VehicleBuilder builder = Vehicle.builder()

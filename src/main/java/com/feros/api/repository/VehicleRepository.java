@@ -15,6 +15,10 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Long> {
     List<Vehicle> findByTenantIdAndIsActiveTrue(Long tenantId);
     Optional<Vehicle> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     boolean existsByRegistrationNumberAndTenantId(String registrationNumber, Long tenantId);
+    boolean existsByRegistrationNumber(String registrationNumber);
+    boolean existsByRegistrationNumberAndIdNot(String registrationNumber, Long id);
+    boolean existsByRegistrationNumberAndTenantIdAndIdNot(String registrationNumber, Long tenantId, Long id);
+    boolean existsByRegistrationNumberAndOwnershipTypeNameContainingIgnoreCase(String registrationNumber, String ownershipNamePart);
     long countByTenantIdAndIsActiveTrue(Long tenantId);
     @Query("SELECT v FROM Vehicle v WHERE v.tenant.id = :tenantId AND v.isActive = true AND (" +
            "v.insuranceExpiryDate <= :alertDate OR v.permitExpiryDate <= :alertDate OR " +
