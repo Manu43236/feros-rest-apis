@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +46,16 @@ public class TenantMasterServiceImpl implements TenantMasterService {
     @Override
     public TenantMasterResponse createVehicleStatus(VehicleStatusRequest request) {
         Tenant tenant = getCurrentTenant();
+        Optional<VehicleStatus> existing = vehicleStatusRepository
+                .findByNameIgnoreCaseAndTenantId(request.getName(), tenant.getId());
+        if (existing.isPresent()) {
+            VehicleStatus status = existing.get();
+            if (status.getIsActive()) {
+                throw new FerosException("Vehicle status '" + request.getName() + "' already exists", HttpStatus.CONFLICT);
+            }
+            status.setIsActive(true);
+            return mapVehicleStatus(vehicleStatusRepository.save(status));
+        }
         VehicleStatus status = VehicleStatus.builder()
                 .tenant(tenant).name(request.getName()).isActive(true).build();
         return mapVehicleStatus(vehicleStatusRepository.save(status));
