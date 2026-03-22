@@ -48,7 +48,7 @@ public class VehicleController {
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<VehicleResponse>> updateVehicle(
-            @PathVariable Long id, @Valid @RequestBody VehicleRequest request) {
+            @PathVariable Long id, @RequestBody VehicleRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Vehicle updated successfully", vehicleService.updateVehicle(id, request)));
     }

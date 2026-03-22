@@ -59,6 +59,9 @@ public class VehicleServiceImpl implements VehicleService {
     public VehicleResponse createVehicle(VehicleRequest request) {
         Tenant tenant = getCurrentTenant();
 
+        if (request.getRegistrationNumber() == null || request.getRegistrationNumber().isBlank())
+            throw new FerosException("Registration number is required", HttpStatus.BAD_REQUEST);
+
         String regNum = request.getRegistrationNumber().toUpperCase();
         if (isOwnedVehicle(request.getOwnershipTypeId())) {
             if (vehicleRepository.existsByRegistrationNumber(regNum))
@@ -152,8 +155,17 @@ public class VehicleServiceImpl implements VehicleService {
     @Override
     public VehicleResponse updateVehicle(Long id, VehicleRequest request) {
         Vehicle vehicle = vehicleRepository
-                .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
+                .findByIdAndTenantId(id, getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+
+        // Handle isActive-only update (e.g. from toggle)
+        if (request.getIsActive() != null && (request.getRegistrationNumber() == null || request.getRegistrationNumber().isBlank())) {
+            vehicle.setIsActive(request.getIsActive());
+            return mapToResponse(vehicleRepository.save(vehicle));
+        }
+
+        if (request.getRegistrationNumber() == null || request.getRegistrationNumber().isBlank())
+            throw new FerosException("Registration number is required", HttpStatus.BAD_REQUEST);
 
         String newRegNum = request.getRegistrationNumber().toUpperCase();
         if (!vehicle.getRegistrationNumber().equals(newRegNum)) {
@@ -171,6 +183,7 @@ public class VehicleServiceImpl implements VehicleService {
             }
         }
         vehicle.setRegistrationNumber(newRegNum);
+        if (request.getIsActive() != null) vehicle.setIsActive(request.getIsActive());
         vehicle.setCapacityInTons(request.getCapacityInTons());
         vehicle.setManufactureYear(request.getManufactureYear());
         vehicle.setColor(request.getColor());

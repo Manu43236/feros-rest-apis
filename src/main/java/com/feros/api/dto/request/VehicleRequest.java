@@ -1,7 +1,6 @@
 package com.feros.api.dto.request;
 
 import com.feros.api.enums.PermitType;
-import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -12,8 +11,9 @@ import java.time.LocalDate;
 @Setter
 public class VehicleRequest {
 
-    @NotBlank(message = "Registration number is required")
     private String registrationNumber;
+
+    private Boolean isActive;
 
     private Long brandId;
     private Long vehicleTypeId;
