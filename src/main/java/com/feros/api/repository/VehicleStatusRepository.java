@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface VehicleStatusRepository extends JpaRepository<VehicleStatus, Long> {
     List<VehicleStatus> findByTenantIdAndIsActiveTrue(Long tenantId);
     Optional<VehicleStatus> findByIdAndTenantId(Long id, Long tenantId);
+    Optional<VehicleStatus> findByNameIgnoreCaseAndTenantId(String name, Long tenantId);
 }

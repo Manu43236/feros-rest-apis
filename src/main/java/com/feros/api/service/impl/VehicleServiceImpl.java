@@ -329,6 +329,10 @@ public class VehicleServiceImpl implements VehicleService {
                         builder.color(row[7].trim());
                     }
 
+                    // default status → Available
+                    vehicleStatusRepository.findByNameIgnoreCaseAndTenantId("Available", tenant.getId())
+                            .ifPresent(builder::currentStatus);
+
                     vehicleRepository.save(builder.build());
                     successCount++;
 
