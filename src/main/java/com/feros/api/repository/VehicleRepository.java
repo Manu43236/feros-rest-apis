@@ -13,6 +13,7 @@ import java.util.Optional;
 @Repository
 public interface VehicleRepository extends JpaRepository<Vehicle, Long> {
     List<Vehicle> findByTenantIdAndIsActiveTrue(Long tenantId);
+    List<Vehicle> findByTenantId(Long tenantId);
     Optional<Vehicle> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     Optional<Vehicle> findByIdAndTenantId(Long id, Long tenantId);
     boolean existsByRegistrationNumberAndTenantId(String registrationNumber, Long tenantId);

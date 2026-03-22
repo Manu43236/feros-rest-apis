@@ -148,7 +148,7 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public List<VehicleResponse> getAllVehicles() {
-        return vehicleRepository.findByTenantIdAndIsActiveTrue(getCurrentTenantId())
+        return vehicleRepository.findByTenantId(getCurrentTenantId())
                 .stream().map(this::mapToResponse).toList();
     }
 
