@@ -327,6 +327,18 @@ public class OrderServiceImpl implements OrderService {
             throw new FerosException("Cannot update payment status of a cancelled order", HttpStatus.BAD_REQUEST);
         }
 
+        if (paymentStatus == OrderPaymentStatus.PAID || paymentStatus == OrderPaymentStatus.PARTIALLY_PAID) {
+            boolean hasDelivery = order.getOrderStatus() == OrderStatus.PARTIALLY_DELIVERED
+                    || order.getOrderStatus() == OrderStatus.DELIVERED
+                    || order.getOrderStatus() == OrderStatus.COMPLETED;
+            if (!hasDelivery) {
+                throw new FerosException(
+                        "Payment cannot be marked as " + paymentStatus.name().replace("_", " ") +
+                        " — order must be at least partially delivered first",
+                        HttpStatus.BAD_REQUEST);
+            }
+        }
+
         order.setOrderPaymentStatus(paymentStatus);
 
         if (paymentStatus == OrderPaymentStatus.PAID) {
