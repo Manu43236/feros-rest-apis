@@ -139,7 +139,7 @@ public class VehicleServiceImpl implements VehicleService {
     @Override
     public VehicleResponse getVehicleById(Long id) {
         return mapToResponse(vehicleRepository
-                .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
+                .findByIdAndTenantId(id, getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND)));
     }
 
