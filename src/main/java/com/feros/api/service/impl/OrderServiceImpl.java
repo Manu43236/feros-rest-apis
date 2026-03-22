@@ -17,6 +17,7 @@ import com.feros.api.enums.OrderStatus;
 import com.feros.api.enums.VehicleAllocationStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
+import com.feros.api.repository.LrRepository;
 import com.feros.api.service.OrderService;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
@@ -45,6 +46,7 @@ public class OrderServiceImpl implements OrderService {
     private final VehicleRepository vehicleRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final LrRepository lrRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -236,7 +238,19 @@ public class OrderServiceImpl implements OrderService {
                 .findByIdAndTenantIdAndIsActiveTrue(request.getVehicleId(), tenantId)
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
 
-        // Validate allocated weight doesn't exceed remaining weight
+        // Validate allocated weight doesn't exceed 1.5x vehicle capacity
+        if (vehicle.getCapacityInTons() != null) {
+            BigDecimal maxAllowed = vehicle.getCapacityInTons()
+                    .multiply(new BigDecimal("1.5"));
+            if (request.getAllocatedWeight().compareTo(maxAllowed) > 0) {
+                throw new FerosException(
+                        "Allocated weight (" + request.getAllocatedWeight() +
+                        "T) exceeds 1.5x vehicle capacity (" + vehicle.getCapacityInTons() +
+                        "T × 1.5 = " + maxAllowed + "T)", HttpStatus.BAD_REQUEST);
+            }
+        }
+
+        // Validate allocated weight doesn't exceed remaining order weight
         BigDecimal remaining = order.getTotalWeight().subtract(order.getTotalWeightFulfilled());
         if (request.getAllocatedWeight().compareTo(remaining) > 0) {
             throw new FerosException(
@@ -272,6 +286,56 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.save(order);
 
         return mapToVehicleAllocationResponse(allocation);
+    }
+
+    @Override
+    @Transactional
+    public void unassignVehicle(Long orderId, Long allocationId) {
+        Long tenantId = getCurrentTenantId();
+
+        Order order = orderRepository
+                .findByIdAndTenantIdAndIsActiveTrue(orderId, tenantId)
+                .orElseThrow(() -> new FerosException("Order not found", HttpStatus.NOT_FOUND));
+
+        OrderVehicleAllocation allocation = vehicleAllocationRepository
+                .findByIdAndTenantIdAndIsActiveTrue(allocationId, tenantId)
+                .orElseThrow(() -> new FerosException("Vehicle allocation not found", HttpStatus.NOT_FOUND));
+
+        if (!allocation.getOrder().getId().equals(orderId)) {
+            throw new FerosException("Allocation does not belong to this order", HttpStatus.BAD_REQUEST);
+        }
+
+        if (allocation.getAllocationStatus() != VehicleAllocationStatus.ALLOCATED) {
+            throw new FerosException(
+                    "Cannot unassign vehicle — allocation is already " + allocation.getAllocationStatus(),
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        if (lrRepository.existsByVehicleAllocationId(allocationId)) {
+            throw new FerosException(
+                    "Cannot unassign vehicle — an LR has already been created for this allocation",
+                    HttpStatus.CONFLICT);
+        }
+
+        // Deduct the allocated weight from order
+        BigDecimal newFulfilled = order.getTotalWeightFulfilled()
+                .subtract(allocation.getAllocatedWeight());
+        if (newFulfilled.compareTo(BigDecimal.ZERO) < 0) newFulfilled = BigDecimal.ZERO;
+        order.setTotalWeightFulfilled(newFulfilled);
+
+        // Recalculate order status
+        if (newFulfilled.compareTo(BigDecimal.ZERO) == 0) {
+            order.setOrderStatus(OrderStatus.PENDING);
+        } else if (newFulfilled.compareTo(order.getTotalWeight()) >= 0) {
+            order.setOrderStatus(OrderStatus.FULLY_ASSIGNED);
+        } else {
+            order.setOrderStatus(OrderStatus.PARTIALLY_ASSIGNED);
+        }
+        orderRepository.save(order);
+
+        // Soft-delete allocation
+        allocation.setIsActive(false);
+        vehicleAllocationRepository.save(allocation);
     }
 
     @Override

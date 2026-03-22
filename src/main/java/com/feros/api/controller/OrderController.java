@@ -77,6 +77,14 @@ public class OrderController {
                 "Payment status updated successfully", orderService.updatePaymentStatus(id, status)));
     }
 
+    @DeleteMapping("/{id}/allocations/{allocationId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<Void>> unassignVehicle(
+            @PathVariable Long id, @PathVariable Long allocationId) {
+        orderService.unassignVehicle(id, allocationId);
+        return ResponseEntity.ok(ApiResponse.success("Vehicle unassigned successfully", null));
+    }
+
     @PostMapping("/{id}/assign-staff")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<StaffAllocationResponse>> assignStaff(
