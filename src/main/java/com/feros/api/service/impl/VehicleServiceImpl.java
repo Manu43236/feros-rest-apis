@@ -7,6 +7,7 @@ import com.feros.api.entity.Tenant;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.master.*;
 import com.feros.api.exception.FerosException;
+import com.feros.api.entity.OrderVehicleAllocation;
 import com.feros.api.repository.*;
 import com.feros.api.service.VehicleService;
 import com.feros.api.util.SecurityUtil;
@@ -33,6 +34,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final FuelTypeRepository fuelTypeRepository;
     private final OwnershipTypeRepository ownershipTypeRepository;
     private final VehicleStatusRepository vehicleStatusRepository;
+    private final OrderVehicleAllocationRepository allocationRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -147,9 +149,33 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     @Override
-    public List<VehicleResponse> getAllVehicles() {
-        return vehicleRepository.findByTenantId(getCurrentTenantId())
-                .stream().map(this::mapToResponse).toList();
+    public List<VehicleResponse> getAllVehicles(LocalDate date) {
+        Long tenantId = getCurrentTenantId();
+        List<Vehicle> vehicles = vehicleRepository.findByTenantId(tenantId);
+
+        LocalDate filterDate = date != null ? date : LocalDate.now();
+        List<OrderVehicleAllocation> allocations = allocationRepository.findActiveAllocationsOnDate(tenantId, filterDate);
+
+        // Build a map: vehicleId → allocation
+        java.util.Map<Long, OrderVehicleAllocation> allocationMap = allocations.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        a -> a.getVehicle().getId(),
+                        a -> a,
+                        (a1, a2) -> a1  // keep first if duplicate
+                ));
+
+        return vehicles.stream().map(v -> {
+            VehicleResponse resp = mapToResponse(v);
+            OrderVehicleAllocation alloc = allocationMap.get(v.getId());
+            if (alloc != null) {
+                resp.setIsAssigned(true);
+                resp.setAssignedOrderId(alloc.getOrder().getId());
+                resp.setAssignedOrderNumber(alloc.getOrder().getOrderNumber());
+            } else {
+                resp.setIsAssigned(false);
+            }
+            return resp;
+        }).toList();
     }
 
     @Override

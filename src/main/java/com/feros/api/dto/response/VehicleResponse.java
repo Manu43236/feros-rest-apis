@@ -92,4 +92,9 @@ public class VehicleResponse {
     private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // Date-based assignment info (populated when ?date= param is provided)
+    private Boolean isAssigned;
+    private Long assignedOrderId;
+    private String assignedOrderNumber;
 }

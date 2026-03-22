@@ -5,6 +5,7 @@ import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.VehicleResponse;
 import com.feros.api.service.VehicleService;
+import java.time.LocalDate;
 import jakarta.validation.Valid;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -25,9 +26,10 @@ public class VehicleController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
-    public ResponseEntity<ApiResponse<List<VehicleResponse>>> getAllVehicles() {
+    public ResponseEntity<ApiResponse<List<VehicleResponse>>> getAllVehicles(
+            @RequestParam(required = false) LocalDate date) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Vehicles fetched successfully", vehicleService.getAllVehicles()));
+                "Vehicles fetched successfully", vehicleService.getAllVehicles(date)));
     }
 
     @GetMapping("/{id}")
