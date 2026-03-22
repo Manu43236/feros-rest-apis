@@ -8,4 +8,5 @@ import java.util.List;
 @Repository
 public interface VehicleBrandRepository extends JpaRepository<VehicleBrand, Long> {
     List<VehicleBrand> findAllByIsActiveTrue();
+    java.util.Optional<VehicleBrand> findByNameIgnoreCase(String name);
 }

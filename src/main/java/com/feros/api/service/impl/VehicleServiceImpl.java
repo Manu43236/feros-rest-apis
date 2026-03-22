@@ -1,6 +1,7 @@
 package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.VehicleRequest;
+import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.VehicleResponse;
 import com.feros.api.entity.Tenant;
 import com.feros.api.entity.Vehicle;
@@ -9,11 +10,16 @@ import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.VehicleService;
 import com.feros.api.util.SecurityUtil;
+import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStreamReader;
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -195,6 +201,101 @@ public class VehicleServiceImpl implements VehicleService {
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
         vehicle.setIsActive(false);
         vehicleRepository.save(vehicle);
+    }
+
+    @Override
+    public BulkTenantUploadResponse bulkUpload(MultipartFile file) {
+        int successCount = 0;
+        int failureCount = 0;
+        List<String> errors = new ArrayList<>();
+        int rowNum = 1;
+
+        Tenant tenant = getCurrentTenant();
+
+        try (CSVReader csvReader = new CSVReader(new InputStreamReader(file.getInputStream()))) {
+            csvReader.readNext(); // skip header
+
+            String[] row;
+            while ((row = csvReader.readNext()) != null) {
+                rowNum++;
+                try {
+                    if (row.length < 1 || row[0].isBlank()) {
+                        errors.add("Row " + rowNum + ": Registration number is required");
+                        failureCount++;
+                        continue;
+                    }
+
+                    String regNum = row[0].trim().toUpperCase();
+
+                    if (vehicleRepository.existsByRegistrationNumberAndTenantId(regNum, tenant.getId())) {
+                        errors.add("Row " + rowNum + ": Vehicle " + regNum + " already exists");
+                        failureCount++;
+                        continue;
+                    }
+
+                    Vehicle.VehicleBuilder builder = Vehicle.builder()
+                            .tenant(tenant)
+                            .registrationNumber(regNum)
+                            .isActive(true);
+
+                    // vehicleType (col 1)
+                    if (row.length > 1 && !row[1].isBlank()) {
+                        vehicleTypeRepository.findByNameIgnoreCase(row[1].trim())
+                                .ifPresent(builder::vehicleType);
+                    }
+
+                    // brand (col 2)
+                    if (row.length > 2 && !row[2].isBlank()) {
+                        vehicleBrandRepository.findByNameIgnoreCase(row[2].trim())
+                                .ifPresent(builder::brand);
+                    }
+
+                    // fuelType (col 3)
+                    if (row.length > 3 && !row[3].isBlank()) {
+                        fuelTypeRepository.findByNameIgnoreCase(row[3].trim())
+                                .ifPresent(builder::fuelType);
+                    }
+
+                    // ownershipType (col 4)
+                    if (row.length > 4 && !row[4].isBlank()) {
+                        ownershipTypeRepository.findByNameIgnoreCase(row[4].trim())
+                                .ifPresent(builder::ownershipType);
+                    }
+
+                    // capacityInTons (col 5)
+                    if (row.length > 5 && !row[5].isBlank()) {
+                        try { builder.capacityInTons(new BigDecimal(row[5].trim())); } catch (NumberFormatException ignored) {}
+                    }
+
+                    // manufactureYear (col 6)
+                    if (row.length > 6 && !row[6].isBlank()) {
+                        try { builder.manufactureYear(Integer.parseInt(row[6].trim())); } catch (NumberFormatException ignored) {}
+                    }
+
+                    // color (col 7)
+                    if (row.length > 7 && !row[7].isBlank()) {
+                        builder.color(row[7].trim());
+                    }
+
+                    vehicleRepository.save(builder.build());
+                    successCount++;
+
+                } catch (Exception e) {
+                    errors.add("Row " + rowNum + ": " + e.getMessage());
+                    failureCount++;
+                }
+            }
+
+        } catch (Exception e) {
+            throw new FerosException("Failed to parse CSV: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+
+        return BulkTenantUploadResponse.builder()
+                .totalRows(rowNum - 1)
+                .successCount(successCount)
+                .failureCount(failureCount)
+                .errors(errors)
+                .build();
     }
 
     private VehicleResponse mapToResponse(Vehicle v) {

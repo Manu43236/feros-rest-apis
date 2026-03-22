@@ -8,4 +8,5 @@ import java.util.List;
 @Repository
 public interface FuelTypeRepository extends JpaRepository<FuelType, Long> {
     List<FuelType> findAllByIsActiveTrue();
+    java.util.Optional<FuelType> findByNameIgnoreCase(String name);
 }

@@ -8,4 +8,5 @@ import java.util.List;
 @Repository
 public interface OwnershipTypeRepository extends JpaRepository<OwnershipType, Long> {
     List<OwnershipType> findAllByIsActiveTrue();
+    java.util.Optional<OwnershipType> findByNameIgnoreCase(String name);
 }
