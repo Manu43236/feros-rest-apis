@@ -12,6 +12,7 @@ public interface VehicleService {
     VehicleResponse getVehicleById(Long id);
     List<VehicleResponse> getAllVehicles();
     VehicleResponse updateVehicle(Long id, VehicleRequest request);
+    VehicleResponse updateVehicleStatus(Long id, Long statusId);
     void deleteVehicle(Long id);
     BulkTenantUploadResponse bulkUpload(MultipartFile file);
 }
