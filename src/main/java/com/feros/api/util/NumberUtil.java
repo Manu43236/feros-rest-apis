@@ -13,7 +13,7 @@ import java.time.format.DateTimeFormatter;
  */
 public final class NumberUtil {
 
-    private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
 
     private NumberUtil() {}
 
