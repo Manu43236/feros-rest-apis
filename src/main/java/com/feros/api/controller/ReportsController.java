@@ -1,9 +1,6 @@
 package com.feros.api.controller;
 
-import com.feros.api.dto.response.ApiResponse;
-import com.feros.api.dto.response.InvoiceOutstandingResponse;
-import com.feros.api.dto.response.LrRegisterResponse;
-import com.feros.api.dto.response.PayrollSummaryResponse;
+import com.feros.api.dto.response.*;
 import com.feros.api.service.ReportsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -24,7 +21,6 @@ public class ReportsController {
 
     private final ReportsService reportsService;
 
-    // LR Register: all LRs in a date range, optionally filtered by client
     @GetMapping("/lr-register")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<List<LrRegisterResponse>>> getLrRegister(
@@ -36,7 +32,6 @@ public class ReportsController {
                 reportsService.getLrRegister(from, to, clientId)));
     }
 
-    // Invoice Outstanding: all invoices with pending balance, optionally filtered by client
     @GetMapping("/invoice-outstanding")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<List<InvoiceOutstandingResponse>>> getInvoiceOutstanding(
@@ -46,7 +41,6 @@ public class ReportsController {
                 reportsService.getInvoiceOutstanding(clientId)));
     }
 
-    // Payroll Summary: all payrolls whose cycle falls within the given date range
     @GetMapping("/payroll-summary")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<List<PayrollSummaryResponse>>> getPayrollSummary(
@@ -55,5 +49,58 @@ public class ReportsController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Payroll summary fetched successfully",
                 reportsService.getPayrollSummary(from, to)));
+    }
+
+    @GetMapping("/collections")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<CollectionReportResponse>>> getCollectionReport(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) Long clientId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Collection report fetched successfully",
+                reportsService.getCollectionReport(from, to, clientId)));
+    }
+
+    @GetMapping("/client-statement")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<ClientStatementResponse>> getClientStatement(
+            @RequestParam Long clientId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Client statement fetched successfully",
+                reportsService.getClientStatement(clientId, from, to)));
+    }
+
+    @GetMapping("/vehicle-trips")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<VehicleTripResponse>>> getVehicleTripReport(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Vehicle trip report fetched successfully",
+                reportsService.getVehicleTripReport(from, to)));
+    }
+
+    @GetMapping("/order-status")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<OrderStatusResponse>>> getOrderStatusReport(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Order status report fetched successfully",
+                reportsService.getOrderStatusReport(from, to, status)));
+    }
+
+    @GetMapping("/attendance")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<AttendanceReportResponse>>> getAttendanceReport(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Attendance report fetched successfully",
+                reportsService.getAttendanceReport(from, to)));
     }
 }

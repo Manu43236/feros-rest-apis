@@ -2,6 +2,8 @@ package com.feros.api.repository;
 
 import com.feros.api.entity.Attendance;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -18,4 +20,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     Optional<Attendance> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     boolean existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
             Long userId, Long tenantId, LocalDate date);
+
+    @Query("SELECT a FROM Attendance a WHERE a.tenant.id = :tenantId AND a.isActive = true AND a.attendanceDate BETWEEN :from AND :to ORDER BY a.user.id, a.attendanceDate ASC")
+    List<Attendance> findByTenantIdAndDateRange(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }
