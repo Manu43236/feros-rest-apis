@@ -2,6 +2,7 @@ package com.feros.api.dto.response;
 
 import com.feros.api.enums.PayCycle;
 import com.feros.api.enums.RoleName;
+import com.feros.api.enums.VehicleStatusType;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,6 +26,9 @@ public class TenantMasterResponse {
     private String destinationCityName;
     private BigDecimal distanceInKm;
     private Integer estimatedHours;
+
+    // VehicleStatus fields
+    private VehicleStatusType statusType;
 
     // Designation fields
     private RoleName roleType;

@@ -389,6 +389,7 @@ public class TenantMasterServiceImpl implements TenantMasterService {
     private TenantMasterResponse mapVehicleStatus(VehicleStatus s) {
         return TenantMasterResponse.builder().id(s.getId())
                 .name(s.getName())
+                .statusType(s.getStatusType())
                 .isActive(s.getIsActive()).createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt()).build();
     }
