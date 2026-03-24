@@ -1,6 +1,7 @@
 package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.CreateTenantRequest;
+import com.feros.api.dto.request.UpdateMyTenantRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.LoginResponse;
 import com.feros.api.dto.response.TenantResponse;
@@ -15,6 +16,7 @@ import com.feros.api.repository.*;
 import com.feros.api.repository.TenantRepository;
 import com.feros.api.service.TenantService;
 import com.feros.api.util.JwtUtil;
+import com.feros.api.util.SecurityUtil;
 import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -273,6 +275,54 @@ public class TenantServiceImpl implements TenantService {
                 .tripBonusAmount(BigDecimal.ZERO)
                 .isActive(true)
                 .build());
+    }
+
+    // ===================== MY TENANT (ADMIN/OFFICE_STAFF) =====================
+    @Override
+    public TenantResponse getMyTenant() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(tenantId)
+                .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+        return mapToResponse(tenant);
+    }
+
+    @Override
+    public TenantResponse updateMyTenant(UpdateMyTenantRequest request) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(tenantId)
+                .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+
+        // Check email uniqueness excluding self
+        if (!tenant.getEmail().equals(request.getEmail()) && tenantRepository.existsByEmail(request.getEmail())) {
+            throw new FerosException("Email already in use", HttpStatus.CONFLICT);
+        }
+        // Check phone uniqueness excluding self
+        if (!tenant.getPhone().equals(request.getPhone()) && tenantRepository.existsByPhone(request.getPhone())) {
+            throw new FerosException("Phone already in use", HttpStatus.CONFLICT);
+        }
+
+        tenant.setCompanyName(request.getCompanyName());
+        tenant.setEmail(request.getEmail());
+        tenant.setPhone(request.getPhone());
+        tenant.setAddress(request.getAddress());
+        tenant.setCity(request.getCity());
+        tenant.setState(request.getState());
+        tenant.setPincode(request.getPincode());
+        tenant.setGstin(request.getGstin());
+        tenant.setPanNumber(request.getPanNumber());
+        tenant.setTanNumber(request.getTanNumber());
+        tenant.setCinNumber(request.getCinNumber());
+        tenant.setTransportLicenseNumber(request.getTransportLicenseNumber());
+        tenant.setBankName(request.getBankName());
+        tenant.setAccountNumber(request.getAccountNumber());
+        tenant.setIfscCode(request.getIfscCode());
+        tenant.setBranchName(request.getBranchName());
+        tenant.setAccountHolderName(request.getAccountHolderName());
+        tenant.setOwnerName(request.getOwnerName());
+        tenant.setOwnerPhone(request.getOwnerPhone());
+        tenant.setOwnerEmail(request.getOwnerEmail());
+
+        return mapToResponse(tenantRepository.save(tenant));
     }
 
     // ===================== IMPERSONATION =====================

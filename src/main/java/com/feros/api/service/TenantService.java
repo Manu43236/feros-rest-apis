@@ -1,6 +1,7 @@
 package com.feros.api.service;
 
 import com.feros.api.dto.request.CreateTenantRequest;
+import com.feros.api.dto.request.UpdateMyTenantRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.LoginResponse;
 import com.feros.api.dto.response.TenantResponse;
@@ -16,4 +17,6 @@ public interface TenantService {
     void deleteTenant(Long id);
     BulkTenantUploadResponse bulkUpload(MultipartFile file);
     LoginResponse impersonateTenant(Long tenantId, Long saUserId, String saPhone);
+    TenantResponse getMyTenant();
+    TenantResponse updateMyTenant(UpdateMyTenantRequest request);
 }

@@ -2,6 +2,7 @@ package com.feros.api.controller;
 
 import com.feros.api.config.UserPrincipal;
 import com.feros.api.dto.request.CreateTenantRequest;
+import com.feros.api.dto.request.UpdateMyTenantRequest;
 import com.feros.api.dto.request.CreateUserRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
@@ -100,6 +101,21 @@ public class TenantController {
         BulkTenantUploadResponse response = userService.bulkUpload(file, tenantId);
         return ResponseEntity.ok(
                 ApiResponse.success("Bulk upload completed", response));
+    }
+
+    @GetMapping("/my")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<TenantResponse>> getMyTenant() {
+        TenantResponse response = tenantService.getMyTenant();
+        return ResponseEntity.ok(ApiResponse.success("Tenant fetched successfully", response));
+    }
+
+    @PutMapping("/my")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<TenantResponse>> updateMyTenant(
+            @Valid @RequestBody UpdateMyTenantRequest request) {
+        TenantResponse response = tenantService.updateMyTenant(request);
+        return ResponseEntity.ok(ApiResponse.success("Company profile updated successfully", response));
     }
 
     @PostMapping("/{id}/impersonate")
