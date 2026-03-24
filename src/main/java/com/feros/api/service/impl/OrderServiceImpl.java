@@ -484,6 +484,11 @@ public class OrderServiceImpl implements OrderService {
                     staffAllocationRepository.saveAll(staffAllocations);
                 }
             }
+            for (OrderVehicleAllocation va : vehicleAllocations) {
+                if (va.getAllocationStatus() != VehicleAllocationStatus.CANCELLED) {
+                    setVehicleStatus(va.getVehicle(), VehicleStatusType.AVAILABLE);
+                }
+            }
             vehicleAllocationRepository.saveAll(vehicleAllocations);
         }
 
