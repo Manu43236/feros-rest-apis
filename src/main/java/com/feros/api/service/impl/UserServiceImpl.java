@@ -152,6 +152,11 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new FerosException(
                         "User not found", HttpStatus.NOT_FOUND));
         validateTenantAccess(user);
+        if (!orderStaffAllocationRepository.findActiveAllocationsForUser(id).isEmpty()) {
+            throw new FerosException(
+                    "Cannot delete staff — they are currently assigned to an active order. Unassign them first.",
+                    HttpStatus.CONFLICT);
+        }
         user.setIsActive(false);
         userRepository.save(user);
     }
@@ -163,6 +168,13 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new FerosException(
                         "User not found", HttpStatus.NOT_FOUND));
         validateTenantAccess(user);
+        // Block deactivation if staff is on an active allocation
+        if (Boolean.FALSE.equals(request.getIsActive()) &&
+                !orderStaffAllocationRepository.findActiveAllocationsForUser(userId).isEmpty()) {
+            throw new FerosException(
+                    "Cannot deactivate staff — they are currently assigned to an active order. Unassign them first.",
+                    HttpStatus.CONFLICT);
+        }
         user.setIsActive(request.getIsActive());
         User updated = userRepository.save(user);
         return mapToResponse(updated, null);
@@ -389,6 +401,15 @@ public class UserServiceImpl implements UserService {
         response.setCompletedTripsCount(
                 orderStaffAllocationRepository.countByUserIdAndAllocationStatusAndIsActiveTrue(
                         user.getId(), StaffAllocationStatus.COMPLETED));
+
+        java.util.List<com.feros.api.entity.OrderStaffAllocation> activeAllocs =
+                orderStaffAllocationRepository.findActiveAllocationsForUser(user.getId());
+        if (!activeAllocs.isEmpty()) {
+            response.setIsAssigned(true);
+            response.setActiveOrderNumber(activeAllocs.get(0).getOrder().getOrderNumber());
+        } else {
+            response.setIsAssigned(false);
+        }
 
         staffProfileRepository.findByUserId(user.getId()).ifPresent(profile -> {
             response.setDesignationName(

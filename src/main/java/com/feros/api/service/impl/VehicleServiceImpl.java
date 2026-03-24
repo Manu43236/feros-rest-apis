@@ -298,6 +298,12 @@ public class VehicleServiceImpl implements VehicleService {
         Vehicle vehicle = vehicleRepository
                 .findByIdAndTenantId(id, getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+        if (vehicle.getIsActive() && allocationRepository
+                .findActiveAllocationForVehicleOnDate(id, LocalDate.now()).isPresent()) {
+            throw new FerosException(
+                "Cannot deactivate vehicle — it is currently assigned to an active order. Unassign it first.",
+                HttpStatus.CONFLICT);
+        }
         vehicle.setIsActive(!vehicle.getIsActive());
         return mapToResponse(vehicleRepository.save(vehicle));
     }
@@ -307,6 +313,11 @@ public class VehicleServiceImpl implements VehicleService {
         Vehicle vehicle = vehicleRepository
                 .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+        if (allocationRepository.findActiveAllocationForVehicleOnDate(id, LocalDate.now()).isPresent()) {
+            throw new FerosException(
+                "Cannot delete vehicle — it is currently assigned to an active order. Unassign it first.",
+                HttpStatus.CONFLICT);
+        }
         vehicle.setIsActive(false);
         vehicleRepository.save(vehicle);
     }

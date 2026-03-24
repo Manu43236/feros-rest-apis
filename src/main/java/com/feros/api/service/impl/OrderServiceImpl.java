@@ -279,6 +279,15 @@ public class OrderServiceImpl implements OrderService {
                 .findByIdAndTenantIdAndIsActiveTrue(request.getVehicleId(), tenantId)
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
 
+        if (vehicle.getCurrentStatus() != null &&
+                (vehicle.getCurrentStatus().getStatusType() == VehicleStatusType.IN_REPAIR ||
+                 vehicle.getCurrentStatus().getStatusType() == VehicleStatusType.BREAKDOWN)) {
+            throw new FerosException(
+                "Cannot assign vehicle — it is currently marked as " +
+                vehicle.getCurrentStatus().getName() + ". Resolve the issue first.",
+                HttpStatus.CONFLICT);
+        }
+
         // Validate allocated weight doesn't exceed 1.5x vehicle capacity
         if (vehicle.getCapacityInTons() != null) {
             BigDecimal maxAllowed = vehicle.getCapacityInTons()
@@ -404,6 +413,14 @@ public class OrderServiceImpl implements OrderService {
                     HttpStatus.CONFLICT);
         }
 
+        // Within-order conflict: same staff on a different vehicle in this order
+        if (staffAllocationRepository.existsWithinOrderConflict(
+                request.getUserId(), orderId, request.getVehicleAllocationId())) {
+            throw new FerosException(
+                    "Staff is already assigned to another vehicle in this order",
+                    HttpStatus.CONFLICT);
+        }
+
         if (staffAllocationRepository.existsStaffConflict(
                 request.getUserId(), request.getExpectedStartDate(), request.getExpectedEndDate())) {
             throw new FerosException(
@@ -432,6 +449,39 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         return mapToStaffAllocationResponse(staffAllocationRepository.save(staffAllocation));
+    }
+
+    @Override
+    @Transactional
+    public void unassignStaff(Long orderId, Long staffAllocationId) {
+        Long tenantId = getCurrentTenantId();
+
+        orderRepository.findByIdAndTenantIdAndIsActiveTrue(orderId, tenantId)
+                .orElseThrow(() -> new FerosException("Order not found", HttpStatus.NOT_FOUND));
+
+        OrderStaffAllocation allocation = staffAllocationRepository
+                .findByIdAndTenantIdAndIsActiveTrue(staffAllocationId, tenantId)
+                .orElseThrow(() -> new FerosException("Staff allocation not found", HttpStatus.NOT_FOUND));
+
+        if (!allocation.getOrder().getId().equals(orderId)) {
+            throw new FerosException("Allocation does not belong to this order", HttpStatus.BAD_REQUEST);
+        }
+
+        if (allocation.getAllocationStatus() == StaffAllocationStatus.IN_TRANSIT) {
+            throw new FerosException(
+                    "Cannot unassign staff — they are currently in transit",
+                    HttpStatus.CONFLICT);
+        }
+
+        if (allocation.getAllocationStatus() == StaffAllocationStatus.COMPLETED) {
+            throw new FerosException(
+                    "Cannot unassign staff — allocation is already completed",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        allocation.setAllocationStatus(StaffAllocationStatus.CANCELLED);
+        allocation.setIsActive(false);
+        staffAllocationRepository.save(allocation);
     }
 
     @Override

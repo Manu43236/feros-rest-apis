@@ -25,6 +25,10 @@ public class UserResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    // Active allocation fields
+    private Boolean isAssigned;
+    private String activeOrderNumber;
+
     // Staff Profile fields
     private String designationName;
     private String employmentType;

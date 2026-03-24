@@ -158,6 +158,34 @@ public class LrServiceImpl implements LrService {
                 // Vehicle is now physically on the road → ON_TRIP
                 setVehicleStatus(allocation.getVehicle(), VehicleStatusType.ON_TRIP);
 
+                // Sync staff on this vehicle allocation → IN_TRANSIT
+                List<OrderStaffAllocation> staffAllocations =
+                        staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(allocation.getId());
+                for (OrderStaffAllocation sa : staffAllocations) {
+                    if (sa.getAllocationStatus() == StaffAllocationStatus.ALLOCATED) {
+                        sa.setAllocationStatus(StaffAllocationStatus.IN_TRANSIT);
+                        sa.setActualStartDate(LocalDate.now());
+                    }
+                }
+                staffAllocationRepository.saveAll(staffAllocations);
+
+            } else if (request.getLrStatus() == LrStatus.CANCELLED) {
+                // Revert allocation back to ALLOCATED — vehicle is still assigned to order, just no LR
+                allocation.setAllocationStatus(VehicleAllocationStatus.ALLOCATED);
+                // Vehicle goes back to ASSIGNED (still allocated to order)
+                setVehicleStatus(allocation.getVehicle(), VehicleStatusType.ASSIGNED);
+
+                // Revert staff on this vehicle allocation back to ALLOCATED
+                List<OrderStaffAllocation> staffAllocations =
+                        staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(allocation.getId());
+                for (OrderStaffAllocation sa : staffAllocations) {
+                    if (sa.getAllocationStatus() == StaffAllocationStatus.IN_TRANSIT) {
+                        sa.setAllocationStatus(StaffAllocationStatus.ALLOCATED);
+                        sa.setActualStartDate(null);
+                    }
+                }
+                staffAllocationRepository.saveAll(staffAllocations);
+
             } else if (request.getLrStatus() == LrStatus.DELIVERED) {
                 allocation.setAllocationStatus(VehicleAllocationStatus.DELIVERED);
 

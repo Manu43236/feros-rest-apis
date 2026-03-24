@@ -19,5 +19,6 @@ public interface OrderService {
     VehicleAllocationResponse assignVehicle(Long orderId, AssignVehicleRequest request);
     void unassignVehicle(Long orderId, Long allocationId);
     StaffAllocationResponse assignStaff(Long orderId, AssignStaffRequest request);
+    void unassignStaff(Long orderId, Long staffAllocationId);
     OrderResponse updatePaymentStatus(Long id, OrderPaymentStatus paymentStatus);
 }

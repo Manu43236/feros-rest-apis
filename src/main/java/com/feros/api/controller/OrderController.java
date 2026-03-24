@@ -92,4 +92,12 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Staff assigned successfully", orderService.assignStaff(id, request)));
     }
+
+    @DeleteMapping("/{id}/staff-allocations/{staffAllocationId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<Void>> unassignStaff(
+            @PathVariable Long id, @PathVariable Long staffAllocationId) {
+        orderService.unassignStaff(id, staffAllocationId);
+        return ResponseEntity.ok(ApiResponse.success("Staff unassigned successfully", null));
+    }
 }
