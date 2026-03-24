@@ -11,7 +11,9 @@ import com.feros.api.entity.*;
 import com.feros.api.entity.master.ChargeType;
 import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.OrderStatus;
+import com.feros.api.enums.StaffAllocationStatus;
 import com.feros.api.enums.VehicleAllocationStatus;
+import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.LrService;
@@ -35,6 +37,9 @@ public class LrServiceImpl implements LrService {
     private final TenantRepository tenantRepository;
     private final OrderRepository orderRepository;
     private final OrderVehicleAllocationRepository vehicleAllocationRepository;
+    private final OrderStaffAllocationRepository staffAllocationRepository;
+    private final VehicleStatusRepository vehicleStatusRepository;
+    private final VehicleRepository vehicleRepository;
     private final ChargeTypeRepository chargeTypeRepository;
     private final UserRepository userRepository;
 
@@ -50,6 +55,14 @@ public class LrServiceImpl implements LrService {
     private User getCurrentUser() {
         return userRepository.findById(SecurityUtil.getCurrentUserId())
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
+    }
+
+    private void setVehicleStatus(com.feros.api.entity.Vehicle vehicle, VehicleStatusType type) {
+        vehicleStatusRepository.findByStatusTypeAndIsActiveTrue(type)
+                .ifPresent(status -> {
+                    vehicle.setCurrentStatus(status);
+                    vehicleRepository.save(vehicle);
+                });
     }
 
     private String generateLrNumber(Tenant tenant) {
@@ -142,6 +155,9 @@ public class LrServiceImpl implements LrService {
                 order.setOrderStatus(OrderStatus.IN_TRANSIT);
                 orderRepository.save(order);
 
+                // Vehicle is now physically on the road → ON_TRIP
+                setVehicleStatus(allocation.getVehicle(), VehicleStatusType.ON_TRIP);
+
             } else if (request.getLrStatus() == LrStatus.DELIVERED) {
                 allocation.setAllocationStatus(VehicleAllocationStatus.DELIVERED);
 
@@ -165,6 +181,21 @@ public class LrServiceImpl implements LrService {
                 if (allSiblingsDelivered) {
                     // Current LR + all others are DELIVERED → fully done
                     order.setOrderStatus(OrderStatus.DELIVERED);
+
+                    // Release all staff allocations for this vehicle allocation
+                    List<OrderStaffAllocation> staffAllocations =
+                            staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(allocation.getId());
+                    for (OrderStaffAllocation sa : staffAllocations) {
+                        sa.setAllocationStatus(StaffAllocationStatus.COMPLETED);
+                        sa.setActualEndDate(LocalDate.now());
+                    }
+                    staffAllocationRepository.saveAll(staffAllocations);
+
+                    // Set actual delivery date on vehicle allocation
+                    allocation.setActualDeliveryDate(LocalDate.now());
+
+                    // Vehicle is back in yard → AVAILABLE
+                    setVehicleStatus(allocation.getVehicle(), VehicleStatusType.AVAILABLE);
                 } else {
                     // Some still in progress
                     order.setOrderStatus(OrderStatus.PARTIALLY_DELIVERED);

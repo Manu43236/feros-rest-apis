@@ -14,7 +14,9 @@ import com.feros.api.entity.master.State;
 import com.feros.api.enums.BillingOn;
 import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.enums.OrderStatus;
+import com.feros.api.enums.StaffAllocationStatus;
 import com.feros.api.enums.VehicleAllocationStatus;
+import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.repository.LrRepository;
@@ -44,6 +46,7 @@ public class OrderServiceImpl implements OrderService {
     private final StateRepository stateRepository;
     private final RouteRepository routeRepository;
     private final VehicleRepository vehicleRepository;
+    private final VehicleStatusRepository vehicleStatusRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final LrRepository lrRepository;
@@ -60,6 +63,14 @@ public class OrderServiceImpl implements OrderService {
     private User getCurrentUser() {
         return userRepository.findById(SecurityUtil.getCurrentUserId())
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
+    }
+
+    private void setVehicleStatus(Vehicle vehicle, VehicleStatusType type) {
+        vehicleStatusRepository.findByStatusTypeAndIsActiveTrue(type)
+                .ifPresent(status -> {
+                    vehicle.setCurrentStatus(status);
+                    vehicleRepository.save(vehicle);
+                });
     }
 
     /** Resolves materialType from either a known ID or a free-text custom name ("Other"). */
@@ -208,6 +219,28 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository
                 .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Order not found", HttpStatus.NOT_FOUND));
+
+        // Cancel and release all vehicle allocations
+        List<OrderVehicleAllocation> vehicleAllocations =
+                vehicleAllocationRepository.findByOrderIdAndIsActiveTrue(order.getId());
+        for (OrderVehicleAllocation va : vehicleAllocations) {
+            // Cancel all staff allocations linked to this vehicle allocation
+            List<OrderStaffAllocation> staffAllocations =
+                    staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(va.getId());
+            for (OrderStaffAllocation sa : staffAllocations) {
+                sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
+                sa.setIsActive(false);
+            }
+            staffAllocationRepository.saveAll(staffAllocations);
+
+            va.setAllocationStatus(VehicleAllocationStatus.CANCELLED);
+            va.setIsActive(false);
+
+            // Restore vehicle status → AVAILABLE
+            setVehicleStatus(va.getVehicle(), VehicleStatusType.AVAILABLE);
+        }
+        vehicleAllocationRepository.saveAll(vehicleAllocations);
+
         order.setOrderStatus(OrderStatus.CANCELLED);
         order.setIsActive(false);
         orderRepository.save(order);
@@ -232,6 +265,13 @@ public class OrderServiceImpl implements OrderService {
         if (vehicleAllocationRepository.existsByOrderIdAndVehicleIdAndIsActiveTrue(
                 orderId, request.getVehicleId())) {
             throw new FerosException("Vehicle already assigned to this order", HttpStatus.CONFLICT);
+        }
+
+        if (vehicleAllocationRepository.existsVehicleConflict(
+                request.getVehicleId(), request.getExpectedLoadDate(), request.getExpectedDeliveryDate())) {
+            throw new FerosException(
+                    "Vehicle is already assigned to another order during this date range",
+                    HttpStatus.CONFLICT);
         }
 
         Vehicle vehicle = vehicleRepository
@@ -272,6 +312,9 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         vehicleAllocationRepository.save(allocation);
+
+        // Update vehicle status → ASSIGNED
+        setVehicleStatus(vehicle, VehicleStatusType.ASSIGNED);
 
         // Update order weight fulfilled and status
         BigDecimal newFulfilled = order.getTotalWeightFulfilled()
@@ -336,6 +379,9 @@ public class OrderServiceImpl implements OrderService {
         // Soft-delete allocation
         allocation.setIsActive(false);
         vehicleAllocationRepository.save(allocation);
+
+        // Restore vehicle status → AVAILABLE
+        setVehicleStatus(allocation.getVehicle(), VehicleStatusType.AVAILABLE);
     }
 
     @Override
@@ -354,6 +400,13 @@ public class OrderServiceImpl implements OrderService {
         if (staffAllocationRepository.existsByVehicleAllocationIdAndUserIdAndIsActiveTrue(
                 request.getVehicleAllocationId(), request.getUserId())) {
             throw new FerosException("Staff already assigned to this vehicle allocation",
+                    HttpStatus.CONFLICT);
+        }
+
+        if (staffAllocationRepository.existsStaffConflict(
+                request.getUserId(), request.getExpectedStartDate(), request.getExpectedEndDate())) {
+            throw new FerosException(
+                    "Staff is already assigned to another order during this date range",
                     HttpStatus.CONFLICT);
         }
 
@@ -407,6 +460,30 @@ public class OrderServiceImpl implements OrderService {
 
         if (paymentStatus == OrderPaymentStatus.PAID) {
             order.setOrderStatus(OrderStatus.COMPLETED);
+
+            // Release any remaining active vehicle and staff allocations
+            List<OrderVehicleAllocation> vehicleAllocations =
+                    vehicleAllocationRepository.findByOrderIdAndIsActiveTrue(order.getId());
+            for (OrderVehicleAllocation va : vehicleAllocations) {
+                if (va.getAllocationStatus() != VehicleAllocationStatus.CANCELLED) {
+                    va.setAllocationStatus(VehicleAllocationStatus.DELIVERED);
+                    if (va.getActualDeliveryDate() == null) {
+                        va.setActualDeliveryDate(LocalDate.now());
+                    }
+                    List<OrderStaffAllocation> staffAllocations =
+                            staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(va.getId());
+                    for (OrderStaffAllocation sa : staffAllocations) {
+                        if (sa.getAllocationStatus() != StaffAllocationStatus.CANCELLED) {
+                            sa.setAllocationStatus(StaffAllocationStatus.COMPLETED);
+                            if (sa.getActualEndDate() == null) {
+                                sa.setActualEndDate(LocalDate.now());
+                            }
+                        }
+                    }
+                    staffAllocationRepository.saveAll(staffAllocations);
+                }
+            }
+            vehicleAllocationRepository.saveAll(vehicleAllocations);
         }
 
         return mapToOrderResponse(orderRepository.save(order));

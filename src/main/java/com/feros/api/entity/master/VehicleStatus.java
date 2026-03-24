@@ -1,7 +1,7 @@
 package com.feros.api.entity.master;
 
 import com.feros.api.entity.BaseEntity;
-import com.feros.api.entity.Tenant;
+import com.feros.api.enums.VehicleStatusType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -18,12 +18,12 @@ public class VehicleStatus extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tenant_id", nullable = false)
-    private Tenant tenant;
-
-    @Column(name = "name", nullable = false)
+    @Column(name = "name", nullable = false, unique = true)
     private String name;
+
+    @Column(name = "status_type", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private VehicleStatusType statusType;
 
     @Column(name = "is_active")
     private Boolean isActive = true;

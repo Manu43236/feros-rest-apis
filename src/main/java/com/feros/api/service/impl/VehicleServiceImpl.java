@@ -6,6 +6,7 @@ import com.feros.api.dto.response.VehicleResponse;
 import com.feros.api.entity.Tenant;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.master.*;
+import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.entity.OrderVehicleAllocation;
 import com.feros.api.repository.*;
@@ -135,7 +136,7 @@ public class VehicleServiceImpl implements VehicleService {
 
         if (request.getCurrentStatusId() != null)
             vehicle.setCurrentStatus(vehicleStatusRepository
-                    .findByIdAndTenantId(request.getCurrentStatusId(), tenant.getId())
+                    .findByIdAndIsActiveTrue(request.getCurrentStatusId())
                     .orElseThrow(() -> new FerosException("Vehicle status not found", HttpStatus.NOT_FOUND)));
 
         return mapToResponse(vehicleRepository.save(vehicle));
@@ -262,7 +263,7 @@ public class VehicleServiceImpl implements VehicleService {
 
         if (request.getCurrentStatusId() != null)
             vehicle.setCurrentStatus(vehicleStatusRepository
-                    .findByIdAndTenantId(request.getCurrentStatusId(), getCurrentTenantId())
+                    .findByIdAndIsActiveTrue(request.getCurrentStatusId())
                     .orElseThrow(() -> new FerosException("Vehicle status not found", HttpStatus.NOT_FOUND)));
 
         return mapToResponse(vehicleRepository.save(vehicle));
@@ -278,7 +279,7 @@ public class VehicleServiceImpl implements VehicleService {
             throw new FerosException("Status ID is required", HttpStatus.BAD_REQUEST);
 
         vehicle.setCurrentStatus(vehicleStatusRepository
-                .findByIdAndTenantId(statusId, getCurrentTenantId())
+                .findByIdAndIsActiveTrue(statusId)
                 .orElseThrow(() -> new FerosException("Vehicle status not found", HttpStatus.NOT_FOUND)));
 
         return mapToResponse(vehicleRepository.save(vehicle));
@@ -394,7 +395,7 @@ public class VehicleServiceImpl implements VehicleService {
                     }
 
                     // default status → Available
-                    vehicleStatusRepository.findByNameIgnoreCaseAndTenantId("Available", tenant.getId())
+                    vehicleStatusRepository.findByStatusTypeAndIsActiveTrue(VehicleStatusType.AVAILABLE)
                             .ifPresent(builder::currentStatus);
 
                     vehicleRepository.save(builder.build());
@@ -434,6 +435,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .ownershipTypeName(v.getOwnershipType() != null ? v.getOwnershipType().getName() : null)
                 .currentStatusId(v.getCurrentStatus() != null ? v.getCurrentStatus().getId() : null)
                 .currentStatusName(v.getCurrentStatus() != null ? v.getCurrentStatus().getName() : null)
+                .currentStatusType(v.getCurrentStatus() != null ? v.getCurrentStatus().getStatusType() : null)
                 .capacityInTons(v.getCapacityInTons())
                 .manufactureYear(v.getManufactureYear())
                 .color(v.getColor())

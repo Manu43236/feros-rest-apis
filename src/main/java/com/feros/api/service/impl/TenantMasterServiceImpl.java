@@ -14,7 +14,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -45,48 +44,44 @@ public class TenantMasterServiceImpl implements TenantMasterService {
     // ===================== VEHICLE STATUSES =====================
     @Override
     public TenantMasterResponse createVehicleStatus(VehicleStatusRequest request) {
-        Tenant tenant = getCurrentTenant();
-        Optional<VehicleStatus> existing = vehicleStatusRepository
-                .findByNameIgnoreCaseAndTenantId(request.getName(), tenant.getId());
-        if (existing.isPresent()) {
-            VehicleStatus status = existing.get();
-            if (status.getIsActive()) {
-                throw new FerosException("Vehicle status '" + request.getName() + "' already exists", HttpStatus.CONFLICT);
-            }
-            status.setIsActive(true);
-            return mapVehicleStatus(vehicleStatusRepository.save(status));
-        }
+        vehicleStatusRepository.findByNameIgnoreCaseAndIsActiveTrue(request.getName())
+                .ifPresent(s -> {
+                    throw new FerosException("Vehicle status '" + request.getName() + "' already exists", HttpStatus.CONFLICT);
+                });
         VehicleStatus status = VehicleStatus.builder()
-                .tenant(tenant).name(request.getName()).isActive(true).build();
+                .name(request.getName())
+                .statusType(request.getStatusType())
+                .isActive(true).build();
         return mapVehicleStatus(vehicleStatusRepository.save(status));
     }
 
     @Override
     public TenantMasterResponse getVehicleStatusById(Long id) {
         return mapVehicleStatus(vehicleStatusRepository
-                .findByIdAndTenantId(id, getCurrentTenantId())
+                .findByIdAndIsActiveTrue(id)
                 .orElseThrow(() -> new FerosException("Vehicle status not found", HttpStatus.NOT_FOUND)));
     }
 
     @Override
     public List<TenantMasterResponse> getAllVehicleStatuses() {
-        return vehicleStatusRepository.findByTenantIdAndIsActiveTrue(getCurrentTenantId())
+        return vehicleStatusRepository.findByIsActiveTrue()
                 .stream().map(this::mapVehicleStatus).toList();
     }
 
     @Override
     public TenantMasterResponse updateVehicleStatus(Long id, VehicleStatusRequest request) {
         VehicleStatus status = vehicleStatusRepository
-                .findByIdAndTenantId(id, getCurrentTenantId())
+                .findByIdAndIsActiveTrue(id)
                 .orElseThrow(() -> new FerosException("Vehicle status not found", HttpStatus.NOT_FOUND));
         status.setName(request.getName());
+        if (request.getStatusType() != null) status.setStatusType(request.getStatusType());
         return mapVehicleStatus(vehicleStatusRepository.save(status));
     }
 
     @Override
     public void deleteVehicleStatus(Long id) {
         VehicleStatus status = vehicleStatusRepository
-                .findByIdAndTenantId(id, getCurrentTenantId())
+                .findByIdAndIsActiveTrue(id)
                 .orElseThrow(() -> new FerosException("Vehicle status not found", HttpStatus.NOT_FOUND));
         status.setIsActive(false);
         vehicleStatusRepository.save(status);
@@ -393,7 +388,7 @@ public class TenantMasterServiceImpl implements TenantMasterService {
     // ===================== MAPPERS =====================
     private TenantMasterResponse mapVehicleStatus(VehicleStatus s) {
         return TenantMasterResponse.builder().id(s.getId())
-                .tenantId(s.getTenant().getId()).name(s.getName())
+                .name(s.getName())
                 .isActive(s.getIsActive()).createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt()).build();
     }

@@ -1,6 +1,7 @@
 package com.feros.api.dto.response;
 
 import com.feros.api.enums.PermitType;
+import com.feros.api.enums.VehicleStatusType;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -31,6 +32,7 @@ public class VehicleResponse {
 
     private Long currentStatusId;
     private String currentStatusName;
+    private VehicleStatusType currentStatusType;
 
     private BigDecimal capacityInTons;
     private Integer manufactureYear;

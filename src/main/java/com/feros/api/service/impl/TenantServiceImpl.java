@@ -34,7 +34,6 @@ import java.util.Map;
 public class TenantServiceImpl implements TenantService {
 
     private final TenantRepository tenantRepository;
-    private final VehicleStatusRepository vehicleStatusRepository;
     private final ClientTypeRepository clientTypeRepository;
     private final PaymentTermsRepository paymentTermsRepository;
     private final ChargeTypeRepository chargeTypeRepository;
@@ -221,11 +220,6 @@ public class TenantServiceImpl implements TenantService {
 
     // ===================== SEED DEFAULT MASTER DATA =====================
     private void seedDefaultMasterData(Tenant tenant) {
-
-        // Vehicle Statuses
-        List.of("Available", "On Trip", "Under Maintenance", "Breakdown", "Inactive")
-                .forEach(name -> vehicleStatusRepository.save(
-                        VehicleStatus.builder().tenant(tenant).name(name).isActive(true).build()));
 
         // Client Types
         List.of("Regular", "Spot", "Contract", "Government")

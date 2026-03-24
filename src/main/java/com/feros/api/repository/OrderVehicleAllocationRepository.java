@@ -24,4 +24,12 @@ public interface OrderVehicleAllocationRepository extends JpaRepository<OrderVeh
            "AND ova.allocationStatus IN ('ALLOCATED', 'LR_CREATED', 'IN_TRANSIT') " +
            "AND ova.expectedLoadDate <= :date AND ova.expectedDeliveryDate >= :date")
     List<OrderVehicleAllocation> findActiveAllocationsOnDate(@Param("tenantId") Long tenantId, @Param("date") LocalDate date);
+
+    @Query("SELECT CASE WHEN COUNT(ova) > 0 THEN true ELSE false END FROM OrderVehicleAllocation ova " +
+           "WHERE ova.vehicle.id = :vehicleId AND ova.isActive = true " +
+           "AND ova.allocationStatus IN ('ALLOCATED', 'LR_CREATED', 'IN_TRANSIT') " +
+           "AND ova.expectedLoadDate <= :deliveryDate AND ova.expectedDeliveryDate >= :loadDate")
+    boolean existsVehicleConflict(@Param("vehicleId") Long vehicleId,
+                                   @Param("loadDate") LocalDate loadDate,
+                                   @Param("deliveryDate") LocalDate deliveryDate);
 }
