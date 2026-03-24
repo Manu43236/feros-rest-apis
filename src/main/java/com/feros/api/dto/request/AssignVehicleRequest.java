@@ -17,7 +17,10 @@ public class AssignVehicleRequest {
     @NotNull(message = "Allocated weight is required")
     private BigDecimal allocatedWeight;
 
+    @NotNull(message = "Expected load date is required")
     private LocalDate expectedLoadDate;
+
+    @NotNull(message = "Expected delivery date is required")
     private LocalDate expectedDeliveryDate;
     private String remarks;
 }

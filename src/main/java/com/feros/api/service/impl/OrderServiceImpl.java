@@ -267,8 +267,9 @@ public class OrderServiceImpl implements OrderService {
             throw new FerosException("Vehicle already assigned to this order", HttpStatus.CONFLICT);
         }
 
-        if (vehicleAllocationRepository.existsVehicleConflict(
-                request.getVehicleId(), request.getExpectedLoadDate(), request.getExpectedDeliveryDate())) {
+        if (request.getExpectedLoadDate() != null && request.getExpectedDeliveryDate() != null &&
+                vehicleAllocationRepository.existsVehicleConflict(
+                        request.getVehicleId(), request.getExpectedLoadDate(), request.getExpectedDeliveryDate())) {
             throw new FerosException(
                     "Vehicle is already assigned to another order during this date range",
                     HttpStatus.CONFLICT);
