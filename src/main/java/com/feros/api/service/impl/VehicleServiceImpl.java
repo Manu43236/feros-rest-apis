@@ -144,9 +144,17 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public VehicleResponse getVehicleById(Long id) {
-        return mapToResponse(vehicleRepository
+        Vehicle vehicle = vehicleRepository
                 .findByIdAndTenantId(id, getCurrentTenantId())
-                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND)));
+                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+        VehicleResponse resp = mapToResponse(vehicle);
+        allocationRepository.findActiveAllocationForVehicleOnDate(id, LocalDate.now())
+                .ifPresentOrElse(alloc -> {
+                    resp.setIsAssigned(true);
+                    resp.setAssignedOrderId(alloc.getOrder().getId());
+                    resp.setAssignedOrderNumber(alloc.getOrder().getOrderNumber());
+                }, () -> resp.setIsAssigned(false));
+        return resp;
     }
 
     @Override
