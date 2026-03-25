@@ -466,7 +466,7 @@ public class TenantServiceImpl implements TenantService {
                 .role("ADMIN")
                 .tenantId(tenant.getId())
                 .companyName(tenant.getCompanyName())
-                .logoUrl(tenant.getLogoUrl() != null ? s3Service.generateLogoPresignedUrl(tenant.getLogoUrl()) : null)
+                .logoUrl(tenant.getLogoUrl() != null ? s3Service.getPublicUrl(tenant.getLogoUrl()) : null)
                 .isPinResetRequired(false)
                 .build();
     }
@@ -496,7 +496,7 @@ public class TenantServiceImpl implements TenantService {
                 .ownerPhone(tenant.getOwnerPhone())
                 .ownerEmail(tenant.getOwnerEmail())
                 .prefix(tenant.getPrefix())
-                .logoUrl(tenant.getLogoUrl() != null ? s3Service.generateLogoPresignedUrl(tenant.getLogoUrl()) : null)
+                .logoUrl(tenant.getLogoUrl() != null ? s3Service.getPublicUrl(tenant.getLogoUrl()) : null)
                 .lorryCount(tenant.getLorryCount())
                 .subscriptionStatus(tenant.getSubscriptionStatus())
                 .trialStartDate(tenant.getTrialStartDate())

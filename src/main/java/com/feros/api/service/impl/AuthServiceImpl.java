@@ -63,7 +63,7 @@ public class AuthServiceImpl implements AuthService {
         Long tenantId = user.getTenant() != null ? user.getTenant().getId() : null;
         String companyName = user.getTenant() != null ? user.getTenant().getCompanyName() : "FEROS";
         String logoKey = user.getTenant() != null ? user.getTenant().getLogoUrl() : null;
-        String logoUrl = logoKey != null ? s3Service.generateLogoPresignedUrl(logoKey) : null;
+        String logoUrl = logoKey != null ? s3Service.getPublicUrl(logoKey) : null;
 
         // 6. Generate JWT token
         String token = jwtUtil.generateToken(
