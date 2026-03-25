@@ -32,9 +32,10 @@ public class FileUploadController {
 
         String key = s3Service.uploadFile(file, folder);
         String url = s3Service.generatePresignedUrl(key);
+        String publicUrl = s3Service.getPublicUrl(key);
 
         return ResponseEntity.ok(ApiResponse.success("File uploaded successfully",
-                Map.of("key", key, "url", url)));
+                Map.of("key", key, "url", url, "publicUrl", publicUrl)));
     }
 
     /**
