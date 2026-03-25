@@ -73,6 +73,17 @@ public class S3Service {
     }
 
     /**
+     * Generate a pre-signed URL valid for 7 days (for logos shown after login).
+     */
+    public String generateLogoPresignedUrl(String key) {
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofDays(7))
+                .getObjectRequest(r -> r.bucket(bucket).key(key))
+                .build();
+        return s3Presigner.presignGetObject(presignRequest).url().toString();
+    }
+
+    /**
      * Return a permanent public URL (use only if bucket/object has public access).
      */
     public String getPublicUrl(String key) {
