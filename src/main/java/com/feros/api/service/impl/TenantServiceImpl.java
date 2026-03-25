@@ -466,6 +466,7 @@ public class TenantServiceImpl implements TenantService {
                 .role("ADMIN")
                 .tenantId(tenant.getId())
                 .companyName(tenant.getCompanyName())
+                .logoUrl(tenant.getLogoUrl())
                 .isPinResetRequired(false)
                 .build();
     }

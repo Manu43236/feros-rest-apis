@@ -60,6 +60,7 @@ public class AuthServiceImpl implements AuthService {
         // 5. Get tenant info
         Long tenantId = user.getTenant() != null ? user.getTenant().getId() : null;
         String companyName = user.getTenant() != null ? user.getTenant().getCompanyName() : "FEROS";
+        String logoUrl = user.getTenant() != null ? user.getTenant().getLogoUrl() : null;
 
         // 6. Generate JWT token
         String token = jwtUtil.generateToken(
@@ -78,6 +79,7 @@ public class AuthServiceImpl implements AuthService {
                 .role(role)
                 .tenantId(tenantId)
                 .companyName(companyName)
+                .logoUrl(logoUrl)
                 .isPinResetRequired(user.getIsPinResetRequired())
                 .build();
     }

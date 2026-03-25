@@ -15,5 +15,6 @@ public class LoginResponse {
     private String role;
     private Long tenantId;
     private String companyName;
+    private String logoUrl;
     private boolean isPinResetRequired;
 }
