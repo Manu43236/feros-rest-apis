@@ -36,3 +36,4 @@ build/
 ### Environment / Secrets ###
 .env
 **/application-local.properties
+aws/
