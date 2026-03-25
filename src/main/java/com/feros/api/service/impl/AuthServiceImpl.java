@@ -7,6 +7,7 @@ import com.feros.api.entity.User;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.UserRepository;
 import com.feros.api.service.AuthService;
+import com.feros.api.service.S3Service;
 import com.feros.api.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final S3Service s3Service;
 
     @Override
     public LoginResponse login(LoginRequest request) {
@@ -60,7 +62,8 @@ public class AuthServiceImpl implements AuthService {
         // 5. Get tenant info
         Long tenantId = user.getTenant() != null ? user.getTenant().getId() : null;
         String companyName = user.getTenant() != null ? user.getTenant().getCompanyName() : "FEROS";
-        String logoUrl = user.getTenant() != null ? user.getTenant().getLogoUrl() : null;
+        String logoKey = user.getTenant() != null ? user.getTenant().getLogoUrl() : null;
+        String logoUrl = logoKey != null ? s3Service.getPublicUrl(logoKey) : null;
 
         // 6. Generate JWT token
         String token = jwtUtil.generateToken(
