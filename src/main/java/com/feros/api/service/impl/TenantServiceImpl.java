@@ -4,16 +4,20 @@ import com.feros.api.dto.request.CreateTenantRequest;
 import com.feros.api.dto.request.UpdateMyTenantRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.LoginResponse;
+import com.feros.api.dto.response.TenantDocumentResponse;
 import com.feros.api.dto.response.TenantResponse;
 import com.feros.api.entity.Designation;
 import com.feros.api.entity.Tenant;
+import com.feros.api.entity.TenantDocument;
 import com.feros.api.entity.master.*;
 import com.feros.api.enums.PayCycle;
 import com.feros.api.enums.RoleName;
 import com.feros.api.enums.SubscriptionStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
+import com.feros.api.repository.TenantDocumentRepository;
 import com.feros.api.repository.TenantRepository;
+import com.feros.api.service.S3Service;
 import com.feros.api.service.TenantService;
 import com.feros.api.util.JwtUtil;
 import com.feros.api.util.SecurityUtil;
@@ -36,11 +40,13 @@ import java.util.Map;
 public class TenantServiceImpl implements TenantService {
 
     private final TenantRepository tenantRepository;
+    private final TenantDocumentRepository tenantDocumentRepository;
     private final ClientTypeRepository clientTypeRepository;
     private final PaymentTermsRepository paymentTermsRepository;
     private final ChargeTypeRepository chargeTypeRepository;
     private final DesignationRepository designationRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
+    private final S3Service s3Service;
     private final JwtUtil jwtUtil;
 
     @Override
@@ -218,6 +224,125 @@ public class TenantServiceImpl implements TenantService {
                 .failureCount(failureCount)
                 .errors(errors)
                 .build();
+    }
+
+    // ===================== S3 — LOGO =====================
+
+    @Override
+    public TenantResponse uploadLogo(Long tenantId, MultipartFile file) {
+        Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(tenantId)
+                .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+        return doUploadLogo(tenant, file);
+    }
+
+    @Override
+    public TenantResponse uploadMyLogo(MultipartFile file) {
+        Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(SecurityUtil.getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+        return doUploadLogo(tenant, file);
+    }
+
+    private TenantResponse doUploadLogo(Tenant tenant, MultipartFile file) {
+        try {
+            String prefix = tenant.getPrefix() != null ? tenant.getPrefix() : "T" + tenant.getId();
+            String ext = getExtension(file.getOriginalFilename());
+            String key = "tenants/images/" + prefix + "_logo" + ext;
+            s3Service.uploadFileWithKey(file, key);
+            tenant.setLogoUrl(key);
+            return mapToResponse(tenantRepository.save(tenant));
+        } catch (Exception e) {
+            throw new FerosException("Failed to upload logo: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ===================== S3 — DOCUMENTS =====================
+
+    @Override
+    public TenantDocumentResponse addDocument(Long tenantId, String documentName, MultipartFile file) {
+        Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(tenantId)
+                .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+        return doAddDocument(tenant, documentName, file);
+    }
+
+    @Override
+    public TenantDocumentResponse addMyDocument(String documentName, MultipartFile file) {
+        Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(SecurityUtil.getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+        return doAddDocument(tenant, documentName, file);
+    }
+
+    private TenantDocumentResponse doAddDocument(Tenant tenant, String documentName, MultipartFile file) {
+        try {
+            String prefix = tenant.getPrefix() != null ? tenant.getPrefix() : "T" + tenant.getId();
+            String ext = getExtension(file.getOriginalFilename());
+            String uuid = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+            String key = "tenants/docs/" + prefix + "_" + uuid + ext;
+            s3Service.uploadFileWithKey(file, key);
+
+            TenantDocument doc = TenantDocument.builder()
+                    .tenant(tenant)
+                    .documentName(documentName)
+                    .originalFileName(file.getOriginalFilename())
+                    .s3Key(key)
+                    .isActive(true)
+                    .build();
+            TenantDocument saved = tenantDocumentRepository.save(doc);
+            return mapDocToResponse(saved);
+        } catch (Exception e) {
+            throw new FerosException("Failed to upload document: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public List<TenantDocumentResponse> getDocuments(Long tenantId) {
+        return tenantDocumentRepository.findByTenantIdAndIsActiveTrue(tenantId)
+                .stream().map(this::mapDocToResponse).toList();
+    }
+
+    @Override
+    public List<TenantDocumentResponse> getMyDocuments() {
+        return tenantDocumentRepository.findByTenantIdAndIsActiveTrue(SecurityUtil.getCurrentTenantId())
+                .stream().map(this::mapDocToResponse).toList();
+    }
+
+    @Override
+    public void deleteDocument(Long tenantId, Long docId) {
+        TenantDocument doc = tenantDocumentRepository.findByIdAndIsActiveTrue(docId)
+                .orElseThrow(() -> new FerosException("Document not found", HttpStatus.NOT_FOUND));
+        if (!doc.getTenant().getId().equals(tenantId))
+            throw new FerosException("Document does not belong to this tenant", HttpStatus.FORBIDDEN);
+        doDeleteDocument(doc);
+    }
+
+    @Override
+    public void deleteMyDocument(Long docId) {
+        TenantDocument doc = tenantDocumentRepository.findByIdAndIsActiveTrue(docId)
+                .orElseThrow(() -> new FerosException("Document not found", HttpStatus.NOT_FOUND));
+        if (!doc.getTenant().getId().equals(SecurityUtil.getCurrentTenantId()))
+            throw new FerosException("Document does not belong to your tenant", HttpStatus.FORBIDDEN);
+        doDeleteDocument(doc);
+    }
+
+    private void doDeleteDocument(TenantDocument doc) {
+        s3Service.deleteFile(doc.getS3Key());
+        doc.setIsActive(false);
+        tenantDocumentRepository.save(doc);
+    }
+
+    private TenantDocumentResponse mapDocToResponse(TenantDocument doc) {
+        return TenantDocumentResponse.builder()
+                .id(doc.getId())
+                .documentName(doc.getDocumentName())
+                .originalFileName(doc.getOriginalFileName())
+                .s3Key(doc.getS3Key())
+                .fileUrl(s3Service.generatePresignedUrl(doc.getS3Key()))
+                .createdAt(doc.getCreatedAt())
+                .build();
+    }
+
+    private String getExtension(String filename) {
+        if (filename == null || !filename.contains(".")) return "";
+        return filename.substring(filename.lastIndexOf('.'));
     }
 
     // ===================== SEED DEFAULT MASTER DATA =====================

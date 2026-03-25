@@ -4,6 +4,7 @@ import com.feros.api.dto.request.CreateTenantRequest;
 import com.feros.api.dto.request.UpdateMyTenantRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.LoginResponse;
+import com.feros.api.dto.response.TenantDocumentResponse;
 import com.feros.api.dto.response.TenantResponse;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,4 +20,16 @@ public interface TenantService {
     LoginResponse impersonateTenant(Long tenantId, Long saUserId, String saPhone);
     TenantResponse getMyTenant();
     TenantResponse updateMyTenant(UpdateMyTenantRequest request);
+
+    // S3 — Logo
+    TenantResponse uploadLogo(Long tenantId, MultipartFile file);
+    TenantResponse uploadMyLogo(MultipartFile file);
+
+    // S3 — Documents
+    TenantDocumentResponse addDocument(Long tenantId, String documentName, MultipartFile file);
+    TenantDocumentResponse addMyDocument(String documentName, MultipartFile file);
+    List<TenantDocumentResponse> getDocuments(Long tenantId);
+    List<TenantDocumentResponse> getMyDocuments();
+    void deleteDocument(Long tenantId, Long docId);
+    void deleteMyDocument(Long docId);
 }
