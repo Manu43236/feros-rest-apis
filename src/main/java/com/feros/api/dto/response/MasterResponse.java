@@ -16,6 +16,7 @@ public class MasterResponse {
     private String code;
     private String category;
     private String applicableFor;
+    private java.util.List<String> applicableRoles;
     private BigDecimal capacityInTons;
     private Integer tyreCount;
     private BigDecimal rate;

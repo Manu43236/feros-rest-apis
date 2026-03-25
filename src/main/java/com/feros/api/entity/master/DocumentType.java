@@ -25,6 +25,9 @@ public class DocumentType extends BaseEntity {
     @Column(name = "applicable_for", nullable = false)
     private ApplicableFor applicableFor;
 
+    @Column(name = "applicable_roles", columnDefinition = "JSON")
+    private String applicableRoles;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 }

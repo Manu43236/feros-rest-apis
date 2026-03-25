@@ -15,4 +15,6 @@ public class DocumentTypeRequest {
 
     @NotNull(message = "Applicable for is required")
     private ApplicableFor applicableFor;
+
+    private java.util.List<String> applicableRoles;
 }

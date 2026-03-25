@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -268,7 +269,8 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
     @Override
     public MasterResponse createDocumentType(DocumentTypeRequest request) {
         DocumentType type = DocumentType.builder()
-                .name(request.getName()).applicableFor(request.getApplicableFor()).isActive(true).build();
+                .name(request.getName()).applicableFor(request.getApplicableFor())
+                .applicableRoles(toRolesJson(request.getApplicableRoles())).isActive(true).build();
         return mapToMasterResponse(documentTypeRepository.save(type));
     }
 
@@ -290,6 +292,7 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
                 .orElseThrow(() -> new FerosException("Document type not found", HttpStatus.NOT_FOUND));
         type.setName(request.getName());
         type.setApplicableFor(request.getApplicableFor());
+        type.setApplicableRoles(toRolesJson(request.getApplicableRoles()));
         return mapToMasterResponse(documentTypeRepository.save(type));
     }
 
@@ -586,7 +589,9 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
                     .createdAt(e.getCreatedAt()).updatedAt(e.getUpdatedAt()).build();
         if (entity instanceof DocumentType e)
             return MasterResponse.builder().id(e.getId()).name(e.getName())
-                    .applicableFor(e.getApplicableFor().name()).isActive(e.getIsActive())
+                    .applicableFor(e.getApplicableFor().name())
+                    .applicableRoles(parseRoles(e.getApplicableRoles()))
+                    .isActive(e.getIsActive())
                     .createdAt(e.getCreatedAt()).updatedAt(e.getUpdatedAt()).build();
         if (entity instanceof AttendanceType e)
             return MasterResponse.builder().id(e.getId()).name(e.getName())
@@ -618,5 +623,17 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
                     .isActive(e.getIsActive()).createdAt(e.getCreatedAt())
                     .updatedAt(e.getUpdatedAt()).build();
         throw new FerosException("Unknown entity type", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    private List<String> parseRoles(String json) {
+        if (json == null || json.isBlank()) return null;
+        String stripped = json.replaceAll("[\\[\\]\"\\s]", "");
+        if (stripped.isEmpty()) return List.of();
+        return List.of(stripped.split(","));
+    }
+
+    private String toRolesJson(List<String> roles) {
+        if (roles == null || roles.isEmpty()) return null;
+        return "[" + roles.stream().map(r -> "\"" + r + "\"").collect(Collectors.joining(",")) + "]";
     }
 }
