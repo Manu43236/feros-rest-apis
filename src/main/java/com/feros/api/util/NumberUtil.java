@@ -26,7 +26,9 @@ public final class NumberUtil {
         DOC,   // Document
         ATD,   // Attendance
         PR,    // Payroll
-        RPT    // Report
+        RPT,   // Report
+        CN,    // Credit Note
+        SVC    // Vehicle Service
     }
 
     /**
