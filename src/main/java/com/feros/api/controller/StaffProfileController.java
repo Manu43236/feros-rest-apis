@@ -5,9 +5,12 @@ import com.feros.api.dto.request.StaffProfileRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.DocumentResponse;
 import com.feros.api.dto.response.StaffProfileResponse;
+import com.feros.api.dto.response.VehicleImageResponse;
 import com.feros.api.service.StaffProfileService;
 import jakarta.validation.Valid;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -109,5 +112,38 @@ public class StaffProfileController {
             @PathVariable Long documentId) {
         staffProfileService.deleteVehicleDocument(documentId);
         return ResponseEntity.ok(ApiResponse.success("Document deleted successfully", null));
+    }
+
+    // ===================== VEHICLE IMAGES =====================
+    @GetMapping("/vehicles/{vehicleId}/images")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<VehicleImageResponse>>> getVehicleImages(
+            @PathVariable Long vehicleId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Images fetched successfully",
+                staffProfileService.getVehicleImages(vehicleId)));
+    }
+
+    @PostMapping("/vehicles/{vehicleId}/images")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<VehicleImageResponse>> addVehicleImage(
+            @PathVariable Long vehicleId, @RequestBody AddImageRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Image added successfully",
+                staffProfileService.addVehicleImage(vehicleId, request.getImageUrl(), request.getCaption())));
+    }
+
+    @DeleteMapping("/vehicles/images/{imageId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteVehicleImage(@PathVariable Long imageId) {
+        staffProfileService.deleteVehicleImage(imageId);
+        return ResponseEntity.ok(ApiResponse.success("Image deleted successfully", null));
+    }
+
+    @Getter
+    @Setter
+    static class AddImageRequest {
+        private String imageUrl;
+        private String caption;
     }
 }

@@ -72,7 +72,7 @@ public class VehicleServiceImpl implements VehicleService {
                         HttpStatus.CONFLICT);
         } else {
             if (!vehicleRepository.existsByRegistrationNumberAndOwnershipTypeNameContainingIgnoreCase(regNum, "OWN"))
-                throw new FerosException("Vehicle must be owned by a fleet before it can be hired",
+                throw new FerosException("Please select a valid ownership type for this vehicle",
                         HttpStatus.BAD_REQUEST);
             if (vehicleRepository.existsByRegistrationNumberAndTenantId(regNum, tenant.getId()))
                 throw new FerosException("Vehicle with this registration number already exists in your fleet",
@@ -210,7 +210,7 @@ public class VehicleServiceImpl implements VehicleService {
                             HttpStatus.CONFLICT);
             } else {
                 if (!vehicleRepository.existsByRegistrationNumberAndOwnershipTypeNameContainingIgnoreCase(newRegNum, "OWN"))
-                    throw new FerosException("Vehicle must be owned by a fleet before it can be hired",
+                    throw new FerosException("Please select a valid ownership type for this vehicle",
                             HttpStatus.BAD_REQUEST);
                 if (vehicleRepository.existsByRegistrationNumberAndTenantIdAndIdNot(newRegNum, getCurrentTenantId(), id))
                     throw new FerosException("Vehicle with this registration number already exists in your fleet",
@@ -358,7 +358,7 @@ public class VehicleServiceImpl implements VehicleService {
                         }
                     } else {
                         if (!vehicleRepository.existsByRegistrationNumberAndOwnershipTypeNameContainingIgnoreCase(regNum, "OWN")) {
-                            errors.add("Row " + rowNum + ": Vehicle " + regNum + " must be owned by a fleet before it can be hired");
+                            errors.add("Row " + rowNum + ": Vehicle " + regNum + " — please select a valid ownership type");
                             failureCount++;
                             continue;
                         }

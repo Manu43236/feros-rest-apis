@@ -4,6 +4,7 @@ import com.feros.api.dto.request.DocumentRequest;
 import com.feros.api.dto.request.StaffProfileRequest;
 import com.feros.api.dto.response.DocumentResponse;
 import com.feros.api.dto.response.StaffProfileResponse;
+import com.feros.api.dto.response.VehicleImageResponse;
 import com.feros.api.entity.*;
 import com.feros.api.entity.master.*;
 import com.feros.api.exception.FerosException;
@@ -25,6 +26,7 @@ public class StaffProfileServiceImpl implements StaffProfileService {
     private final StaffProfileRepository staffProfileRepository;
     private final StaffDocumentRepository staffDocumentRepository;
     private final VehicleDocumentRepository vehicleDocumentRepository;
+    private final VehicleImageRepository vehicleImageRepository;
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
     private final VehicleRepository vehicleRepository;
@@ -216,6 +218,41 @@ public class StaffProfileServiceImpl implements StaffProfileService {
         vehicleDocumentRepository.save(doc);
     }
 
+    // ===================== VEHICLE IMAGES =====================
+    @Override
+    @Transactional
+    public VehicleImageResponse addVehicleImage(Long vehicleId, String imageUrl, String caption) {
+        Long tenantId = getCurrentTenantId();
+        Vehicle vehicle = vehicleRepository
+                .findByIdAndTenantIdAndIsActiveTrue(vehicleId, tenantId)
+                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+        VehicleImage image = VehicleImage.builder()
+                .tenant(getCurrentTenant())
+                .vehicle(vehicle)
+                .imageUrl(imageUrl)
+                .caption(caption)
+                .isActive(true)
+                .build();
+        return mapToImageResponse(vehicleImageRepository.save(image));
+    }
+
+    @Override
+    public List<VehicleImageResponse> getVehicleImages(Long vehicleId) {
+        return vehicleImageRepository
+                .findByVehicleIdAndTenantIdAndIsActiveTrue(vehicleId, getCurrentTenantId())
+                .stream().map(this::mapToImageResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public void deleteVehicleImage(Long imageId) {
+        VehicleImage image = vehicleImageRepository
+                .findByIdAndTenantIdAndIsActiveTrue(imageId, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Image not found", HttpStatus.NOT_FOUND));
+        image.setIsActive(false);
+        vehicleImageRepository.save(image);
+    }
+
     // ===================== MAPPERS =====================
     private StaffProfileResponse mapToProfileResponse(StaffProfile p) {
         String roleName = p.getUser().getRoles().stream()
@@ -297,6 +334,15 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .remarks(d.getRemarks())
                 .createdAt(d.getCreatedAt())
                 .updatedAt(d.getUpdatedAt())
+                .build();
+    }
+
+    private VehicleImageResponse mapToImageResponse(VehicleImage img) {
+        return VehicleImageResponse.builder()
+                .id(img.getId())
+                .imageUrl(img.getImageUrl())
+                .caption(img.getCaption())
+                .createdAt(img.getCreatedAt())
                 .build();
     }
 }

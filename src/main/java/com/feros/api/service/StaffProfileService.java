@@ -4,6 +4,7 @@ import com.feros.api.dto.request.DocumentRequest;
 import com.feros.api.dto.request.StaffProfileRequest;
 import com.feros.api.dto.response.DocumentResponse;
 import com.feros.api.dto.response.StaffProfileResponse;
+import com.feros.api.dto.response.VehicleImageResponse;
 
 import java.util.List;
 
@@ -20,4 +21,8 @@ public interface StaffProfileService {
     List<DocumentResponse> getVehicleDocuments(Long vehicleId);
     DocumentResponse verifyVehicleDocument(Long documentId);
     void deleteVehicleDocument(Long documentId);
+
+    VehicleImageResponse addVehicleImage(Long vehicleId, String imageUrl, String caption);
+    List<VehicleImageResponse> getVehicleImages(Long vehicleId);
+    void deleteVehicleImage(Long imageId);
 }
