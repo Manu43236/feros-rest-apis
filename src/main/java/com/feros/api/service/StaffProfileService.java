@@ -19,4 +19,5 @@ public interface StaffProfileService {
     DocumentResponse addVehicleDocument(Long vehicleId, DocumentRequest request);
     List<DocumentResponse> getVehicleDocuments(Long vehicleId);
     DocumentResponse verifyVehicleDocument(Long documentId);
+    void deleteVehicleDocument(Long documentId);
 }

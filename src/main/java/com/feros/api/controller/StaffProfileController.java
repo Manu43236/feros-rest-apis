@@ -102,4 +102,12 @@ public class StaffProfileController {
                 "Document verified successfully",
                 staffProfileService.verifyVehicleDocument(documentId)));
     }
+
+    @DeleteMapping("/vehicles/documents/{documentId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteVehicleDocument(
+            @PathVariable Long documentId) {
+        staffProfileService.deleteVehicleDocument(documentId);
+        return ResponseEntity.ok(ApiResponse.success("Document deleted successfully", null));
+    }
 }

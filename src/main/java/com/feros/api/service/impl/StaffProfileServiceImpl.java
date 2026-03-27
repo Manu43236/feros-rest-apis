@@ -206,6 +206,16 @@ public class StaffProfileServiceImpl implements StaffProfileService {
         return mapToDocumentResponse(vehicleDocumentRepository.save(doc));
     }
 
+    @Override
+    @Transactional
+    public void deleteVehicleDocument(Long documentId) {
+        VehicleDocument doc = vehicleDocumentRepository
+                .findByIdAndTenantIdAndIsActiveTrue(documentId, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Document not found", HttpStatus.NOT_FOUND));
+        doc.setIsActive(false);
+        vehicleDocumentRepository.save(doc);
+    }
+
     // ===================== MAPPERS =====================
     private StaffProfileResponse mapToProfileResponse(StaffProfile p) {
         String roleName = p.getUser().getRoles().stream()
