@@ -25,21 +25,21 @@ public class LrController {
     private final LrService lrService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<List<LrResponse>>> getAllLrs() {
         return ResponseEntity.ok(ApiResponse.success(
                 "LRs fetched successfully", lrService.getAllLrs()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<LrResponse>> getLrById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 "LR fetched successfully", lrService.getLrById(id)));
     }
 
     @GetMapping("/order/{orderId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<List<LrResponse>>> getLrsByOrder(
             @PathVariable Long orderId) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -47,7 +47,7 @@ public class LrController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<LrResponse>> createLr(
             @Valid @RequestBody CreateLrRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -55,7 +55,7 @@ public class LrController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<LrResponse>> updateLr(
             @PathVariable Long id, @RequestBody UpdateLrRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -63,7 +63,7 @@ public class LrController {
     }
 
     @PostMapping("/{id}/checkposts")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<LrCheckpostResponse>> addCheckpost(
             @PathVariable Long id, @Valid @RequestBody LrCheckpostRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -71,7 +71,7 @@ public class LrController {
     }
 
     @GetMapping("/{id}/checkposts")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<List<LrCheckpostResponse>>> getCheckposts(
             @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -79,7 +79,7 @@ public class LrController {
     }
 
     @PostMapping("/{id}/charges")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<LrChargeResponse>> addCharge(
             @PathVariable Long id, @Valid @RequestBody LrChargeRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -87,7 +87,7 @@ public class LrController {
     }
 
     @GetMapping("/{id}/charges")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<List<LrChargeResponse>>> getCharges(
             @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(

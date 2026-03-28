@@ -25,14 +25,14 @@ public class OrderController {
     private final OrderService orderService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getAllOrders() {
         return ResponseEntity.ok(ApiResponse.success(
                 "Orders fetched successfully", orderService.getAllOrders()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<OrderResponse>> getOrderById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Order fetched successfully", orderService.getOrderById(id)));
@@ -62,7 +62,7 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/assign-vehicle")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<VehicleAllocationResponse>> assignVehicle(
             @PathVariable Long id, @Valid @RequestBody AssignVehicleRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -78,7 +78,7 @@ public class OrderController {
     }
 
     @DeleteMapping("/{id}/allocations/{allocationId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<Void>> unassignVehicle(
             @PathVariable Long id, @PathVariable Long allocationId) {
         orderService.unassignVehicle(id, allocationId);
@@ -86,7 +86,7 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/assign-staff")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<StaffAllocationResponse>> assignStaff(
             @PathVariable Long id, @Valid @RequestBody AssignStaffRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -94,7 +94,7 @@ public class OrderController {
     }
 
     @DeleteMapping("/{id}/staff-allocations/{staffAllocationId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<Void>> unassignStaff(
             @PathVariable Long id, @PathVariable Long staffAllocationId) {
         orderService.unassignStaff(id, staffAllocationId);

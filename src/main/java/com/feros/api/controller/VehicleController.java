@@ -25,7 +25,7 @@ public class VehicleController {
     private final VehicleService vehicleService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<List<VehicleResponse>>> getAllVehicles(
             @RequestParam(required = false) LocalDate date) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -33,7 +33,7 @@ public class VehicleController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<VehicleResponse>> getVehicleById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Vehicle fetched successfully", vehicleService.getVehicleById(id)));

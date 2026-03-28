@@ -27,7 +27,7 @@ public class AttendanceController {
 
     // ===================== ATTENDANCE =====================
     @PostMapping("/attendance")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> markAttendance(
             @Valid @RequestBody AttendanceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -35,7 +35,7 @@ public class AttendanceController {
     }
 
     @PostMapping("/attendance/bulk")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> markBulkAttendance(
             @Valid @RequestBody BulkAttendanceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -44,7 +44,7 @@ public class AttendanceController {
     }
 
     @GetMapping("/attendance")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getAttendanceByDate(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -53,7 +53,7 @@ public class AttendanceController {
     }
 
     @GetMapping("/attendance/user/{userId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getAttendanceByUser(
             @PathVariable Long userId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -83,7 +83,7 @@ public class AttendanceController {
     }
 
     @GetMapping("/trip-proofs/lr/{lrId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<List<TripProofResponse>>> getTripProofsByLr(
             @PathVariable Long lrId) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -92,7 +92,7 @@ public class AttendanceController {
     }
 
     @GetMapping("/trip-proofs/user/{userId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<List<TripProofResponse>>> getTripProofsByUser(
             @PathVariable Long userId) {
         return ResponseEntity.ok(ApiResponse.success(
