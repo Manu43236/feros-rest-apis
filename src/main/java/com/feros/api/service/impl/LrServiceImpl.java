@@ -195,19 +195,19 @@ public class LrServiceImpl implements LrService {
                         order.getTotalWeightFulfilled().add(request.getDeliveredWeight()));
                 }
 
-                // Recalculate order status based on all sibling LRs for this order.
-                // Current LR is already set to DELIVERED in memory — check all others in DB.
-                List<Lr> siblingLrs = lrRepository.findByOrderIdAndIsActiveTrue(order.getId())
-                        .stream()
-                        .filter(l -> !l.getId().equals(lr.getId())
-                                  && l.getLrStatus() != LrStatus.CANCELLED)
-                        .toList();
+                // Recalculate order status based on all vehicle allocations for this order.
+                // Current allocation is already set to DELIVERED in memory — check all others in DB.
+                List<OrderVehicleAllocation> allAllocations =
+                        vehicleAllocationRepository.findByOrderIdAndIsActiveTrue(order.getId());
 
-                boolean allSiblingsDelivered = siblingLrs.stream()
-                        .allMatch(l -> l.getLrStatus() == LrStatus.DELIVERED);
+                boolean allAllocationsDelivered = allAllocations.stream()
+                        .filter(va -> va.getAllocationStatus() != VehicleAllocationStatus.CANCELLED)
+                        .allMatch(va ->
+                                va.getId().equals(allocation.getId())
+                                || va.getAllocationStatus() == VehicleAllocationStatus.DELIVERED);
 
-                if (allSiblingsDelivered) {
-                    // Current LR + all others are DELIVERED → fully done
+                if (allAllocationsDelivered) {
+                    // All vehicle allocations are DELIVERED → fully done
                     order.setOrderStatus(OrderStatus.DELIVERED);
 
                     // Release all staff allocations for this vehicle allocation
