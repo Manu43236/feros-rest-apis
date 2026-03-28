@@ -54,11 +54,6 @@ public class StaffProfileServiceImpl implements StaffProfileService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
 
-        EmploymentType employmentType = employmentTypeRepository
-                .findById(request.getEmploymentTypeId())
-                .orElseThrow(() -> new FerosException("Employment type not found",
-                        HttpStatus.NOT_FOUND));
-
         StaffProfile profile = staffProfileRepository
                 .findByUserIdAndIsActiveTrue(userId)
                 .orElse(StaffProfile.builder()
@@ -67,7 +62,11 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                         .isActive(true)
                         .build());
 
-        profile.setEmploymentType(employmentType);
+        if (request.getEmploymentTypeId() != null)
+            profile.setEmploymentType(employmentTypeRepository
+                    .findById(request.getEmploymentTypeId())
+                    .orElseThrow(() -> new FerosException("Employment type not found",
+                            HttpStatus.NOT_FOUND)));
         profile.setDateOfBirth(request.getDateOfBirth());
         profile.setJoiningDate(request.getJoiningDate());
         profile.setAddress(request.getAddress());
