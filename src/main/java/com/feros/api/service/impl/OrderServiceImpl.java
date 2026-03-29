@@ -370,6 +370,24 @@ public class OrderServiceImpl implements OrderService {
                     HttpStatus.CONFLICT);
         }
 
+        // Guard: block unassign if any staff is IN_TRANSIT on this vehicle
+        List<OrderStaffAllocation> linkedStaff =
+                staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(allocation.getId());
+        boolean anyInTransit = linkedStaff.stream()
+                .anyMatch(sa -> sa.getAllocationStatus() == StaffAllocationStatus.IN_TRANSIT);
+        if (anyInTransit) {
+            throw new FerosException(
+                    "Cannot unassign vehicle — staff is currently in transit on this vehicle",
+                    HttpStatus.CONFLICT);
+        }
+
+        // Cancel all staff allocations linked to this vehicle allocation
+        for (OrderStaffAllocation sa : linkedStaff) {
+            sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
+            sa.setIsActive(false);
+        }
+        staffAllocationRepository.saveAll(linkedStaff);
+
         // Deduct the allocated weight from order
         BigDecimal newFulfilled = order.getTotalWeightFulfilled()
                 .subtract(allocation.getAllocatedWeight());
@@ -386,7 +404,8 @@ public class OrderServiceImpl implements OrderService {
         }
         orderRepository.save(order);
 
-        // Soft-delete allocation
+        // Cancel and soft-delete vehicle allocation
+        allocation.setAllocationStatus(VehicleAllocationStatus.CANCELLED);
         allocation.setIsActive(false);
         vehicleAllocationRepository.save(allocation);
 
