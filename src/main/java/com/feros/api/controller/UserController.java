@@ -103,4 +103,15 @@ public class UserController {
                 ApiResponse.success("Bulk upload completed", response)
         );
     }
+
+    @PostMapping("/staff-bulk-upload")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<BulkTenantUploadResponse>> staffBulkUpload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "tenantId", required = false) Long tenantId) {
+        BulkTenantUploadResponse response = userService.staffBulkUpload(file, tenantId);
+        return ResponseEntity.ok(
+                ApiResponse.success("Staff bulk upload completed", response)
+        );
+    }
 }

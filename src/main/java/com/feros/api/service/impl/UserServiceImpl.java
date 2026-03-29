@@ -285,6 +285,110 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    @Override
+    @Transactional
+    public BulkTenantUploadResponse staffBulkUpload(MultipartFile file, Long tenantId) {
+        int successCount = 0;
+        int failureCount = 0;
+        List<String> errors = new ArrayList<>();
+        int rowNum = 1;
+
+        Long resolvedTenantId = resolveTenantId(tenantId);
+
+        // Get first available employment type for default profile creation
+        EmploymentType defaultEmploymentType = employmentTypeRepository.findAllByIsActiveTrue()
+                .stream().findFirst().orElse(null);
+
+        try (CSVReader csvReader = new CSVReader(new InputStreamReader(file.getInputStream()))) {
+            csvReader.readNext(); // skip header
+
+            String[] row;
+            while ((row = csvReader.readNext()) != null) {
+                rowNum++;
+                try {
+                    if (row.length < 3) {
+                        errors.add("Row " + rowNum + ": Insufficient columns (name, phone, role required)");
+                        failureCount++;
+                        continue;
+                    }
+
+                    String name            = row[0].trim();
+                    String phone           = row[1].trim();
+                    String roleName        = row[2].trim();
+                    String joiningDateStr  = row.length > 3 ? row[3].trim() : "";
+                    String licenseNumber   = row.length > 4 ? row[4].trim() : "";
+                    String licenseExpiryStr= row.length > 5 ? row[5].trim() : "";
+
+                    if (userRepository.existsByPhone(phone)) {
+                        errors.add("Row " + rowNum + ": Phone " + phone + " already exists");
+                        failureCount++;
+                        continue;
+                    }
+
+                    RoleName role = RoleName.valueOf(roleName.toUpperCase());
+                    Role roleEntity = roleRepository.findByName(role)
+                            .orElseThrow(() -> new FerosException("Role not found", HttpStatus.NOT_FOUND));
+
+                    Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(resolvedTenantId)
+                            .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+
+                    String rawPin = generatePin();
+                    User user = User.builder()
+                            .tenant(tenant)
+                            .userNumber(NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.USR))
+                            .name(name)
+                            .phone(phone)
+                            .pin(passwordEncoder.encode(rawPin))
+                            .plainPin(rawPin)
+                            .pinGeneratedAt(LocalDateTime.now())
+                            .isPinResetRequired(true)
+                            .isActive(true)
+                            .roles(new HashSet<>(Set.of(roleEntity)))
+                            .build();
+
+                    userRepository.save(user);
+
+                    // Create staff profile if employment type is available
+                    if (defaultEmploymentType != null) {
+                        StaffProfile.StaffProfileBuilder profileBuilder = StaffProfile.builder()
+                                .user(user)
+                                .tenant(tenant)
+                                .employmentType(defaultEmploymentType)
+                                .isActive(true);
+
+                        if (!joiningDateStr.isEmpty()) {
+                            profileBuilder.joiningDate(java.time.LocalDate.parse(joiningDateStr));
+                        }
+                        if (!licenseNumber.isEmpty()) {
+                            profileBuilder.licenseNumber(licenseNumber);
+                        }
+                        if (!licenseExpiryStr.isEmpty()) {
+                            profileBuilder.licenseExpiryDate(java.time.LocalDate.parse(licenseExpiryStr));
+                        }
+
+                        staffProfileRepository.save(profileBuilder.build());
+                    }
+
+                    successCount++;
+
+                } catch (Exception e) {
+                    errors.add("Row " + rowNum + ": " + e.getMessage());
+                    failureCount++;
+                }
+            }
+
+        } catch (Exception e) {
+            throw new FerosException("Failed to parse CSV: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+
+        return BulkTenantUploadResponse.builder()
+                .totalRows(rowNum - 1)
+                .successCount(successCount)
+                .failureCount(failureCount)
+                .errors(errors)
+                .build();
+    }
+
     // Helper methods
     private String generatePin() {
         return String.format("%04d", new Random().nextInt(10000));

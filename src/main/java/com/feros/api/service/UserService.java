@@ -24,5 +24,7 @@ public interface UserService {
 
     BulkTenantUploadResponse bulkUpload(MultipartFile file, Long tenantId);
 
+    BulkTenantUploadResponse staffBulkUpload(MultipartFile file, Long tenantId);
+
     UserResponse toggleUserStatus(Long userId, UserStatusRequest request);
 }
