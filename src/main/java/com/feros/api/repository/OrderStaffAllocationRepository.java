@@ -18,29 +18,33 @@ public interface OrderStaffAllocationRepository extends JpaRepository<OrderStaff
     Optional<OrderStaffAllocation> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
 
     // Fix: NULL dates treated as open-ended (no boundary) to prevent silent double-booking
+    // Note: uses typed enum params — Hibernate 6 requires enum constants, not string literals
     @Query("SELECT CASE WHEN COUNT(sa) > 0 THEN true ELSE false END FROM OrderStaffAllocation sa " +
            "WHERE sa.user.id = :userId AND sa.isActive = true " +
-           "AND sa.allocationStatus IN ('ALLOCATED', 'IN_TRANSIT') " +
-           "AND (sa.expectedStartDate IS NULL OR sa.expectedStartDate <= :endDate) " +
-           "AND (sa.expectedEndDate IS NULL OR sa.expectedEndDate >= :startDate)")
+           "AND sa.allocationStatus IN :activeStatuses " +
+           "AND (:startDate IS NULL OR sa.expectedEndDate IS NULL OR sa.expectedEndDate >= :startDate) " +
+           "AND (:endDate IS NULL OR sa.expectedStartDate IS NULL OR sa.expectedStartDate <= :endDate)")
     boolean existsStaffConflict(@Param("userId") Long userId,
                                  @Param("startDate") LocalDate startDate,
-                                 @Param("endDate") LocalDate endDate);
+                                 @Param("endDate") LocalDate endDate,
+                                 @Param("activeStatuses") List<com.feros.api.enums.StaffAllocationStatus> activeStatuses);
 
     // Within-order conflict: same user already assigned to a different vehicle in this order
     @Query("SELECT CASE WHEN COUNT(sa) > 0 THEN true ELSE false END FROM OrderStaffAllocation sa " +
            "WHERE sa.user.id = :userId AND sa.isActive = true " +
-           "AND sa.allocationStatus IN ('ALLOCATED', 'IN_TRANSIT') " +
+           "AND sa.allocationStatus IN :activeStatuses " +
            "AND sa.order.id = :orderId " +
            "AND sa.vehicleAllocation.id <> :excludeVehicleAllocationId")
     boolean existsWithinOrderConflict(@Param("userId") Long userId,
                                        @Param("orderId") Long orderId,
-                                       @Param("excludeVehicleAllocationId") Long excludeVehicleAllocationId);
+                                       @Param("excludeVehicleAllocationId") Long excludeVehicleAllocationId,
+                                       @Param("activeStatuses") List<com.feros.api.enums.StaffAllocationStatus> activeStatuses);
 
     // Active allocation for a user (ALLOCATED or IN_TRANSIT) — used for isAssigned + guards
     @Query("SELECT sa FROM OrderStaffAllocation sa " +
            "WHERE sa.user.id = :userId AND sa.isActive = true " +
-           "AND sa.allocationStatus IN ('ALLOCATED', 'IN_TRANSIT') " +
+           "AND sa.allocationStatus IN :activeStatuses " +
            "ORDER BY sa.createdAt DESC")
-    List<OrderStaffAllocation> findActiveAllocationsForUser(@Param("userId") Long userId);
+    List<OrderStaffAllocation> findActiveAllocationsForUser(@Param("userId") Long userId,
+                                                             @Param("activeStatuses") List<com.feros.api.enums.StaffAllocationStatus> activeStatuses);
 }

@@ -414,15 +414,20 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Within-order conflict: same staff on a different vehicle in this order
+        List<StaffAllocationStatus> activeStatuses = List.of(
+                StaffAllocationStatus.ALLOCATED, StaffAllocationStatus.IN_TRANSIT);
+
         if (staffAllocationRepository.existsWithinOrderConflict(
-                request.getUserId(), orderId, request.getVehicleAllocationId())) {
+                request.getUserId(), orderId, request.getVehicleAllocationId(), activeStatuses)) {
             throw new FerosException(
                     "Staff is already assigned to another vehicle in this order",
                     HttpStatus.CONFLICT);
         }
 
-        if (staffAllocationRepository.existsStaffConflict(
-                request.getUserId(), request.getExpectedStartDate(), request.getExpectedEndDate())) {
+        if (request.getExpectedStartDate() != null && request.getExpectedEndDate() != null
+                && staffAllocationRepository.existsStaffConflict(
+                        request.getUserId(), request.getExpectedStartDate(),
+                        request.getExpectedEndDate(), activeStatuses)) {
             throw new FerosException(
                     "Staff is already assigned to another order during this date range",
                     HttpStatus.CONFLICT);

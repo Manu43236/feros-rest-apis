@@ -152,7 +152,8 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new FerosException(
                         "User not found", HttpStatus.NOT_FOUND));
         validateTenantAccess(user);
-        if (!orderStaffAllocationRepository.findActiveAllocationsForUser(id).isEmpty()) {
+        List<StaffAllocationStatus> activeStatuses = List.of(StaffAllocationStatus.ALLOCATED, StaffAllocationStatus.IN_TRANSIT);
+        if (!orderStaffAllocationRepository.findActiveAllocationsForUser(id, activeStatuses).isEmpty()) {
             throw new FerosException(
                     "Cannot delete staff — they are currently assigned to an active order. Unassign them first.",
                     HttpStatus.CONFLICT);
@@ -169,8 +170,9 @@ public class UserServiceImpl implements UserService {
                         "User not found", HttpStatus.NOT_FOUND));
         validateTenantAccess(user);
         // Block deactivation if staff is on an active allocation
+        List<StaffAllocationStatus> activeStatuses = List.of(StaffAllocationStatus.ALLOCATED, StaffAllocationStatus.IN_TRANSIT);
         if (Boolean.FALSE.equals(request.getIsActive()) &&
-                !orderStaffAllocationRepository.findActiveAllocationsForUser(userId).isEmpty()) {
+                !orderStaffAllocationRepository.findActiveAllocationsForUser(userId, activeStatuses).isEmpty()) {
             throw new FerosException(
                     "Cannot deactivate staff — they are currently assigned to an active order. Unassign them first.",
                     HttpStatus.CONFLICT);
@@ -506,8 +508,9 @@ public class UserServiceImpl implements UserService {
                 orderStaffAllocationRepository.countByUserIdAndAllocationStatusAndIsActiveTrue(
                         user.getId(), StaffAllocationStatus.COMPLETED));
 
-        java.util.List<com.feros.api.entity.OrderStaffAllocation> activeAllocs =
-                orderStaffAllocationRepository.findActiveAllocationsForUser(user.getId());
+        List<StaffAllocationStatus> driverActiveStatuses = List.of(StaffAllocationStatus.ALLOCATED, StaffAllocationStatus.IN_TRANSIT);
+        List<com.feros.api.entity.OrderStaffAllocation> activeAllocs =
+                orderStaffAllocationRepository.findActiveAllocationsForUser(user.getId(), driverActiveStatuses);
         if (!activeAllocs.isEmpty()) {
             response.setIsAssigned(true);
             response.setActiveOrderNumber(activeAllocs.get(0).getOrder().getOrderNumber());
