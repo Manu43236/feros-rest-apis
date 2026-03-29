@@ -53,6 +53,7 @@ public class OrderStaffAllocation extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "allocation_status")
+    @Builder.Default
     private StaffAllocationStatus allocationStatus = StaffAllocationStatus.ALLOCATED;
 
     @Column(name = "remarks", columnDefinition = "TEXT")
@@ -63,5 +64,6 @@ public class OrderStaffAllocation extends BaseEntity {
     private User allocatedBy;
 
     @Column(name = "is_active")
+    @Builder.Default
     private Boolean isActive = true;
 }
