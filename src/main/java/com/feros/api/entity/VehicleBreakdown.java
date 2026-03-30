@@ -1,5 +1,6 @@
 package com.feros.api.entity;
 
+import com.feros.api.enums.BreakdownDuration;
 import com.feros.api.enums.BreakdownStatus;
 import com.feros.api.enums.BreakdownType;
 import jakarta.persistence.*;
@@ -29,11 +30,11 @@ public class VehicleBreakdown extends BaseEntity {
     private Vehicle vehicle;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "vehicle_allocation_id", nullable = false)
+    @JoinColumn(name = "vehicle_allocation_id")
     private OrderVehicleAllocation vehicleAllocation;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id", nullable = false)
+    @JoinColumn(name = "order_id")
     private Order order;
 
     @Column(name = "breakdown_date", nullable = false)
@@ -46,7 +47,11 @@ public class VehicleBreakdown extends BaseEntity {
     @Column(name = "breakdown_type", nullable = false)
     private BreakdownType breakdownType;
 
-    @Column(name = "reason", columnDefinition = "TEXT")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "breakdown_duration", nullable = false)
+    private BreakdownDuration breakdownDuration;
+
+    @Column(name = "reason", columnDefinition = "TEXT", nullable = false)
     private String reason;
 
     @Enumerated(EnumType.STRING)

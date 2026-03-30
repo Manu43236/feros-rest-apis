@@ -126,6 +126,7 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
                 .breakdownDate(request.getBreakdownDate())
                 .location(request.getLocation())
                 .breakdownType(request.getBreakdownType())
+                .breakdownDuration(request.getBreakdownDuration())
                 .reason(request.getReason())
                 .notes(request.getNotes())
                 .reportedBy(getCurrentUser())
@@ -349,6 +350,83 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
                 .toList();
     }
 
+    // ── standalone breakdown (available vehicle — not on any order) ───────────
+
+    @Override
+    @Transactional
+    public BreakdownResponse reportStandaloneBreakdown(Long vehicleId, BreakdownRequest request) {
+        Long tenantId = getTenantId();
+
+        Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(vehicleId, tenantId)
+                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+
+        if (vehicle.getCurrentStatus() != null &&
+                vehicle.getCurrentStatus().getStatusType() == VehicleStatusType.BREAKDOWN) {
+            throw new FerosException("Vehicle is already in BREAKDOWN status", HttpStatus.CONFLICT);
+        }
+
+        if (vehicle.getCurrentStatus() != null &&
+                (vehicle.getCurrentStatus().getStatusType() == VehicleStatusType.ASSIGNED ||
+                 vehicle.getCurrentStatus().getStatusType() == VehicleStatusType.ON_TRIP)) {
+            throw new FerosException(
+                    "Vehicle is currently " + vehicle.getCurrentStatus().getName() +
+                    " — report breakdown from the active order instead",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(tenantId).orElseThrow();
+
+        VehicleBreakdown breakdown = VehicleBreakdown.builder()
+                .tenant(tenant)
+                .vehicle(vehicle)
+                .breakdownDate(request.getBreakdownDate())
+                .location(request.getLocation())
+                .breakdownType(request.getBreakdownType())
+                .breakdownDuration(request.getBreakdownDuration())
+                .reason(request.getReason())
+                .notes(request.getNotes())
+                .reportedBy(getCurrentUser())
+                .status(BreakdownStatus.REPORTED)
+                .build();
+
+        setVehicleStatus(vehicle, VehicleStatusType.BREAKDOWN);
+
+        return mapToResponse(breakdownRepository.save(breakdown));
+    }
+
+    @Override
+    @Transactional
+    public BreakdownResponse resolveStandaloneBreakdown(Long vehicleId, Long breakdownId) {
+        Long tenantId = getTenantId();
+
+        vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(vehicleId, tenantId)
+                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+
+        VehicleBreakdown breakdown = breakdownRepository.findByIdAndTenantIdAndIsActiveTrue(breakdownId, tenantId)
+                .orElseThrow(() -> new FerosException("Breakdown record not found", HttpStatus.NOT_FOUND));
+
+        if (!breakdown.getVehicle().getId().equals(vehicleId)) {
+            throw new FerosException("Breakdown does not belong to this vehicle", HttpStatus.BAD_REQUEST);
+        }
+
+        if (breakdown.getOrder() != null) {
+            throw new FerosException(
+                    "This breakdown is linked to an order — use the order breakdown resolve endpoint",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        if (breakdown.getStatus() == BreakdownStatus.RESOLVED) {
+            throw new FerosException("Breakdown is already resolved", HttpStatus.BAD_REQUEST);
+        }
+
+        setVehicleStatus(breakdown.getVehicle(), VehicleStatusType.AVAILABLE);
+
+        breakdown.setStatus(BreakdownStatus.RESOLVED);
+        breakdown.setResolvedAt(LocalDateTime.now());
+
+        return mapToResponse(breakdownRepository.save(breakdown));
+    }
+
     // ── mapper ────────────────────────────────────────────────────────────────
 
     private BreakdownResponse mapToResponse(VehicleBreakdown b) {
@@ -363,12 +441,13 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
                 .id(b.getId())
                 .vehicleId(b.getVehicle().getId())
                 .vehicleRegistrationNumber(b.getVehicle().getRegistrationNumber())
-                .vehicleAllocationId(b.getVehicleAllocation().getId())
-                .orderId(b.getOrder().getId())
-                .orderNumber(b.getOrder().getOrderNumber())
+                .vehicleAllocationId(b.getVehicleAllocation() != null ? b.getVehicleAllocation().getId() : null)
+                .orderId(b.getOrder() != null ? b.getOrder().getId() : null)
+                .orderNumber(b.getOrder() != null ? b.getOrder().getOrderNumber() : null)
                 .breakdownDate(b.getBreakdownDate())
                 .location(b.getLocation())
                 .breakdownType(b.getBreakdownType().name())
+                .breakdownDuration(b.getBreakdownDuration().name())
                 .reason(b.getReason())
                 .status(b.getStatus().name())
                 .replacementVehicleAllocationId(replacementAllocId)

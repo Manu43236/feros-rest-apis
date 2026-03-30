@@ -17,6 +17,7 @@ public class BreakdownResponse {
     private LocalDateTime breakdownDate;
     private String location;
     private String breakdownType;
+    private String breakdownDuration;
     private String reason;
     private String status;
     private Long replacementVehicleAllocationId;

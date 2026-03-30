@@ -89,4 +89,25 @@ public class VehicleBreakdownController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Breakdown history fetched", breakdownService.getBreakdownHistoryByVehicle(vehicleId)));
     }
+
+    // Standalone — mark available vehicle as BREAKDOWN (not on any order)
+    @PostMapping("/vehicles/{vehicleId}/breakdown")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    public ResponseEntity<ApiResponse<BreakdownResponse>> reportStandaloneBreakdown(
+            @PathVariable Long vehicleId,
+            @Valid @RequestBody BreakdownRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Breakdown reported", breakdownService.reportStandaloneBreakdown(vehicleId, request)));
+    }
+
+    // Standalone — resolve breakdown and mark vehicle back to AVAILABLE
+    @PostMapping("/vehicles/{vehicleId}/breakdown/{breakdownId}/resolve")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    public ResponseEntity<ApiResponse<BreakdownResponse>> resolveStandaloneBreakdown(
+            @PathVariable Long vehicleId,
+            @PathVariable Long breakdownId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Breakdown resolved — vehicle is now available",
+                breakdownService.resolveStandaloneBreakdown(vehicleId, breakdownId)));
+    }
 }
