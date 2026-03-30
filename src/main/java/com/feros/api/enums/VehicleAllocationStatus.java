@@ -5,5 +5,6 @@ public enum VehicleAllocationStatus {
     LR_CREATED,
     IN_TRANSIT,
     DELIVERED,
-    CANCELLED
+    CANCELLED,
+    BREAKDOWN
 }

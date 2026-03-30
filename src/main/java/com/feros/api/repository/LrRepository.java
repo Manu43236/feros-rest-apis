@@ -15,6 +15,7 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
     List<Lr> findByTenantIdAndIsActiveTrue(Long tenantId);
     Optional<Lr> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     boolean existsByVehicleAllocationId(Long vehicleAllocationId);
+    java.util.Optional<Lr> findByVehicleAllocationId(Long vehicleAllocationId);
     List<Lr> findByOrderIdAndIsActiveTrue(Long orderId);
     @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true AND l.lrDate BETWEEN :from AND :to ORDER BY l.lrDate DESC")
     List<Lr> findByTenantIdAndDateRange(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
