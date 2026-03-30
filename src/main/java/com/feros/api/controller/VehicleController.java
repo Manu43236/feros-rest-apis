@@ -4,8 +4,11 @@ import com.feros.api.dto.request.VehicleRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.VehicleResponse;
+import com.feros.api.enums.BreakdownDuration;
+import com.feros.api.enums.BreakdownType;
 import com.feros.api.service.VehicleService;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import jakarta.validation.Valid;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -68,7 +71,7 @@ public class VehicleController {
             @PathVariable Long id, @RequestBody UpdateStatusRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Vehicle status updated successfully",
-                vehicleService.updateVehicleStatus(id, request.getCurrentStatusId())));
+                vehicleService.updateVehicleStatus(id, request)));
     }
 
     @DeleteMapping("/{id}")
@@ -88,7 +91,14 @@ public class VehicleController {
 
     @Getter
     @Setter
-    static class UpdateStatusRequest {
+    public static class UpdateStatusRequest {
         private Long currentStatusId;
+        // Required only when transitioning to BREAKDOWN
+        private BreakdownType breakdownType;
+        private BreakdownDuration breakdownDuration;
+        private String reason;
+        private String location;
+        private LocalDateTime breakdownDate;
+        private String notes;
     }
 }

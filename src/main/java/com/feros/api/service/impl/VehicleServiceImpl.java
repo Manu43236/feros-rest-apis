@@ -1,11 +1,14 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.controller.VehicleController.UpdateStatusRequest;
 import com.feros.api.dto.request.VehicleRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.VehicleResponse;
 import com.feros.api.entity.Tenant;
 import com.feros.api.entity.Vehicle;
+import com.feros.api.entity.VehicleBreakdown;
 import com.feros.api.entity.master.*;
+import com.feros.api.enums.BreakdownStatus;
 import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.entity.OrderVehicleAllocation;
@@ -21,6 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,6 +40,8 @@ public class VehicleServiceImpl implements VehicleService {
     private final OwnershipTypeRepository ownershipTypeRepository;
     private final VehicleStatusRepository vehicleStatusRepository;
     private final OrderVehicleAllocationRepository allocationRepository;
+    private final VehicleBreakdownRepository vehicleBreakdownRepository;
+    private final UserRepository userRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -278,18 +284,87 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     @Override
-    public VehicleResponse updateVehicleStatus(Long id, Long statusId) {
-        Vehicle vehicle = vehicleRepository
-                .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
-                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+    public VehicleResponse updateVehicleStatus(Long id, UpdateStatusRequest request) {
+        Long tenantId = getCurrentTenantId();
 
-        if (statusId == null)
+        if (request.getCurrentStatusId() == null)
             throw new FerosException("Status ID is required", HttpStatus.BAD_REQUEST);
 
-        vehicle.setCurrentStatus(vehicleStatusRepository
-                .findByIdAndIsActiveTrue(statusId)
-                .orElseThrow(() -> new FerosException("Vehicle status not found", HttpStatus.NOT_FOUND)));
+        Vehicle vehicle = vehicleRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
+                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
 
+        var newStatus = vehicleStatusRepository
+                .findByIdAndIsActiveTrue(request.getCurrentStatusId())
+                .orElseThrow(() -> new FerosException("Vehicle status not found", HttpStatus.NOT_FOUND));
+
+        VehicleStatusType currentType = vehicle.getCurrentStatus() != null
+                ? vehicle.getCurrentStatus().getStatusType() : null;
+        VehicleStatusType newType = newStatus.getStatusType();
+
+        // ── Transition rules ──────────────────────────────────────────────────
+        if (currentType == VehicleStatusType.BREAKDOWN && newType != VehicleStatusType.IN_REPAIR) {
+            throw new FerosException(
+                    "Vehicle is in BREAKDOWN — it can only move to In Repair",
+                    HttpStatus.BAD_REQUEST);
+        }
+        if (currentType == VehicleStatusType.IN_REPAIR && newType != VehicleStatusType.AVAILABLE) {
+            throw new FerosException(
+                    "Vehicle is In Repair — it can only move to Available",
+                    HttpStatus.BAD_REQUEST);
+        }
+        if (currentType == VehicleStatusType.ASSIGNED || currentType == VehicleStatusType.ON_TRIP) {
+            throw new FerosException(
+                    "Vehicle is " + vehicle.getCurrentStatus().getName() +
+                    " — status is managed by the order flow",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // ── Breakdown transition — create record ──────────────────────────────
+        if (newType == VehicleStatusType.BREAKDOWN) {
+            if (request.getBreakdownType() == null)
+                throw new FerosException("Breakdown type is required", HttpStatus.BAD_REQUEST);
+            if (request.getBreakdownDuration() == null)
+                throw new FerosException("Breakdown duration (SHORT/LONG) is required", HttpStatus.BAD_REQUEST);
+            if (request.getReason() == null || request.getReason().isBlank())
+                throw new FerosException("Breakdown reason is required", HttpStatus.BAD_REQUEST);
+
+            Tenant tenant = getCurrentTenant();
+            var reportedBy = userRepository.findById(SecurityUtil.getCurrentUserId())
+                    .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
+
+            VehicleBreakdown breakdown = VehicleBreakdown.builder()
+                    .tenant(tenant)
+                    .vehicle(vehicle)
+                    .breakdownDate(request.getBreakdownDate() != null
+                            ? request.getBreakdownDate() : LocalDateTime.now())
+                    .location(request.getLocation())
+                    .breakdownType(request.getBreakdownType())
+                    .breakdownDuration(request.getBreakdownDuration())
+                    .reason(request.getReason())
+                    .notes(request.getNotes())
+                    .reportedBy(reportedBy)
+                    .status(BreakdownStatus.REPORTED)
+                    .build();
+
+            vehicleBreakdownRepository.save(breakdown);
+        }
+
+        // ── If moving out of breakdown → resolve the active breakdown record ──
+        if (currentType == VehicleStatusType.BREAKDOWN) {
+            vehicleBreakdownRepository
+                    .findByVehicleIdAndIsActiveTrueOrderByCreatedAtDesc(vehicle.getId())
+                    .stream()
+                    .filter(b -> b.getStatus() == BreakdownStatus.REPORTED && b.getOrder() == null)
+                    .findFirst()
+                    .ifPresent(b -> {
+                        b.setStatus(BreakdownStatus.RESOLVED);
+                        b.setResolvedAt(LocalDateTime.now());
+                        vehicleBreakdownRepository.save(b);
+                    });
+        }
+
+        vehicle.setCurrentStatus(newStatus);
         return mapToResponse(vehicleRepository.save(vehicle));
     }
 
