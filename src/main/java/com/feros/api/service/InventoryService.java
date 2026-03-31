@@ -2,6 +2,7 @@ package com.feros.api.service;
 
 import com.feros.api.dto.request.*;
 import com.feros.api.dto.response.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -28,4 +29,8 @@ public interface InventoryService {
     // Transactions
     List<SparePartsTransactionResponse> getTransactions();
     List<SparePartsTransactionResponse> getTransactionsByPart(Long sparePartId);
+
+    // Bulk uploads
+    BulkTenantUploadResponse bulkUploadSpareParts(MultipartFile file);
+    BulkTenantUploadResponse bulkUploadStockIn(MultipartFile file);
 }

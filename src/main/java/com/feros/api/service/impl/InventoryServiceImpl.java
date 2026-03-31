@@ -12,13 +12,17 @@ import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.InventoryService;
 import com.feros.api.util.SecurityUtil;
+import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -288,6 +292,117 @@ public class InventoryServiceImpl implements InventoryService {
     public List<SparePartsTransactionResponse> getTransactionsByPart(Long sparePartId) {
         return transactionRepository.findByTenantIdAndSparePartIdOrderByCreatedAtDesc(getTenantId(), sparePartId)
                 .stream().map(this::toTransactionResponse).toList();
+    }
+
+    // ─── Bulk Uploads ─────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public BulkTenantUploadResponse bulkUploadSpareParts(MultipartFile file) {
+        int successCount = 0, failureCount = 0, rowNum = 1;
+        List<String> errors = new ArrayList<>();
+        Tenant tenant = getTenant();
+
+        try (CSVReader csv = new CSVReader(new InputStreamReader(file.getInputStream()))) {
+            csv.readNext(); // skip header: name,partNumber,category,unit,minStockLevel
+            String[] row;
+            while ((row = csv.readNext()) != null) {
+                rowNum++;
+                try {
+                    if (row.length < 1 || row[0].isBlank()) {
+                        errors.add("Row " + rowNum + ": Name is required"); failureCount++; continue;
+                    }
+                    String name     = row[0].trim();
+                    String partNum  = row.length > 1 ? row[1].trim() : "";
+                    String category = row.length > 2 ? row[2].trim() : "";
+                    String unit     = row.length > 3 && !row[3].isBlank() ? row[3].trim() : "Pieces";
+                    int minStock    = 0;
+                    if (row.length > 4 && !row[4].isBlank()) {
+                        try { minStock = Integer.parseInt(row[4].trim()); }
+                        catch (NumberFormatException e) { errors.add("Row " + rowNum + ": Invalid min stock level"); failureCount++; continue; }
+                    }
+                    SparePart part = SparePart.builder()
+                            .tenant(tenant).name(name)
+                            .partNumber(partNum.isBlank() ? null : partNum)
+                            .category(category.isBlank() ? null : category)
+                            .unit(unit).minStockLevel(minStock).build();
+                    part = sparePartRepository.save(part);
+
+                    SparePartsInventory inv = SparePartsInventory.builder()
+                            .tenant(tenant).sparePart(part).quantity(0).lastUpdated(LocalDateTime.now()).build();
+                    inventoryRepository.save(inv);
+                    successCount++;
+                } catch (Exception e) {
+                    errors.add("Row " + rowNum + ": " + e.getMessage()); failureCount++;
+                }
+            }
+        } catch (Exception e) {
+            throw new FerosException("Failed to parse CSV: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+        return BulkTenantUploadResponse.builder()
+                .totalRows(rowNum - 1).successCount(successCount).failureCount(failureCount).errors(errors).build();
+    }
+
+    @Override
+    @Transactional
+    public BulkTenantUploadResponse bulkUploadStockIn(MultipartFile file) {
+        int successCount = 0, failureCount = 0, rowNum = 1;
+        List<String> errors = new ArrayList<>();
+        Long tenantId = getTenantId();
+        Tenant tenant = getTenant();
+        User user = getCurrentUser();
+
+        try (CSVReader csv = new CSVReader(new InputStreamReader(file.getInputStream()))) {
+            csv.readNext(); // skip header: partName,quantity,unitCost,supplierName,notes
+            String[] row;
+            while ((row = csv.readNext()) != null) {
+                rowNum++;
+                try {
+                    if (row.length < 2 || row[0].isBlank()) {
+                        errors.add("Row " + rowNum + ": Part name is required"); failureCount++; continue;
+                    }
+                    String partName = row[0].trim();
+                    int qty;
+                    try { qty = Integer.parseInt(row[1].trim()); if (qty < 1) throw new NumberFormatException(); }
+                    catch (NumberFormatException e) { errors.add("Row " + rowNum + ": Invalid quantity"); failureCount++; continue; }
+
+                    List<SparePart> matches = sparePartRepository.findByTenantIdAndIsActiveTrueOrderByNameAsc(tenantId)
+                            .stream().filter(p -> p.getName().equalsIgnoreCase(partName)).toList();
+                    if (matches.isEmpty()) {
+                        errors.add("Row " + rowNum + ": Spare part '" + partName + "' not found"); failureCount++; continue;
+                    }
+                    SparePart part = matches.get(0);
+
+                    BigDecimal unitCost = BigDecimal.ZERO;
+                    if (row.length > 2 && !row[2].isBlank()) {
+                        try { unitCost = new BigDecimal(row[2].trim()); }
+                        catch (NumberFormatException e) { errors.add("Row " + rowNum + ": Invalid unit cost"); failureCount++; continue; }
+                    }
+                    String supplierName = row.length > 3 && !row[3].isBlank() ? row[3].trim() : null;
+                    String notes        = row.length > 4 && !row[4].isBlank() ? row[4].trim() : null;
+
+                    SparePartsInventory inv = inventoryRepository.findByTenantIdAndSparePartId(tenantId, part.getId())
+                            .orElseGet(() -> SparePartsInventory.builder().tenant(tenant).sparePart(part).quantity(0).build());
+                    inv.setQuantity(inv.getQuantity() + qty);
+                    inv.setLastUpdated(LocalDateTime.now());
+                    inventoryRepository.save(inv);
+
+                    transactionRepository.save(SparePartsTransaction.builder()
+                            .tenant(tenant).sparePart(part)
+                            .transactionType(StockTransactionType.IN).quantity(qty)
+                            .unitCost(unitCost).totalCost(unitCost.multiply(BigDecimal.valueOf(qty)))
+                            .referenceType(StockReferenceType.PURCHASE)
+                            .supplierName(supplierName).notes(notes).createdBy(user).build());
+                    successCount++;
+                } catch (Exception e) {
+                    errors.add("Row " + rowNum + ": " + e.getMessage()); failureCount++;
+                }
+            }
+        } catch (Exception e) {
+            throw new FerosException("Failed to parse CSV: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+        return BulkTenantUploadResponse.builder()
+                .totalRows(rowNum - 1).successCount(successCount).failureCount(failureCount).errors(errors).build();
     }
 
     // ─── Mappers ──────────────────────────────────────────────────────────────

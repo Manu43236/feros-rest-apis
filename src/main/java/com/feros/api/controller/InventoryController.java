@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -51,6 +52,12 @@ public class InventoryController {
         return ResponseEntity.ok(ApiResponse.success("Spare part deleted", null));
     }
 
+    @PostMapping("/spare-parts/bulk-upload")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<BulkTenantUploadResponse>> bulkUploadSpareParts(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.success("Bulk upload completed", inventoryService.bulkUploadSpareParts(file)));
+    }
+
     // ─── Stock ────────────────────────────────────────────────────────────────
 
     @GetMapping("/stock")
@@ -64,6 +71,12 @@ public class InventoryController {
     public ResponseEntity<ApiResponse<Void>> stockIn(@Valid @RequestBody StockInRequest request) {
         inventoryService.stockIn(request);
         return ResponseEntity.ok(ApiResponse.success("Stock added successfully", null));
+    }
+
+    @PostMapping("/stock-in/bulk-upload")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<BulkTenantUploadResponse>> bulkUploadStockIn(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.success("Bulk stock upload completed", inventoryService.bulkUploadStockIn(file)));
     }
 
     // ─── Transactions ─────────────────────────────────────────────────────────
