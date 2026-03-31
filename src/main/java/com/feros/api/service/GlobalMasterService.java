@@ -105,4 +105,10 @@ public interface GlobalMasterService {
     List<MasterResponse> getAllPaymentStatuses();
     MasterResponse updatePaymentStatus(Long id, MasterRequest request);
     void deletePaymentStatus(Long id);
+
+    // Service Task Types
+    MasterResponse createServiceTaskType(MasterRequest request);
+    List<MasterResponse> getAllServiceTaskTypes();
+    MasterResponse updateServiceTaskType(Long id, MasterRequest request);
+    void deleteServiceTaskType(Long id);
 }

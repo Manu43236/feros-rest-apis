@@ -31,6 +31,7 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
     private final TaxRepository taxRepository;
     private final DeductionTypeRepository deductionTypeRepository;
     private final PaymentStatusRepository paymentStatusRepository;
+    private final ServiceTaskTypeRepository serviceTaskTypeRepository;
 
     // ===================== STATES =====================
     @Override
@@ -623,6 +624,41 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
                     .isActive(e.getIsActive()).createdAt(e.getCreatedAt())
                     .updatedAt(e.getUpdatedAt()).build();
         throw new FerosException("Unknown entity type", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    // ===================== SERVICE TASK TYPES =====================
+    @Override
+    public MasterResponse createServiceTaskType(MasterRequest request) {
+        ServiceTaskType t = ServiceTaskType.builder().name(request.getName()).isActive(true).build();
+        ServiceTaskType saved = serviceTaskTypeRepository.save(t);
+        return MasterResponse.builder().id(saved.getId()).name(saved.getName()).isActive(saved.getIsActive())
+                .createdAt(saved.getCreatedAt()).updatedAt(saved.getUpdatedAt()).build();
+    }
+
+    @Override
+    public List<MasterResponse> getAllServiceTaskTypes() {
+        return serviceTaskTypeRepository.findAllByIsActiveTrueOrderByNameAsc()
+                .stream().map(t -> MasterResponse.builder().id(t.getId()).name(t.getName())
+                        .isActive(t.getIsActive()).createdAt(t.getCreatedAt()).updatedAt(t.getUpdatedAt()).build())
+                .toList();
+    }
+
+    @Override
+    public MasterResponse updateServiceTaskType(Long id, MasterRequest request) {
+        ServiceTaskType t = serviceTaskTypeRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Service task type not found", HttpStatus.NOT_FOUND));
+        t.setName(request.getName());
+        serviceTaskTypeRepository.save(t);
+        return MasterResponse.builder().id(t.getId()).name(t.getName()).isActive(t.getIsActive())
+                .createdAt(t.getCreatedAt()).updatedAt(t.getUpdatedAt()).build();
+    }
+
+    @Override
+    public void deleteServiceTaskType(Long id) {
+        ServiceTaskType t = serviceTaskTypeRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Service task type not found", HttpStatus.NOT_FOUND));
+        t.setIsActive(false);
+        serviceTaskTypeRepository.save(t);
     }
 
     private List<String> parseRoles(String json) {

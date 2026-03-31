@@ -9,7 +9,7 @@ import java.util.Optional;
 
 @Repository
 public interface VehicleServiceRepository extends JpaRepository<VehicleService, Long> {
-    List<VehicleService> findByTenantIdAndIsActiveTrueOrderByServiceDateDesc(Long tenantId);
-    List<VehicleService> findByTenantIdAndVehicleIdAndIsActiveTrueOrderByServiceDateDesc(Long tenantId, Long vehicleId);
+    List<VehicleService> findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(Long tenantId);
+    List<VehicleService> findByTenantIdAndVehicleIdAndIsActiveTrueOrderByCreatedAtDesc(Long tenantId, Long vehicleId);
     Optional<VehicleService> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
 }

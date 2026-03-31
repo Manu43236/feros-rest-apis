@@ -1,5 +1,6 @@
 package com.feros.api.controller;
 
+import com.feros.api.dto.request.CompleteServiceRequest;
 import com.feros.api.dto.request.VehicleServiceRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.VehicleServiceResponse;
@@ -22,44 +23,39 @@ public class VehicleMaintenanceController {
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<List<VehicleServiceResponse>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Vehicle services fetched successfully", vehicleMaintenanceService.getAll()));
+        return ResponseEntity.ok(ApiResponse.success("Vehicle services fetched successfully", vehicleMaintenanceService.getAll()));
     }
 
     @GetMapping("/vehicle/{vehicleId}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<List<VehicleServiceResponse>>> getByVehicle(@PathVariable Long vehicleId) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Vehicle services fetched successfully", vehicleMaintenanceService.getByVehicle(vehicleId)));
+        return ResponseEntity.ok(ApiResponse.success("Vehicle services fetched successfully", vehicleMaintenanceService.getByVehicle(vehicleId)));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Vehicle service fetched successfully", vehicleMaintenanceService.getById(id)));
+        return ResponseEntity.ok(ApiResponse.success("Vehicle service fetched successfully", vehicleMaintenanceService.getById(id)));
     }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
-    public ResponseEntity<ApiResponse<VehicleServiceResponse>> create(
-            @Valid @RequestBody VehicleServiceRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Vehicle service recorded successfully", vehicleMaintenanceService.create(request)));
+    public ResponseEntity<ApiResponse<VehicleServiceResponse>> create(@Valid @RequestBody VehicleServiceRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Service created successfully", vehicleMaintenanceService.create(request)));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/{id}/complete")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
-    public ResponseEntity<ApiResponse<VehicleServiceResponse>> update(
-            @PathVariable Long id, @Valid @RequestBody VehicleServiceRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Vehicle service updated successfully", vehicleMaintenanceService.update(id, request)));
+    public ResponseEntity<ApiResponse<VehicleServiceResponse>> complete(
+            @PathVariable Long id,
+            @Valid @RequestBody CompleteServiceRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Service completed successfully", vehicleMaintenanceService.complete(id, request)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         vehicleMaintenanceService.delete(id);
-        return ResponseEntity.ok(ApiResponse.success("Vehicle service deleted successfully", null));
+        return ResponseEntity.ok(ApiResponse.success("Service deleted successfully", null));
     }
 }

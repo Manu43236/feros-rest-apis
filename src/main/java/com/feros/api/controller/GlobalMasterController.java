@@ -407,4 +407,29 @@ public class GlobalMasterController {
         globalMasterService.deletePaymentStatus(id);
         return ResponseEntity.ok(ApiResponse.success("Payment status deleted successfully", null));
     }
+
+    // ===================== SERVICE TASK TYPES =====================
+    @GetMapping("/service-task-types")
+    public ResponseEntity<ApiResponse<List<MasterResponse>>> getAllServiceTaskTypes() {
+        return ResponseEntity.ok(ApiResponse.success("Service task types fetched successfully", globalMasterService.getAllServiceTaskTypes()));
+    }
+
+    @PostMapping("/service-task-types")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<MasterResponse>> createServiceTaskType(@Valid @RequestBody MasterRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Service task type created successfully", globalMasterService.createServiceTaskType(request)));
+    }
+
+    @PutMapping("/service-task-types/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<MasterResponse>> updateServiceTaskType(@PathVariable Long id, @Valid @RequestBody MasterRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Service task type updated successfully", globalMasterService.updateServiceTaskType(id, request)));
+    }
+
+    @DeleteMapping("/service-task-types/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteServiceTaskType(@PathVariable Long id) {
+        globalMasterService.deleteServiceTaskType(id);
+        return ResponseEntity.ok(ApiResponse.success("Service task type deleted successfully", null));
+    }
 }
