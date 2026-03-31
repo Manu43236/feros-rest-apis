@@ -122,6 +122,24 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
 
     @Override
     @Transactional
+    public VehicleServiceResponse start(Long id) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        VehicleService vs = vehicleServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+
+        if (vs.getStatus() != ServiceStatus.OPEN) {
+            throw new FerosException("Only OPEN services can be started", HttpStatus.BAD_REQUEST);
+        }
+
+        vs.setStatus(ServiceStatus.IN_PROGRESS);
+        vehicleServiceRepository.save(vs);
+        return mapToResponse(vehicleServiceRepository.findById(vs.getId()).orElse(vs));
+    }
+
+    @Override
+    @Transactional
     public VehicleServiceResponse complete(Long id, CompleteServiceRequest request) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
 
@@ -131,6 +149,9 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
 
         if (vs.getStatus() == ServiceStatus.COMPLETED) {
             throw new FerosException("Service is already completed", HttpStatus.BAD_REQUEST);
+        }
+        if (vs.getStatus() == ServiceStatus.OPEN) {
+            vs.setStatus(ServiceStatus.IN_PROGRESS); // allow direct OPEN → COMPLETED
         }
 
         vs.setStatus(ServiceStatus.COMPLETED);
@@ -206,6 +227,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
 
     private String computeDisplayStatus(VehicleService vs) {
         if (vs.getStatus() == ServiceStatus.COMPLETED) return "COMPLETED";
+        if (vs.getStatus() == ServiceStatus.IN_PROGRESS) return "IN_PROGRESS";
         if (vs.getDueAtOdometer() == null) return "OPEN";
         BigDecimal currentOdo = vs.getVehicle().getCurrentOdometerReading();
         int current = currentOdo != null ? currentOdo.intValue() : 0;

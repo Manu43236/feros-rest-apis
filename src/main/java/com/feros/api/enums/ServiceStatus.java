@@ -1,5 +1,5 @@
 package com.feros.api.enums;
 
 public enum ServiceStatus {
-    OPEN, COMPLETED
+    OPEN, IN_PROGRESS, COMPLETED
 }

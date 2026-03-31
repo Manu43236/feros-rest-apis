@@ -32,7 +32,7 @@ CREATE TABLE vehicle_services (
   service_type ENUM('INTERNAL','EXTERNAL') NOT NULL,
   vendor_name VARCHAR(200) NULL,
   location VARCHAR(300) NULL,
-  status ENUM('OPEN','COMPLETED') NOT NULL DEFAULT 'OPEN',
+  status ENUM('OPEN','IN_PROGRESS','COMPLETED') NOT NULL DEFAULT 'OPEN',
   due_at_odometer INT NULL,
   service_date DATE NULL,
   completed_date DATE NULL,

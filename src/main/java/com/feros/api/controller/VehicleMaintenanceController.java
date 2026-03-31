@@ -44,6 +44,12 @@ public class VehicleMaintenanceController {
         return ResponseEntity.ok(ApiResponse.success("Service created successfully", vehicleMaintenanceService.create(request)));
     }
 
+    @PutMapping("/{id}/start")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<VehicleServiceResponse>> start(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Service started successfully", vehicleMaintenanceService.start(id)));
+    }
+
     @PutMapping("/{id}/complete")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> complete(
