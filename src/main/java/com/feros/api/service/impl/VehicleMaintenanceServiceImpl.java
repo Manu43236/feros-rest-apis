@@ -7,10 +7,12 @@ import com.feros.api.dto.response.VehicleServiceResponse;
 import com.feros.api.dto.response.VehicleServiceTaskResponse;
 import com.feros.api.entity.*;
 import com.feros.api.entity.master.ServiceTaskType;
+import com.feros.api.enums.BreakdownStatus;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTaskStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
 import com.feros.api.enums.VehicleServiceType;
+import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.VehicleMaintenanceService;
@@ -36,6 +38,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     private final VehicleRepository vehicleRepository;
     private final TenantRepository tenantRepository;
     private final VehicleBreakdownRepository vehicleBreakdownRepository;
+    private final VehicleStatusRepository vehicleStatusRepository;
     private final ServiceTaskTypeRepository serviceTaskTypeRepository;
 
     @Override
@@ -53,6 +56,15 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
         if (request.getBreakdownId() != null) {
             breakdown = vehicleBreakdownRepository.findById(request.getBreakdownId())
                     .orElseThrow(() -> new FerosException("Breakdown not found", HttpStatus.NOT_FOUND));
+
+            // Prevent duplicate active service for the same breakdown
+            boolean alreadyHasService = vehicleServiceRepository
+                    .existsByBreakdownIdAndIsActiveTrueAndStatusNot(request.getBreakdownId(), ServiceStatus.COMPLETED);
+            if (alreadyHasService) {
+                throw new FerosException(
+                        "An active service already exists for this breakdown. Complete it before creating a new one.",
+                        HttpStatus.CONFLICT);
+            }
         }
 
         String vendorName = request.getServiceType() == VehicleServiceType.INTERNAL ? "Self" : request.getVendorName();
@@ -75,6 +87,18 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .build();
 
         VehicleService saved = vehicleServiceRepository.save(vs);
+
+        // When a service is created for a breakdown → move breakdown to IN_REPAIR + vehicle to IN_REPAIR
+        if (breakdown != null) {
+            breakdown.setStatus(BreakdownStatus.IN_REPAIR);
+            vehicleBreakdownRepository.save(breakdown);
+
+            vehicleStatusRepository.findByStatusTypeAndIsActiveTrue(VehicleStatusType.IN_REPAIR)
+                    .ifPresent(inRepairStatus -> {
+                        vehicle.setCurrentStatus(inRepairStatus);
+                        vehicleRepository.save(vehicle);
+                    });
+        }
 
         for (VehicleServiceTaskRequest taskReq : request.getTasks()) {
             ServiceTaskType taskType = null;
@@ -161,6 +185,20 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
 
         vs.getTasks().forEach(t -> t.setStatus(ServiceTaskStatus.COMPLETED));
         vehicleServiceRepository.save(vs);
+
+        // When a breakdown-triggered service is completed → resolve breakdown + move vehicle to AVAILABLE
+        if (vs.getBreakdown() != null) {
+            VehicleBreakdown bd = vs.getBreakdown();
+            bd.setStatus(BreakdownStatus.RESOLVED);
+            bd.setResolvedAt(java.time.LocalDateTime.now());
+            vehicleBreakdownRepository.save(bd);
+
+            vehicleStatusRepository.findByStatusTypeAndIsActiveTrue(VehicleStatusType.AVAILABLE)
+                    .ifPresent(availStatus -> {
+                        vs.getVehicle().setCurrentStatus(availStatus);
+                        vehicleRepository.save(vs.getVehicle());
+                    });
+        }
 
         // Auto-schedule next services for recurring tasks (SCHEDULED flow only)
         if (vs.getTriggeredBy() == ServiceTriggeredBy.SCHEDULED && vs.getOdometer() != null) {

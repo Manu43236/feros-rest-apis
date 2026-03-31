@@ -1,6 +1,7 @@
 package com.feros.api.repository;
 
 import com.feros.api.entity.VehicleService;
+import com.feros.api.enums.ServiceStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,4 +13,5 @@ public interface VehicleServiceRepository extends JpaRepository<VehicleService, 
     List<VehicleService> findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(Long tenantId);
     List<VehicleService> findByTenantIdAndVehicleIdAndIsActiveTrueOrderByCreatedAtDesc(Long tenantId, Long vehicleId);
     Optional<VehicleService> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
+    boolean existsByBreakdownIdAndIsActiveTrueAndStatusNot(Long breakdownId, ServiceStatus status);
 }
