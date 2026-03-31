@@ -14,8 +14,7 @@ public class SparePartRequest {
     @NotBlank(message = "Name is required")
     private String name;
 
-    private String partNumber;
-    private String category;
+    private String category; // must match predefined list
 
     @NotBlank(message = "Unit is required")
     private String unit;

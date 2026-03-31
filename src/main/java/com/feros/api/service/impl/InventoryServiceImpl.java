@@ -11,6 +11,7 @@ import com.feros.api.enums.StockTransactionType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.InventoryService;
+import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
@@ -58,10 +59,11 @@ public class InventoryServiceImpl implements InventoryService {
     @Transactional
     public SparePartResponse createSparePart(SparePartRequest request) {
         Tenant tenant = getTenant();
+        String partNumber = NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.PART);
         SparePart part = SparePart.builder()
                 .tenant(tenant)
                 .name(request.getName())
-                .partNumber(request.getPartNumber())
+                .partNumber(partNumber)
                 .category(request.getCategory())
                 .unit(request.getUnit())
                 .minStockLevel(request.getMinStockLevel())
@@ -86,7 +88,6 @@ public class InventoryServiceImpl implements InventoryService {
         SparePart part = sparePartRepository.findByIdAndTenantIdAndIsActiveTrue(id, getTenantId())
                 .orElseThrow(() -> new FerosException("Spare part not found", HttpStatus.NOT_FOUND));
         part.setName(request.getName());
-        part.setPartNumber(request.getPartNumber());
         part.setCategory(request.getCategory());
         part.setUnit(request.getUnit());
         part.setMinStockLevel(request.getMinStockLevel());
@@ -313,17 +314,17 @@ public class InventoryServiceImpl implements InventoryService {
                         errors.add("Row " + rowNum + ": Name is required"); failureCount++; continue;
                     }
                     String name     = row[0].trim();
-                    String partNum  = row.length > 1 ? row[1].trim() : "";
-                    String category = row.length > 2 ? row[2].trim() : "";
-                    String unit     = row.length > 3 && !row[3].isBlank() ? row[3].trim() : "Pieces";
+                    String category = row.length > 1 ? row[1].trim() : "";
+                    String unit     = row.length > 2 && !row[2].isBlank() ? row[2].trim() : "Pieces";
                     int minStock    = 0;
-                    if (row.length > 4 && !row[4].isBlank()) {
-                        try { minStock = Integer.parseInt(row[4].trim()); }
+                    if (row.length > 3 && !row[3].isBlank()) {
+                        try { minStock = Integer.parseInt(row[3].trim()); }
                         catch (NumberFormatException e) { errors.add("Row " + rowNum + ": Invalid min stock level"); failureCount++; continue; }
                     }
+                    String partNumber = NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.PART);
                     SparePart part = SparePart.builder()
                             .tenant(tenant).name(name)
-                            .partNumber(partNum.isBlank() ? null : partNum)
+                            .partNumber(partNumber)
                             .category(category.isBlank() ? null : category)
                             .unit(unit).minStockLevel(minStock).build();
                     part = sparePartRepository.save(part);
