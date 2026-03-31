@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -68,6 +69,9 @@ public class VehicleService extends BaseEntity {
 
     @Column(name = "odometer")
     private Integer odometer;
+
+    @Column(name = "started_at")
+    private LocalDateTime startedAt;
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;

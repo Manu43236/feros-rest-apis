@@ -35,6 +35,7 @@ public class VehicleServiceResponse {
     private String notes;
     private BigDecimal totalCost;
     private List<VehicleServiceTaskResponse> tasks;
+    private LocalDateTime startedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -134,6 +134,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
         }
 
         vs.setStatus(ServiceStatus.IN_PROGRESS);
+        vs.setStartedAt(java.time.LocalDateTime.now());
         vehicleServiceRepository.save(vs);
         return mapToResponse(vehicleServiceRepository.findById(vs.getId()).orElse(vs));
     }
@@ -279,6 +280,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .notes(vs.getNotes())
                 .totalCost(totalCost)
                 .tasks(taskResponses)
+                .startedAt(vs.getStartedAt())
                 .createdAt(vs.getCreatedAt())
                 .updatedAt(vs.getUpdatedAt())
                 .build();
