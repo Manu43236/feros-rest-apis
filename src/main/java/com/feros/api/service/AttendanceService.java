@@ -13,6 +13,8 @@ import java.util.List;
 public interface AttendanceService {
     AttendanceResponse markAttendance(AttendanceRequest request);
 
+    AttendanceResponse markOwnAttendance(AttendanceRequest request);
+
     List<AttendanceResponse> markBulkAttendance(BulkAttendanceRequest request);
 
     List<AttendanceResponse> getAttendanceByDate(LocalDate date);
@@ -20,6 +22,14 @@ public interface AttendanceService {
     List<AttendanceResponse> getAttendanceByUser(Long userId, LocalDate from, LocalDate to);
 
     AttendanceResponse updateAttendance(Long id, AttendanceRequest request);
+
+    AttendanceResponse approveAttendance(Long id);
+
+    AttendanceResponse rejectAttendance(Long id);
+
+    List<AttendanceResponse> getPendingAttendance();
+
+    List<AttendanceResponse> getMyAttendance(LocalDate from, LocalDate to);
 
     TripProofResponse addTripProof(Long userId, TripProofRequest request);
 

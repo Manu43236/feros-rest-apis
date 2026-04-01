@@ -63,6 +63,44 @@ public class AttendanceController {
                 attendanceService.getAttendanceByUser(userId, from, to)));
     }
 
+    @PostMapping("/attendance/my")
+    @PreAuthorize("hasAnyRole('SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MEN', 'STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<AttendanceResponse>> markOwnAttendance(
+            @Valid @RequestBody AttendanceRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Attendance marked successfully", attendanceService.markOwnAttendance(request)));
+    }
+
+    @GetMapping("/attendance/my")
+    @PreAuthorize("hasAnyRole('SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MEN', 'STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getMyAttendance(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Attendance fetched successfully", attendanceService.getMyAttendance(from, to)));
+    }
+
+    @GetMapping("/attendance/pending")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getPendingAttendance() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Pending attendance fetched successfully", attendanceService.getPendingAttendance()));
+    }
+
+    @PutMapping("/attendance/{id}/approve")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<AttendanceResponse>> approveAttendance(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Attendance approved successfully", attendanceService.approveAttendance(id)));
+    }
+
+    @PutMapping("/attendance/{id}/reject")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<AttendanceResponse>> rejectAttendance(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Attendance rejected successfully", attendanceService.rejectAttendance(id)));
+    }
+
     @PutMapping("/attendance/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> updateAttendance(

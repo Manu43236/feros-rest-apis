@@ -1,5 +1,6 @@
 package com.feros.api.dto.response;
 
+import com.feros.api.enums.AttendanceApprovalStatus;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -26,6 +27,10 @@ public class AttendanceResponse {
     private String markedByName;
     private LocalDateTime markedAt;
     private String remarks;
+    private AttendanceApprovalStatus approvalStatus;
+    private Long approvedById;
+    private String approvedByName;
+    private LocalDateTime approvedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

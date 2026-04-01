@@ -9,6 +9,7 @@ import com.feros.api.dto.response.TripProofResponse;
 import com.feros.api.entity.*;
 import com.feros.api.entity.master.AttendanceType;
 import com.feros.api.entity.master.LeaveType;
+import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.AttendanceService;
@@ -60,7 +61,75 @@ public class AttendanceServiceImpl implements AttendanceService {
                     request.getAttendanceDate(), HttpStatus.CONFLICT);
         }
 
-        return mapToResponse(saveAttendance(request, tenantId));
+        return mapToResponse(saveAttendance(request, tenantId, AttendanceApprovalStatus.APPROVED));
+    }
+
+    @Override
+    @Transactional
+    public AttendanceResponse markOwnAttendance(AttendanceRequest request) {
+        Long tenantId = getCurrentTenantId();
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+
+        // Force the record to be for themselves only
+        request.setUserId(currentUserId);
+        request.setAttendanceDate(java.time.LocalDate.now());
+
+        if (attendanceRepository.existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
+                currentUserId, tenantId, request.getAttendanceDate())) {
+            throw new FerosException("You have already marked attendance for today", HttpStatus.CONFLICT);
+        }
+
+        return mapToResponse(saveAttendance(request, tenantId, AttendanceApprovalStatus.PENDING));
+    }
+
+    @Override
+    @Transactional
+    public AttendanceResponse approveAttendance(Long id) {
+        Attendance attendance = attendanceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Attendance not found", HttpStatus.NOT_FOUND));
+
+        if (attendance.getApprovalStatus() != AttendanceApprovalStatus.PENDING) {
+            throw new FerosException("Only PENDING attendance can be approved", HttpStatus.BAD_REQUEST);
+        }
+
+        attendance.setApprovalStatus(AttendanceApprovalStatus.APPROVED);
+        attendance.setApprovedBy(getCurrentUser());
+        attendance.setApprovedAt(LocalDateTime.now());
+        return mapToResponse(attendanceRepository.save(attendance));
+    }
+
+    @Override
+    @Transactional
+    public AttendanceResponse rejectAttendance(Long id) {
+        Attendance attendance = attendanceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Attendance not found", HttpStatus.NOT_FOUND));
+
+        if (attendance.getApprovalStatus() != AttendanceApprovalStatus.PENDING) {
+            throw new FerosException("Only PENDING attendance can be rejected", HttpStatus.BAD_REQUEST);
+        }
+
+        attendance.setApprovalStatus(AttendanceApprovalStatus.REJECTED);
+        attendance.setApprovedBy(getCurrentUser());
+        attendance.setApprovedAt(LocalDateTime.now());
+        return mapToResponse(attendanceRepository.save(attendance));
+    }
+
+    @Override
+    public List<AttendanceResponse> getPendingAttendance() {
+        return attendanceRepository
+                .findByTenantIdAndApprovalStatusAndIsActiveTrue(getCurrentTenantId(), AttendanceApprovalStatus.PENDING)
+                .stream().map(this::mapToResponse).toList();
+    }
+
+    @Override
+    public List<AttendanceResponse> getMyAttendance(java.time.LocalDate from, java.time.LocalDate to) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        return attendanceRepository
+                .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrueOrderByAttendanceDateDesc(
+                        currentUserId, getCurrentTenantId(), from, to)
+                .stream().map(this::mapToResponse).toList();
     }
 
     @Override
@@ -83,13 +152,13 @@ public class AttendanceServiceImpl implements AttendanceService {
             req.setLeaveReason(entry.getLeaveReason());
             req.setRemarks(entry.getRemarks());
 
-            responses.add(mapToResponse(saveAttendance(req, tenantId)));
+            responses.add(mapToResponse(saveAttendance(req, tenantId, AttendanceApprovalStatus.APPROVED)));
         }
 
         return responses;
     }
 
-    private Attendance saveAttendance(AttendanceRequest request, Long tenantId) {
+    private Attendance saveAttendance(AttendanceRequest request, Long tenantId, AttendanceApprovalStatus approvalStatus) {
         Tenant tenant = getCurrentTenant();
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
@@ -108,6 +177,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .remarks(request.getRemarks())
                 .markedBy(getCurrentUser())
                 .markedAt(LocalDateTime.now())
+                .approvalStatus(approvalStatus)
                 .isActive(true)
                 .build();
 
@@ -240,6 +310,10 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .markedByName(a.getMarkedBy().getName())
                 .markedAt(a.getMarkedAt())
                 .remarks(a.getRemarks())
+                .approvalStatus(a.getApprovalStatus())
+                .approvedById(a.getApprovedBy() != null ? a.getApprovedBy().getId() : null)
+                .approvedByName(a.getApprovedBy() != null ? a.getApprovedBy().getName() : null)
+                .approvedAt(a.getApprovedAt())
                 .createdAt(a.getCreatedAt())
                 .updatedAt(a.getUpdatedAt())
                 .build();

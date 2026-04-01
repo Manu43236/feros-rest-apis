@@ -2,6 +2,7 @@ package com.feros.api.entity;
 
 import com.feros.api.entity.master.AttendanceType;
 import com.feros.api.entity.master.LeaveType;
+import com.feros.api.enums.AttendanceApprovalStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -52,6 +53,17 @@ public class Attendance extends BaseEntity {
 
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "approval_status", nullable = false)
+    private AttendanceApprovalStatus approvalStatus = AttendanceApprovalStatus.APPROVED;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "approved_by")
+    private User approvedBy;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
 
     @Column(name = "is_active")
     private Boolean isActive = true;
