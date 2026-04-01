@@ -2,6 +2,7 @@ package com.feros.api.controller;
 
 import com.feros.api.dto.request.AttendanceRequest;
 import com.feros.api.dto.request.BulkAttendanceRequest;
+import com.feros.api.dto.request.MarkOwnAttendanceRequest;
 import com.feros.api.dto.request.ReviewTripProofRequest;
 import com.feros.api.dto.request.TripProofRequest;
 import com.feros.api.dto.response.ApiResponse;
@@ -66,7 +67,7 @@ public class AttendanceController {
     @PostMapping("/attendance/my")
     @PreAuthorize("hasAnyRole('SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MEN', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> markOwnAttendance(
-            @Valid @RequestBody AttendanceRequest request) {
+            @Valid @RequestBody MarkOwnAttendanceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Attendance marked successfully", attendanceService.markOwnAttendance(request)));
     }

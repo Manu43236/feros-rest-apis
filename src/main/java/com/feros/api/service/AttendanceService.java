@@ -2,6 +2,7 @@ package com.feros.api.service;
 
 import com.feros.api.dto.request.AttendanceRequest;
 import com.feros.api.dto.request.BulkAttendanceRequest;
+import com.feros.api.dto.request.MarkOwnAttendanceRequest;
 import com.feros.api.dto.request.ReviewTripProofRequest;
 import com.feros.api.dto.request.TripProofRequest;
 import com.feros.api.dto.response.AttendanceResponse;
@@ -13,7 +14,7 @@ import java.util.List;
 public interface AttendanceService {
     AttendanceResponse markAttendance(AttendanceRequest request);
 
-    AttendanceResponse markOwnAttendance(AttendanceRequest request);
+    AttendanceResponse markOwnAttendance(MarkOwnAttendanceRequest request);
 
     List<AttendanceResponse> markBulkAttendance(BulkAttendanceRequest request);
 

@@ -2,6 +2,7 @@ package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.AttendanceRequest;
 import com.feros.api.dto.request.BulkAttendanceRequest;
+import com.feros.api.dto.request.MarkOwnAttendanceRequest;
 import com.feros.api.dto.request.ReviewTripProofRequest;
 import com.feros.api.dto.request.TripProofRequest;
 import com.feros.api.dto.response.AttendanceResponse;
@@ -66,20 +67,25 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     @Override
     @Transactional
-    public AttendanceResponse markOwnAttendance(AttendanceRequest request) {
+    public AttendanceResponse markOwnAttendance(MarkOwnAttendanceRequest request) {
         Long tenantId = getCurrentTenantId();
         Long currentUserId = SecurityUtil.getCurrentUserId();
-
-        // Force the record to be for themselves only
-        request.setUserId(currentUserId);
-        request.setAttendanceDate(java.time.LocalDate.now());
+        LocalDate today = LocalDate.now();
 
         if (attendanceRepository.existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
-                currentUserId, tenantId, request.getAttendanceDate())) {
+                currentUserId, tenantId, today)) {
             throw new FerosException("You have already marked attendance for today", HttpStatus.CONFLICT);
         }
 
-        return mapToResponse(saveAttendance(request, tenantId, AttendanceApprovalStatus.PENDING));
+        AttendanceRequest req = new AttendanceRequest();
+        req.setUserId(currentUserId);
+        req.setAttendanceDate(today);
+        req.setAttendanceTypeId(request.getAttendanceTypeId());
+        req.setLeaveTypeId(request.getLeaveTypeId());
+        req.setLeaveReason(request.getLeaveReason());
+        req.setRemarks(request.getRemarks());
+
+        return mapToResponse(saveAttendance(req, tenantId, AttendanceApprovalStatus.PENDING));
     }
 
     @Override
