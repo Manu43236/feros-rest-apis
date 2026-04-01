@@ -157,7 +157,12 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public List<OrderResponse> getAllOrders() {
-        return orderRepository.findByTenantIdAndIsActiveTrue(getCurrentTenantId())
+        Long tenantId = getCurrentTenantId();
+        if ("SUPERVISOR".equals(SecurityUtil.getCurrentRole())) {
+            return orderRepository.findByTenantIdAndSupervisorId(tenantId, SecurityUtil.getCurrentUserId())
+                    .stream().map(this::mapToOrderResponse).toList();
+        }
+        return orderRepository.findByTenantIdAndIsActiveTrue(tenantId)
                 .stream().map(this::mapToOrderResponse).toList();
     }
 

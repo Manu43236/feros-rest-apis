@@ -120,7 +120,12 @@ public class LrServiceImpl implements LrService {
 
     @Override
     public List<LrResponse> getAllLrs() {
-        return lrRepository.findByTenantIdAndIsActiveTrue(getCurrentTenantId())
+        Long tenantId = getCurrentTenantId();
+        if ("SUPERVISOR".equals(SecurityUtil.getCurrentRole())) {
+            return lrRepository.findByTenantIdAndCreatedByIdAndIsActiveTrue(tenantId, SecurityUtil.getCurrentUserId())
+                    .stream().map(this::mapToLrResponse).toList();
+        }
+        return lrRepository.findByTenantIdAndIsActiveTrue(tenantId)
                 .stream().map(this::mapToLrResponse).toList();
     }
 

@@ -20,6 +20,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     long countByTenantIdAndIsActiveTrue(Long tenantId);
     long countByTenantIdAndOrderStatusAndIsActiveTrue(Long tenantId, OrderStatus status);
 
+    @Query("SELECT DISTINCT o FROM Order o WHERE o.tenant.id = :tenantId AND o.isActive = true AND EXISTS (SELECT sa FROM OrderStaffAllocation sa WHERE sa.order.id = o.id AND sa.user.id = :userId AND sa.isActive = true)")
+    List<Order> findByTenantIdAndSupervisorId(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
+
     @Query("SELECT o FROM Order o WHERE o.tenant.id = :tenantId AND o.isActive = true AND o.orderDate BETWEEN :from AND :to ORDER BY o.orderDate DESC")
     List<Order> findByTenantIdAndDateRange(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 
