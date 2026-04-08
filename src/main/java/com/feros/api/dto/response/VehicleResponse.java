@@ -89,6 +89,8 @@ public class VehicleResponse {
     private String gpsProvider;
 
     private BigDecimal currentOdometerReading;
+    private BigDecimal fuelTankCapacity;
+    private BigDecimal currentFuelLevel;
     private String notes;
 
     private Boolean isActive;

@@ -155,6 +155,13 @@ public class Vehicle extends BaseEntity {
     @Column(name = "current_odometer_reading")
     private BigDecimal currentOdometerReading;
 
+    // Fuel
+    @Column(name = "fuel_tank_capacity")
+    private BigDecimal fuelTankCapacity;
+
+    @Column(name = "current_fuel_level")
+    private BigDecimal currentFuelLevel;
+
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 

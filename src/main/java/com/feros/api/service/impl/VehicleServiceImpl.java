@@ -121,6 +121,8 @@ public class VehicleServiceImpl implements VehicleService {
                 .gpsDeviceImei(request.getGpsDeviceImei())
                 .gpsProvider(request.getGpsProvider())
                 .currentOdometerReading(request.getCurrentOdometerReading())
+                .fuelTankCapacity(request.getFuelTankCapacity())
+                .currentFuelLevel(request.getCurrentFuelLevel())
                 .notes(request.getNotes())
                 .isActive(true)
                 .build();
@@ -258,6 +260,8 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setGpsDeviceImei(request.getGpsDeviceImei());
         vehicle.setGpsProvider(request.getGpsProvider());
         vehicle.setCurrentOdometerReading(request.getCurrentOdometerReading());
+        vehicle.setFuelTankCapacity(request.getFuelTankCapacity());
+        vehicle.setCurrentFuelLevel(request.getCurrentFuelLevel());
         vehicle.setNotes(request.getNotes());
 
         if (request.getBrandId() != null)
@@ -570,6 +574,8 @@ public class VehicleServiceImpl implements VehicleService {
                 .gpsDeviceImei(v.getGpsDeviceImei())
                 .gpsProvider(v.getGpsProvider())
                 .currentOdometerReading(v.getCurrentOdometerReading())
+                .fuelTankCapacity(v.getFuelTankCapacity())
+                .currentFuelLevel(v.getCurrentFuelLevel())
                 .notes(v.getNotes())
                 .isActive(v.getIsActive())
                 .createdAt(v.getCreatedAt())

@@ -70,5 +70,7 @@ public class VehicleRequest {
     private String gpsProvider;
 
     private BigDecimal currentOdometerReading;
+    private BigDecimal fuelTankCapacity;
+    private BigDecimal currentFuelLevel;
     private String notes;
 }
