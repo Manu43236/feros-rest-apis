@@ -15,6 +15,19 @@ public interface VehicleFuelLogRepository extends JpaRepository<VehicleFuelLog, 
 
     List<VehicleFuelLog> findByTenantIdAndIsActiveTrueOrderByFillDateDescIdDesc(Long tenantId);
 
+    // Most recent fuel log for a vehicle on a given date (for meter reading sync)
+    @Query("""
+        SELECT f FROM VehicleFuelLog f
+        WHERE f.vehicle.id = :vehicleId
+          AND f.isActive = true
+          AND f.fillDate = :fillDate
+        ORDER BY f.id DESC
+        LIMIT 1
+    """)
+    Optional<VehicleFuelLog> findLatestForVehicleOnDate(
+            @Param("vehicleId") Long vehicleId,
+            @Param("fillDate") java.time.LocalDate fillDate);
+
     // Previous full tank fill-up before a given log id (for mileage calculation)
     @Query("""
         SELECT f FROM VehicleFuelLog f

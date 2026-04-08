@@ -4,6 +4,7 @@ import com.feros.api.dto.request.MeterReadingRequest;
 import com.feros.api.dto.response.MeterReadingResponse;
 import com.feros.api.entity.*;
 import com.feros.api.exception.FerosException;
+import com.feros.api.enums.MeterReadingType;
 import com.feros.api.repository.*;
 import com.feros.api.service.MeterReadingService;
 import com.feros.api.util.SecurityUtil;
@@ -12,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +29,7 @@ public class MeterReadingServiceImpl implements MeterReadingService {
     private final LrRepository lrRepository;
     private final UserRepository userRepository;
     private final VehicleServiceRepository vehicleServiceRepository;
+    private final VehicleFuelLogRepository fuelLogRepository;
 
     private Long tenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -75,6 +78,16 @@ public class MeterReadingServiceImpl implements MeterReadingService {
         vehicle.setCurrentOdometerReading(request.getReadingKm());
         vehicleRepository.save(vehicle);
 
+        // Sync fuel log odometer if this is a FUEL_FILL reading
+        if (request.getReadingType() == MeterReadingType.FUEL_FILL) {
+            LocalDate today = reading.getRecordedAt().toLocalDate();
+            fuelLogRepository.findLatestForVehicleOnDate(vehicle.getId(), today)
+                    .ifPresent(fuelLog -> {
+                        fuelLog.setOdometerReading(request.getReadingKm());
+                        fuelLogRepository.save(fuelLog);
+                    });
+        }
+
         // Check for service alerts
         int alertThreshold = request.getReadingKm().intValue() + SERVICE_ALERT_BUFFER_KM;
         List<VehicleService> alertServices = vehicleServiceRepository
@@ -106,6 +119,56 @@ public class MeterReadingServiceImpl implements MeterReadingService {
                     .findByTenantIdAndIsActiveTrueOrderByRecordedAtDesc(tid);
         }
         return readings.stream().map(r -> mapToResponse(r, new ArrayList<>())).toList();
+    }
+
+    @Override
+    @Transactional
+    public MeterReadingResponse update(Long id, MeterReadingRequest request) {
+        Long tid = tenantId();
+
+        VehicleMeterReading reading = meterReadingRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, tid)
+                .orElseThrow(() -> new FerosException("Meter reading not found", HttpStatus.NOT_FOUND));
+
+        Vehicle vehicle = reading.getVehicle();
+
+        // Validate new reading is not less than the previous reading for this vehicle (excluding this record)
+        List<VehicleMeterReading> others = meterReadingRepository
+                .findTopByVehicleOrderByReadingKmDesc(vehicle.getId())
+                .stream()
+                .filter(r -> !r.getId().equals(id))
+                .toList();
+
+        if (!others.isEmpty() && request.getReadingKm().compareTo(others.get(0).getReadingKm()) < 0) {
+            throw new FerosException(
+                    "Reading (" + request.getReadingKm() + " km) cannot be less than the previous reading (" +
+                    others.get(0).getReadingKm() + " km)", HttpStatus.BAD_REQUEST);
+        }
+
+        Lr lr = null;
+        if (request.getLrId() != null) {
+            lr = lrRepository.findById(request.getLrId())
+                    .orElseThrow(() -> new FerosException("LR not found", HttpStatus.NOT_FOUND));
+        }
+
+        reading.setReadingKm(request.getReadingKm());
+        reading.setReadingType(request.getReadingType());
+        reading.setLr(lr);
+        reading.setPhotoUrl(request.getPhotoUrl());
+        reading.setNotes(request.getNotes());
+        if (request.getRecordedAt() != null) reading.setRecordedAt(request.getRecordedAt());
+
+        meterReadingRepository.save(reading);
+
+        // Re-sync vehicle odometer to the highest active reading
+        meterReadingRepository.findTopByVehicleOrderByReadingKmDesc(vehicle.getId())
+                .stream().findFirst()
+                .ifPresent(top -> {
+                    vehicle.setCurrentOdometerReading(top.getReadingKm());
+                    vehicleRepository.save(vehicle);
+                });
+
+        return mapToResponse(reading, new ArrayList<>());
     }
 
     @Override

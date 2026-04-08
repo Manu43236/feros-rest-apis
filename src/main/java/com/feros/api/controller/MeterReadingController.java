@@ -35,6 +35,15 @@ public class MeterReadingController {
                 "Meter readings fetched", meterReadingService.getAll(vehicleId)));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<MeterReadingResponse>> update(
+            @PathVariable Long id,
+            @Valid @RequestBody MeterReadingRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Meter reading updated", meterReadingService.update(id, request)));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
