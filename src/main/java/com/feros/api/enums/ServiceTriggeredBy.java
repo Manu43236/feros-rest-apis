@@ -1,5 +1,5 @@
 package com.feros.api.enums;
 
 public enum ServiceTriggeredBy {
-    SCHEDULED, BREAKDOWN
+    SCHEDULED, BREAKDOWN, ACCIDENT, COMPLIANCE, WARRANTY
 }

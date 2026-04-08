@@ -1,5 +1,5 @@
 package com.feros.api.enums;
 
 public enum VehicleServiceType {
-    INTERNAL, EXTERNAL
+    INTERNAL, THIRD_PARTY, OEM_CENTER
 }

@@ -67,7 +67,9 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
             }
         }
 
-        String vendorName = request.getServiceType() == VehicleServiceType.INTERNAL ? "Self" : request.getVendorName();
+        String vendorName = request.getServiceType() == VehicleServiceType.INTERNAL
+                ? (request.getVendorName() != null ? request.getVendorName() : "Self")
+                : request.getVendorName();
 
         VehicleService vs = VehicleService.builder()
                 .tenant(tenant)
@@ -76,6 +78,9 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .triggeredBy(request.getTriggeredBy())
                 .breakdown(breakdown)
                 .serviceType(request.getServiceType())
+                .payerType(request.getPayerType() != null
+                        ? request.getPayerType()
+                        : com.feros.api.enums.ServicePayerType.OWN_EXPENSE)
                 .vendorName(vendorName)
                 .location(request.getLocation())
                 .status(ServiceStatus.OPEN)
@@ -83,6 +88,11 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .serviceDate(request.getServiceDate())
                 .odometer(request.getOdometer())
                 .notes(request.getNotes())
+                .insuranceClaimNo(request.getInsuranceClaimNo())
+                .insuranceClaimAmt(request.getInsuranceClaimAmt())
+                .certificateNumber(request.getCertificateNumber())
+                .certificateValidUntil(request.getCertificateValidUntil())
+                .isEscalated(Boolean.TRUE.equals(request.getIsEscalated()))
                 .isActive(true)
                 .build();
 
@@ -307,6 +317,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .triggeredBy(vs.getTriggeredBy())
                 .breakdownId(vs.getBreakdown() != null ? vs.getBreakdown().getId() : null)
                 .serviceType(vs.getServiceType())
+                .payerType(vs.getPayerType())
                 .vendorName(vs.getVendorName())
                 .location(vs.getLocation())
                 .status(vs.getStatus())
@@ -317,6 +328,11 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .odometer(vs.getOdometer())
                 .notes(vs.getNotes())
                 .totalCost(totalCost)
+                .insuranceClaimNo(vs.getInsuranceClaimNo())
+                .insuranceClaimAmt(vs.getInsuranceClaimAmt())
+                .certificateNumber(vs.getCertificateNumber())
+                .certificateValidUntil(vs.getCertificateValidUntil())
+                .isEscalated(vs.getIsEscalated())
                 .tasks(taskResponses)
                 .startedAt(vs.getStartedAt())
                 .createdAt(vs.getCreatedAt())

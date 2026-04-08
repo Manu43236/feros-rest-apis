@@ -1,5 +1,6 @@
 package com.feros.api.entity;
 
+import com.feros.api.enums.ServicePayerType;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
 import com.feros.api.enums.VehicleServiceType;
@@ -46,6 +47,30 @@ public class VehicleService extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "service_type", nullable = false)
     private VehicleServiceType serviceType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payer_type")
+    @Builder.Default
+    private ServicePayerType payerType = ServicePayerType.OWN_EXPENSE;
+
+    @Column(name = "total_cost", precision = 10, scale = 2)
+    private java.math.BigDecimal totalCost;
+
+    @Column(name = "insurance_claim_no", length = 100)
+    private String insuranceClaimNo;
+
+    @Column(name = "insurance_claim_amt", precision = 10, scale = 2)
+    private java.math.BigDecimal insuranceClaimAmt;
+
+    @Column(name = "certificate_number", length = 100)
+    private String certificateNumber;
+
+    @Column(name = "certificate_valid_until")
+    private java.time.LocalDate certificateValidUntil;
+
+    @Column(name = "is_escalated")
+    @Builder.Default
+    private Boolean isEscalated = false;
 
     @Column(name = "vendor_name")
     private String vendorName;

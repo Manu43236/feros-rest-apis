@@ -1,5 +1,6 @@
 package com.feros.api.dto.response;
 
+import com.feros.api.enums.ServicePayerType;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
 import com.feros.api.enums.VehicleServiceType;
@@ -24,6 +25,7 @@ public class VehicleServiceResponse {
     private ServiceTriggeredBy triggeredBy;
     private Long breakdownId;
     private VehicleServiceType serviceType;
+    private ServicePayerType payerType;
     private String vendorName;
     private String location;
     private ServiceStatus status;
@@ -34,6 +36,11 @@ public class VehicleServiceResponse {
     private Integer odometer;
     private String notes;
     private BigDecimal totalCost;
+    private String insuranceClaimNo;
+    private BigDecimal insuranceClaimAmt;
+    private String certificateNumber;
+    private LocalDate certificateValidUntil;
+    private Boolean isEscalated;
     private List<VehicleServiceTaskResponse> tasks;
     private LocalDateTime startedAt;
     private LocalDateTime createdAt;
