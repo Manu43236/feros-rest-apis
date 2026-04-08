@@ -4,5 +4,5 @@ public enum MeterReadingType {
     TRIP_START,
     TRIP_END,
     FUEL_FILL,
-    AD_HOC
+    GENERAL
 }
