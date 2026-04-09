@@ -138,6 +138,9 @@ public class OrderServiceImpl implements OrderService {
                 .orderStatus(OrderStatus.PENDING)
                 .specialInstructions(request.getSpecialInstructions())
                 .remarks(request.getRemarks())
+                .ewayBillNumber(request.getEwayBillNumber())
+                .ewayBillDate(request.getEwayBillDate())
+                .ewayBillValidUpto(request.getEwayBillValidUpto())
                 .isActive(true)
                 .build();
 
@@ -209,6 +212,9 @@ public class OrderServiceImpl implements OrderService {
         order.setFreightRate(request.getFreightRate());
         order.setSpecialInstructions(request.getSpecialInstructions());
         order.setRemarks(request.getRemarks());
+        order.setEwayBillNumber(request.getEwayBillNumber());
+        order.setEwayBillDate(request.getEwayBillDate());
+        order.setEwayBillValidUpto(request.getEwayBillValidUpto());
 
         if (request.getBillingOn() != null) order.setBillingOn(request.getBillingOn());
         if (request.getRouteId() != null)
@@ -613,6 +619,9 @@ public class OrderServiceImpl implements OrderService {
                 .orderPaymentStatus(o.getOrderPaymentStatus())
                 .specialInstructions(o.getSpecialInstructions())
                 .remarks(o.getRemarks())
+                .ewayBillNumber(o.getEwayBillNumber())
+                .ewayBillDate(o.getEwayBillDate())
+                .ewayBillValidUpto(o.getEwayBillValidUpto())
                 .createdById(o.getCreatedBy().getId())
                 .createdByName(o.getCreatedBy().getName())
                 .vehicleAllocations(vehicleAllocations)

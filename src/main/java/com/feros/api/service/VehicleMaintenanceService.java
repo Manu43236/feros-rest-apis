@@ -12,6 +12,8 @@ public interface VehicleMaintenanceService {
     List<VehicleServiceResponse> getByVehicle(Long vehicleId);
     VehicleServiceResponse getById(Long id);
     VehicleServiceResponse start(Long id);
+    VehicleServiceResponse cancel(Long id);
+    VehicleServiceResponse updateNotes(Long id, String notes);
     VehicleServiceResponse complete(Long id, CompleteServiceRequest request);
     void delete(Long id);
 }

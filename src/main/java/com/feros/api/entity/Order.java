@@ -112,6 +112,15 @@ public class Order extends BaseEntity {
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
+    @Column(name = "eway_bill_number", length = 50)
+    private String ewayBillNumber;
+
+    @Column(name = "eway_bill_date")
+    private LocalDate ewayBillDate;
+
+    @Column(name = "eway_bill_valid_upto")
+    private LocalDate ewayBillValidUpto;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 }

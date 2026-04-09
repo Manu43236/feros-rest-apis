@@ -175,6 +175,34 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
 
     @Override
     @Transactional
+    public VehicleServiceResponse cancel(Long id) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        VehicleService vs = vehicleServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+        if (vs.getStatus() != ServiceStatus.IN_PROGRESS) {
+            throw new FerosException("Only IN_PROGRESS services can be undone", HttpStatus.BAD_REQUEST);
+        }
+        vs.setStatus(ServiceStatus.OPEN);
+        vs.setStartedAt(null);
+        vehicleServiceRepository.save(vs);
+        return mapToResponse(vehicleServiceRepository.findById(vs.getId()).orElse(vs));
+    }
+
+    @Override
+    @Transactional
+    public VehicleServiceResponse updateNotes(Long id, String notes) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        VehicleService vs = vehicleServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+        vs.setNotes(notes);
+        vehicleServiceRepository.save(vs);
+        return mapToResponse(vehicleServiceRepository.findById(vs.getId()).orElse(vs));
+    }
+
+    @Override
+    @Transactional
     public VehicleServiceResponse complete(Long id, CompleteServiceRequest request) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
 

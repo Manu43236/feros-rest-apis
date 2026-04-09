@@ -12,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/vehicle-services")
@@ -48,6 +49,19 @@ public class VehicleMaintenanceController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> start(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Service started successfully", vehicleMaintenanceService.start(id)));
+    }
+
+    @PutMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<VehicleServiceResponse>> cancel(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Service undone to Open", vehicleMaintenanceService.cancel(id)));
+    }
+
+    @PutMapping("/{id}/notes")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<VehicleServiceResponse>> updateNotes(
+            @PathVariable Long id, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.success("Notes updated", vehicleMaintenanceService.updateNotes(id, body.get("notes"))));
     }
 
     @PutMapping("/{id}/complete")
