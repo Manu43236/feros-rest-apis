@@ -32,6 +32,7 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
     private final DeductionTypeRepository deductionTypeRepository;
     private final PaymentStatusRepository paymentStatusRepository;
     private final ServiceTaskTypeRepository serviceTaskTypeRepository;
+    private final VehicleModelRepository vehicleModelRepository;
 
     // ===================== STATES =====================
     @Override
@@ -659,6 +660,90 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
                 .orElseThrow(() -> new FerosException("Service task type not found", HttpStatus.NOT_FOUND));
         t.setIsActive(false);
         serviceTaskTypeRepository.save(t);
+    }
+
+    // ===================== VEHICLE MODELS =====================
+    @Override
+    public VehicleModelResponse createVehicleModel(VehicleModelRequest request) {
+        if (vehicleModelRepository.existsByBrand_IdAndNameIgnoreCaseAndIsActiveTrue(request.getBrandId(), request.getName()))
+            throw new FerosException("Model '" + request.getName() + "' already exists for this brand", HttpStatus.CONFLICT);
+
+        VehicleBrand brand = vehicleBrandRepository.findById(request.getBrandId())
+                .orElseThrow(() -> new FerosException("Brand not found", HttpStatus.NOT_FOUND));
+
+        VehicleType vehicleType = null;
+        if (request.getVehicleTypeId() != null)
+            vehicleType = vehicleTypeRepository.findById(request.getVehicleTypeId())
+                    .orElseThrow(() -> new FerosException("Vehicle type not found", HttpStatus.NOT_FOUND));
+
+        VehicleModel model = VehicleModel.builder()
+                .brand(brand)
+                .vehicleType(vehicleType)
+                .name(request.getName())
+                .tyreCount(request.getTyreCount())
+                .capacityInTons(request.getCapacityInTons())
+                .isActive(true)
+                .build();
+        return toVehicleModelResponse(vehicleModelRepository.save(model));
+    }
+
+    @Override
+    public List<VehicleModelResponse> getAllVehicleModels() {
+        return vehicleModelRepository.findAllByIsActiveTrueOrderByBrand_NameAscNameAsc()
+                .stream().map(this::toVehicleModelResponse).toList();
+    }
+
+    @Override
+    public List<VehicleModelResponse> getVehicleModelsByBrand(Long brandId) {
+        return vehicleModelRepository.findByBrand_IdAndIsActiveTrueOrderByNameAsc(brandId)
+                .stream().map(this::toVehicleModelResponse).toList();
+    }
+
+    @Override
+    public VehicleModelResponse updateVehicleModel(Long id, VehicleModelRequest request) {
+        VehicleModel model = vehicleModelRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Vehicle model not found", HttpStatus.NOT_FOUND));
+
+        VehicleBrand brand = vehicleBrandRepository.findById(request.getBrandId())
+                .orElseThrow(() -> new FerosException("Brand not found", HttpStatus.NOT_FOUND));
+        model.setBrand(brand);
+        model.setName(request.getName());
+        model.setTyreCount(request.getTyreCount());
+        model.setCapacityInTons(request.getCapacityInTons());
+
+        if (request.getVehicleTypeId() != null) {
+            VehicleType vehicleType = vehicleTypeRepository.findById(request.getVehicleTypeId())
+                    .orElseThrow(() -> new FerosException("Vehicle type not found", HttpStatus.NOT_FOUND));
+            model.setVehicleType(vehicleType);
+        } else {
+            model.setVehicleType(null);
+        }
+
+        return toVehicleModelResponse(vehicleModelRepository.save(model));
+    }
+
+    @Override
+    public void deleteVehicleModel(Long id) {
+        VehicleModel model = vehicleModelRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Vehicle model not found", HttpStatus.NOT_FOUND));
+        model.setIsActive(false);
+        vehicleModelRepository.save(model);
+    }
+
+    private VehicleModelResponse toVehicleModelResponse(VehicleModel m) {
+        return VehicleModelResponse.builder()
+                .id(m.getId())
+                .brandId(m.getBrand().getId())
+                .brandName(m.getBrand().getName())
+                .vehicleTypeId(m.getVehicleType() != null ? m.getVehicleType().getId() : null)
+                .vehicleTypeName(m.getVehicleType() != null ? m.getVehicleType().getName() : null)
+                .name(m.getName())
+                .tyreCount(m.getTyreCount())
+                .capacityInTons(m.getCapacityInTons())
+                .isActive(m.getIsActive())
+                .createdAt(m.getCreatedAt())
+                .updatedAt(m.getUpdatedAt())
+                .build();
     }
 
     private List<String> parseRoles(String json) {

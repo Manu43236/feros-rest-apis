@@ -17,6 +17,11 @@ public class TirePositionController {
 
     private final TireService tireService;
 
+    @PostMapping("/auto-setup")
+    public ResponseEntity<ApiResponse<List<TirePositionResponse>>> autoSetup(@RequestParam Long vehicleId) {
+        return ResponseEntity.ok(ApiResponse.success("Positions auto-configured", tireService.autoSetupPositions(vehicleId)));
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<TirePositionResponse>> create(@RequestBody TirePositionRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Position created", tireService.addPosition(request)));

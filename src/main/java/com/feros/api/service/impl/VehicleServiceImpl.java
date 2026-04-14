@@ -43,6 +43,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final OrderVehicleAllocationRepository allocationRepository;
     private final VehicleBreakdownRepository vehicleBreakdownRepository;
     private final UserRepository userRepository;
+    private final VehicleModelRepository vehicleModelRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -147,6 +148,17 @@ public class VehicleServiceImpl implements VehicleService {
             vehicle.setCurrentStatus(vehicleStatusRepository
                     .findByIdAndIsActiveTrue(request.getCurrentStatusId())
                     .orElseThrow(() -> new FerosException("Vehicle status not found", HttpStatus.NOT_FOUND)));
+
+        if (request.getVehicleModelId() != null) {
+            VehicleModel vehicleModel = vehicleModelRepository.findById(request.getVehicleModelId())
+                    .orElseThrow(() -> new FerosException("Vehicle model not found", HttpStatus.NOT_FOUND));
+            vehicle.setVehicleModel(vehicleModel);
+            // Auto-fill from model if not explicitly provided
+            if (request.getCapacityInTons() == null && vehicleModel.getCapacityInTons() != null)
+                vehicle.setCapacityInTons(vehicleModel.getCapacityInTons());
+            if (request.getVehicleTypeId() == null && vehicleModel.getVehicleType() != null)
+                vehicle.setVehicleType(vehicleModel.getVehicleType());
+        }
 
         return mapToResponse(vehicleRepository.save(vehicle));
     }
@@ -284,6 +296,10 @@ public class VehicleServiceImpl implements VehicleService {
             vehicle.setCurrentStatus(vehicleStatusRepository
                     .findByIdAndIsActiveTrue(request.getCurrentStatusId())
                     .orElseThrow(() -> new FerosException("Vehicle status not found", HttpStatus.NOT_FOUND)));
+
+        if (request.getVehicleModelId() != null)
+            vehicle.setVehicleModel(vehicleModelRepository.findById(request.getVehicleModelId())
+                    .orElseThrow(() -> new FerosException("Vehicle model not found", HttpStatus.NOT_FOUND)));
 
         return mapToResponse(vehicleRepository.save(vehicle));
     }
@@ -529,6 +545,9 @@ public class VehicleServiceImpl implements VehicleService {
                 .brandName(v.getBrand() != null ? v.getBrand().getName() : null)
                 .vehicleTypeId(v.getVehicleType() != null ? v.getVehicleType().getId() : null)
                 .vehicleTypeName(v.getVehicleType() != null ? v.getVehicleType().getName() : null)
+                .tyreCount(v.getVehicleType() != null ? v.getVehicleType().getTyreCount() : null)
+                .vehicleModelId(v.getVehicleModel() != null ? v.getVehicleModel().getId() : null)
+                .vehicleModelName(v.getVehicleModel() != null ? v.getVehicleModel().getName() : null)
                 .fuelTypeId(v.getFuelType() != null ? v.getFuelType().getId() : null)
                 .fuelTypeName(v.getFuelType() != null ? v.getFuelType().getName() : null)
                 .ownershipTypeId(v.getOwnershipType() != null ? v.getOwnershipType().getId() : null)

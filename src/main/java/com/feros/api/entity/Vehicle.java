@@ -38,6 +38,10 @@ public class Vehicle extends BaseEntity {
     private VehicleType vehicleType;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehicle_model_id")
+    private VehicleModel vehicleModel;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fuel_type_id")
     private FuelType fuelType;
 
@@ -165,6 +169,7 @@ public class Vehicle extends BaseEntity {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;
 }

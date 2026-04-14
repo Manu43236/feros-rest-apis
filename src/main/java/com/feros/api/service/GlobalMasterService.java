@@ -5,6 +5,7 @@ import com.feros.api.dto.response.*;
 
 import java.util.List;
 
+
 public interface GlobalMasterService {
 
     // States
@@ -111,4 +112,11 @@ public interface GlobalMasterService {
     List<MasterResponse> getAllServiceTaskTypes();
     MasterResponse updateServiceTaskType(Long id, MasterRequest request);
     void deleteServiceTaskType(Long id);
+
+    // Vehicle Models
+    VehicleModelResponse createVehicleModel(VehicleModelRequest request);
+    List<VehicleModelResponse> getAllVehicleModels();
+    List<VehicleModelResponse> getVehicleModelsByBrand(Long brandId);
+    VehicleModelResponse updateVehicleModel(Long id, VehicleModelRequest request);
+    void deleteVehicleModel(Long id);
 }

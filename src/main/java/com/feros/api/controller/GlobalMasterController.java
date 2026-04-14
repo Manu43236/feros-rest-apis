@@ -432,4 +432,36 @@ public class GlobalMasterController {
         globalMasterService.deleteServiceTaskType(id);
         return ResponseEntity.ok(ApiResponse.success("Service task type deleted successfully", null));
     }
+
+    // ── Vehicle Models ──────────────────────────────────────────────────────────
+
+    @GetMapping("/vehicle-models")
+    public ResponseEntity<ApiResponse<List<VehicleModelResponse>>> getAllVehicleModels(
+            @RequestParam(required = false) Long brandId) {
+        List<VehicleModelResponse> result = brandId != null
+                ? globalMasterService.getVehicleModelsByBrand(brandId)
+                : globalMasterService.getAllVehicleModels();
+        return ResponseEntity.ok(ApiResponse.success("Vehicle models fetched", result));
+    }
+
+    @PostMapping("/vehicle-models")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<VehicleModelResponse>> createVehicleModel(
+            @Valid @RequestBody VehicleModelRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Vehicle model created", globalMasterService.createVehicleModel(request)));
+    }
+
+    @PutMapping("/vehicle-models/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<VehicleModelResponse>> updateVehicleModel(
+            @PathVariable Long id, @Valid @RequestBody VehicleModelRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Vehicle model updated", globalMasterService.updateVehicleModel(id, request)));
+    }
+
+    @DeleteMapping("/vehicle-models/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteVehicleModel(@PathVariable Long id) {
+        globalMasterService.deleteVehicleModel(id);
+        return ResponseEntity.ok(ApiResponse.success("Vehicle model deleted", null));
+    }
 }

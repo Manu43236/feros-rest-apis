@@ -14,6 +14,7 @@ public interface TireService {
     TireResponse updateTire(Long id, TireRequest request);
 
     // Positions
+    List<TirePositionResponse> autoSetupPositions(Long vehicleId);
     TirePositionResponse addPosition(TirePositionRequest request);
     List<TirePositionResponse> getPositionsForVehicle(Long vehicleId);
     List<TirePositionResponse> getCurrentPositionsForVehicle(Long vehicleId);

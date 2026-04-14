@@ -16,6 +16,7 @@ public class VehicleRequest {
     private Boolean isActive;
 
     private Long brandId;
+    private Long vehicleModelId;
     private Long vehicleTypeId;
     private Long fuelTypeId;
     private Long ownershipTypeId;

@@ -9,6 +9,7 @@ import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.TireService;
 import com.feros.api.util.SecurityUtil;
+import com.feros.api.util.TirePositionTemplateUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -94,6 +95,45 @@ public class TireServiceImpl implements TireService {
     }
 
     // ── Positions ─────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public List<TirePositionResponse> autoSetupPositions(Long vehicleId) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        Tenant tenant = getTenant(tenantId);
+        Vehicle vehicle = getVehicle(vehicleId, tenantId);
+
+        boolean hasExisting = !positionRepository
+                .findByVehicleIdAndIsActiveTrueOrderByDisplayOrderAsc(vehicleId).isEmpty();
+        if (hasExisting) {
+            throw new FerosException("Positions already set up for this vehicle. Remove existing positions first.", HttpStatus.CONFLICT);
+        }
+
+        Integer tyreCount = null;
+        if (vehicle.getVehicleModel() != null && vehicle.getVehicleModel().getTyreCount() != null)
+            tyreCount = vehicle.getVehicleModel().getTyreCount();
+        else if (vehicle.getVehicleType() != null && vehicle.getVehicleType().getTyreCount() != null)
+            tyreCount = vehicle.getVehicleType().getTyreCount();
+        if (tyreCount == null || tyreCount < 4) {
+            throw new FerosException("Vehicle type has no valid tyre count configured", HttpStatus.BAD_REQUEST);
+        }
+
+        List<TirePositionTemplateUtil.PositionDef> template = TirePositionTemplateUtil.getTemplate(tyreCount);
+
+        List<VehicleTirePosition> saved = template.stream()
+                .map(def -> VehicleTirePosition.builder()
+                        .tenant(tenant)
+                        .vehicle(vehicle)
+                        .positionCode(def.code())
+                        .positionType(def.type())
+                        .displayOrder(def.order())
+                        .isActive(true)
+                        .build())
+                .map(positionRepository::save)
+                .toList();
+
+        return saved.stream().map(p -> toPositionResponse(p, null)).toList();
+    }
 
     @Override
     @Transactional

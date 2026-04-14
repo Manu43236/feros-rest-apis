@@ -23,6 +23,10 @@ public class VehicleResponse {
 
     private Long vehicleTypeId;
     private String vehicleTypeName;
+    private Integer tyreCount;
+
+    private Long vehicleModelId;
+    private String vehicleModelName;
 
     private Long fuelTypeId;
     private String fuelTypeName;
