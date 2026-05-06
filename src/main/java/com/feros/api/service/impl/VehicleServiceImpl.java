@@ -593,6 +593,24 @@ public class VehicleServiceImpl implements VehicleService {
                 .build();
     }
 
+    @Override
+    @Transactional
+    public int backfillTirePositions() {
+        Long tenantId = getCurrentTenantId();
+        Tenant tenant = getCurrentTenant();
+
+        List<Vehicle> vehicles = vehicleRepository.findByTenantIdAndIsActiveTrue(tenantId);
+        int count = 0;
+        for (Vehicle vehicle : vehicles) {
+            boolean hasPositions = tirePositionRepository.existsByVehicleIdAndIsActiveTrue(vehicle.getId());
+            if (!hasPositions && vehicle.getVehicleType() != null && vehicle.getVehicleType().getTyreCount() != null) {
+                autoCreateTirePositions(vehicle, vehicle.getVehicleType().getTyreCount(), tenant);
+                count++;
+            }
+        }
+        return count;
+    }
+
     // ── Auto-generate tyre positions based on vehicle type tyre count ──────────
     private void autoCreateTirePositions(Vehicle vehicle, int tyreCount, Tenant tenant) {
         List<VehicleTirePosition> positions = new ArrayList<>();

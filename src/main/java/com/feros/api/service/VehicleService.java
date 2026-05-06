@@ -18,4 +18,5 @@ public interface VehicleService {
     VehicleResponse toggleVehicleActive(Long id);
     void deleteVehicle(Long id);
     BulkTenantUploadResponse bulkUpload(MultipartFile file);
+    int backfillTirePositions();
 }

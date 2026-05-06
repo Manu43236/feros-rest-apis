@@ -81,6 +81,13 @@ public class VehicleController {
         return ResponseEntity.ok(ApiResponse.success("Vehicle deleted successfully", null));
     }
 
+    @PostMapping("/backfill-tire-positions")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<String>> backfillTirePositions() {
+        int count = vehicleService.backfillTirePositions();
+        return ResponseEntity.ok(ApiResponse.success("Backfill complete", count + " vehicles updated"));
+    }
+
     @PostMapping("/bulk-upload")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<BulkTenantUploadResponse>> bulkUpload(
