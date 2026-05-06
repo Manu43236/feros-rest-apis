@@ -42,4 +42,9 @@ public class TireController {
     public ResponseEntity<ApiResponse<List<TireFittingResponse>>> getTireHistory(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Tire history fetched", tireService.getTireHistory(id)));
     }
+
+    @PatchMapping("/{id}/back-to-stock")
+    public ResponseEntity<ApiResponse<TireResponse>> markBackToStock(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Tire marked back to stock", tireService.markBackToStock(id)));
+    }
 }

@@ -59,21 +59,30 @@ public class TireServiceImpl implements TireService {
                 .isActive(true)
                 .build();
 
-        return toTireResponse(tireRepository.save(tire));
+        return toTireResponse(tireRepository.save(tire), null);
     }
 
     @Override
     public List<TireResponse> getAllTires() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        return tireRepository.findByTenantIdAndIsActiveTrueOrderByIdDesc(tenantId)
-                .stream().map(this::toTireResponse).toList();
+        List<Tire> tires = tireRepository.findByTenantIdAndIsActiveTrueOrderByIdDesc(tenantId);
+
+        // Batch fetch all active fittings to avoid N+1
+        Map<Long, VehicleTireFitting> fittingByTireId = fittingRepository
+                .findAllActiveFittingsByTenantId(tenantId)
+                .stream()
+                .collect(Collectors.toMap(f -> f.getTire().getId(), f -> f));
+
+        return tires.stream()
+                .map(t -> toTireResponse(t, fittingByTireId.get(t.getId())))
+                .toList();
     }
 
     @Override
     public List<TireResponse> getAvailableTires() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         return tireRepository.findByTenantIdAndStatusAndIsActiveTrueOrderByIdDesc(tenantId, TireStatus.IN_STOCK)
-                .stream().map(this::toTireResponse).toList();
+                .stream().map(t -> toTireResponse(t, null)).toList();
     }
 
     @Override
@@ -90,7 +99,7 @@ public class TireServiceImpl implements TireService {
         if (request.getPurchaseCost() != null) tire.setPurchaseCost(request.getPurchaseCost());
         if (request.getNotes() != null)        tire.setNotes(request.getNotes());
 
-        return toTireResponse(tireRepository.save(tire));
+        return toTireResponse(tireRepository.save(tire), null);
     }
 
     // ── Positions ─────────────────────────────────────────────────────────────
@@ -369,6 +378,18 @@ public class TireServiceImpl implements TireService {
                 }).toList();
     }
 
+    @Override
+    @Transactional
+    public TireResponse markBackToStock(Long id) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        Tire tire = findTire(id, tenantId);
+        if (tire.getStatus() != TireStatus.RETREADING) {
+            throw new FerosException("Only tires in RETREADING status can be marked back to stock", HttpStatus.CONFLICT);
+        }
+        tire.setStatus(TireStatus.IN_STOCK);
+        return toTireResponse(tireRepository.save(tire), null);
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private Tenant getTenant(Long tenantId) {
@@ -410,7 +431,7 @@ public class TireServiceImpl implements TireService {
 
     // ── Mappers ───────────────────────────────────────────────────────────────
 
-    private TireResponse toTireResponse(Tire tire) {
+    private TireResponse toTireResponse(Tire tire, VehicleTireFitting currentFitting) {
         return TireResponse.builder()
                 .id(tire.getId())
                 .tenantId(tire.getTenant().getId())
@@ -425,6 +446,9 @@ public class TireServiceImpl implements TireService {
                 .retreadCount(tire.getRetreadCount())
                 .totalLifetimeKm(tire.getTotalLifetimeKm())
                 .notes(tire.getNotes())
+                .currentFittingId(currentFitting != null ? currentFitting.getId() : null)
+                .currentVehicleRegistrationNumber(currentFitting != null ? currentFitting.getVehicle().getRegistrationNumber() : null)
+                .currentPositionCode(currentFitting != null ? currentFitting.getPosition().getPositionCode() : null)
                 .createdAt(tire.getCreatedAt())
                 .updatedAt(tire.getUpdatedAt())
                 .build();

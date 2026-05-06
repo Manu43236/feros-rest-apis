@@ -12,6 +12,7 @@ public interface TireService {
     List<TireResponse> getAllTires();
     List<TireResponse> getAvailableTires();
     TireResponse updateTire(Long id, TireRequest request);
+    TireResponse markBackToStock(Long id);
 
     // Positions
     TirePositionResponse addPosition(TirePositionRequest request);

@@ -25,4 +25,8 @@ public interface VehicleTireFittingRepository extends JpaRepository<VehicleTireF
     // Check if a tire is currently fitted anywhere
     @Query("SELECT f FROM VehicleTireFitting f WHERE f.tire.id = :tireId AND f.removedAtKm IS NULL AND f.isActive = true")
     Optional<VehicleTireFitting> findCurrentFittingForTire(@Param("tireId") Long tireId);
+
+    // All active fittings for a tenant — used to build vehicle context on tire list
+    @Query("SELECT f FROM VehicleTireFitting f WHERE f.tenant.id = :tenantId AND f.removedAtKm IS NULL AND f.isActive = true")
+    List<VehicleTireFitting> findAllActiveFittingsByTenantId(@Param("tenantId") Long tenantId);
 }
