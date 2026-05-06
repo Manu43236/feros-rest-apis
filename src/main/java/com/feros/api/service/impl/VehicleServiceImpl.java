@@ -7,7 +7,9 @@ import com.feros.api.dto.response.VehicleResponse;
 import com.feros.api.entity.Tenant;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.VehicleBreakdown;
+import com.feros.api.entity.VehicleTirePosition;
 import com.feros.api.entity.master.*;
+import com.feros.api.enums.TirePositionType;
 import com.feros.api.enums.BreakdownStatus;
 import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
@@ -43,6 +45,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final OrderVehicleAllocationRepository allocationRepository;
     private final VehicleBreakdownRepository vehicleBreakdownRepository;
     private final UserRepository userRepository;
+    private final VehicleTirePositionRepository tirePositionRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -148,7 +151,14 @@ public class VehicleServiceImpl implements VehicleService {
                     .findByIdAndIsActiveTrue(request.getCurrentStatusId())
                     .orElseThrow(() -> new FerosException("Vehicle status not found", HttpStatus.NOT_FOUND)));
 
-        return mapToResponse(vehicleRepository.save(vehicle));
+        Vehicle saved = vehicleRepository.save(vehicle);
+
+        // Auto-create tyre positions based on vehicle type tyre count
+        if (saved.getVehicleType() != null && saved.getVehicleType().getTyreCount() != null) {
+            autoCreateTirePositions(saved, saved.getVehicleType().getTyreCount(), tenant);
+        }
+
+        return mapToResponse(saved);
     }
 
     @Override
@@ -580,6 +590,42 @@ public class VehicleServiceImpl implements VehicleService {
                 .isActive(v.getIsActive())
                 .createdAt(v.getCreatedAt())
                 .updatedAt(v.getUpdatedAt())
+                .build();
+    }
+
+    // ── Auto-generate tyre positions based on vehicle type tyre count ──────────
+    private void autoCreateTirePositions(Vehicle vehicle, int tyreCount, Tenant tenant) {
+        List<VehicleTirePosition> positions = new ArrayList<>();
+        int order = 0;
+
+        // Steer axle — always FL and FR
+        positions.add(buildTirePosition(tenant, vehicle, "FL", TirePositionType.STEER, ++order));
+        positions.add(buildTirePosition(tenant, vehicle, "FR", TirePositionType.STEER, ++order));
+
+        // Drive positions — remaining after steer, split evenly left and right
+        int driveCount = Math.max(0, tyreCount - 2);
+        int perSide = driveCount / 2;
+
+        for (int i = 1; i <= perSide; i++)
+            positions.add(buildTirePosition(tenant, vehicle, "L" + i, TirePositionType.DRIVE, ++order));
+
+        for (int i = 1; i <= perSide; i++)
+            positions.add(buildTirePosition(tenant, vehicle, "R" + i, TirePositionType.DRIVE, ++order));
+
+        // Always one spare
+        positions.add(buildTirePosition(tenant, vehicle, "SP", TirePositionType.SPARE, ++order));
+
+        tirePositionRepository.saveAll(positions);
+    }
+
+    private VehicleTirePosition buildTirePosition(Tenant tenant, Vehicle vehicle, String code, TirePositionType type, int order) {
+        return VehicleTirePosition.builder()
+                .tenant(tenant)
+                .vehicle(vehicle)
+                .positionCode(code)
+                .positionType(type)
+                .displayOrder(order)
+                .isActive(true)
                 .build();
     }
 }
