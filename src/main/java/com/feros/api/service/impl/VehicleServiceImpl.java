@@ -127,6 +127,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .fuelTankCapacity(request.getFuelTankCapacity())
                 .currentFuelLevel(request.getCurrentFuelLevel())
                 .notes(request.getNotes())
+                .tyreRotationIntervalKm(request.getTyreRotationIntervalKm())
                 .isActive(true)
                 .build();
 
@@ -273,6 +274,7 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setFuelTankCapacity(request.getFuelTankCapacity());
         vehicle.setCurrentFuelLevel(request.getCurrentFuelLevel());
         vehicle.setNotes(request.getNotes());
+        vehicle.setTyreRotationIntervalKm(request.getTyreRotationIntervalKm());
 
         if (request.getBrandId() != null)
             vehicle.setBrand(vehicleBrandRepository.findById(request.getBrandId())
@@ -587,6 +589,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .fuelTankCapacity(v.getFuelTankCapacity())
                 .currentFuelLevel(v.getCurrentFuelLevel())
                 .notes(v.getNotes())
+                .tyreRotationIntervalKm(v.getTyreRotationIntervalKm())
                 .isActive(v.getIsActive())
                 .createdAt(v.getCreatedAt())
                 .updatedAt(v.getUpdatedAt())

@@ -73,4 +73,5 @@ public class VehicleRequest {
     private BigDecimal fuelTankCapacity;
     private BigDecimal currentFuelLevel;
     private String notes;
+    private Integer tyreRotationIntervalKm;
 }

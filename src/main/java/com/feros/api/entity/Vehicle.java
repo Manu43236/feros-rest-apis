@@ -165,6 +165,9 @@ public class Vehicle extends BaseEntity {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "tyre_rotation_interval_km")
+    private Integer tyreRotationIntervalKm;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 }

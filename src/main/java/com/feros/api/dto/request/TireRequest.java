@@ -16,4 +16,6 @@ public class TireRequest {
     private LocalDate purchaseDate;
     private BigDecimal purchaseCost;
     private String notes;
+    private Integer tyreLifeYears;
+    private BigDecimal maxLifetimeKm;
 }

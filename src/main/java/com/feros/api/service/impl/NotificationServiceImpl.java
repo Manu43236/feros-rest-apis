@@ -21,6 +21,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final TenantRepository tenantRepository;
+    private final com.feros.api.repository.UserRepository userRepository;
 
     @Override
     public List<NotificationResponse> getMyNotifications() {
@@ -69,6 +70,21 @@ public class NotificationServiceImpl implements NotificationService {
                 .message(message)
                 .build();
         notificationRepository.save(notification);
+    }
+
+    @Override
+    public void sendToRoles(Tenant tenant, List<com.feros.api.enums.RoleName> roles, NotificationType type, String title, String message) {
+        List<com.feros.api.entity.User> users = userRepository.findByTenantIdAndRoleNames(tenant.getId(), roles);
+        for (com.feros.api.entity.User user : users) {
+            Notification notification = Notification.builder()
+                    .tenant(tenant)
+                    .userId(user.getId())
+                    .type(type)
+                    .title(title)
+                    .message(message)
+                    .build();
+            notificationRepository.save(notification);
+        }
     }
 
     private NotificationResponse toResponse(Notification n) {

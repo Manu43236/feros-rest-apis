@@ -25,6 +25,9 @@ public class TireResponse {
     private Integer retreadCount;
     private BigDecimal totalLifetimeKm;
     private String notes;
+    private Integer tyreLifeYears;
+    private LocalDate expiryDate;
+    private BigDecimal maxLifetimeKm;
     // Retread info (populated when status = RETREADING)
     private String retreaderName;
     private LocalDate expectedReturnDate;

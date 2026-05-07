@@ -92,6 +92,7 @@ public class VehicleResponse {
     private BigDecimal fuelTankCapacity;
     private BigDecimal currentFuelLevel;
     private String notes;
+    private Integer tyreRotationIntervalKm;
 
     private Boolean isActive;
     private LocalDateTime createdAt;

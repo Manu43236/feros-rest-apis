@@ -8,6 +8,9 @@ import com.feros.api.enums.TireStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.TireService;
+import com.feros.api.service.NotificationService;
+import com.feros.api.enums.RoleName;
+import java.util.Arrays;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,6 +32,7 @@ public class TireServiceImpl implements TireService {
     private final TireRotationLogRepository rotationLogRepository;
     private final TireRotationItemRepository rotationItemRepository;
     private final VehicleRepository vehicleRepository;
+    private final NotificationService notificationService;
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
 
@@ -43,6 +47,9 @@ public class TireServiceImpl implements TireService {
         tireRepository.findByTenantIdAndSerialNumberAndIsActiveTrue(tenantId, request.getSerialNumber())
                 .ifPresent(t -> { throw new FerosException("Tire with this serial number already exists", HttpStatus.CONFLICT); });
 
+        LocalDate baseDate = request.getPurchaseDate() != null ? request.getPurchaseDate() : LocalDate.now();
+        LocalDate expiryDate = request.getTyreLifeYears() != null ? baseDate.plusYears(request.getTyreLifeYears()) : null;
+
         Tire tire = Tire.builder()
                 .tenant(tenant)
                 .serialNumber(request.getSerialNumber())
@@ -55,6 +62,9 @@ public class TireServiceImpl implements TireService {
                 .status(TireStatus.IN_STOCK)
                 .retreadCount(0)
                 .totalLifetimeKm(BigDecimal.ZERO)
+                .tyreLifeYears(request.getTyreLifeYears())
+                .expiryDate(expiryDate)
+                .maxLifetimeKm(request.getMaxLifetimeKm())
                 .notes(request.getNotes())
                 .isActive(true)
                 .build();
@@ -98,6 +108,12 @@ public class TireServiceImpl implements TireService {
         if (request.getPurchaseDate() != null) tire.setPurchaseDate(request.getPurchaseDate());
         if (request.getPurchaseCost() != null) tire.setPurchaseCost(request.getPurchaseCost());
         if (request.getNotes() != null)        tire.setNotes(request.getNotes());
+        if (request.getMaxLifetimeKm() != null)   tire.setMaxLifetimeKm(request.getMaxLifetimeKm());
+        if (request.getTyreLifeYears() != null) {
+            tire.setTyreLifeYears(request.getTyreLifeYears());
+            LocalDate base = tire.getPurchaseDate() != null ? tire.getPurchaseDate() : LocalDate.now();
+            tire.setExpiryDate(base.plusYears(request.getTyreLifeYears()));
+        }
 
         return toTireResponse(tireRepository.save(tire), null);
     }
@@ -210,6 +226,13 @@ public class TireServiceImpl implements TireService {
         fitting = fittingRepository.save(fitting);
         tire.setStatus(TireStatus.FITTED);
         tireRepository.save(tire);
+
+        // Notify ADMIN + OFFICE_STAFF
+        notificationService.sendToRoles(tenant,
+                Arrays.asList(RoleName.ADMIN, RoleName.OFFICE_STAFF),
+                com.feros.api.enums.NotificationType.TYRE_FITTED,
+                "Tyre Fitted",
+                tire.getSerialNumber() + " fitted to " + vehicle.getRegistrationNumber() + " at position " + position.getPositionCode());
 
         return toFittingResponse(fitting);
     }
@@ -368,6 +391,13 @@ public class TireServiceImpl implements TireService {
             items.add(rotationItemRepository.save(item));
         }
 
+        // Notify ADMIN + SUPERVISOR
+        notificationService.sendToRoles(tenant,
+                Arrays.asList(RoleName.ADMIN, RoleName.SUPERVISOR),
+                com.feros.api.enums.NotificationType.TYRE_ROTATION,
+                "Tyre Rotation Performed",
+                "Tyre rotation performed on " + vehicle.getRegistrationNumber() + " — " + items.size() + " tyre(s) rotated at " + String.format("%,.0f", request.getOdometerKm()) + " km");
+
         return toRotationLogResponse(rotationLog, items);
     }
 
@@ -450,6 +480,9 @@ public class TireServiceImpl implements TireService {
                 .retreadCount(tire.getRetreadCount())
                 .totalLifetimeKm(tire.getTotalLifetimeKm())
                 .notes(tire.getNotes())
+                .tyreLifeYears(tire.getTyreLifeYears())
+                .expiryDate(tire.getExpiryDate())
+                .maxLifetimeKm(tire.getMaxLifetimeKm())
                 .retreaderName(tire.getRetreaderName())
                 .expectedReturnDate(tire.getExpectedReturnDate())
                 .currentFittingId(currentFitting != null ? currentFitting.getId() : null)

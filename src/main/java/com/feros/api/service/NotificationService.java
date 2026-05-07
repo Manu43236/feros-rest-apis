@@ -13,4 +13,5 @@ public interface NotificationService {
     void markAllRead();
     void broadcast(BroadcastNotificationRequest request);
     void sendToTenant(Tenant tenant, NotificationType type, String title, String message);
+    void sendToRoles(Tenant tenant, List<com.feros.api.enums.RoleName> roles, NotificationType type, String title, String message);
 }
