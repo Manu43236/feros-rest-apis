@@ -518,6 +518,8 @@ public class TireServiceImpl implements TireService {
                 .tireSerialNumber(f.getTire().getSerialNumber())
                 .tireBrand(f.getTire().getBrand())
                 .tireSize(f.getTire().getSize())
+                .tireMaxLifetimeKm(f.getTire().getMaxLifetimeKm())
+                .tireTotalLifetimeKm(f.getTire().getTotalLifetimeKm())
                 .positionId(f.getPosition().getId())
                 .positionCode(f.getPosition().getPositionCode())
                 .fittedAtKm(f.getFittedAtKm())

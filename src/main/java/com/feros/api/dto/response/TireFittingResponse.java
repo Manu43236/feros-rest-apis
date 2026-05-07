@@ -19,6 +19,8 @@ public class TireFittingResponse {
     private String tireSerialNumber;
     private String tireBrand;
     private String tireSize;
+    private BigDecimal tireMaxLifetimeKm;
+    private BigDecimal tireTotalLifetimeKm;
     private Long positionId;
     private String positionCode;
     private BigDecimal fittedAtKm;
