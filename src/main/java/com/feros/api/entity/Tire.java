@@ -60,6 +60,12 @@ public class Tire extends BaseEntity {
     @Column(name = "total_lifetime_km", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalLifetimeKm = BigDecimal.ZERO;
 
+    @Column(name = "retreader_name")
+    private String retreaderName;
+
+    @Column(name = "expected_return_date")
+    private LocalDate expectedReturnDate;
+
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 

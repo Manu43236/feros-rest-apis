@@ -12,4 +12,6 @@ public class TireRemoveRequest {
     private LocalDate removedDate;
     private TireRemovalReason removalReason;
     private String notes;
+    private String retreaderName;
+    private LocalDate expectedReturnDate;
 }

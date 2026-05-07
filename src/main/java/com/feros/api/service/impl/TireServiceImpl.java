@@ -254,6 +254,8 @@ public class TireServiceImpl implements TireService {
         if (reason == TireRemovalReason.RETREAD) {
             tire.setStatus(TireStatus.RETREADING);
             tire.setRetreadCount(tire.getRetreadCount() + 1);
+            tire.setRetreaderName(request.getRetreaderName());
+            tire.setExpectedReturnDate(request.getExpectedReturnDate());
         } else if (reason == TireRemovalReason.SCRAP) {
             tire.setStatus(TireStatus.SCRAPPED);
         } else {
@@ -387,6 +389,8 @@ public class TireServiceImpl implements TireService {
             throw new FerosException("Only tires in RETREADING status can be marked back to stock", HttpStatus.CONFLICT);
         }
         tire.setStatus(TireStatus.IN_STOCK);
+        tire.setRetreaderName(null);
+        tire.setExpectedReturnDate(null);
         return toTireResponse(tireRepository.save(tire), null);
     }
 
@@ -446,6 +450,8 @@ public class TireServiceImpl implements TireService {
                 .retreadCount(tire.getRetreadCount())
                 .totalLifetimeKm(tire.getTotalLifetimeKm())
                 .notes(tire.getNotes())
+                .retreaderName(tire.getRetreaderName())
+                .expectedReturnDate(tire.getExpectedReturnDate())
                 .currentFittingId(currentFitting != null ? currentFitting.getId() : null)
                 .currentVehicleRegistrationNumber(currentFitting != null ? currentFitting.getVehicle().getRegistrationNumber() : null)
                 .currentPositionCode(currentFitting != null ? currentFitting.getPosition().getPositionCode() : null)

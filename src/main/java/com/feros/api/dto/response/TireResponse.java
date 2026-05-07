@@ -25,6 +25,9 @@ public class TireResponse {
     private Integer retreadCount;
     private BigDecimal totalLifetimeKm;
     private String notes;
+    // Retread info (populated when status = RETREADING)
+    private String retreaderName;
+    private LocalDate expectedReturnDate;
     // Current fitting info (populated when status = FITTED)
     private Long currentFittingId;
     private String currentVehicleRegistrationNumber;
