@@ -4,9 +4,12 @@ import com.feros.api.dto.request.BroadcastNotificationRequest;
 import com.feros.api.dto.response.NotificationResponse;
 import com.feros.api.entity.Notification;
 import com.feros.api.entity.Tenant;
+import com.feros.api.entity.User;
 import com.feros.api.enums.NotificationType;
+import com.feros.api.enums.RoleName;
 import com.feros.api.repository.NotificationRepository;
 import com.feros.api.repository.TenantRepository;
+import com.feros.api.repository.UserRepository;
 import com.feros.api.service.NotificationService;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +24,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final TenantRepository tenantRepository;
-    private final com.feros.api.repository.UserRepository userRepository;
+    private final UserRepository userRepository;
 
     @Override
     public List<NotificationResponse> getMyNotifications() {
@@ -73,9 +76,9 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    public void sendToRoles(Tenant tenant, List<com.feros.api.enums.RoleName> roles, NotificationType type, String title, String message) {
-        List<com.feros.api.entity.User> users = userRepository.findByTenantIdAndRoleNames(tenant.getId(), roles);
-        for (com.feros.api.entity.User user : users) {
+    public void sendToRoles(Tenant tenant, List<RoleName> roles, NotificationType type, String title, String message) {
+        List<User> users = userRepository.findByTenantIdAndRoleNames(tenant.getId(), roles);
+        for (User user : users) {
             Notification notification = Notification.builder()
                     .tenant(tenant)
                     .userId(user.getId())
