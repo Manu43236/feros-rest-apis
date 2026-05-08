@@ -18,6 +18,8 @@ public interface LrService {
     LrResponse updateLr(Long id, UpdateLrRequest request);
     LrCheckpostResponse addCheckpost(Long lrId, LrCheckpostRequest request);
     List<LrCheckpostResponse> getCheckposts(Long lrId);
+    void deleteCheckpost(Long checkpostId);
     LrChargeResponse addCharge(Long lrId, LrChargeRequest request);
     List<LrChargeResponse> getCharges(Long lrId);
+    void deleteCharge(Long chargeId);
 }

@@ -93,4 +93,20 @@ public class LrController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Charges fetched successfully", lrService.getCharges(id)));
     }
+
+    @DeleteMapping("/{id}/checkposts/{checkpostId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<Void>> deleteCheckpost(
+            @PathVariable Long id, @PathVariable Long checkpostId) {
+        lrService.deleteCheckpost(checkpostId);
+        return ResponseEntity.ok(ApiResponse.success("Checkpost deleted", null));
+    }
+
+    @DeleteMapping("/{id}/charges/{chargeId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<Void>> deleteCharge(
+            @PathVariable Long id, @PathVariable Long chargeId) {
+        lrService.deleteCharge(chargeId);
+        return ResponseEntity.ok(ApiResponse.success("Charge deleted", null));
+    }
 }

@@ -299,6 +299,24 @@ public class LrServiceImpl implements LrService {
                 .stream().map(this::mapToChargeResponse).toList();
     }
 
+    @Override
+    @Transactional
+    public void deleteCheckpost(Long checkpostId) {
+        LrCheckpost checkpost = lrCheckpostRepository.findById(checkpostId)
+                .orElseThrow(() -> new FerosException("Checkpost not found", HttpStatus.NOT_FOUND));
+        checkpost.setIsActive(false);
+        lrCheckpostRepository.save(checkpost);
+    }
+
+    @Override
+    @Transactional
+    public void deleteCharge(Long chargeId) {
+        LrCharge charge = lrChargeRepository.findById(chargeId)
+                .orElseThrow(() -> new FerosException("Charge not found", HttpStatus.NOT_FOUND));
+        charge.setIsActive(false);
+        lrChargeRepository.save(charge);
+    }
+
     // ===================== MAPPERS =====================
     private LrResponse mapToLrResponse(Lr lr) {
         Vehicle vehicle = lr.getVehicleAllocation().getVehicle();
