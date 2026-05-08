@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -20,5 +21,7 @@ public class CreateInvoiceRequest {
 
     private LocalDate invoiceDate;
     private LocalDate dueDate;
+    private BigDecimal cgstPercentage; // e.g. 9 for 9% CGST
+    private BigDecimal sgstPercentage; // e.g. 9 for 9% SGST (use 0 + igstPercentage for interstate)
     private String remarks;
 }

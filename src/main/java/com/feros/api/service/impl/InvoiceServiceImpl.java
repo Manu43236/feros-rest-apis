@@ -147,10 +147,26 @@ public class InvoiceServiceImpl implements InvoiceService {
             subtotal = subtotal.add(lrTotal);
         }
 
-        // Update invoice totals
+        // Apply CGST / SGST and update totals
+        BigDecimal cgstPct = request.getCgstPercentage() != null
+                ? request.getCgstPercentage() : BigDecimal.ZERO;
+        BigDecimal sgstPct = request.getSgstPercentage() != null
+                ? request.getSgstPercentage() : BigDecimal.ZERO;
+        BigDecimal cgstAmt = subtotal.multiply(cgstPct)
+                .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+        BigDecimal sgstAmt = subtotal.multiply(sgstPct)
+                .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+        BigDecimal taxAmt = cgstAmt.add(sgstAmt);
+        BigDecimal total  = subtotal.add(taxAmt);
+
         savedInvoice.setSubtotal(subtotal);
-        savedInvoice.setTotalAmount(subtotal);
-        savedInvoice.setBalanceDue(subtotal);
+        savedInvoice.setCgstPercentage(cgstPct);
+        savedInvoice.setSgstPercentage(sgstPct);
+        savedInvoice.setCgstAmount(cgstAmt);
+        savedInvoice.setSgstAmount(sgstAmt);
+        savedInvoice.setTaxAmount(taxAmt);
+        savedInvoice.setTotalAmount(total);
+        savedInvoice.setBalanceDue(total);
         invoiceRepository.save(savedInvoice);
 
         return mapToInvoiceResponse(savedInvoice);
@@ -345,16 +361,43 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .findByInvoiceIdAndIsActiveTrue(inv.getId())
                 .stream().map(this::mapToPaymentResponse).toList();
 
+        com.feros.api.entity.Tenant t  = inv.getTenant();
+        com.feros.api.entity.Client  cl = inv.getClient();
+
         return InvoiceResponse.builder()
                 .id(inv.getId())
-                .tenantId(inv.getTenant().getId())
+                .tenantId(t.getId())
                 .invoiceNumber(inv.getInvoiceNumber())
-                .clientId(inv.getClient().getId())
-                .clientName(inv.getClient().getClientName())
+                .clientId(cl.getId())
+                .clientName(cl.getClientName())
                 .invoiceDate(inv.getInvoiceDate())
                 .dueDate(inv.getDueDate())
                 .subtotal(inv.getSubtotal())
+                .cgstPercentage(inv.getCgstPercentage())
+                .sgstPercentage(inv.getSgstPercentage())
+                .cgstAmount(inv.getCgstAmount())
+                .sgstAmount(inv.getSgstAmount())
                 .taxAmount(inv.getTaxAmount())
+                // Tenant print details
+                .tenantLogoUrl(t.getLogoUrl())
+                .tenantGstin(t.getGstin())
+                .tenantPan(t.getPanNumber())
+                .tenantAddress(t.getAddress())
+                .tenantCity(t.getCity())
+                .tenantState(t.getState())
+                .tenantPincode(t.getPincode())
+                .tenantBankName(t.getBankName())
+                .tenantAccountNumber(t.getAccountNumber())
+                .tenantIfscCode(t.getIfscCode())
+                .tenantBranchName(t.getBranchName())
+                .tenantAccountHolderName(t.getAccountHolderName())
+                .transportHsnSac(t.getTransportHsnSac() != null ? t.getTransportHsnSac() : "996791")
+                // Client print details
+                .clientGstin(cl.getGstin())
+                .clientAddress(cl.getAddress())
+                .clientCity(cl.getCity() != null ? cl.getCity().getName() : null)
+                .clientState(cl.getState() != null ? cl.getState().getName() : null)
+                .clientPincode(cl.getPincode())
                 .totalAmount(inv.getTotalAmount())
                 .advanceAdjusted(inv.getAdvanceAdjusted())
                 .creditNoteAdjusted(inv.getCreditNoteAdjusted())
@@ -373,14 +416,28 @@ public class InvoiceServiceImpl implements InvoiceService {
     }
 
     private InvoiceLrResponse mapToInvoiceLrResponse(InvoiceLr il) {
+        Lr lr       = il.getLr();
+        Order order = il.getOrder();
+        // Determine billing weight (same logic as calculateFreightAmount)
+        BigDecimal billingWeight;
+        if (order.getBillingOn() == BillingOn.DELIVERED_WEIGHT) {
+            billingWeight = lr.getDeliveredWeight() != null ? lr.getDeliveredWeight() : lr.getLoadedWeight();
+        } else {
+            billingWeight = lr.getLoadedWeight() != null ? lr.getLoadedWeight() : lr.getAllocatedWeight();
+        }
+        if (billingWeight == null) billingWeight = lr.getAllocatedWeight();
+
         return InvoiceLrResponse.builder()
                 .id(il.getId())
-                .lrId(il.getLr().getId())
-                .lrNumber(il.getLr().getLrNumber())
-                .orderId(il.getOrder().getId())
-                .orderNumber(il.getOrder().getOrderNumber())
-                .vehicleRegistrationNumber(
-                        il.getLr().getVehicleAllocation().getVehicle().getRegistrationNumber())
+                .lrId(lr.getId())
+                .lrNumber(lr.getLrNumber())
+                .lrDate(lr.getLrDate())
+                .orderId(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .vehicleRegistrationNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
+                .billingWeight(billingWeight)
+                .freightRateType(order.getFreightRateType() != null ? order.getFreightRateType().name() : null)
+                .freightRate(order.getFreightRate())
                 .freightAmount(il.getFreightAmount())
                 .chargesAmount(il.getChargesAmount())
                 .checkpostFineAmount(il.getCheckpostFineAmount())
