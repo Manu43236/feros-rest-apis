@@ -2,6 +2,7 @@ package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.CreateInvoiceRequest;
 import com.feros.api.dto.request.InvoicePaymentRequest;
+import com.feros.api.dto.request.UpdateInvoiceRequest;
 import com.feros.api.dto.request.UpdateInvoiceStatusRequest;
 import com.feros.api.dto.response.InvoiceLrResponse;
 import com.feros.api.dto.response.InvoicePaymentResponse;
@@ -276,6 +277,62 @@ public class InvoiceServiceImpl implements InvoiceService {
     public List<InvoicePaymentResponse> getPayments(Long id) {
         return invoicePaymentRepository.findByInvoiceIdAndIsActiveTrue(id)
                 .stream().map(this::mapToPaymentResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public InvoiceResponse updateInvoice(Long id, UpdateInvoiceRequest request) {
+        Invoice invoice = invoiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
+
+        if (request.getDueDate() != null) invoice.setDueDate(request.getDueDate());
+        if (request.getRemarks() != null) invoice.setRemarks(request.getRemarks());
+
+        return mapToInvoiceResponse(invoiceRepository.save(invoice));
+    }
+
+    @Override
+    @Transactional
+    public void deletePayment(Long invoiceId, Long paymentId) {
+        Invoice invoice = invoiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(invoiceId, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
+
+        InvoicePayment payment = invoicePaymentRepository.findById(paymentId)
+                .orElseThrow(() -> new FerosException("Payment not found", HttpStatus.NOT_FOUND));
+
+        if (!payment.getInvoice().getId().equals(invoiceId)) {
+            throw new FerosException("Payment does not belong to this invoice", HttpStatus.BAD_REQUEST);
+        }
+
+        payment.setIsActive(false);
+        invoicePaymentRepository.save(payment);
+
+        BigDecimal newAmountPaid = invoice.getAmountPaid().subtract(payment.getAmount());
+        BigDecimal newBalanceDue = invoice.getTotalAmount()
+                .subtract(invoice.getAdvanceAdjusted())
+                .subtract(invoice.getCreditNoteAdjusted())
+                .subtract(newAmountPaid);
+
+        invoice.setAmountPaid(newAmountPaid);
+        invoice.setBalanceDue(newBalanceDue);
+
+        if (newBalanceDue.compareTo(invoice.getTotalAmount()) >= 0) {
+            if (invoice.getInvoiceStatus() == InvoiceStatus.PAID
+                    || invoice.getInvoiceStatus() == InvoiceStatus.PARTIALLY_PAID) {
+                invoice.setInvoiceStatus(InvoiceStatus.SENT);
+            }
+        } else if (newBalanceDue.compareTo(BigDecimal.ZERO) > 0) {
+            invoice.setInvoiceStatus(InvoiceStatus.PARTIALLY_PAID);
+        }
+
+        invoiceRepository.save(invoice);
+    }
+
+    @Override
+    public List<Long> getInvoicedLrIds() {
+        return invoiceLrRepository.findActiveLrIds(getCurrentTenantId());
     }
 
     // ===================== MAPPERS =====================

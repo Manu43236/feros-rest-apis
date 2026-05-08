@@ -23,4 +23,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     List<Invoice> findOutstandingInvoices(@Param("tenantId") Long tenantId);
     @Query("SELECT i FROM Invoice i WHERE i.tenant.id = :tenantId AND i.isActive = true AND i.balanceDue > 0 AND i.client.id = :clientId ORDER BY i.dueDate ASC")
     List<Invoice> findOutstandingInvoicesByClient(@Param("tenantId") Long tenantId, @Param("clientId") Long clientId);
+
+    @Query("SELECT i FROM Invoice i WHERE i.isActive = true AND i.invoiceStatus IN :statuses AND i.dueDate < :today")
+    List<Invoice> findByStatusInAndDueDateBefore(@Param("statuses") List<InvoiceStatus> statuses, @Param("today") java.time.LocalDate today);
 }

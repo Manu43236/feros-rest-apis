@@ -2,6 +2,7 @@ package com.feros.api.controller;
 
 import com.feros.api.dto.request.CreateInvoiceRequest;
 import com.feros.api.dto.request.InvoicePaymentRequest;
+import com.feros.api.dto.request.UpdateInvoiceRequest;
 import com.feros.api.dto.request.UpdateInvoiceStatusRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.InvoicePaymentResponse;
@@ -75,5 +76,28 @@ public class InvoiceController {
             @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Payments fetched successfully", invoiceService.getPayments(id)));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<InvoiceResponse>> updateInvoice(
+            @PathVariable Long id, @RequestBody UpdateInvoiceRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Invoice updated successfully", invoiceService.updateInvoice(id, request)));
+    }
+
+    @DeleteMapping("/{id}/payments/{paymentId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deletePayment(
+            @PathVariable Long id, @PathVariable Long paymentId) {
+        invoiceService.deletePayment(id, paymentId);
+        return ResponseEntity.ok(ApiResponse.success("Payment deleted", null));
+    }
+
+    @GetMapping("/invoiced-lr-ids")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<Long>>> getInvoicedLrIds() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Invoiced LR IDs fetched", invoiceService.getInvoicedLrIds()));
     }
 }
