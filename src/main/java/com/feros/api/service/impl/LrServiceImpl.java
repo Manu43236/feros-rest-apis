@@ -143,7 +143,16 @@ public class LrServiceImpl implements LrService {
 
         if (request.getLoadedWeight() != null) lr.setLoadedWeight(request.getLoadedWeight());
         if (request.getLoadedAt() != null) lr.setLoadedAt(request.getLoadedAt());
-        if (request.getDeliveredWeight() != null) lr.setDeliveredWeight(request.getDeliveredWeight());
+        if (request.getDeliveredWeight() != null) {
+            java.math.BigDecimal effectiveLoaded = request.getLoadedWeight() != null
+                    ? request.getLoadedWeight() : lr.getLoadedWeight();
+            if (effectiveLoaded != null && request.getDeliveredWeight().compareTo(effectiveLoaded) > 0) {
+                throw new FerosException(
+                    "Delivered weight (" + request.getDeliveredWeight() + "T) cannot exceed loaded weight (" + effectiveLoaded + "T)",
+                    HttpStatus.BAD_REQUEST);
+            }
+            lr.setDeliveredWeight(request.getDeliveredWeight());
+        }
         if (request.getDeliveredAt() != null) lr.setDeliveredAt(request.getDeliveredAt());
         if (request.getRemarks() != null) lr.setRemarks(request.getRemarks());
 
@@ -239,7 +248,9 @@ public class LrServiceImpl implements LrService {
             vehicleAllocationRepository.save(allocation);
         }
 
-        return mapToLrResponse(lrRepository.save(lr));
+        lrRepository.save(lr);
+        // Re-fetch to pick up DB-generated columns (weight_variance, is_overloaded, overload_weight)
+        return mapToLrResponse(lrRepository.findById(lr.getId()).orElse(lr));
     }
 
     @Override
