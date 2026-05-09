@@ -40,6 +40,7 @@ public class InvoiceResponse {
     private String remarks;
 
     // Tenant details (for print)
+    private String tenantCompanyName;
     private String tenantLogoUrl;
     private String tenantGstin;
     private String tenantPan;

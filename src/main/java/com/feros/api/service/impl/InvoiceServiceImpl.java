@@ -379,6 +379,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .sgstAmount(inv.getSgstAmount())
                 .taxAmount(inv.getTaxAmount())
                 // Tenant print details
+                .tenantCompanyName(t.getCompanyName())
                 .tenantLogoUrl(t.getLogoUrl())
                 .tenantGstin(t.getGstin())
                 .tenantPan(t.getPanNumber())
