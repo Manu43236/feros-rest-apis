@@ -14,6 +14,7 @@ import com.feros.api.enums.InvoiceStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.InvoiceService;
+import com.feros.api.service.S3Service;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final LrChargeRepository lrChargeRepository;
     private final LrCheckpostRepository lrCheckpostRepository;
     private final UserRepository userRepository;
+    private final S3Service s3Service;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -380,7 +382,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .taxAmount(inv.getTaxAmount())
                 // Tenant print details
                 .tenantCompanyName(t.getCompanyName())
-                .tenantLogoUrl(t.getLogoUrl())
+                .tenantLogoUrl(t.getLogoUrl() != null ? s3Service.getPublicUrl(t.getLogoUrl()) : null)
                 .tenantGstin(t.getGstin())
                 .tenantPan(t.getPanNumber())
                 .tenantAddress(t.getAddress())
