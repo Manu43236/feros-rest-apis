@@ -15,4 +15,6 @@ public interface InvoiceLrRepository extends JpaRepository<InvoiceLr, Long> {
 
     @Query("SELECT il.lr.id FROM InvoiceLr il WHERE il.tenant.id = :tenantId AND il.isActive = true")
     List<Long> findActiveLrIds(@Param("tenantId") Long tenantId);
+
+    List<InvoiceLr> findByTenantIdAndIsActiveTrue(Long tenantId);
 }

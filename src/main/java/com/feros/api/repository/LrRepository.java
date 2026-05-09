@@ -22,4 +22,19 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
     List<Lr> findByTenantIdAndDateRange(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
     @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true AND l.lrDate BETWEEN :from AND :to AND l.order.client.id = :clientId ORDER BY l.lrDate DESC")
     List<Lr> findByTenantIdAndDateRangeAndClient(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to, @Param("clientId") Long clientId);
+
+    @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true AND l.lrStatus = :status")
+    List<Lr> findByTenantIdAndLrStatus(@Param("tenantId") Long tenantId, @Param("status") com.feros.api.enums.LrStatus status);
+
+    @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true AND FUNCTION('DATE', l.loadedAt) = :date")
+    List<Lr> findByTenantIdAndLoadedAtDate(@Param("tenantId") Long tenantId, @Param("date") LocalDate date);
+
+    @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true AND FUNCTION('DATE', l.deliveredAt) = :date")
+    List<Lr> findByTenantIdAndDeliveredAtDate(@Param("tenantId") Long tenantId, @Param("date") LocalDate date);
+
+    @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true AND l.lrStatus = :status AND l.lrDate BETWEEN :from AND :to")
+    List<Lr> findByTenantIdAndLrStatusAndDateRange(@Param("tenantId") Long tenantId, @Param("status") com.feros.api.enums.LrStatus status, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true AND l.isOverloaded = true AND l.lrDate BETWEEN :from AND :to ORDER BY l.lrDate DESC")
+    List<Lr> findOverloadedByTenantIdAndDateRange(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }

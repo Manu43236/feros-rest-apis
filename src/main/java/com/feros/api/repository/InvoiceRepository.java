@@ -26,4 +26,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     @Query("SELECT i FROM Invoice i WHERE i.isActive = true AND i.invoiceStatus IN :statuses AND i.dueDate < :today")
     List<Invoice> findByStatusInAndDueDateBefore(@Param("statuses") List<InvoiceStatus> statuses, @Param("today") java.time.LocalDate today);
+
+    @Query("SELECT i FROM Invoice i WHERE i.tenant.id = :tenantId AND i.isActive = true AND i.invoiceDate BETWEEN :from AND :to ORDER BY i.invoiceDate DESC")
+    List<Invoice> findByTenantIdAndDateRange(@Param("tenantId") Long tenantId, @Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to);
 }

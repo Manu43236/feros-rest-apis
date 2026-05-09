@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface LrChargeRepository extends JpaRepository<LrCharge, Long> {
     List<LrCharge> findByLrIdAndIsActiveTrue(Long lrId);
+    List<LrCharge> findByTenantIdAndIsActiveTrue(Long tenantId);
 }

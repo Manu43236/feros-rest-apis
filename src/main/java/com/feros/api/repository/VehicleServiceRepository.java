@@ -7,12 +7,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface VehicleServiceRepository extends JpaRepository<VehicleService, Long> {
     List<VehicleService> findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(Long tenantId);
+    List<VehicleService> findByTenantIdAndServiceDateBetweenAndIsActiveTrue(Long tenantId, LocalDate from, LocalDate to);
     List<VehicleService> findByTenantIdAndVehicleIdAndIsActiveTrueOrderByCreatedAtDesc(Long tenantId, Long vehicleId);
     Optional<VehicleService> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     boolean existsByBreakdownIdAndIsActiveTrueAndStatusNot(Long breakdownId, ServiceStatus status);
