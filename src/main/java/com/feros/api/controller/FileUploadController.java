@@ -3,6 +3,8 @@ package com.feros.api.controller;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.service.S3Service;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -47,5 +49,18 @@ public class FileUploadController {
 
         String url = s3Service.generatePresignedUrl(key);
         return ResponseEntity.ok(ApiResponse.success("URL generated", Map.of("url", url)));
+    }
+
+    /**
+     * Proxy an S3 file back to the browser — avoids CORS issues for cross-origin images.
+     * Used by the PDF generator to embed the company logo.
+     */
+    @GetMapping("/proxy")
+    public ResponseEntity<byte[]> proxy(@RequestParam("key") String key) {
+        var result = s3Service.getFileBytes(key);
+        String contentType = result.response().contentType();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_TYPE, contentType != null ? contentType : MediaType.APPLICATION_OCTET_STREAM_VALUE)
+                .body(result.asByteArray());
     }
 }
