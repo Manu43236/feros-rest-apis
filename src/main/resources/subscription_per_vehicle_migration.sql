@@ -24,4 +24,5 @@ VALUES
     ('Growth',     449.00,  20,  49,  -1,   -1,    0.00,  0.00, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
     ('Business',   399.00,  50,  99,  -1,   -1,    0.00,  0.00, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
     ('Scale',      349.00, 100, 249,  -1,   -1,    0.00,  0.00, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
-    ('Enterprise', 299.00, 250, 499,  -1,   -1,    0.00,  0.00, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE);
+    ('Enterprise',         299.00, 250, 499,  -1,   -1,    0.00,  0.00, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
+    ('Premium Enterprise', 249.00, 500,  -1,  -1,   -1,    0.00,  0.00, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE);

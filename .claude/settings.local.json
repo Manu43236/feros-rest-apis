@@ -379,7 +379,10 @@
       "Bash(git add src/main/resources/subscription_per_vehicle_migration.sql && git commit -m \"simplify migration: Hibernate handles column additions, only run data ops manually\" && git push origin main 2>&1)",
       "Bash(mvn compile -q 2>&1 && echo \"OK\")",
       "Bash(git add src/main/java/com/feros/api/dto/response/SubscriptionPlanResponse.java src/main/java/com/feros/api/service/impl/SubscriptionPlanServiceImpl.java && git commit -m \"fix plan response: include pricePerVehicle, vehicle ranges and feature flags in toResponse\\(\\)\" && git push origin main 2>&1)",
-      "Bash(git add -A && git status)"
+      "Bash(git add -A && git status)",
+      "Bash(git commit -m \"$\\(cat <<'EOF'\nadd per-vehicle subscription pricing: feature flags, plan edit, pricing model\n\n- SubscriptionPlanRequest/Response: add pricePerVehicle, minVehicles, maxVehicles, 8 feature flags\n- SubscriptionPlanServiceImpl: map all new fields in toResponse\\(\\), handle per-vehicle in create/update\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(cd /Users/manu/Documents/FEROS/web && npm run build 2>&1 | grep -E \"error|Error|✓ built\")",
+      "Bash(git add -A && git commit -m \"$\\(cat <<'EOF'\nrestrict 2-months-free annual benefit to 250+ vehicles \\(Enterprise+\\)\n\n- calculateBaseAmount: use 10-month pricing only for plans with minVehicles >= 250,\n  all other plans pay full 12 months for annual billing\n- Add Premium Enterprise plan to migration SQL \\(₹249, 500+ vehicles\\)\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push)"
     ]
   }
 }

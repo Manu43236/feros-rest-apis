@@ -58,7 +58,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
         // Calculate amounts
         BigDecimal pricePerVehicle = isFree ? BigDecimal.ZERO : plan.getPricePerVehicle();
-        BigDecimal baseAmount      = calculateBaseAmount(request.getAmount(), pricePerVehicle, vehicleCount, request.getBillingCycle());
+        int planMinVehicles = plan.getMinVehicles() != null ? plan.getMinVehicles() : 0;
+        BigDecimal baseAmount      = calculateBaseAmount(request.getAmount(), pricePerVehicle, vehicleCount, request.getBillingCycle(), planMinVehicles);
         BigDecimal gstAmount       = baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
         BigDecimal totalAmount     = baseAmount.add(gstAmount);
 
@@ -168,7 +169,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 : calculateEndDate(previous.getEndDate() != null ? previous.getEndDate() : LocalDate.now(),
                         previous.getBillingCycle());
 
-        BigDecimal baseAmount  = calculateBaseAmount(request.getAmount(), pricePerVehicle, vehicleCount, previous.getBillingCycle());
+        int extendMinVehicles = plan != null && plan.getMinVehicles() != null ? plan.getMinVehicles() : 0;
+        BigDecimal baseAmount  = calculateBaseAmount(request.getAmount(), pricePerVehicle, vehicleCount, previous.getBillingCycle(), extendMinVehicles);
         BigDecimal gstAmount   = baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
         BigDecimal totalAmount = baseAmount.add(gstAmount);
 
@@ -327,14 +329,21 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     }
 
     /**
-     * Amount = vehicleCount × pricePerVehicle × months (10 for annual, 1 for monthly).
+     * Amount = vehicleCount × pricePerVehicle × months.
+     * 2-months-free (pay 10, get 12) applies only to plans with minVehicles >= 250 (Enterprise+).
+     * All other plans pay full 12 months for annual billing.
      * If SA provides an explicit override amount, that is used directly.
      */
     private BigDecimal calculateBaseAmount(BigDecimal override, BigDecimal pricePerVehicle,
-                                           int vehicleCount, BillingCycle cycle) {
+                                           int vehicleCount, BillingCycle cycle, int minVehicles) {
         if (override != null) return override;
         if (pricePerVehicle == null || pricePerVehicle.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO;
-        int months = (cycle == BillingCycle.YEARLY) ? ANNUAL_MONTHS_PAID : 1;
+        int months;
+        if (cycle == BillingCycle.YEARLY) {
+            months = minVehicles >= 250 ? ANNUAL_MONTHS_PAID : 12;
+        } else {
+            months = 1;
+        }
         return pricePerVehicle.multiply(BigDecimal.valueOf(vehicleCount))
                 .multiply(BigDecimal.valueOf(months))
                 .setScale(2, RoundingMode.HALF_UP);
