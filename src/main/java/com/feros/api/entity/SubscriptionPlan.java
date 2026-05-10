@@ -34,6 +34,40 @@ public class SubscriptionPlan {
     @Column(name = "price_yearly", nullable = false)
     private BigDecimal priceYearly;
 
+    @Column(name = "price_per_vehicle", precision = 10, scale = 2)
+    private BigDecimal pricePerVehicle;
+
+    @Column(name = "min_vehicles")
+    private Integer minVehicles;
+
+    @Column(name = "max_vehicles")
+    private Integer maxVehicles;
+
+    // ─── Feature flags ──────────────────────────────────────────────────────────
+    @Column(name = "has_fuel_logs")
+    @Builder.Default private Boolean hasFuelLogs = true;
+
+    @Column(name = "has_meter_readings")
+    @Builder.Default private Boolean hasMeterReadings = true;
+
+    @Column(name = "has_vehicle_services")
+    @Builder.Default private Boolean hasVehicleServices = true;
+
+    @Column(name = "has_attendance")
+    @Builder.Default private Boolean hasAttendance = true;
+
+    @Column(name = "has_payroll")
+    @Builder.Default private Boolean hasPayroll = true;
+
+    @Column(name = "has_inventory")
+    @Builder.Default private Boolean hasInventory = true;
+
+    @Column(name = "has_reports")
+    @Builder.Default private Boolean hasReports = true;
+
+    @Column(name = "has_credit_notes")
+    @Builder.Default private Boolean hasCreditNotes = true;
+
     @Column(columnDefinition = "JSON")
     private String features;
 

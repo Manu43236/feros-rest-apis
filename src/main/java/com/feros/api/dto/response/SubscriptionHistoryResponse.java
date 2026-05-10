@@ -13,8 +13,19 @@ public class SubscriptionHistoryResponse {
     private Long tenantId;
     private String companyName;
     private String planName;
+    private Integer vehicleCount;
+    private BigDecimal pricePerVehicle;
     private Integer maxLorries;
     private Integer maxUsers;
+    // ─── Plan feature flags ───────────────────────────────────────────────────
+    private Boolean hasFuelLogs;
+    private Boolean hasMeterReadings;
+    private Boolean hasVehicleServices;
+    private Boolean hasAttendance;
+    private Boolean hasPayroll;
+    private Boolean hasInventory;
+    private Boolean hasReports;
+    private Boolean hasCreditNotes;
     private SubscriptionStatus status;
     private BillingCycle billingCycle;
     private LocalDate startDate;

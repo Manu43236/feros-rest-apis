@@ -1,6 +1,6 @@
 package com.feros.api.dto.request;
 
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Min;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -10,9 +10,11 @@ import java.time.LocalDate;
 @Getter
 @Setter
 public class ExtendSubscriptionRequest {
-    @NotNull(message = "New end date is required")
-    private LocalDate newEndDate;
-    private BigDecimal amount;      // optional override; defaults to plan price if omitted
-    private String paymentRef;      // payment reference / transaction ID
+    @Min(value = 1, message = "At least 1 vehicle required")
+    private Integer vehicleCount;      // optional — keeps existing count if omitted
+
+    private LocalDate newEndDate;      // optional — auto-calculated from billing cycle if omitted
+    private BigDecimal amount;         // optional override
+    private String paymentRef;
     private String notes;
 }

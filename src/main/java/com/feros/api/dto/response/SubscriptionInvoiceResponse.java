@@ -13,6 +13,8 @@ public class SubscriptionInvoiceResponse {
     private String companyName;
     private String planName;
     private String billingCycle;
+    private Integer vehicleCount;
+    private BigDecimal pricePerVehicle;
     private LocalDate periodStart;
     private LocalDate periodEnd;
     private BigDecimal amount;

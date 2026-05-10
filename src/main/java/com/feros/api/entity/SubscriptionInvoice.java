@@ -37,6 +37,12 @@ public class SubscriptionInvoice {
     @Column(name = "billing_cycle")
     private String billingCycle;
 
+    @Column(name = "vehicle_count")
+    private Integer vehicleCount;
+
+    @Column(name = "price_per_vehicle", precision = 10, scale = 2)
+    private BigDecimal pricePerVehicle;
+
     @Column(name = "period_start")
     private LocalDate periodStart;
 

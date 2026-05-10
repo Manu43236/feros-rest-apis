@@ -73,15 +73,16 @@ public class VehicleServiceImpl implements VehicleService {
     public VehicleResponse createVehicle(VehicleRequest request) {
         Tenant tenant = getCurrentTenant();
 
-        // Enforce plan lorry limit
+        // Enforce vehicle count limit (per-vehicle billing: limit = vehicleCount paid for)
         subscriptionHistoryRepository.findActiveByTenantId(tenant.getId()).stream()
                 .findFirst()
                 .ifPresent(h -> {
-                    if (h.getPlan() != null && h.getPlan().getMaxLorries() != -1) {
+                    Integer limit = h.getVehicleCount();
+                    if (limit != null && limit > 0) {
                         long current = vehicleRepository.countByTenantIdAndIsActiveTrue(tenant.getId());
-                        if (current >= h.getPlan().getMaxLorries()) {
+                        if (current >= limit) {
                             throw new FerosException(
-                                    "Vehicle limit reached for your plan (" + h.getPlan().getMaxLorries() + " vehicles). Please upgrade your plan.",
+                                    "Vehicle limit reached (" + limit + " vehicles). Contact FEROS support to add more vehicles to your plan.",
                                     HttpStatus.FORBIDDEN);
                         }
                     }

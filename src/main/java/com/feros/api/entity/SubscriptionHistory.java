@@ -38,10 +38,16 @@ public class SubscriptionHistory {
     @Column(name = "billing_cycle")
     private BillingCycle billingCycle;
 
+    @Column(name = "vehicle_count")
+    private Integer vehicleCount;
+
+    @Column(name = "price_per_vehicle", precision = 10, scale = 2)
+    private BigDecimal pricePerVehicle;
+
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
 
-    @Column(name = "end_date", nullable = false)
+    @Column(name = "end_date")
     private LocalDate endDate;
 
     @Column(precision = 10, scale = 2)

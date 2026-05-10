@@ -6,6 +6,7 @@ import com.feros.api.dto.request.SuspendSubscriptionRequest;
 import com.feros.api.dto.response.SubscriptionHistoryResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceResponse;
 import com.feros.api.entity.*;
+import com.feros.api.enums.BillingCycle;
 import com.feros.api.enums.NotificationType;
 import com.feros.api.enums.SubscriptionStatus;
 import com.feros.api.exception.FerosException;
@@ -33,13 +34,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SubscriptionServiceImpl implements SubscriptionService {
 
-    private static final BigDecimal GST_RATE = new BigDecimal("0.18");
+    private static final BigDecimal GST_RATE          = new BigDecimal("0.18");
+    private static final int        ANNUAL_MONTHS_PAID = 10; // pay 10, get 12 (2 months free)
 
     private final TenantRepository tenantRepository;
     private final SubscriptionPlanRepository planRepository;
     private final SubscriptionHistoryRepository historyRepository;
     private final SubscriptionInvoiceRepository invoiceRepository;
     private final NotificationService notificationService;
+
+    // ─── Activate ─────────────────────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -48,18 +52,28 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         SubscriptionPlan plan = planRepository.findByIdAndIsActiveTrue(request.getPlanId())
                 .orElseThrow(() -> new FerosException("Plan not found or inactive", HttpStatus.NOT_FOUND));
 
-        BigDecimal baseAmount = request.getAmount() != null ? request.getAmount()
-                : (request.getBillingCycle().name().equals("YEARLY") ? plan.getPriceYearly() : plan.getPriceMonthly());
-        BigDecimal gstAmount = baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal totalAmount = baseAmount.add(gstAmount);
+        int vehicleCount = request.getVehicleCount();
+        boolean isFree   = plan.getPricePerVehicle() == null
+                           || plan.getPricePerVehicle().compareTo(BigDecimal.ZERO) == 0;
+
+        // Calculate amounts
+        BigDecimal pricePerVehicle = isFree ? BigDecimal.ZERO : plan.getPricePerVehicle();
+        BigDecimal baseAmount      = calculateBaseAmount(request.getAmount(), pricePerVehicle, vehicleCount, request.getBillingCycle());
+        BigDecimal gstAmount       = baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalAmount     = baseAmount.add(gstAmount);
+
+        // End date: free = null (never expires), monthly = +1 month, annual = +12 months
+        LocalDate endDate = isFree ? null : calculateEndDate(request.getStartDate(), request.getBillingCycle());
 
         SubscriptionHistory history = SubscriptionHistory.builder()
                 .tenant(tenant)
                 .plan(plan)
-                .status(SubscriptionStatus.ACTIVE)
-                .billingCycle(request.getBillingCycle())
+                .status(isFree ? SubscriptionStatus.TRIAL : SubscriptionStatus.ACTIVE)
+                .billingCycle(isFree ? null : request.getBillingCycle())
+                .vehicleCount(vehicleCount)
+                .pricePerVehicle(pricePerVehicle)
                 .startDate(request.getStartDate())
-                .endDate(request.getEndDate())
+                .endDate(endDate)
                 .amount(baseAmount)
                 .gstAmount(gstAmount)
                 .totalAmount(totalAmount)
@@ -69,22 +83,27 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .build();
         history = historyRepository.save(history);
 
-        // Update tenant subscription fields
-        tenant.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+        // Update tenant
+        tenant.setSubscriptionStatus(isFree ? SubscriptionStatus.TRIAL : SubscriptionStatus.ACTIVE);
         tenant.setSubscriptionStartDate(request.getStartDate());
-        tenant.setSubscriptionEndDate(request.getEndDate());
+        tenant.setSubscriptionEndDate(endDate);
         tenantRepository.save(tenant);
 
-        // Generate invoice
-        createInvoice(history, tenant, plan.getName(), totalAmount, baseAmount, gstAmount, request.getPaymentRef());
+        // Invoice (skip for free plan)
+        if (!isFree) {
+            createInvoice(history, tenant, plan.getName(), totalAmount, baseAmount, gstAmount,
+                    request.getPaymentRef(), vehicleCount, pricePerVehicle);
+        }
 
-        // Notify
         notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_ACTIVATED,
                 "Subscription Activated",
-                "Your " + plan.getName() + " plan has been activated until " + request.getEndDate() + ".");
+                "Your " + plan.getName() + " plan has been activated"
+                + (endDate != null ? " until " + endDate : "") + ".");
 
         return toHistoryResponse(history, tenant, plan.getName());
     }
+
+    // ─── Extend Trial ─────────────────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -93,64 +112,75 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         if (tenant.getSubscriptionStatus() != SubscriptionStatus.TRIAL) {
             throw new FerosException("Tenant is not on trial", HttpStatus.BAD_REQUEST);
         }
-        tenant.setTrialEndDate(request.getNewEndDate());
+        LocalDate newEnd = request.getNewEndDate();
+        if (newEnd == null) throw new FerosException("New end date is required to extend trial", HttpStatus.BAD_REQUEST);
+
+        tenant.setTrialEndDate(newEnd);
         tenantRepository.save(tenant);
 
         SubscriptionHistory history = SubscriptionHistory.builder()
                 .tenant(tenant)
                 .status(SubscriptionStatus.TRIAL)
                 .startDate(tenant.getTrialStartDate() != null ? tenant.getTrialStartDate() : LocalDate.now())
-                .endDate(request.getNewEndDate())
+                .endDate(newEnd)
                 .notes(request.getNotes())
                 .createdBy(SecurityUtil.getCurrentUserId())
                 .build();
         history = historyRepository.save(history);
 
         notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_ACTIVATED,
-                "Trial Extended",
-                "Your trial has been extended to " + request.getNewEndDate() + ".");
+                "Trial Extended", "Your trial has been extended to " + newEnd + ".");
 
         return toHistoryResponse(history, tenant, "Trial");
     }
+
+    // ─── Extend / Renew ───────────────────────────────────────────────────────
 
     @Override
     @Transactional
     public SubscriptionHistoryResponse extendSubscription(Long tenantId, ExtendSubscriptionRequest request) {
         Tenant tenant = getTenant(tenantId);
 
-        // Find the latest ACTIVE history row — close it as RENEWED so the
-        // auto-expire job never picks it up again after we create the new period.
+        // Close the current ACTIVE row as RENEWED
         SubscriptionHistory previous = historyRepository
                 .findAllByTenantIdOrderByCreatedAtDesc(tenantId).stream()
                 .filter(h -> h.getStatus() == SubscriptionStatus.ACTIVE)
                 .findFirst()
-                .orElseThrow(() -> new FerosException("No active subscription history found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new FerosException("No active subscription found", HttpStatus.NOT_FOUND));
 
         previous.setStatus(SubscriptionStatus.RENEWED);
         historyRepository.save(previous);
 
-        // Determine amount: use override if provided, else fall back to plan price
         SubscriptionPlan plan = previous.getPlan();
-        BigDecimal baseAmount = request.getAmount();
-        if (baseAmount == null && plan != null) {
-            baseAmount = previous.getBillingCycle() != null &&
-                         previous.getBillingCycle().name().equals("YEARLY")
-                    ? plan.getPriceYearly()
-                    : plan.getPriceMonthly();
-        }
-        BigDecimal gstAmount = baseAmount != null
-                ? baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-        BigDecimal totalAmount = baseAmount != null ? baseAmount.add(gstAmount) : BigDecimal.ZERO;
 
-        // Create new ACTIVE history row for the renewed period
+        // Vehicle count: use new count from request or keep previous
+        int vehicleCount = request.getVehicleCount() != null
+                ? request.getVehicleCount()
+                : (previous.getVehicleCount() != null ? previous.getVehicleCount() : 1);
+
+        BigDecimal pricePerVehicle = previous.getPricePerVehicle() != null
+                ? previous.getPricePerVehicle()
+                : (plan != null && plan.getPricePerVehicle() != null ? plan.getPricePerVehicle() : BigDecimal.ZERO);
+
+        // New end date: provided or auto-calculated from billing cycle
+        LocalDate newEnd = request.getNewEndDate() != null
+                ? request.getNewEndDate()
+                : calculateEndDate(previous.getEndDate() != null ? previous.getEndDate() : LocalDate.now(),
+                        previous.getBillingCycle());
+
+        BigDecimal baseAmount  = calculateBaseAmount(request.getAmount(), pricePerVehicle, vehicleCount, previous.getBillingCycle());
+        BigDecimal gstAmount   = baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalAmount = baseAmount.add(gstAmount);
+
         SubscriptionHistory history = SubscriptionHistory.builder()
                 .tenant(tenant)
                 .plan(plan)
                 .status(SubscriptionStatus.ACTIVE)
                 .billingCycle(previous.getBillingCycle())
-                .startDate(previous.getEndDate())
-                .endDate(request.getNewEndDate())
+                .vehicleCount(vehicleCount)
+                .pricePerVehicle(pricePerVehicle)
+                .startDate(previous.getEndDate() != null ? previous.getEndDate() : LocalDate.now())
+                .endDate(newEnd)
                 .amount(baseAmount)
                 .gstAmount(gstAmount)
                 .totalAmount(totalAmount)
@@ -160,24 +190,24 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .build();
         history = historyRepository.save(history);
 
-        // Update tenant end date and ensure status is ACTIVE
-        tenant.setSubscriptionEndDate(request.getNewEndDate());
+        tenant.setSubscriptionEndDate(newEnd);
         tenant.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
         tenantRepository.save(tenant);
 
-        // Generate invoice for this renewal (same as activation)
-        if (baseAmount != null && baseAmount.compareTo(BigDecimal.ZERO) > 0) {
+        if (baseAmount.compareTo(BigDecimal.ZERO) > 0) {
             String planName = plan != null ? plan.getName() : "-";
-            createInvoice(history, tenant, planName, totalAmount, baseAmount, gstAmount, request.getPaymentRef());
+            createInvoice(history, tenant, planName, totalAmount, baseAmount, gstAmount,
+                    request.getPaymentRef(), vehicleCount, pricePerVehicle);
         }
 
         notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_ACTIVATED,
-                "Subscription Extended",
-                "Your subscription has been extended to " + request.getNewEndDate() + ".");
+                "Subscription Renewed", "Your subscription has been renewed until " + newEnd + ".");
 
         String planName = plan != null ? plan.getName() : "-";
         return toHistoryResponse(history, tenant, planName);
     }
+
+    // ─── Suspend ──────────────────────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -190,7 +220,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .tenant(tenant)
                 .status(SubscriptionStatus.SUSPENDED)
                 .startDate(LocalDate.now())
-                .endDate(tenant.getSubscriptionEndDate() != null ? tenant.getSubscriptionEndDate() : LocalDate.now())
+                .endDate(tenant.getSubscriptionEndDate())
                 .notes(request.getNotes())
                 .createdBy(SecurityUtil.getCurrentUserId())
                 .build();
@@ -202,6 +232,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
         return toHistoryResponse(history, tenant, "-");
     }
+
+    // ─── Reactivate ───────────────────────────────────────────────────────────
 
     @Override
     @Transactional
@@ -217,25 +249,25 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .tenant(tenant)
                 .status(SubscriptionStatus.ACTIVE)
                 .startDate(LocalDate.now())
-                .endDate(tenant.getSubscriptionEndDate() != null ? tenant.getSubscriptionEndDate() : LocalDate.now())
+                .endDate(tenant.getSubscriptionEndDate())
                 .notes(notes)
                 .createdBy(SecurityUtil.getCurrentUserId())
                 .build();
         history = historyRepository.save(history);
 
         notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_ACTIVATED,
-                "Subscription Reactivated",
-                "Your subscription has been reactivated.");
+                "Subscription Reactivated", "Your subscription has been reactivated.");
 
         return toHistoryResponse(history, tenant, "-");
     }
+
+    // ─── Queries ──────────────────────────────────────────────────────────────
 
     @Override
     public List<SubscriptionHistoryResponse> getHistory(Long tenantId) {
         Tenant tenant = getTenant(tenantId);
         return historyRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId).stream()
-                .map(h -> toHistoryResponse(h, tenant,
-                        h.getPlan() != null ? h.getPlan().getName() : "-"))
+                .map(h -> toHistoryResponse(h, tenant, h.getPlan() != null ? h.getPlan().getName() : "-"))
                 .collect(Collectors.toList());
     }
 
@@ -252,14 +284,13 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         Tenant tenant = getTenant(tenantId);
         return historyRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId).stream()
                 .findFirst()
-                .map(h -> toHistoryResponse(h, tenant,
-                        h.getPlan() != null ? h.getPlan().getName() : "-"))
+                .map(h -> toHistoryResponse(h, tenant, h.getPlan() != null ? h.getPlan().getName() : "-"))
                 .orElseThrow(() -> new FerosException("No subscription found", HttpStatus.NOT_FOUND));
     }
 
-    // ─── Scheduled Jobs ──────────────────────────────────────────────────────
+    // ─── Scheduled Jobs ───────────────────────────────────────────────────────
 
-    @Scheduled(cron = "0 0 1 * * *") // daily at 01:00
+    @Scheduled(cron = "0 0 1 * * *")
     @Transactional
     public void autoExpireSubscriptions() {
         LocalDate today = LocalDate.now();
@@ -272,12 +303,12 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             tenantRepository.save(tenant);
             notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_EXPIRY,
                     "Subscription Expired",
-                    "Your subscription has expired. Please renew to continue using FEROS.");
+                    "Your subscription has expired. Please contact FEROS support to renew.");
             log.info("Auto-expired subscription for tenant {}", tenant.getId());
         }
     }
 
-    @Scheduled(cron = "0 0 9 * * *") // daily at 09:00 - warn 7 days before expiry
+    @Scheduled(cron = "0 0 9 * * *")
     public void sendExpiryWarnings() {
         LocalDate warningDate = LocalDate.now().plusDays(7);
         List<SubscriptionHistory> expiring = historyRepository.findActiveExpiringOn(warningDate);
@@ -288,18 +319,40 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         }
     }
 
-    // ─── Helpers ─────────────────────────────────────────────────────────────
+    // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private Tenant getTenant(Long tenantId) {
         return tenantRepository.findByIdAndIsActiveTrue(tenantId)
                 .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
     }
 
+    /**
+     * Amount = vehicleCount × pricePerVehicle × months (10 for annual, 1 for monthly).
+     * If SA provides an explicit override amount, that is used directly.
+     */
+    private BigDecimal calculateBaseAmount(BigDecimal override, BigDecimal pricePerVehicle,
+                                           int vehicleCount, BillingCycle cycle) {
+        if (override != null) return override;
+        if (pricePerVehicle == null || pricePerVehicle.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO;
+        int months = (cycle == BillingCycle.YEARLY) ? ANNUAL_MONTHS_PAID : 1;
+        return pricePerVehicle.multiply(BigDecimal.valueOf(vehicleCount))
+                .multiply(BigDecimal.valueOf(months))
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Monthly → +1 month, Annual → +12 months calendar access (paying for 10).
+     */
+    private LocalDate calculateEndDate(LocalDate from, BillingCycle cycle) {
+        if (cycle == null) return from.plusMonths(1);
+        return cycle == BillingCycle.YEARLY ? from.plusMonths(12) : from.plusMonths(1);
+    }
+
     private void createInvoice(SubscriptionHistory history, Tenant tenant, String planName,
                                 BigDecimal totalAmount, BigDecimal amount, BigDecimal gstAmount,
-                                String paymentRef) {
-        YearMonth ym = YearMonth.now();
-        long count = invoiceRepository.countByYearAndMonth(ym.getYear(), ym.getMonthValue());
+                                String paymentRef, Integer vehicleCount, BigDecimal pricePerVehicle) {
+        YearMonth ym    = YearMonth.now();
+        long count      = invoiceRepository.countByYearAndMonth(ym.getYear(), ym.getMonthValue());
         String invoiceNumber = "INV-" + ym.format(DateTimeFormatter.ofPattern("yyyyMM"))
                 + "-" + String.format("%04d", count + 1);
 
@@ -309,6 +362,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .tenant(tenant)
                 .planName(planName)
                 .billingCycle(history.getBillingCycle() != null ? history.getBillingCycle().name() : null)
+                .vehicleCount(vehicleCount)
+                .pricePerVehicle(pricePerVehicle)
                 .periodStart(history.getStartDate())
                 .periodEnd(history.getEndDate())
                 .amount(amount)
@@ -320,13 +375,25 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     }
 
     private SubscriptionHistoryResponse toHistoryResponse(SubscriptionHistory h, Tenant tenant, String planName) {
+        SubscriptionPlan plan = h.getPlan();
         return SubscriptionHistoryResponse.builder()
                 .id(h.getId())
                 .tenantId(tenant.getId())
                 .companyName(tenant.getCompanyName())
                 .planName(planName)
-                .maxLorries(h.getPlan() != null ? h.getPlan().getMaxLorries() : null)
-                .maxUsers(h.getPlan() != null ? h.getPlan().getMaxUsers() : null)
+                .vehicleCount(h.getVehicleCount())
+                .pricePerVehicle(h.getPricePerVehicle())
+                .maxLorries(h.getVehicleCount())           // limit = what they paid for
+                .maxUsers(plan != null ? plan.getMaxUsers() : null)
+                // Feature flags — all true if no plan (backward compat)
+                .hasFuelLogs(plan == null || Boolean.TRUE.equals(plan.getHasFuelLogs()))
+                .hasMeterReadings(plan == null || Boolean.TRUE.equals(plan.getHasMeterReadings()))
+                .hasVehicleServices(plan == null || Boolean.TRUE.equals(plan.getHasVehicleServices()))
+                .hasAttendance(plan == null || Boolean.TRUE.equals(plan.getHasAttendance()))
+                .hasPayroll(plan == null || Boolean.TRUE.equals(plan.getHasPayroll()))
+                .hasInventory(plan == null || Boolean.TRUE.equals(plan.getHasInventory()))
+                .hasReports(plan == null || Boolean.TRUE.equals(plan.getHasReports()))
+                .hasCreditNotes(plan == null || Boolean.TRUE.equals(plan.getHasCreditNotes()))
                 .status(h.getStatus())
                 .billingCycle(h.getBillingCycle())
                 .startDate(h.getStartDate())
@@ -348,6 +415,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .companyName(companyName)
                 .planName(i.getPlanName())
                 .billingCycle(i.getBillingCycle())
+                .vehicleCount(i.getVehicleCount())
+                .pricePerVehicle(i.getPricePerVehicle())
                 .periodStart(i.getPeriodStart())
                 .periodEnd(i.getPeriodEnd())
                 .amount(i.getAmount())
