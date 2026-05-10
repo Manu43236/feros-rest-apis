@@ -16,4 +16,7 @@ public interface SubscriptionHistoryRepository extends JpaRepository<Subscriptio
 
     @Query("SELECT h FROM SubscriptionHistory h WHERE h.endDate = :date AND h.status = 'ACTIVE'")
     List<SubscriptionHistory> findActiveExpiringOn(@Param("date") LocalDate date);
+
+    @Query("SELECT h FROM SubscriptionHistory h WHERE h.tenant.id = :tenantId AND h.status = 'ACTIVE' ORDER BY h.createdAt DESC")
+    List<SubscriptionHistory> findActiveByTenantId(@Param("tenantId") Long tenantId);
 }

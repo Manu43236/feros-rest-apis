@@ -46,6 +46,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final VehicleBreakdownRepository vehicleBreakdownRepository;
     private final UserRepository userRepository;
     private final VehicleTirePositionRepository tirePositionRepository;
+    private final SubscriptionHistoryRepository subscriptionHistoryRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -71,6 +72,20 @@ public class VehicleServiceImpl implements VehicleService {
     @Override
     public VehicleResponse createVehicle(VehicleRequest request) {
         Tenant tenant = getCurrentTenant();
+
+        // Enforce plan lorry limit
+        subscriptionHistoryRepository.findActiveByTenantId(tenant.getId()).stream()
+                .findFirst()
+                .ifPresent(h -> {
+                    if (h.getPlan() != null && h.getPlan().getMaxLorries() != -1) {
+                        long current = vehicleRepository.countByTenantIdAndIsActiveTrue(tenant.getId());
+                        if (current >= h.getPlan().getMaxLorries()) {
+                            throw new FerosException(
+                                    "Vehicle limit reached for your plan (" + h.getPlan().getMaxLorries() + " vehicles). Please upgrade your plan.",
+                                    HttpStatus.FORBIDDEN);
+                        }
+                    }
+                });
 
         if (request.getRegistrationNumber() == null || request.getRegistrationNumber().isBlank())
             throw new FerosException("Registration number is required", HttpStatus.BAD_REQUEST);

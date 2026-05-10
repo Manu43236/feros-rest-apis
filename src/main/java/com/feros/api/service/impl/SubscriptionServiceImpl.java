@@ -117,33 +117,65 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     @Transactional
     public SubscriptionHistoryResponse extendSubscription(Long tenantId, ExtendSubscriptionRequest request) {
         Tenant tenant = getTenant(tenantId);
-        tenant.setSubscriptionEndDate(request.getNewEndDate());
-        if (tenant.getSubscriptionStatus() == SubscriptionStatus.EXPIRED) {
-            tenant.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+
+        // Find the latest ACTIVE history row — close it as RENEWED so the
+        // auto-expire job never picks it up again after we create the new period.
+        SubscriptionHistory previous = historyRepository
+                .findAllByTenantIdOrderByCreatedAtDesc(tenantId).stream()
+                .filter(h -> h.getStatus() == SubscriptionStatus.ACTIVE)
+                .findFirst()
+                .orElseThrow(() -> new FerosException("No active subscription history found", HttpStatus.NOT_FOUND));
+
+        previous.setStatus(SubscriptionStatus.RENEWED);
+        historyRepository.save(previous);
+
+        // Determine amount: use override if provided, else fall back to plan price
+        SubscriptionPlan plan = previous.getPlan();
+        BigDecimal baseAmount = request.getAmount();
+        if (baseAmount == null && plan != null) {
+            baseAmount = previous.getBillingCycle() != null &&
+                         previous.getBillingCycle().name().equals("YEARLY")
+                    ? plan.getPriceYearly()
+                    : plan.getPriceMonthly();
         }
-        tenantRepository.save(tenant);
+        BigDecimal gstAmount = baseAmount != null
+                ? baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+        BigDecimal totalAmount = baseAmount != null ? baseAmount.add(gstAmount) : BigDecimal.ZERO;
 
-        SubscriptionHistory latestHistory = historyRepository
-                .findAllByTenantIdOrderByCreatedAtDesc(tenantId).stream().findFirst()
-                .orElseThrow(() -> new FerosException("No subscription history found", HttpStatus.NOT_FOUND));
-
+        // Create new ACTIVE history row for the renewed period
         SubscriptionHistory history = SubscriptionHistory.builder()
                 .tenant(tenant)
-                .plan(latestHistory.getPlan())
+                .plan(plan)
                 .status(SubscriptionStatus.ACTIVE)
-                .billingCycle(latestHistory.getBillingCycle())
-                .startDate(latestHistory.getEndDate())
+                .billingCycle(previous.getBillingCycle())
+                .startDate(previous.getEndDate())
                 .endDate(request.getNewEndDate())
+                .amount(baseAmount)
+                .gstAmount(gstAmount)
+                .totalAmount(totalAmount)
+                .paymentRef(request.getPaymentRef())
                 .notes(request.getNotes())
                 .createdBy(SecurityUtil.getCurrentUserId())
                 .build();
         history = historyRepository.save(history);
 
+        // Update tenant end date and ensure status is ACTIVE
+        tenant.setSubscriptionEndDate(request.getNewEndDate());
+        tenant.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
+        tenantRepository.save(tenant);
+
+        // Generate invoice for this renewal (same as activation)
+        if (baseAmount != null && baseAmount.compareTo(BigDecimal.ZERO) > 0) {
+            String planName = plan != null ? plan.getName() : "-";
+            createInvoice(history, tenant, planName, totalAmount, baseAmount, gstAmount, request.getPaymentRef());
+        }
+
         notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_ACTIVATED,
                 "Subscription Extended",
                 "Your subscription has been extended to " + request.getNewEndDate() + ".");
 
-        String planName = latestHistory.getPlan() != null ? latestHistory.getPlan().getName() : "-";
+        String planName = plan != null ? plan.getName() : "-";
         return toHistoryResponse(history, tenant, planName);
     }
 
@@ -293,6 +325,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .tenantId(tenant.getId())
                 .companyName(tenant.getCompanyName())
                 .planName(planName)
+                .maxLorries(h.getPlan() != null ? h.getPlan().getMaxLorries() : null)
+                .maxUsers(h.getPlan() != null ? h.getPlan().getMaxUsers() : null)
                 .status(h.getStatus())
                 .billingCycle(h.getBillingCycle())
                 .startDate(h.getStartDate())

@@ -13,6 +13,8 @@ public class SubscriptionHistoryResponse {
     private Long tenantId;
     private String companyName;
     private String planName;
+    private Integer maxLorries;
+    private Integer maxUsers;
     private SubscriptionStatus status;
     private BillingCycle billingCycle;
     private LocalDate startDate;

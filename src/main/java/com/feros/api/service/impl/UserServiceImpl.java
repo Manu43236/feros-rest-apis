@@ -48,6 +48,7 @@ public class UserServiceImpl implements UserService {
     private final StateRepository stateRepository;
     private final EmploymentTypeRepository employmentTypeRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
+    private final SubscriptionHistoryRepository subscriptionHistoryRepository;
 
     @Override
     @Transactional
@@ -65,6 +66,22 @@ public class UserServiceImpl implements UserService {
         Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(tenantId)
                 .orElseThrow(() -> new FerosException(
                         "Tenant not found", HttpStatus.NOT_FOUND));
+
+        // 3a. Enforce plan user limit (skip for SUPER_ADMIN creating users)
+        if (!SecurityUtil.isSuperAdmin()) {
+            subscriptionHistoryRepository.findActiveByTenantId(tenantId).stream()
+                    .findFirst()
+                    .ifPresent(h -> {
+                        if (h.getPlan() != null && h.getPlan().getMaxUsers() != -1) {
+                            long current = userRepository.countByTenantIdAndIsActiveTrue(tenantId);
+                            if (current >= h.getPlan().getMaxUsers()) {
+                                throw new FerosException(
+                                        "User limit reached for your plan (" + h.getPlan().getMaxUsers() + " users). Please upgrade your plan.",
+                                        HttpStatus.FORBIDDEN);
+                            }
+                        }
+                    });
+        }
 
         // 4. Get role
         Role role = roleRepository.findByName(request.getRole())

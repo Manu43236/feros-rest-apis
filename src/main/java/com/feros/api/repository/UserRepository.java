@@ -18,6 +18,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findAllByIsActiveTrue();
     List<User> findAllByTenantIdAndIsActiveTrue(Long tenantId);
     List<User> findAllByTenantId(Long tenantId);
+    long countByTenantIdAndIsActiveTrue(Long tenantId);
 
     @Query("SELECT DISTINCT u FROM User u JOIN u.roles r WHERE u.tenant.id = :tenantId AND u.isActive = true AND r.name IN :roles")
     List<User> findByTenantIdAndRoleNames(@Param("tenantId") Long tenantId, @Param("roles") List<RoleName> roles);

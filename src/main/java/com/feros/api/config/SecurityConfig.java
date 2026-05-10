@@ -23,6 +23,7 @@ import org.springframework.web.filter.RequestContextFilter;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final SubscriptionEnforcementFilter subscriptionEnforcementFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -39,7 +40,9 @@ public class SecurityConfig {
                         .permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter,
-                        UsernamePasswordAuthenticationFilter.class);
+                        UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(subscriptionEnforcementFilter,
+                        JwtAuthenticationFilter.class);
 
         return http.build();
     }
