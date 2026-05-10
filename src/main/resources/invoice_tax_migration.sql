@@ -8,3 +8,4 @@ ALTER TABLE invoices
 -- Tenant: optional transport HSN/SAC code (default 996791 for goods transport)
 ALTER TABLE tenants
     ADD COLUMN transport_hsn_sac VARCHAR(20) NULL;
+

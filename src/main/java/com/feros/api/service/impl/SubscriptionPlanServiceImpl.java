@@ -23,10 +23,21 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
     public SubscriptionPlanResponse createPlan(SubscriptionPlanRequest request) {
         SubscriptionPlan plan = SubscriptionPlan.builder()
                 .name(request.getName())
-                .maxLorries(request.getMaxLorries())
-                .maxUsers(request.getMaxUsers())
-                .priceMonthly(request.getPriceMonthly())
-                .priceYearly(request.getPriceYearly())
+                .pricePerVehicle(request.getPricePerVehicle())
+                .minVehicles(request.getMinVehicles())
+                .maxVehicles(request.getMaxVehicles())
+                .maxLorries(request.getMaxLorries() != null ? request.getMaxLorries() : -1)
+                .maxUsers(request.getMaxUsers() != null ? request.getMaxUsers() : -1)
+                .priceMonthly(java.math.BigDecimal.ZERO)
+                .priceYearly(java.math.BigDecimal.ZERO)
+                .hasFuelLogs(request.getHasFuelLogs() != null ? request.getHasFuelLogs() : true)
+                .hasMeterReadings(request.getHasMeterReadings() != null ? request.getHasMeterReadings() : true)
+                .hasVehicleServices(request.getHasVehicleServices() != null ? request.getHasVehicleServices() : true)
+                .hasAttendance(request.getHasAttendance() != null ? request.getHasAttendance() : true)
+                .hasPayroll(request.getHasPayroll() != null ? request.getHasPayroll() : true)
+                .hasInventory(request.getHasInventory() != null ? request.getHasInventory() : true)
+                .hasReports(request.getHasReports() != null ? request.getHasReports() : true)
+                .hasCreditNotes(request.getHasCreditNotes() != null ? request.getHasCreditNotes() : true)
                 .features(request.getFeatures())
                 .isActive(true)
                 .build();
@@ -38,10 +49,19 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
         SubscriptionPlan plan = planRepository.findById(id)
                 .orElseThrow(() -> new FerosException("Plan not found", HttpStatus.NOT_FOUND));
         plan.setName(request.getName());
-        plan.setMaxLorries(request.getMaxLorries());
-        plan.setMaxUsers(request.getMaxUsers());
-        plan.setPriceMonthly(request.getPriceMonthly());
-        plan.setPriceYearly(request.getPriceYearly());
+        if (request.getPricePerVehicle() != null) plan.setPricePerVehicle(request.getPricePerVehicle());
+        if (request.getMinVehicles() != null)     plan.setMinVehicles(request.getMinVehicles());
+        if (request.getMaxVehicles() != null)     plan.setMaxVehicles(request.getMaxVehicles());
+        if (request.getMaxLorries() != null)      plan.setMaxLorries(request.getMaxLorries());
+        if (request.getMaxUsers() != null)        plan.setMaxUsers(request.getMaxUsers());
+        if (request.getHasFuelLogs() != null)        plan.setHasFuelLogs(request.getHasFuelLogs());
+        if (request.getHasMeterReadings() != null)   plan.setHasMeterReadings(request.getHasMeterReadings());
+        if (request.getHasVehicleServices() != null) plan.setHasVehicleServices(request.getHasVehicleServices());
+        if (request.getHasAttendance() != null)      plan.setHasAttendance(request.getHasAttendance());
+        if (request.getHasPayroll() != null)         plan.setHasPayroll(request.getHasPayroll());
+        if (request.getHasInventory() != null)       plan.setHasInventory(request.getHasInventory());
+        if (request.getHasReports() != null)         plan.setHasReports(request.getHasReports());
+        if (request.getHasCreditNotes() != null)     plan.setHasCreditNotes(request.getHasCreditNotes());
         plan.setFeatures(request.getFeatures());
         return toResponse(planRepository.save(plan));
     }
