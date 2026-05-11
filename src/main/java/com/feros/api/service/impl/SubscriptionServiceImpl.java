@@ -380,6 +380,10 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         int months;
         if (cycle == BillingCycle.YEARLY) {
             months = minVehicles >= 250 ? ANNUAL_MONTHS_PAID : 12;
+        } else if (cycle == BillingCycle.SIX_MONTHS) {
+            months = 6;
+        } else if (cycle == BillingCycle.THREE_MONTHS) {
+            months = 3;
         } else {
             months = 1;
         }
@@ -393,7 +397,12 @@ public class SubscriptionServiceImpl implements SubscriptionService {
      */
     private LocalDate calculateEndDate(LocalDate from, BillingCycle cycle) {
         if (cycle == null) return from.plusMonths(1);
-        return cycle == BillingCycle.YEARLY ? from.plusMonths(12) : from.plusMonths(1);
+        return switch (cycle) {
+            case YEARLY       -> from.plusMonths(12);
+            case SIX_MONTHS   -> from.plusMonths(6);
+            case THREE_MONTHS -> from.plusMonths(3);
+            default           -> from.plusMonths(1);
+        };
     }
 
     private void createInvoice(SubscriptionHistory history, Tenant tenant, String planName,
