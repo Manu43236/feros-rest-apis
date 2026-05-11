@@ -431,7 +431,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .planName(planName)
                 .vehicleCount(h.getVehicleCount())
                 .pricePerVehicle(h.getPricePerVehicle())
-                .maxLorries(h.getVehicleCount())           // limit = what they paid for
+                .maxLorries(h.getVehicleCount() != null ? h.getVehicleCount()
+                        : (plan != null && plan.getMaxVehicles() != null && plan.getMaxVehicles() > 0
+                                ? plan.getMaxVehicles() : -1))  // paid = vehicleCount, trial = plan max, unlimited = -1
                 .maxUsers(plan != null ? plan.getMaxUsers() : null)
                 // Feature flags — all true if no plan (backward compat)
                 .hasFuelLogs(plan == null || Boolean.TRUE.equals(plan.getHasFuelLogs()))
