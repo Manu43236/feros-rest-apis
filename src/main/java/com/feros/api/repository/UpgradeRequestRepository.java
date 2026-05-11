@@ -9,4 +9,5 @@ import java.util.List;
 public interface UpgradeRequestRepository extends JpaRepository<UpgradeRequest, Long> {
     List<UpgradeRequest> findAllByStatusOrderByCreatedAtDesc(UpgradeRequestStatus status);
     List<UpgradeRequest> findAllByOrderByCreatedAtDesc();
+    java.util.Optional<UpgradeRequest> findFirstByTenant_IdAndStatusOrderByCreatedAtDesc(Long tenantId, UpgradeRequestStatus status);
 }

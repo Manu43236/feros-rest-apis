@@ -27,8 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -99,6 +97,14 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             createInvoice(history, tenant, plan.getName(), totalAmount, baseAmount, gstAmount,
                     request.getPaymentRef(), vehicleCount, pricePerVehicle);
         }
+
+        // Mark any PENDING upgrade request for this tenant as FULFILLED
+        upgradeRequestRepository.findFirstByTenant_IdAndStatusOrderByCreatedAtDesc(
+                tenantId, UpgradeRequestStatus.PENDING)
+                .ifPresent(ur -> {
+                    ur.setStatus(UpgradeRequestStatus.FULFILLED);
+                    upgradeRequestRepository.save(ur);
+                });
 
         notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_ACTIVATED,
                 "Subscription Activated",
@@ -416,10 +422,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private void createInvoice(SubscriptionHistory history, Tenant tenant, String planName,
                                 BigDecimal totalAmount, BigDecimal amount, BigDecimal gstAmount,
                                 String paymentRef, Integer vehicleCount, BigDecimal pricePerVehicle) {
-        YearMonth ym    = YearMonth.now();
-        long count      = invoiceRepository.countByYearAndMonth(ym.getYear(), ym.getMonthValue());
-        String invoiceNumber = "INV-" + ym.format(DateTimeFormatter.ofPattern("yyyyMM"))
-                + "-" + String.format("%04d", count + 1);
+        String invoiceNumber = "INV_FEROS_SUB_"
+                + java.time.LocalDateTime.now()
+                        .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
 
         SubscriptionInvoice invoice = SubscriptionInvoice.builder()
                 .invoiceNumber(invoiceNumber)
