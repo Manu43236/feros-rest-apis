@@ -296,8 +296,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     @Transactional
     public void autoExpireSubscriptions() {
         LocalDate today = LocalDate.now();
-        List<SubscriptionHistory> expired = historyRepository.findExpiredActive(today);
-        for (SubscriptionHistory h : expired) {
+
+        // Expire ACTIVE subscriptions
+        for (SubscriptionHistory h : historyRepository.findExpiredActive(today)) {
             h.setStatus(SubscriptionStatus.EXPIRED);
             historyRepository.save(h);
             Tenant tenant = h.getTenant();
@@ -308,17 +309,49 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                     "Your subscription has expired. Please contact FEROS support to renew.");
             log.info("Auto-expired subscription for tenant {}", tenant.getId());
         }
+
+        // Expire TRIAL subscriptions
+        for (SubscriptionHistory h : historyRepository.findExpiredTrials(today)) {
+            h.setStatus(SubscriptionStatus.EXPIRED);
+            historyRepository.save(h);
+            Tenant tenant = h.getTenant();
+            tenant.setSubscriptionStatus(SubscriptionStatus.EXPIRED);
+            tenantRepository.save(tenant);
+            notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_EXPIRY,
+                    "Trial Expired",
+                    "Your 30-day free trial has expired. Contact FEROS to activate a plan and continue using the platform.");
+            log.info("Auto-expired trial for tenant {}", tenant.getId());
+        }
     }
 
     @Scheduled(cron = "0 0 9 * * *")
     public void sendExpiryWarnings() {
-        LocalDate warningDate = LocalDate.now().plusDays(7);
-        List<SubscriptionHistory> expiring = historyRepository.findActiveExpiringOn(warningDate);
-        for (SubscriptionHistory h : expiring) {
-            notificationService.sendToTenant(h.getTenant(), NotificationType.TRIAL_ENDING,
-                    "Subscription Expiring Soon",
-                    "Your subscription expires on " + h.getEndDate() + ". Please renew to avoid interruption.");
-        }
+        LocalDate sevenDays = LocalDate.now().plusDays(7);
+        LocalDate tomorrow  = LocalDate.now().plusDays(1);
+
+        // 7-day warning — ACTIVE
+        historyRepository.findActiveExpiringOn(sevenDays).forEach(h ->
+                notificationService.sendToTenant(h.getTenant(), NotificationType.TRIAL_ENDING,
+                        "Subscription Expiring in 7 Days",
+                        "Your subscription expires on " + h.getEndDate() + ". Please renew to avoid interruption."));
+
+        // 7-day warning — TRIAL
+        historyRepository.findTrialsExpiringOn(sevenDays).forEach(h ->
+                notificationService.sendToTenant(h.getTenant(), NotificationType.TRIAL_ENDING,
+                        "Trial Ending in 7 Days",
+                        "Your free trial expires on " + h.getEndDate() + ". Contact FEROS to activate a paid plan."));
+
+        // 1-day warning — ACTIVE
+        historyRepository.findActiveExpiringOn(tomorrow).forEach(h ->
+                notificationService.sendToTenant(h.getTenant(), NotificationType.TRIAL_ENDING,
+                        "Subscription Expires Tomorrow",
+                        "Your subscription expires tomorrow (" + h.getEndDate() + "). Renew now to avoid access loss."));
+
+        // 1-day warning — TRIAL
+        historyRepository.findTrialsExpiringOn(tomorrow).forEach(h ->
+                notificationService.sendToTenant(h.getTenant(), NotificationType.TRIAL_ENDING,
+                        "Trial Expires Tomorrow",
+                        "Your free trial expires tomorrow (" + h.getEndDate() + "). Contact FEROS to activate a plan."));
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────

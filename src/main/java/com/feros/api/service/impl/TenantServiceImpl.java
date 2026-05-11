@@ -7,12 +7,14 @@ import com.feros.api.dto.response.LoginResponse;
 import com.feros.api.dto.response.TenantDocumentResponse;
 import com.feros.api.dto.response.TenantResponse;
 import com.feros.api.entity.Designation;
+import com.feros.api.entity.SubscriptionHistory;
 import com.feros.api.entity.Tenant;
 import com.feros.api.entity.TenantDocument;
 import com.feros.api.entity.master.*;
 import com.feros.api.enums.PayCycle;
 import com.feros.api.enums.RoleName;
 import com.feros.api.enums.SubscriptionStatus;
+import com.feros.api.repository.SubscriptionHistoryRepository;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.repository.TenantDocumentRepository;
@@ -30,6 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,6 +49,7 @@ public class TenantServiceImpl implements TenantService {
     private final ChargeTypeRepository chargeTypeRepository;
     private final DesignationRepository designationRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
+    private final SubscriptionHistoryRepository subscriptionHistoryRepository;
     private final S3Service s3Service;
     private final JwtUtil jwtUtil;
 
@@ -89,6 +93,7 @@ public class TenantServiceImpl implements TenantService {
 
         Tenant savedTenant = tenantRepository.save(tenant);
         seedDefaultMasterData(savedTenant);
+        createTrialHistory(savedTenant);
         return mapToResponse(savedTenant);
     }
 
@@ -206,6 +211,7 @@ public class TenantServiceImpl implements TenantService {
 
                     Tenant savedTenant = tenantRepository.save(tenant);
                     seedDefaultMasterData(savedTenant);
+                    createTrialHistory(savedTenant);
                     successCount++;
 
                 } catch (Exception e) {
@@ -507,5 +513,23 @@ public class TenantServiceImpl implements TenantService {
                 .createdAt(tenant.getCreatedAt())
                 .updatedAt(tenant.getUpdatedAt())
                 .build();
+    }
+
+    private void createTrialHistory(Tenant tenant) {
+        LocalDate start = LocalDate.now();
+        LocalDate end   = start.plusDays(30);
+        SubscriptionHistory trial = SubscriptionHistory.builder()
+                .tenant(tenant)
+                .plan(null)
+                .status(SubscriptionStatus.TRIAL)
+                .startDate(start)
+                .endDate(end)
+                .amount(BigDecimal.ZERO)
+                .gstAmount(BigDecimal.ZERO)
+                .totalAmount(BigDecimal.ZERO)
+                .notes("30-day free trial — auto-created on signup")
+                .createdAt(LocalDateTime.now())
+                .build();
+        subscriptionHistoryRepository.save(trial);
     }
 }
