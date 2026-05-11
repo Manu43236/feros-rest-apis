@@ -283,8 +283,16 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     public List<SubscriptionInvoiceResponse> getInvoices(Long tenantId) {
         Tenant tenant = getTenant(tenantId);
         return invoiceRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId).stream()
-                .map(i -> toInvoiceResponse(i, tenant.getCompanyName()))
+                .map(i -> toInvoiceResponse(i, tenant))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public SubscriptionInvoiceResponse getInvoiceById(Long tenantId, Long invoiceId) {
+        Tenant tenant = getTenant(tenantId);
+        SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
+                .orElseThrow(() -> new com.feros.api.exception.FerosException("Invoice not found", org.springframework.http.HttpStatus.NOT_FOUND));
+        return toInvoiceResponse(invoice, tenant);
     }
 
     @Override
@@ -555,12 +563,12 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .build();
     }
 
-    private SubscriptionInvoiceResponse toInvoiceResponse(SubscriptionInvoice i, String companyName) {
+    private SubscriptionInvoiceResponse toInvoiceResponse(SubscriptionInvoice i, Tenant tenant) {
         return SubscriptionInvoiceResponse.builder()
                 .id(i.getId())
                 .invoiceNumber(i.getInvoiceNumber())
                 .tenantId(i.getTenant().getId())
-                .companyName(companyName)
+                .companyName(tenant.getCompanyName())
                 .planName(i.getPlanName())
                 .billingCycle(i.getBillingCycle())
                 .vehicleCount(i.getVehicleCount())
@@ -572,6 +580,11 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .totalAmount(i.getTotalAmount())
                 .paymentRef(i.getPaymentRef())
                 .createdAt(i.getCreatedAt())
+                .tenantAddress(tenant.getAddress())
+                .tenantCity(tenant.getCity())
+                .tenantState(tenant.getState())
+                .tenantPincode(tenant.getPincode())
+                .tenantGstin(tenant.getGstin())
                 .build();
     }
 }

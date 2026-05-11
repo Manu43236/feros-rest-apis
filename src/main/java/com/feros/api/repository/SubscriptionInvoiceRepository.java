@@ -9,6 +9,7 @@ import java.util.List;
 
 public interface SubscriptionInvoiceRepository extends JpaRepository<SubscriptionInvoice, Long> {
     List<SubscriptionInvoice> findAllByTenantIdOrderByCreatedAtDesc(Long tenantId);
+    java.util.Optional<SubscriptionInvoice> findByIdAndTenant_Id(Long id, Long tenantId);
 
     @Query("SELECT COUNT(i) FROM SubscriptionInvoice i WHERE YEAR(i.createdAt) = :year AND MONTH(i.createdAt) = :month")
     long countByYearAndMonth(@Param("year") int year, @Param("month") int month);

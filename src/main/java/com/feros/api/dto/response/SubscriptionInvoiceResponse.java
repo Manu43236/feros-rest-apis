@@ -22,4 +22,10 @@ public class SubscriptionInvoiceResponse {
     private BigDecimal totalAmount;
     private String paymentRef;
     private LocalDateTime createdAt;
+    // Tenant details for print/PDF
+    private String tenantAddress;
+    private String tenantCity;
+    private String tenantState;
+    private String tenantPincode;
+    private String tenantGstin;
 }

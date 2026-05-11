@@ -114,6 +114,15 @@ public class SubscriptionController {
                 subscriptionService.getInvoices(tenantId)));
     }
 
+    @GetMapping("/my/invoices/{invoiceId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<SubscriptionInvoiceResponse>> getMyInvoiceById(
+            @PathVariable Long invoiceId) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return ResponseEntity.ok(ApiResponse.success("Invoice fetched",
+                subscriptionService.getInvoiceById(tenantId, invoiceId)));
+    }
+
     // ─── Upgrade Requests ─────────────────────────────────────────────────────
 
     @PostMapping("/upgrade-request")
