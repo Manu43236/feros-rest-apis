@@ -2,6 +2,7 @@ package com.feros.api.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feros.api.enums.SubscriptionStatus;
+import com.feros.api.repository.SubscriptionHistoryRepository;
 import com.feros.api.repository.TenantRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.Map;
 
 @Component
@@ -22,6 +24,7 @@ import java.util.Map;
 public class SubscriptionEnforcementFilter extends OncePerRequestFilter {
 
     private final TenantRepository tenantRepository;
+    private final SubscriptionHistoryRepository subscriptionHistoryRepository;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -81,6 +84,16 @@ public class SubscriptionEnforcementFilter extends OncePerRequestFilter {
         if (status == SubscriptionStatus.SUSPENDED) {
             writeError(response, HttpServletResponse.SC_FORBIDDEN,
                     "Your account has been suspended. Please contact FEROS support.");
+            return;
+        }
+
+        // Also check if end date has passed even if scheduler hasn't updated status yet
+        boolean endDateExpired = subscriptionHistoryRepository.findCurrentByTenantId(tenantId)
+                .map(h -> h.getEndDate() != null && h.getEndDate().isBefore(LocalDate.now()))
+                .orElse(false);
+        if (endDateExpired) {
+            writeError(response, HttpServletResponse.SC_PAYMENT_REQUIRED,
+                    "Your subscription has expired. You can view your data but cannot make changes. Please upgrade to continue.");
             return;
         }
 
