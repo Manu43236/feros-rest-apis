@@ -3,8 +3,11 @@ package com.feros.api.service.impl;
 import com.feros.api.dto.request.ActivateSubscriptionRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
+import com.feros.api.dto.request.UpgradeRequestRequest;
 import com.feros.api.dto.response.SubscriptionHistoryResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceResponse;
+import com.feros.api.dto.response.UpgradeRequestResponse;
+import com.feros.api.enums.UpgradeRequestStatus;
 import com.feros.api.entity.*;
 import com.feros.api.enums.BillingCycle;
 import com.feros.api.enums.NotificationType;
@@ -41,6 +44,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final SubscriptionPlanRepository planRepository;
     private final SubscriptionHistoryRepository historyRepository;
     private final SubscriptionInvoiceRepository invoiceRepository;
+    private final UpgradeRequestRepository upgradeRequestRepository;
     private final NotificationService notificationService;
 
     // ─── Activate ─────────────────────────────────────────────────────────────
@@ -448,6 +452,95 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .paymentRef(h.getPaymentRef())
                 .notes(h.getNotes())
                 .createdAt(h.getCreatedAt())
+                .build();
+    }
+
+        // ─── Upgrade Requests ─────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public UpgradeRequestResponse submitUpgradeRequest(Long tenantId, UpgradeRequestRequest request) {
+        Tenant tenant = getTenant(tenantId);
+        SubscriptionPlan plan = planRepository.findById(request.getPlanId())
+                .orElseThrow(() -> new FerosException("Plan not found", HttpStatus.NOT_FOUND));
+
+        int months = (request.getBillingCycle() == BillingCycle.YEARLY)
+                ? ((plan.getMinVehicles() != null && plan.getMinVehicles() >= 250) ? ANNUAL_MONTHS_PAID : 12)
+                : 1;
+        BigDecimal base  = plan.getPricePerVehicle()
+                .multiply(BigDecimal.valueOf(request.getVehicleCount()))
+                .multiply(BigDecimal.valueOf(months))
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total = base.add(base.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP));
+
+        com.feros.api.entity.UpgradeRequest ur = com.feros.api.entity.UpgradeRequest.builder()
+                .tenant(tenant)
+                .plan(plan)
+                .vehicleCount(request.getVehicleCount())
+                .billingCycle(request.getBillingCycle())
+                .notes(request.getNotes())
+                .status(UpgradeRequestStatus.PENDING)
+                .createdAt(java.time.LocalDateTime.now())
+                .build();
+        ur = upgradeRequestRepository.save(ur);
+
+        // Confirm to tenant
+        notificationService.sendToTenant(tenant, NotificationType.UPGRADE_REQUEST,
+                "Upgrade Request Received",
+                "Your request to upgrade to " + plan.getName() + " plan (" + request.getVehicleCount()
+                        + " vehicles) has been received. We'll contact you shortly.");
+
+        return toUpgradeRequestResponse(ur, plan, tenant.getCompanyName(), base, total);
+    }
+
+    @Override
+    public List<UpgradeRequestResponse> getUpgradeRequests() {
+        return upgradeRequestRepository.findAllByOrderByCreatedAtDesc().stream()
+                .map(ur -> {
+                    BigDecimal base = BigDecimal.ZERO, total = BigDecimal.ZERO;
+                    if (ur.getPlan() != null && ur.getPlan().getPricePerVehicle() != null && ur.getVehicleCount() != null) {
+                        int months = (ur.getBillingCycle() == BillingCycle.YEARLY)
+                                ? ((ur.getPlan().getMinVehicles() != null && ur.getPlan().getMinVehicles() >= 250) ? ANNUAL_MONTHS_PAID : 12)
+                                : 1;
+                        base  = ur.getPlan().getPricePerVehicle()
+                                .multiply(BigDecimal.valueOf(ur.getVehicleCount()))
+                                .multiply(BigDecimal.valueOf(months))
+                                .setScale(2, RoundingMode.HALF_UP);
+                        total = base.add(base.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP));
+                    }
+                    return toUpgradeRequestResponse(ur,
+                            ur.getPlan(),
+                            ur.getTenant().getCompanyName(), base, total);
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void dismissUpgradeRequest(Long id) {
+        com.feros.api.entity.UpgradeRequest ur = upgradeRequestRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Upgrade request not found", HttpStatus.NOT_FOUND));
+        ur.setStatus(UpgradeRequestStatus.DISMISSED);
+        upgradeRequestRepository.save(ur);
+    }
+
+    private UpgradeRequestResponse toUpgradeRequestResponse(
+            com.feros.api.entity.UpgradeRequest ur, SubscriptionPlan plan,
+            String companyName, BigDecimal base, BigDecimal total) {
+        return UpgradeRequestResponse.builder()
+                .id(ur.getId())
+                .tenantId(ur.getTenant().getId())
+                .companyName(companyName)
+                .planId(plan != null ? plan.getId() : null)
+                .planName(plan != null ? plan.getName() : null)
+                .pricePerVehicle(plan != null ? plan.getPricePerVehicle() : null)
+                .vehicleCount(ur.getVehicleCount())
+                .billingCycle(ur.getBillingCycle())
+                .estimatedBase(base)
+                .estimatedTotal(total)
+                .notes(ur.getNotes())
+                .status(ur.getStatus())
+                .createdAt(ur.getCreatedAt())
                 .build();
     }
 

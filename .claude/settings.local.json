@@ -388,7 +388,11 @@
       "Bash(mvn compile -q 2>&1 | grep -E \"ERROR|error:\" | head -10)",
       "Bash(git add -A && git commit -m \"$\\(cat <<'EOF'\nbackfill trial history for existing tenants + null-safe getCurrentSubscription\n\n- backfill_trial_history.sql: one-time script to insert TRIAL history for all\n  active tenants with no subscription_history record \\(uses existing trial dates\\)\n- getCurrentSubscription: return null instead of throwing 404 when no history\n  exists, so existing tenants don't get errors before backfill is run\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push)",
       "Bash(git add -A && git commit -m \"$\\(cat <<'EOF'\nadd Trial plan to plans list — SA can view, edit and control trial\n\n- SubscriptionPlanRepository: add findByNameIgnoreCase\\(\\)\n- TenantServiceImpl: inject SubscriptionPlanRepository, link Trial plan to\n  createTrialHistory\\(\\) so new tenants are associated with the Trial plan\n- backfill_trial_history.sql: insert Trial plan \\(all features enabled, free,\n  unlimited vehicles/users\\) then backfill history linked to it\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push)",
-      "Bash(mvn compile -q 2>&1 | grep -E \"ERROR|error:\" | head -5)"
+      "Bash(mvn compile -q 2>&1 | grep -E \"ERROR|error:\" | head -5)",
+      "Bash(mysql -u root -p feros_db -e \"SELECT COUNT\\(*\\) as history_count FROM subscription_history WHERE plan_id = \\(SELECT id FROM subscription_plans WHERE name = 'Free'\\);\" 2>/dev/null || echo \"run manually\")",
+      "Bash(cd /Users/manu/Documents/FEROS/web && npm run build 2>&1 | grep -E \"error TS|Error|✓ built\")",
+      "Bash(mvn compile -q 2>&1 | grep -E \"ERROR|error:\" | head -15)",
+      "Bash(git add -A && git commit -m \"$\\(cat <<'EOF'\nadd upgrade request flow: tenant submits, SA reviews and activates\n\nBackend:\n- UpgradeRequest entity + repository + UpgradeRequestStatus enum\n- SubscriptionService: submitUpgradeRequest, getUpgradeRequests, dismissUpgradeRequest\n- SubscriptionController: POST /upgrade-request \\(tenant\\), GET+PATCH /upgrade-requests \\(SA\\)\n- Tenant gets confirmation notification on submit\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push)"
     ]
   }
 }

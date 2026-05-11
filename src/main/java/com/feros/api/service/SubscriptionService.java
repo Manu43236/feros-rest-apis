@@ -3,8 +3,10 @@ package com.feros.api.service;
 import com.feros.api.dto.request.ActivateSubscriptionRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
+import com.feros.api.dto.request.UpgradeRequestRequest;
 import com.feros.api.dto.response.SubscriptionHistoryResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceResponse;
+import com.feros.api.dto.response.UpgradeRequestResponse;
 
 import java.util.List;
 
@@ -17,4 +19,7 @@ public interface SubscriptionService {
     List<SubscriptionHistoryResponse> getHistory(Long tenantId);
     List<SubscriptionInvoiceResponse> getInvoices(Long tenantId);
     SubscriptionHistoryResponse getCurrentSubscription(Long tenantId);
+    UpgradeRequestResponse submitUpgradeRequest(Long tenantId, UpgradeRequestRequest request);
+    List<UpgradeRequestResponse> getUpgradeRequests();
+    void dismissUpgradeRequest(Long id);
 }

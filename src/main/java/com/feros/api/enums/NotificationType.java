@@ -3,6 +3,7 @@ package com.feros.api.enums;
 public enum NotificationType {
     SUBSCRIPTION_EXPIRY,
     TRIAL_ENDING,
+    UPGRADE_REQUEST,
     SUBSCRIPTION_ACTIVATED,
     SUBSCRIPTION_SUSPENDED,
     BROADCAST,
