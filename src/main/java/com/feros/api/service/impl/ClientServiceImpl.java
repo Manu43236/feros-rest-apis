@@ -80,7 +80,7 @@ public class ClientServiceImpl implements ClientService {
         if (request.getPaymentTermsId() != null)
             client.setPaymentTerms(paymentTermsRepository
                     .findByIdAndTenantId(request.getPaymentTermsId(), tenant.getId())
-                    .orElseThrow(() -> new FerosException("Payment terms not found", HttpStatus.NOT_FOUND)));
+                    .orElseThrow(() -> new FerosException("Selected payment terms are invalid or no longer available. Please select valid payment terms.", HttpStatus.NOT_FOUND)));
 
         return mapToResponse(clientRepository.save(client));
     }
@@ -135,7 +135,7 @@ public class ClientServiceImpl implements ClientService {
         if (request.getPaymentTermsId() != null)
             client.setPaymentTerms(paymentTermsRepository
                     .findByIdAndTenantId(request.getPaymentTermsId(), getCurrentTenantId())
-                    .orElseThrow(() -> new FerosException("Payment terms not found", HttpStatus.NOT_FOUND)));
+                    .orElseThrow(() -> new FerosException("Selected payment terms are invalid or no longer available. Please select valid payment terms.", HttpStatus.NOT_FOUND)));
 
         return mapToResponse(clientRepository.save(client));
     }

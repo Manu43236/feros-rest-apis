@@ -291,7 +291,7 @@ public class TenantMasterServiceImpl implements TenantMasterService {
     @Override
     public TenantMasterResponse getPaymentTermsById(Long id) {
         return mapPaymentTerms(paymentTermsRepository.findByIdAndTenantId(id, getCurrentTenantId())
-                .orElseThrow(() -> new FerosException("Payment terms not found", HttpStatus.NOT_FOUND)));
+                .orElseThrow(() -> new FerosException("Selected payment terms are invalid or no longer available. Please select valid payment terms.", HttpStatus.NOT_FOUND)));
     }
 
     @Override
@@ -303,7 +303,7 @@ public class TenantMasterServiceImpl implements TenantMasterService {
     @Override
     public TenantMasterResponse updatePaymentTerms(Long id, PaymentTermsRequest request) {
         PaymentTerms terms = paymentTermsRepository.findByIdAndTenantId(id, getCurrentTenantId())
-                .orElseThrow(() -> new FerosException("Payment terms not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new FerosException("Selected payment terms are invalid or no longer available. Please select valid payment terms.", HttpStatus.NOT_FOUND));
         terms.setName(request.getName());
         terms.setCreditDays(request.getCreditDays());
         return mapPaymentTerms(paymentTermsRepository.save(terms));
@@ -312,7 +312,7 @@ public class TenantMasterServiceImpl implements TenantMasterService {
     @Override
     public void deletePaymentTerms(Long id) {
         PaymentTerms terms = paymentTermsRepository.findByIdAndTenantId(id, getCurrentTenantId())
-                .orElseThrow(() -> new FerosException("Payment terms not found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new FerosException("Selected payment terms are invalid or no longer available. Please select valid payment terms.", HttpStatus.NOT_FOUND));
         terms.setIsActive(false);
         paymentTermsRepository.save(terms);
     }
