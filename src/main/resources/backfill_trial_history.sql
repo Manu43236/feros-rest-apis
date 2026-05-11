@@ -1,4 +1,15 @@
--- ─── Backfill trial history for existing tenants ────────────────────────────
+-- ─── 1. Insert Trial plan (if not already present) ───────────────────────────
+INSERT INTO subscription_plans
+    (name, price_per_vehicle, min_vehicles, max_vehicles, max_lorries, max_users,
+     price_monthly, price_yearly,
+     has_fuel_logs, has_meter_readings, has_vehicle_services,
+     has_attendance, has_payroll, has_inventory, has_reports, has_credit_notes,
+     is_active)
+SELECT 'Trial', 0.00, 1, -1, -1, -1, 0.00, 0.00,
+       TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE
+WHERE NOT EXISTS (SELECT 1 FROM subscription_plans WHERE name = 'Trial');
+
+-- ─── 2. Backfill trial history for existing tenants ──────────────────────────
 -- Run once. Inserts a TRIAL SubscriptionHistory for every active tenant that
 -- has no history record yet. Uses the tenant's existing trial_start_date /
 -- trial_end_date if set, otherwise defaults to today / today+30.

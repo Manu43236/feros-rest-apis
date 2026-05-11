@@ -8,6 +8,7 @@ import com.feros.api.dto.response.TenantDocumentResponse;
 import com.feros.api.dto.response.TenantResponse;
 import com.feros.api.entity.Designation;
 import com.feros.api.entity.SubscriptionHistory;
+import com.feros.api.entity.SubscriptionPlan;
 import com.feros.api.entity.Tenant;
 import com.feros.api.entity.TenantDocument;
 import com.feros.api.entity.master.*;
@@ -15,6 +16,7 @@ import com.feros.api.enums.PayCycle;
 import com.feros.api.enums.RoleName;
 import com.feros.api.enums.SubscriptionStatus;
 import com.feros.api.repository.SubscriptionHistoryRepository;
+import com.feros.api.repository.SubscriptionPlanRepository;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.repository.TenantDocumentRepository;
@@ -50,6 +52,7 @@ public class TenantServiceImpl implements TenantService {
     private final DesignationRepository designationRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
+    private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final S3Service s3Service;
     private final JwtUtil jwtUtil;
 
@@ -518,9 +521,10 @@ public class TenantServiceImpl implements TenantService {
     private void createTrialHistory(Tenant tenant) {
         LocalDate start = LocalDate.now();
         LocalDate end   = start.plusDays(30);
+        SubscriptionPlan trialPlan = subscriptionPlanRepository.findByNameIgnoreCase("Trial").orElse(null);
         SubscriptionHistory trial = SubscriptionHistory.builder()
                 .tenant(tenant)
-                .plan(null)
+                .plan(trialPlan)
                 .status(SubscriptionStatus.TRIAL)
                 .startDate(start)
                 .endDate(end)
