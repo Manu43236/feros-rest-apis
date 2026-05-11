@@ -22,19 +22,19 @@ public class VehicleMaintenanceController {
     private final VehicleMaintenanceService vehicleMaintenanceService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MEN')")
     public ResponseEntity<ApiResponse<List<VehicleServiceResponse>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success("Vehicle services fetched successfully", vehicleMaintenanceService.getAll()));
     }
 
     @GetMapping("/vehicle/{vehicleId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MEN')")
     public ResponseEntity<ApiResponse<List<VehicleServiceResponse>>> getByVehicle(@PathVariable Long vehicleId) {
         return ResponseEntity.ok(ApiResponse.success("Vehicle services fetched successfully", vehicleMaintenanceService.getByVehicle(vehicleId)));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MEN')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Vehicle service fetched successfully", vehicleMaintenanceService.getById(id)));
     }
