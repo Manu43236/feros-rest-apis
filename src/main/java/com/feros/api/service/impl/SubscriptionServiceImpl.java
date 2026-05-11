@@ -287,7 +287,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         return historyRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId).stream()
                 .findFirst()
                 .map(h -> toHistoryResponse(h, tenant, h.getPlan() != null ? h.getPlan().getName() : "-"))
-                .orElseThrow(() -> new FerosException("No subscription found", HttpStatus.NOT_FOUND));
+                .orElse(null);
     }
 
     // ─── Scheduled Jobs ───────────────────────────────────────────────────────
