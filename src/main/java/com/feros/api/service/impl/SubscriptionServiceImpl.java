@@ -119,8 +119,10 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         tenant.setTrialEndDate(newEnd);
         tenantRepository.save(tenant);
 
+        SubscriptionPlan trialPlan = planRepository.findByNameIgnoreCase("Trial").orElse(null);
         SubscriptionHistory history = SubscriptionHistory.builder()
                 .tenant(tenant)
+                .plan(trialPlan)
                 .status(SubscriptionStatus.TRIAL)
                 .startDate(tenant.getTrialStartDate() != null ? tenant.getTrialStartDate() : LocalDate.now())
                 .endDate(newEnd)

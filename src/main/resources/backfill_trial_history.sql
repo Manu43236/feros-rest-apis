@@ -19,7 +19,7 @@ INSERT INTO subscription_history
      amount, gst_amount, total_amount, notes, created_at)
 SELECT
     t.id,
-    NULL,
+    (SELECT id FROM subscription_plans WHERE name = 'Trial' LIMIT 1),
     'TRIAL',
     COALESCE(t.trial_start_date, CURDATE()),
     COALESCE(t.trial_end_date,   DATE_ADD(CURDATE(), INTERVAL 30 DAY)),
