@@ -48,9 +48,13 @@ public class SubscriptionEnforcementFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Skip subscription-related and auth endpoints so tenant can always view their status
-        String path = request.getRequestURI();
-        if (path.contains("/auth/") || path.contains("/subscriptions/my")) {
+        // Always allow GET requests (read-only access) and auth/subscription endpoints
+        String method  = request.getMethod();
+        String path    = request.getRequestURI();
+        if ("GET".equalsIgnoreCase(method)
+                || path.contains("/auth/")
+                || path.contains("/subscriptions/my")
+                || path.contains("/subscriptions/upgrade-request")) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -70,7 +74,7 @@ public class SubscriptionEnforcementFilter extends OncePerRequestFilter {
 
         if (status == SubscriptionStatus.EXPIRED) {
             writeError(response, HttpServletResponse.SC_PAYMENT_REQUIRED,
-                    "Your subscription has expired. Please contact FEROS support to renew.");
+                    "Your subscription has expired. You can view your data but cannot make changes. Please upgrade to continue.");
             return;
         }
 
