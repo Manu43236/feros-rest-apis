@@ -24,5 +24,7 @@ public class DriverDashboardResponse {
         private String fromCity;
         private String toCity;
         private String vehicleNumber;
+        private java.time.LocalDate expectedLoadDate;
+        private java.time.LocalDate expectedDeliveryDate;
     }
 }

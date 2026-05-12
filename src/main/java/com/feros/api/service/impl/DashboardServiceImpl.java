@@ -185,6 +185,10 @@ public class DashboardServiceImpl implements DashboardService {
         List<DriverDashboardResponse.UpcomingTrip> upcoming = myLrs.stream()
                 .filter(lr -> lr.getLrStatus() == LrStatus.CREATED
                         || lr.getLrStatus() == LrStatus.WEIGHT_LOADED)
+                .sorted(java.util.Comparator.comparing(
+                        lr -> lr.getVehicleAllocation().getExpectedLoadDate() != null
+                                ? lr.getVehicleAllocation().getExpectedLoadDate()
+                                : LocalDate.MAX))
                 .map(lr -> DriverDashboardResponse.UpcomingTrip.builder()
                         .lrId(lr.getId())
                         .lrNumber(lr.getLrNumber())
@@ -195,6 +199,8 @@ public class DashboardServiceImpl implements DashboardService {
                         .toCity(lr.getOrder().getDestinationCity() != null
                                 ? lr.getOrder().getDestinationCity().getName() : "—")
                         .vehicleNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
+                        .expectedLoadDate(lr.getVehicleAllocation().getExpectedLoadDate())
+                        .expectedDeliveryDate(lr.getVehicleAllocation().getExpectedDeliveryDate())
                         .build())
                 .toList();
 
