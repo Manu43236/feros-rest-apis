@@ -280,11 +280,8 @@ public class LrServiceImpl implements LrService {
 
                 allocation.setAllocationStatus(VehicleAllocationStatus.DELIVERED);
 
-                // Update order fulfilled weight
-                if (request.getDeliveredWeight() != null) {
-                    order.setTotalWeightFulfilled(
-                        order.getTotalWeightFulfilled().add(request.getDeliveredWeight()));
-                }
+                // Note: order.totalWeightFulfilled tracks assigned weight (set at allocation time).
+                // Do NOT add deliveredWeight here — that would double-count.
 
                 // Recalculate order status based on all vehicle allocations for this order.
                 // Current allocation is already set to DELIVERED in memory — check all others in DB.
