@@ -161,12 +161,32 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public List<OrderResponse> getAllOrders() {
         Long tenantId = getCurrentTenantId();
-        if ("SUPERVISOR".equals(SecurityUtil.getCurrentRole())) {
+        String role = SecurityUtil.getCurrentRole();
+        if ("SUPERVISOR".equals(role) || "DRIVER".equals(role) || "CLEANER".equals(role)) {
             return orderRepository.findByTenantIdAndSupervisorId(tenantId, SecurityUtil.getCurrentUserId())
                     .stream().map(this::mapToOrderResponse).toList();
         }
         return orderRepository.findByTenantIdAndIsActiveTrue(tenantId)
                 .stream().map(this::mapToOrderResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updateOrderStatus(Long id, OrderStatus status) {
+        Order order = orderRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Order not found", HttpStatus.NOT_FOUND));
+
+        String role = SecurityUtil.getCurrentRole();
+        if ("DRIVER".equals(role) || "CLEANER".equals(role)) {
+            if (status != OrderStatus.IN_TRANSIT && status != OrderStatus.DELIVERED) {
+                throw new FerosException("Drivers can only update status to IN_TRANSIT or DELIVERED",
+                        HttpStatus.FORBIDDEN);
+            }
+        }
+
+        order.setOrderStatus(status);
+        return mapToOrderResponse(orderRepository.save(order));
     }
 
     @Override
