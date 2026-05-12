@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.*;
 import com.feros.api.dto.response.*;
 import com.feros.api.entity.*;
@@ -47,7 +48,7 @@ public class TireServiceImpl implements TireService {
         tireRepository.findByTenantIdAndSerialNumberAndIsActiveTrue(tenantId, request.getSerialNumber())
                 .ifPresent(t -> { throw new FerosException("Tire with this serial number already exists", HttpStatus.CONFLICT); });
 
-        LocalDate baseDate = request.getPurchaseDate() != null ? request.getPurchaseDate() : LocalDate.now();
+        LocalDate baseDate = request.getPurchaseDate() != null ? request.getPurchaseDate() : TimeUtil.today();
         LocalDate expiryDate = request.getTyreLifeYears() != null ? baseDate.plusYears(request.getTyreLifeYears()) : null;
 
         Tire tire = Tire.builder()
@@ -111,7 +112,7 @@ public class TireServiceImpl implements TireService {
         if (request.getMaxLifetimeKm() != null)   tire.setMaxLifetimeKm(request.getMaxLifetimeKm());
         if (request.getTyreLifeYears() != null) {
             tire.setTyreLifeYears(request.getTyreLifeYears());
-            LocalDate base = tire.getPurchaseDate() != null ? tire.getPurchaseDate() : LocalDate.now();
+            LocalDate base = tire.getPurchaseDate() != null ? tire.getPurchaseDate() : TimeUtil.today();
             tire.setExpiryDate(base.plusYears(request.getTyreLifeYears()));
         }
 
@@ -217,7 +218,7 @@ public class TireServiceImpl implements TireService {
                 .tire(tire)
                 .position(position)
                 .fittedAtKm(request.getFittedAtKm())
-                .fittedDate(request.getFittedDate() != null ? request.getFittedDate() : LocalDate.now())
+                .fittedDate(request.getFittedDate() != null ? request.getFittedDate() : TimeUtil.today())
                 .fittedBy(fittedBy)
                 .notes(request.getNotes())
                 .isActive(true)
@@ -256,7 +257,7 @@ public class TireServiceImpl implements TireService {
         User removedBy = getUser(userId);
 
         fitting.setRemovedAtKm(request.getRemovedAtKm());
-        fitting.setRemovedDate(request.getRemovedDate() != null ? request.getRemovedDate() : LocalDate.now());
+        fitting.setRemovedDate(request.getRemovedDate() != null ? request.getRemovedDate() : TimeUtil.today());
         fitting.setRemovalReason(request.getRemovalReason());
         fitting.setRemovedBy(removedBy);
         fitting.setNotes(request.getNotes() != null ? request.getNotes() : fitting.getNotes());
@@ -330,7 +331,7 @@ public class TireServiceImpl implements TireService {
         TireRotationLog rotationLog = TireRotationLog.builder()
                 .tenant(tenant)
                 .vehicle(vehicle)
-                .rotationDate(request.getRotationDate() != null ? request.getRotationDate() : LocalDate.now())
+                .rotationDate(request.getRotationDate() != null ? request.getRotationDate() : TimeUtil.today())
                 .odometerKm(request.getOdometerKm())
                 .performedBy(performedBy)
                 .notes(request.getNotes())
@@ -351,7 +352,7 @@ public class TireServiceImpl implements TireService {
                     .orElseThrow(() -> new FerosException("No active fitting found for position: " + fromPos.getPositionCode(), HttpStatus.NOT_FOUND));
 
             oldFitting.setRemovedAtKm(request.getOdometerKm());
-            oldFitting.setRemovedDate(request.getRotationDate() != null ? request.getRotationDate() : LocalDate.now());
+            oldFitting.setRemovedDate(request.getRotationDate() != null ? request.getRotationDate() : TimeUtil.today());
             oldFitting.setRemovalReason(TireRemovalReason.ROTATION);
             oldFitting.setRemovedBy(performedBy);
             oldFitting.setRotationLog(rotationLog);
@@ -372,7 +373,7 @@ public class TireServiceImpl implements TireService {
                     .tire(tire)
                     .position(toPos)
                     .fittedAtKm(request.getOdometerKm())
-                    .fittedDate(request.getRotationDate() != null ? request.getRotationDate() : LocalDate.now())
+                    .fittedDate(request.getRotationDate() != null ? request.getRotationDate() : TimeUtil.today())
                     .fittedBy(performedBy)
                     .rotationLog(rotationLog)
                     .isActive(true)

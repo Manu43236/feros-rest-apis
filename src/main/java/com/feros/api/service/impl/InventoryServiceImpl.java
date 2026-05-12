@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.*;
 import com.feros.api.dto.response.*;
 import com.feros.api.entity.*;
@@ -75,7 +76,7 @@ public class InventoryServiceImpl implements InventoryService {
                 .tenant(tenant)
                 .sparePart(part)
                 .quantity(0)
-                .lastUpdated(LocalDateTime.now())
+                .lastUpdated(TimeUtil.nowIst())
                 .build();
         inventoryRepository.save(inv);
 
@@ -139,7 +140,7 @@ public class InventoryServiceImpl implements InventoryService {
         SparePartsInventory inv = inventoryRepository.findByTenantIdAndSparePartId(tenantId, part.getId())
                 .orElseGet(() -> SparePartsInventory.builder().tenant(tenant).sparePart(part).quantity(0).build());
         inv.setQuantity(inv.getQuantity() + request.getQuantity());
-        inv.setLastUpdated(LocalDateTime.now());
+        inv.setLastUpdated(TimeUtil.nowIst());
         inventoryRepository.save(inv);
 
         // Record transaction
@@ -218,11 +219,11 @@ public class InventoryServiceImpl implements InventoryService {
             sp.setStatus(ServicePartStatus.APPROVED);
             sp.setQuantityApproved(qtyApproved);
             sp.setApprovedBy(approver);
-            sp.setApprovedAt(LocalDateTime.now());
+            sp.setApprovedAt(TimeUtil.nowIst());
 
             // Deduct stock
             inv.setQuantity(inv.getQuantity() - qtyApproved);
-            inv.setLastUpdated(LocalDateTime.now());
+            inv.setLastUpdated(TimeUtil.nowIst());
             inventoryRepository.save(inv);
 
             // Record OUT transaction
@@ -244,7 +245,7 @@ public class InventoryServiceImpl implements InventoryService {
             sp.setStatus(ServicePartStatus.REJECTED);
             sp.setRejectionReason(request.getRejectionReason());
             sp.setApprovedBy(approver);
-            sp.setApprovedAt(LocalDateTime.now());
+            sp.setApprovedAt(TimeUtil.nowIst());
         } else {
             throw new FerosException("Status must be APPROVED or REJECTED", HttpStatus.BAD_REQUEST);
         }
@@ -330,7 +331,7 @@ public class InventoryServiceImpl implements InventoryService {
                     part = sparePartRepository.save(part);
 
                     SparePartsInventory inv = SparePartsInventory.builder()
-                            .tenant(tenant).sparePart(part).quantity(0).lastUpdated(LocalDateTime.now()).build();
+                            .tenant(tenant).sparePart(part).quantity(0).lastUpdated(TimeUtil.nowIst()).build();
                     inventoryRepository.save(inv);
                     successCount++;
                 } catch (Exception e) {
@@ -385,7 +386,7 @@ public class InventoryServiceImpl implements InventoryService {
                     SparePartsInventory inv = inventoryRepository.findByTenantIdAndSparePartId(tenantId, part.getId())
                             .orElseGet(() -> SparePartsInventory.builder().tenant(tenant).sparePart(part).quantity(0).build());
                     inv.setQuantity(inv.getQuantity() + qty);
-                    inv.setLastUpdated(LocalDateTime.now());
+                    inv.setLastUpdated(TimeUtil.nowIst());
                     inventoryRepository.save(inv);
 
                     transactionRepository.save(SparePartsTransaction.builder()

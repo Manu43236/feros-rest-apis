@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.response.DashboardResponse;
 import com.feros.api.dto.response.DriverDashboardResponse;
 import com.feros.api.dto.response.ExpiryAlertResponse;
@@ -42,7 +43,7 @@ public class DashboardServiceImpl implements DashboardService {
     @Transactional(readOnly = true)
     public DashboardResponse getDashboard() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
 
         // Orders
         long totalOrders = orderRepository.countByTenantIdAndIsActiveTrue(tenantId);
@@ -107,7 +108,7 @@ public class DashboardServiceImpl implements DashboardService {
     @Transactional(readOnly = true)
     public ExpiryAlertResponse getExpiryAlerts(int days) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
         LocalDate alertDate = today.plusDays(days);
 
         List<ExpiryAlertResponse.VehicleAlert> vehicleAlerts = new ArrayList<>();
@@ -165,7 +166,7 @@ public class DashboardServiceImpl implements DashboardService {
     public DriverDashboardResponse getDriverDashboard() {
         Long userId = SecurityUtil.getCurrentUserId();
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
 
         List<Lr> myLrs = lrRepository.findByTenantIdAndDriverUserId(tenantId, userId);
 

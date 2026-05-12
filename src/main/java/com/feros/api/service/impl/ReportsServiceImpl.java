@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.response.*;
 import com.feros.api.entity.*;
 import com.feros.api.enums.*;
@@ -94,7 +95,7 @@ public class ReportsServiceImpl implements ReportsService {
                 ? invoiceRepository.findOutstandingInvoicesByClient(tenantId, clientId)
                 : invoiceRepository.findOutstandingInvoices(tenantId);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
         return invoices.stream().map(i -> {
             long daysOverdue = 0;
             if (i.getDueDate() != null && i.getDueDate().isBefore(today)) {
@@ -366,7 +367,7 @@ public class ReportsServiceImpl implements ReportsService {
     @Transactional(readOnly = true)
     public DailyVehicleActivityResponse getDailyVehicleActivity() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
 
         List<Lr> onRoadLrs = lrRepository.findByTenantIdAndLrStatus(tenantId, LrStatus.IN_TRANSIT);
         List<Lr> startedLrs = lrRepository.findByTenantIdAndLoadedAtDate(tenantId, today);
@@ -420,7 +421,7 @@ public class ReportsServiceImpl implements ReportsService {
     @Transactional(readOnly = true)
     public LocalLongTripSummaryResponse getLocalLongTripSummary() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
         List<Lr> lrs = lrRepository.findByTenantIdAndLoadedAtDate(tenantId, today);
 
         List<LocalLongTripSummaryResponse.TripRow> trips = lrs.stream().map(l -> {
@@ -472,7 +473,7 @@ public class ReportsServiceImpl implements ReportsService {
     @Transactional(readOnly = true)
     public List<DocumentExpiryAlertResponse> getDocumentExpiryAlerts(int daysAhead) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
         LocalDate alertDate = today.plusDays(daysAhead);
 
         List<VehicleDocument> docs = vehicleDocumentRepository.findExpiringDocuments(tenantId, alertDate);
@@ -494,7 +495,7 @@ public class ReportsServiceImpl implements ReportsService {
     @Transactional(readOnly = true)
     public TodayAttendanceSummaryResponse getTodayAttendance() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
 
         List<Attendance> todayRecords = attendanceRepository.findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, today);
         Map<Long, Attendance> byUser = todayRecords.stream()
@@ -535,7 +536,7 @@ public class ReportsServiceImpl implements ReportsService {
     @Transactional(readOnly = true)
     public List<DelayedTripResponse> getDelayedTrips() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
         List<Lr> inTransit = lrRepository.findByTenantIdAndLrStatus(tenantId, LrStatus.IN_TRANSIT);
 
         return inTransit.stream()
@@ -618,7 +619,7 @@ public class ReportsServiceImpl implements ReportsService {
     @Transactional(readOnly = true)
     public List<UnassignedVehiclesResponse> getUnassignedVehicles() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
         List<Order> pending = orderRepository.findByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.PENDING);
         List<Order> partial = orderRepository.findByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.PARTIALLY_ASSIGNED);
         List<Order> backlog = new ArrayList<>();
@@ -666,7 +667,7 @@ public class ReportsServiceImpl implements ReportsService {
     @Transactional(readOnly = true)
     public List<TripInProgressResponse> getTripsInProgress() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
         return lrRepository.findByTenantIdAndLrStatus(tenantId, LrStatus.IN_TRANSIT).stream().map(l -> {
             Order o = l.getOrder();
             long daysInTransit = l.getLoadedAt() != null
@@ -702,7 +703,7 @@ public class ReportsServiceImpl implements ReportsService {
     @Transactional(readOnly = true)
     public List<UnbilledLrResponse> getUnbilledLrs() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
         Set<Long> invoicedLrIds = new HashSet<>(invoiceLrRepository.findActiveLrIds(tenantId));
         return lrRepository.findByTenantIdAndLrStatus(tenantId, LrStatus.DELIVERED).stream()
                 .filter(l -> !invoicedLrIds.contains(l.getId()))
@@ -834,7 +835,7 @@ public class ReportsServiceImpl implements ReportsService {
     @Transactional(readOnly = true)
     public List<OrdersBacklogResponse> getOrdersBacklog() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
 
         List<Order> pending = orderRepository.findByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.PENDING);
         List<Order> partial = orderRepository.findByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.PARTIALLY_ASSIGNED);
@@ -1181,7 +1182,7 @@ public class ReportsServiceImpl implements ReportsService {
     @Transactional(readOnly = true)
     public InvoiceAgingResponse getInvoiceAging() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
         List<Invoice> outstanding = invoiceRepository.findOutstandingInvoices(tenantId);
 
         List<InvoiceAgingResponse.AgingRow> rows = outstanding.stream().map(inv -> {
@@ -1222,7 +1223,7 @@ public class ReportsServiceImpl implements ReportsService {
     @Transactional(readOnly = true)
     public List<RevenueTrendResponse> getRevenueTrend() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
         LocalDate sixMonthsAgo = today.minusMonths(5).withDayOfMonth(1);
 
         List<Invoice> invoices = invoiceRepository.findByTenantIdAndDateRange(tenantId, sixMonthsAgo, today);
@@ -1356,7 +1357,7 @@ public class ReportsServiceImpl implements ReportsService {
     @Transactional(readOnly = true)
     public List<ClientPendingBillingResponse> getClientPendingBilling() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
         Set<Long> invoicedLrIds = new HashSet<>(invoiceLrRepository.findActiveLrIds(tenantId));
 
         List<Lr> unbilled = lrRepository.findByTenantIdAndLrStatus(tenantId, LrStatus.DELIVERED).stream()

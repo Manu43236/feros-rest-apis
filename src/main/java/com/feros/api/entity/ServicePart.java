@@ -1,5 +1,6 @@
 package com.feros.api.entity;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.entity.master.SparePart;
 import com.feros.api.enums.ServicePartStatus;
 import jakarta.persistence.*;
@@ -61,12 +62,12 @@ public class ServicePart {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
+        createdAt = TimeUtil.nowIst();
+        updatedAt = TimeUtil.nowIst();
     }
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        updatedAt = TimeUtil.nowIst();
     }
 }

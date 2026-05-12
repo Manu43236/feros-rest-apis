@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.BreakdownRequest;
 import com.feros.api.dto.request.BreakdownReplaceRequest;
 import com.feros.api.dto.response.BreakdownResponse;
@@ -246,7 +247,7 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         // Update breakdown record
         breakdown.setStatus(BreakdownStatus.VEHICLE_REPLACED);
         breakdown.setReplacementVehicleAllocation(replacementAllocation);
-        breakdown.setResolvedAt(LocalDateTime.now());
+        breakdown.setResolvedAt(TimeUtil.nowIst());
 
         return mapToResponse(breakdownRepository.save(breakdown));
     }
@@ -282,7 +283,7 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         setVehicleStatus(breakdown.getVehicle(), VehicleStatusType.ON_TRIP);
 
         breakdown.setStatus(BreakdownStatus.RESOLVED);
-        breakdown.setResolvedAt(LocalDateTime.now());
+        breakdown.setResolvedAt(TimeUtil.nowIst());
 
         return mapToResponse(breakdownRepository.save(breakdown));
     }
@@ -422,7 +423,7 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         setVehicleStatus(breakdown.getVehicle(), VehicleStatusType.AVAILABLE);
 
         breakdown.setStatus(BreakdownStatus.RESOLVED);
-        breakdown.setResolvedAt(LocalDateTime.now());
+        breakdown.setResolvedAt(TimeUtil.nowIst());
 
         return mapToResponse(breakdownRepository.save(breakdown));
     }

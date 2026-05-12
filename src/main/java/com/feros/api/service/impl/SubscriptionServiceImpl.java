@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.ActivateSubscriptionRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
@@ -134,7 +135,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .tenant(tenant)
                 .plan(trialPlan)
                 .status(SubscriptionStatus.TRIAL)
-                .startDate(tenant.getTrialStartDate() != null ? tenant.getTrialStartDate() : LocalDate.now())
+                .startDate(tenant.getTrialStartDate() != null ? tenant.getTrialStartDate() : TimeUtil.today())
                 .endDate(newEnd)
                 .notes(request.getNotes())
                 .createdBy(SecurityUtil.getCurrentUserId())
@@ -178,7 +179,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         // New end date: provided or auto-calculated from billing cycle
         LocalDate newEnd = request.getNewEndDate() != null
                 ? request.getNewEndDate()
-                : calculateEndDate(previous.getEndDate() != null ? previous.getEndDate() : LocalDate.now(),
+                : calculateEndDate(previous.getEndDate() != null ? previous.getEndDate() : TimeUtil.today(),
                         previous.getBillingCycle());
 
         int extendMinVehicles = plan != null && plan.getMinVehicles() != null ? plan.getMinVehicles() : 0;
@@ -193,7 +194,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .billingCycle(previous.getBillingCycle())
                 .vehicleCount(vehicleCount)
                 .pricePerVehicle(pricePerVehicle)
-                .startDate(previous.getEndDate() != null ? previous.getEndDate() : LocalDate.now())
+                .startDate(previous.getEndDate() != null ? previous.getEndDate() : TimeUtil.today())
                 .endDate(newEnd)
                 .amount(baseAmount)
                 .gstAmount(gstAmount)
@@ -233,7 +234,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         SubscriptionHistory history = SubscriptionHistory.builder()
                 .tenant(tenant)
                 .status(SubscriptionStatus.SUSPENDED)
-                .startDate(LocalDate.now())
+                .startDate(TimeUtil.today())
                 .endDate(tenant.getSubscriptionEndDate())
                 .notes(request.getNotes())
                 .createdBy(SecurityUtil.getCurrentUserId())
@@ -262,7 +263,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         SubscriptionHistory history = SubscriptionHistory.builder()
                 .tenant(tenant)
                 .status(SubscriptionStatus.ACTIVE)
-                .startDate(LocalDate.now())
+                .startDate(TimeUtil.today())
                 .endDate(tenant.getSubscriptionEndDate())
                 .notes(notes)
                 .createdBy(SecurityUtil.getCurrentUserId())
@@ -315,7 +316,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     @Scheduled(cron = "0 0 1 * * *")
     @Transactional
     public void autoExpireSubscriptions() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
 
         // Expire ACTIVE subscriptions
         for (SubscriptionHistory h : historyRepository.findExpiredActive(today)) {
@@ -346,8 +347,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
     @Scheduled(cron = "0 0 9 * * *")
     public void sendExpiryWarnings() {
-        LocalDate sevenDays = LocalDate.now().plusDays(7);
-        LocalDate tomorrow  = LocalDate.now().plusDays(1);
+        LocalDate sevenDays = TimeUtil.today().plusDays(7);
+        LocalDate tomorrow  = TimeUtil.today().plusDays(1);
 
         // 7-day warning — ACTIVE
         historyRepository.findActiveExpiringOn(sevenDays).forEach(h ->
@@ -423,7 +424,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                                 BigDecimal totalAmount, BigDecimal amount, BigDecimal gstAmount,
                                 String paymentRef, Integer vehicleCount, BigDecimal pricePerVehicle) {
         String invoiceNumber = "INV_FEROS_SUB_"
-                + java.time.LocalDateTime.now()
+                + TimeUtil.nowIst()
                         .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
 
         SubscriptionInvoice invoice = SubscriptionInvoice.builder()
@@ -504,7 +505,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .billingCycle(request.getBillingCycle())
                 .notes(request.getNotes())
                 .status(UpgradeRequestStatus.PENDING)
-                .createdAt(java.time.LocalDateTime.now())
+                .createdAt(TimeUtil.nowIst())
                 .build();
         ur = upgradeRequestRepository.save(ur);
 

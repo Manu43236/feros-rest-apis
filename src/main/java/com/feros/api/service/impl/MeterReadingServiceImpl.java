@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.MeterReadingRequest;
 import com.feros.api.dto.response.MeterReadingResponse;
 import com.feros.api.entity.*;
@@ -68,7 +69,7 @@ public class MeterReadingServiceImpl implements MeterReadingService {
                 .lr(lr)
                 .photoUrl(request.getPhotoUrl())
                 .recordedBy(recordedBy)
-                .recordedAt(request.getRecordedAt() != null ? request.getRecordedAt() : LocalDateTime.now())
+                .recordedAt(request.getRecordedAt() != null ? request.getRecordedAt() : TimeUtil.nowIst())
                 .notes(request.getNotes())
                 .build();
 

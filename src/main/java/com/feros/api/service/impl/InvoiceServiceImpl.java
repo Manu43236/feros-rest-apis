@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.CreateInvoiceRequest;
 import com.feros.api.dto.request.InvoicePaymentRequest;
 import com.feros.api.dto.request.UpdateInvoiceRequest;
@@ -92,7 +93,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .invoiceNumber(generateInvoiceNumber(tenant))
                 .client(client)
                 .invoiceDate(request.getInvoiceDate() != null ?
-                        request.getInvoiceDate() : LocalDate.now())
+                        request.getInvoiceDate() : TimeUtil.today())
                 .dueDate(request.getDueDate())
                 .subtotal(BigDecimal.ZERO)
                 .taxAmount(BigDecimal.ZERO)
@@ -259,7 +260,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .tenant(getCurrentTenant())
                 .invoice(invoice)
                 .paymentDate(request.getPaymentDate() != null ?
-                        request.getPaymentDate() : LocalDate.now())
+                        request.getPaymentDate() : TimeUtil.today())
                 .amount(request.getAmount())
                 .paymentMode(request.getPaymentMode())
                 .referenceNumber(request.getReferenceNumber())

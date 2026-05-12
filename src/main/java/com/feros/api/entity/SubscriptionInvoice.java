@@ -1,5 +1,6 @@
 package com.feros.api.entity;
 
+import com.feros.api.util.TimeUtil;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -65,5 +66,5 @@ public class SubscriptionInvoice {
     private LocalDateTime createdAt;
 
     @PrePersist
-    void onCreate() { createdAt = LocalDateTime.now(); }
+    void onCreate() { createdAt = TimeUtil.nowIst(); }
 }

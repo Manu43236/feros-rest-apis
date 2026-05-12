@@ -1,5 +1,6 @@
 package com.feros.api.entity;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.entity.master.SparePart;
 import com.feros.api.enums.StockReferenceType;
 import com.feros.api.enums.StockTransactionType;
@@ -66,6 +67,6 @@ public class SparePartsTransaction {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        createdAt = TimeUtil.nowIst();
     }
 }

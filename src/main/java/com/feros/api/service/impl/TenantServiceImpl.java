@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.CreateTenantRequest;
 import com.feros.api.dto.request.UpdateMyTenantRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
@@ -89,8 +90,8 @@ public class TenantServiceImpl implements TenantService {
                 .ownerEmail(request.getOwnerEmail())
                 .lorryCount(0)
                 .subscriptionStatus(SubscriptionStatus.TRIAL)
-                .trialStartDate(LocalDate.now())
-                .trialEndDate(LocalDate.now().plusMonths(1))
+                .trialStartDate(TimeUtil.today())
+                .trialEndDate(TimeUtil.today().plusMonths(1))
                 .isActive(true)
                 .build();
 
@@ -208,8 +209,8 @@ public class TenantServiceImpl implements TenantService {
                             .ownerName(ownerName).ownerPhone(ownerPhone)
                             .ownerEmail(ownerEmail).lorryCount(0)
                             .subscriptionStatus(SubscriptionStatus.TRIAL)
-                            .trialStartDate(LocalDate.now())
-                            .trialEndDate(LocalDate.now().plusMonths(1))
+                            .trialStartDate(TimeUtil.today())
+                            .trialEndDate(TimeUtil.today().plusMonths(1))
                             .isActive(true).build();
 
                     Tenant savedTenant = tenantRepository.save(tenant);
@@ -519,7 +520,7 @@ public class TenantServiceImpl implements TenantService {
     }
 
     private void createTrialHistory(Tenant tenant) {
-        LocalDate start = LocalDate.now();
+        LocalDate start = TimeUtil.today();
         LocalDate end   = start.plusDays(30);
         SubscriptionPlan trialPlan = subscriptionPlanRepository.findByNameIgnoreCase("Trial").orElse(null);
         SubscriptionHistory trial = SubscriptionHistory.builder()
@@ -532,7 +533,7 @@ public class TenantServiceImpl implements TenantService {
                 .gstAmount(BigDecimal.ZERO)
                 .totalAmount(BigDecimal.ZERO)
                 .notes("30-day free trial — auto-created on signup")
-                .createdAt(LocalDateTime.now())
+                .createdAt(TimeUtil.nowIst())
                 .build();
         subscriptionHistoryRepository.save(trial);
     }

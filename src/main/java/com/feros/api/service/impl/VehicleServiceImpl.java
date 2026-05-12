@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.controller.VehicleController.UpdateStatusRequest;
 import com.feros.api.dto.request.VehicleRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
@@ -184,7 +185,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .findByIdAndTenantId(id, getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
         VehicleResponse resp = mapToResponse(vehicle);
-        allocationRepository.findActiveAllocationForVehicleOnDate(id, LocalDate.now())
+        allocationRepository.findActiveAllocationForVehicleOnDate(id, TimeUtil.today())
                 .ifPresentOrElse(alloc -> {
                     resp.setIsAssigned(true);
                     resp.setAssignedOrderId(alloc.getOrder().getId());
@@ -198,7 +199,7 @@ public class VehicleServiceImpl implements VehicleService {
         Long tenantId = getCurrentTenantId();
         List<Vehicle> vehicles = vehicleRepository.findByTenantId(tenantId);
 
-        LocalDate filterDate = date != null ? date : LocalDate.now();
+        LocalDate filterDate = date != null ? date : TimeUtil.today();
         List<OrderVehicleAllocation> allocations = allocationRepository.findActiveAllocationsOnDate(tenantId, filterDate);
 
         // Build a map: vehicleId → allocation
@@ -371,7 +372,7 @@ public class VehicleServiceImpl implements VehicleService {
                     .tenant(tenant)
                     .vehicle(vehicle)
                     .breakdownDate(request.getBreakdownDate() != null
-                            ? request.getBreakdownDate() : LocalDateTime.now())
+                            ? request.getBreakdownDate() : TimeUtil.nowIst())
                     .location(request.getLocation())
                     .breakdownType(request.getBreakdownType())
                     .breakdownDuration(request.getBreakdownDuration())
@@ -393,7 +394,7 @@ public class VehicleServiceImpl implements VehicleService {
                     .findFirst()
                     .ifPresent(b -> {
                         b.setStatus(BreakdownStatus.RESOLVED);
-                        b.setResolvedAt(LocalDateTime.now());
+                        b.setResolvedAt(TimeUtil.nowIst());
                         vehicleBreakdownRepository.save(b);
                     });
         }
@@ -408,7 +409,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .findByIdAndTenantId(id, getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
         if (vehicle.getIsActive() && allocationRepository
-                .findActiveAllocationForVehicleOnDate(id, LocalDate.now()).isPresent()) {
+                .findActiveAllocationForVehicleOnDate(id, TimeUtil.today()).isPresent()) {
             throw new FerosException(
                 "Cannot deactivate vehicle — it is currently assigned to an active order. Unassign it first.",
                 HttpStatus.CONFLICT);
@@ -422,7 +423,7 @@ public class VehicleServiceImpl implements VehicleService {
         Vehicle vehicle = vehicleRepository
                 .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
-        if (allocationRepository.findActiveAllocationForVehicleOnDate(id, LocalDate.now()).isPresent()) {
+        if (allocationRepository.findActiveAllocationForVehicleOnDate(id, TimeUtil.today()).isPresent()) {
             throw new FerosException(
                 "Cannot delete vehicle — it is currently assigned to an active order. Unassign it first.",
                 HttpStatus.CONFLICT);
@@ -548,7 +549,7 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     private VehicleResponse mapToResponse(Vehicle v) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
         return VehicleResponse.builder()
                 .id(v.getId())
                 .tenantId(v.getTenant().getId())

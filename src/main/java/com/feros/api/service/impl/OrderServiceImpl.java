@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.AssignStaffRequest;
 import com.feros.api.dto.request.AssignVehicleRequest;
 import com.feros.api.dto.request.OrderRequest;
@@ -120,7 +121,7 @@ public class OrderServiceImpl implements OrderService {
         Order order = Order.builder()
                 .tenant(tenant)
                 .orderNumber(generateOrderNumber(tenant))
-                .orderDate(request.getOrderDate() != null ? request.getOrderDate() : LocalDate.now())
+                .orderDate(request.getOrderDate() != null ? request.getOrderDate() : TimeUtil.today())
                 .expectedDeliveryDate(request.getExpectedDeliveryDate())
                 .createdBy(createdBy)
                 .client(client)
@@ -597,7 +598,7 @@ public class OrderServiceImpl implements OrderService {
                 if (va.getAllocationStatus() != VehicleAllocationStatus.CANCELLED) {
                     va.setAllocationStatus(VehicleAllocationStatus.DELIVERED);
                     if (va.getActualDeliveryDate() == null) {
-                        va.setActualDeliveryDate(LocalDate.now());
+                        va.setActualDeliveryDate(TimeUtil.today());
                     }
                     List<OrderStaffAllocation> staffAllocations =
                             staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(va.getId());
@@ -605,7 +606,7 @@ public class OrderServiceImpl implements OrderService {
                         if (sa.getAllocationStatus() != StaffAllocationStatus.CANCELLED) {
                             sa.setAllocationStatus(StaffAllocationStatus.COMPLETED);
                             if (sa.getActualEndDate() == null) {
-                                sa.setActualEndDate(LocalDate.now());
+                                sa.setActualEndDate(TimeUtil.today());
                             }
                         }
                     }

@@ -1,5 +1,6 @@
 package com.feros.api.entity;
 
+import com.feros.api.util.TimeUtil;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -47,6 +48,6 @@ public class TireRotationItem {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        createdAt = TimeUtil.nowIst();
     }
 }

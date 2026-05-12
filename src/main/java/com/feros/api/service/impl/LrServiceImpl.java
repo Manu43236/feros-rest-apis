@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.CreateLrRequest;
 import com.feros.api.dto.request.LrChargeRequest;
 import com.feros.api.dto.request.LrCheckpostRequest;
@@ -97,7 +98,7 @@ public class LrServiceImpl implements LrService {
                 .lrNumber(generateLrNumber(tenant))
                 .order(order)
                 .vehicleAllocation(allocation)
-                .lrDate(request.getLrDate() != null ? request.getLrDate() : LocalDate.now())
+                .lrDate(request.getLrDate() != null ? request.getLrDate() : TimeUtil.today())
                 .vehicleCapacity(vehicle.getCapacityInTons())
                 .allocatedWeight(allocation.getAllocatedWeight())
                 .loadedWeight(request.getLoadedWeight())
@@ -205,7 +206,7 @@ public class LrServiceImpl implements LrService {
                         .lr(lr)
                         .photoUrl(request.getStartOdometerPhotoUrl())
                         .recordedBy(getCurrentUser())
-                        .recordedAt(java.time.LocalDateTime.now())
+                        .recordedAt(TimeUtil.nowIst())
                         .isActive(true)
                         .build();
                 vehicleMeterReadingRepository.save(startReading);
@@ -223,7 +224,7 @@ public class LrServiceImpl implements LrService {
                 for (OrderStaffAllocation sa : staffAllocations) {
                     if (sa.getAllocationStatus() == StaffAllocationStatus.ALLOCATED) {
                         sa.setAllocationStatus(StaffAllocationStatus.IN_TRANSIT);
-                        sa.setActualStartDate(LocalDate.now());
+                        sa.setActualStartDate(TimeUtil.today());
                     }
                 }
                 staffAllocationRepository.saveAll(staffAllocations);
@@ -272,7 +273,7 @@ public class LrServiceImpl implements LrService {
                         .lr(lr)
                         .photoUrl(request.getEndOdometerPhotoUrl())
                         .recordedBy(getCurrentUser())
-                        .recordedAt(java.time.LocalDateTime.now())
+                        .recordedAt(TimeUtil.nowIst())
                         .isActive(true)
                         .build();
                 vehicleMeterReadingRepository.save(endReading);
@@ -310,12 +311,12 @@ public class LrServiceImpl implements LrService {
                         staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(allocation.getId());
                 for (OrderStaffAllocation sa : staffAllocations) {
                     sa.setAllocationStatus(StaffAllocationStatus.COMPLETED);
-                    sa.setActualEndDate(LocalDate.now());
+                    sa.setActualEndDate(TimeUtil.today());
                 }
                 staffAllocationRepository.saveAll(staffAllocations);
 
                 // Set actual delivery date and free the vehicle regardless
-                allocation.setActualDeliveryDate(LocalDate.now());
+                allocation.setActualDeliveryDate(TimeUtil.today());
                 setVehicleStatus(allocation.getVehicle(), VehicleStatusType.AVAILABLE);
 
                 if (allAllocationsDelivered && allWeightAllocated) {

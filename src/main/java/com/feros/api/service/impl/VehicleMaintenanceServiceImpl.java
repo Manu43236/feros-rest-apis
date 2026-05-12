@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.CompleteServiceRequest;
 import com.feros.api.dto.request.VehicleServiceRequest;
 import com.feros.api.dto.request.VehicleServiceTaskRequest;
@@ -168,7 +169,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
         }
 
         vs.setStatus(ServiceStatus.IN_PROGRESS);
-        vs.setStartedAt(java.time.LocalDateTime.now());
+        vs.setStartedAt(TimeUtil.nowIst());
         vehicleServiceRepository.save(vs);
         return mapToResponse(vehicleServiceRepository.findById(vs.getId()).orElse(vs));
     }
@@ -228,7 +229,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
         if (vs.getBreakdown() != null) {
             VehicleBreakdown bd = vs.getBreakdown();
             bd.setStatus(BreakdownStatus.RESOLVED);
-            bd.setResolvedAt(java.time.LocalDateTime.now());
+            bd.setResolvedAt(TimeUtil.nowIst());
             vehicleBreakdownRepository.save(bd);
 
             vehicleStatusRepository.findByStatusTypeAndIsActiveTrue(VehicleStatusType.AVAILABLE)

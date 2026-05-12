@@ -1,5 +1,6 @@
 package com.feros.api.config;
 
+import com.feros.api.util.TimeUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feros.api.enums.SubscriptionStatus;
 import com.feros.api.repository.SubscriptionHistoryRepository;
@@ -89,7 +90,7 @@ public class SubscriptionEnforcementFilter extends OncePerRequestFilter {
 
         // Also check if end date has passed even if scheduler hasn't updated status yet
         boolean endDateExpired = subscriptionHistoryRepository.findCurrentByTenantId(tenantId)
-                .map(h -> h.getEndDate() != null && h.getEndDate().isBefore(LocalDate.now()))
+                .map(h -> h.getEndDate() != null && h.getEndDate().isBefore(TimeUtil.today()))
                 .orElse(false);
         if (endDateExpired) {
             writeError(response, HttpServletResponse.SC_PAYMENT_REQUIRED,

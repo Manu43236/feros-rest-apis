@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.CreateUserRequest;
 import com.feros.api.dto.request.UserStatusRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
@@ -100,7 +101,7 @@ public class UserServiceImpl implements UserService {
                 .phone(request.getPhone())
                 .pin(hashedPin)
                 .plainPin(rawPin)
-                .pinGeneratedAt(LocalDateTime.now())
+                .pinGeneratedAt(TimeUtil.nowIst())
                 .isPinResetRequired(true)
                 .isActive(true)
                 .roles(new HashSet<>(Set.of(role)))
@@ -210,7 +211,7 @@ public class UserServiceImpl implements UserService {
         String rawPin = generatePin();
         user.setPin(passwordEncoder.encode(rawPin));
         user.setPlainPin(rawPin);
-        user.setPinGeneratedAt(LocalDateTime.now());
+        user.setPinGeneratedAt(TimeUtil.nowIst());
         user.setIsPinResetRequired(true);
         userRepository.save(user);
 
@@ -276,7 +277,7 @@ public class UserServiceImpl implements UserService {
                             .phone(phone)
                             .pin(hashedPin)
                             .plainPin(rawPin)
-                            .pinGeneratedAt(LocalDateTime.now())
+                            .pinGeneratedAt(TimeUtil.nowIst())
                             .isPinResetRequired(true)
                             .isActive(true)
                             .roles(new HashSet<>(Set.of(roleEntity)))
@@ -359,7 +360,7 @@ public class UserServiceImpl implements UserService {
                             .phone(phone)
                             .pin(passwordEncoder.encode(rawPin))
                             .plainPin(rawPin)
-                            .pinGeneratedAt(LocalDateTime.now())
+                            .pinGeneratedAt(TimeUtil.nowIst())
                             .isPinResetRequired(true)
                             .isActive(true)
                             .roles(new HashSet<>(Set.of(roleEntity)))

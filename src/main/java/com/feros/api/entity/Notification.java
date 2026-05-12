@@ -1,5 +1,6 @@
 package com.feros.api.entity;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.enums.NotificationType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -44,5 +45,5 @@ public class Notification {
     private LocalDateTime createdAt;
 
     @PrePersist
-    void onCreate() { createdAt = LocalDateTime.now(); }
+    void onCreate() { createdAt = TimeUtil.nowIst(); }
 }

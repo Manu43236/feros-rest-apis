@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.AttendanceRequest;
 import com.feros.api.dto.request.BulkAttendanceRequest;
 import com.feros.api.dto.request.MarkMobilePresentRequest;
@@ -71,7 +72,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     public AttendanceResponse markOwnAttendance(MarkOwnAttendanceRequest request) {
         Long tenantId = getCurrentTenantId();
         Long currentUserId = SecurityUtil.getCurrentUserId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
 
         if (attendanceRepository.existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
                 currentUserId, tenantId, today)) {
@@ -102,7 +103,7 @@ public class AttendanceServiceImpl implements AttendanceService {
 
         attendance.setApprovalStatus(AttendanceApprovalStatus.APPROVED);
         attendance.setApprovedBy(getCurrentUser());
-        attendance.setApprovedAt(LocalDateTime.now());
+        attendance.setApprovedAt(TimeUtil.nowIst());
         return mapToResponse(attendanceRepository.save(attendance));
     }
 
@@ -119,7 +120,7 @@ public class AttendanceServiceImpl implements AttendanceService {
 
         attendance.setApprovalStatus(AttendanceApprovalStatus.REJECTED);
         attendance.setApprovedBy(getCurrentUser());
-        attendance.setApprovedAt(LocalDateTime.now());
+        attendance.setApprovedAt(TimeUtil.nowIst());
         return mapToResponse(attendanceRepository.save(attendance));
     }
 
@@ -183,7 +184,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .leaveReason(request.getLeaveReason())
                 .remarks(request.getRemarks())
                 .markedBy(getCurrentUser())
-                .markedAt(LocalDateTime.now())
+                .markedAt(TimeUtil.nowIst())
                 .approvalStatus(approvalStatus)
                 .isActive(true)
                 .build();
@@ -229,7 +230,7 @@ public class AttendanceServiceImpl implements AttendanceService {
         attendance.setLeaveReason(request.getLeaveReason());
         attendance.setRemarks(request.getRemarks());
         attendance.setMarkedBy(getCurrentUser());
-        attendance.setMarkedAt(LocalDateTime.now());
+        attendance.setMarkedAt(TimeUtil.nowIst());
 
         if (request.getLeaveTypeId() != null) {
             LeaveType leaveType = leaveTypeRepository.findById(request.getLeaveTypeId())
@@ -261,7 +262,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .imageUrl(request.getImageUrl())
-                .capturedAt(request.getCapturedAt() != null ? request.getCapturedAt() : LocalDateTime.now())
+                .capturedAt(request.getCapturedAt() != null ? request.getCapturedAt() : TimeUtil.nowIst())
                 .isReviewed(false)
                 .isActive(true)
                 .build();
@@ -290,7 +291,7 @@ public class AttendanceServiceImpl implements AttendanceService {
 
         proof.setIsReviewed(true);
         proof.setReviewedBy(getCurrentUser());
-        proof.setReviewedAt(LocalDateTime.now());
+        proof.setReviewedAt(TimeUtil.nowIst());
         proof.setReviewRemarks(request.getReviewRemarks());
 
         return mapToTripProofResponse(tripProofRepository.save(proof));
@@ -334,7 +335,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     public AttendanceResponse markMobilePresent(MarkMobilePresentRequest request) {
         Long tenantId = getCurrentTenantId();
         Long currentUserId = SecurityUtil.getCurrentUserId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
 
         if (attendanceRepository.existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
                 currentUserId, tenantId, today)) {
@@ -359,7 +360,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .longitude(request.getLongitude())
                 .remarks(request.getRemarks())
                 .markedBy(user)
-                .markedAt(LocalDateTime.now())
+                .markedAt(TimeUtil.nowIst())
                 .approvalStatus(AttendanceApprovalStatus.PENDING)
                 .isActive(true)
                 .build();
@@ -371,7 +372,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     public AttendanceResponse getTodayAttendanceStatus() {
         return attendanceRepository
                 .findByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
-                        SecurityUtil.getCurrentUserId(), getCurrentTenantId(), LocalDate.now())
+                        SecurityUtil.getCurrentUserId(), getCurrentTenantId(), TimeUtil.today())
                 .map(this::mapToResponse)
                 .orElse(null);
     }

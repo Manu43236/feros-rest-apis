@@ -1,5 +1,6 @@
 package com.feros.api.util;
 
+import com.feros.api.util.TimeUtil;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -44,6 +45,6 @@ public final class NumberUtil {
         String p = (prefix != null && !prefix.isBlank())
                 ? prefix.trim().toUpperCase()
                 : "T" + tenantId;
-        return p + "_" + type.name() + "_" + LocalDateTime.now().format(TS);
+        return p + "_" + type.name() + "_" + TimeUtil.nowIst().format(TS);
     }
 }

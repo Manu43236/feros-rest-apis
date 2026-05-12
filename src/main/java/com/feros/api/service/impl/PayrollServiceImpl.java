@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.ApprovePayrollRequest;
 import com.feros.api.dto.request.GeneratePayrollRequest;
 import com.feros.api.dto.request.SalaryAdvanceRequest;
@@ -63,14 +64,14 @@ public class PayrollServiceImpl implements PayrollService {
         SalaryAdvance advance = SalaryAdvance.builder()
                 .tenant(getCurrentTenant())
                 .user(user)
-                .advanceDate(request.getAdvanceDate() != null ? request.getAdvanceDate() : LocalDate.now())
+                .advanceDate(request.getAdvanceDate() != null ? request.getAdvanceDate() : TimeUtil.today())
                 .amount(request.getAmount())
                 .reason(request.getReason())
                 .totalRepaid(BigDecimal.ZERO)
                 .balanceAmount(request.getAmount())
                 .isFullyRepaid(false)
                 .approvedBy(getCurrentUser())
-                .approvedAt(LocalDateTime.now())
+                .approvedAt(TimeUtil.nowIst())
                 .remarks(request.getRemarks())
                 .isActive(true)
                 .build();
@@ -268,10 +269,10 @@ public class PayrollServiceImpl implements PayrollService {
 
         payroll.setPayrollStatus(PayrollStatus.PAID);
         payroll.setPaymentMode(request.getPaymentMode());
-        payroll.setPaymentDate(request.getPaymentDate() != null ? request.getPaymentDate() : LocalDate.now());
+        payroll.setPaymentDate(request.getPaymentDate() != null ? request.getPaymentDate() : TimeUtil.today());
         payroll.setReferenceNumber(request.getReferenceNumber());
         payroll.setApprovedBy(getCurrentUser());
-        payroll.setApprovedAt(LocalDateTime.now());
+        payroll.setApprovedAt(TimeUtil.nowIst());
         if (request.getRemarks() != null)
             payroll.setRemarks(request.getRemarks());
 

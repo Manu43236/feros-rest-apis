@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.DocumentRequest;
 import com.feros.api.dto.request.StaffProfileRequest;
 import com.feros.api.dto.response.DocumentResponse;
@@ -291,7 +292,7 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .licenseNumber(p.getLicenseNumber())
                 .licenseExpiryDate(p.getLicenseExpiryDate())
                 .licenseExpired(p.getLicenseExpiryDate() != null &&
-                        p.getLicenseExpiryDate().isBefore(LocalDate.now()))
+                        p.getLicenseExpiryDate().isBefore(TimeUtil.today()))
                 .profilePhotoUrl(p.getProfilePhotoUrl())
                 .documents(documents)
                 .isActive(p.getIsActive())
@@ -309,7 +310,7 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .issueDate(d.getIssueDate())
                 .expiryDate(d.getExpiryDate())
                 .isExpired(d.getExpiryDate() != null &&
-                        d.getExpiryDate().isBefore(LocalDate.now()))
+                        d.getExpiryDate().isBefore(TimeUtil.today()))
                 .fileUrl(d.getFileUrl())
                 .isVerified(d.getIsVerified())
                 .remarks(d.getRemarks())
@@ -327,7 +328,7 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .issueDate(d.getIssueDate())
                 .expiryDate(d.getExpiryDate())
                 .isExpired(d.getExpiryDate() != null &&
-                        d.getExpiryDate().isBefore(LocalDate.now()))
+                        d.getExpiryDate().isBefore(TimeUtil.today()))
                 .fileUrl(d.getFileUrl())
                 .isVerified(d.getIsVerified())
                 .remarks(d.getRemarks())

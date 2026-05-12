@@ -1,5 +1,6 @@
 package com.feros.api.scheduler;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.entity.Invoice;
 import com.feros.api.enums.InvoiceStatus;
 import com.feros.api.repository.InvoiceRepository;
@@ -22,7 +23,7 @@ public class InvoiceOverdueScheduler {
     @Scheduled(cron = "0 0 1 * * *") // 1 AM daily
     @Transactional
     public void markOverdueInvoices() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
         List<Invoice> invoices = invoiceRepository.findByStatusInAndDueDateBefore(
                 List.of(InvoiceStatus.SENT, InvoiceStatus.PARTIALLY_PAID), today);
 

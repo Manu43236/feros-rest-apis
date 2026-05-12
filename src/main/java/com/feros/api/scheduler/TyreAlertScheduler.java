@@ -1,5 +1,6 @@
 package com.feros.api.scheduler;
 
+import com.feros.api.util.TimeUtil;
 import com.feros.api.entity.*;
 import com.feros.api.enums.NotificationType;
 import com.feros.api.enums.RoleName;
@@ -54,7 +55,7 @@ public class TyreAlertScheduler {
     // Alert every day for 15 days before expiry
     private void checkExpiryDateAlerts(Tenant tenant) {
         List<Tire> tires = tireRepository.findByTenantIdAndIsActiveTrueOrderByIdDesc(tenant.getId());
-        LocalDate today = LocalDate.now();
+        LocalDate today = TimeUtil.today();
 
         for (Tire tire : tires) {
             if (tire.getExpiryDate() == null) continue;
