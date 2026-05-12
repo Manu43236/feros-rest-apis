@@ -164,7 +164,11 @@ public class LrServiceImpl implements LrService {
             OrderVehicleAllocation allocation = lr.getVehicleAllocation();
             Order order = lr.getOrder();
 
-            if (request.getLrStatus() == LrStatus.IN_TRANSIT) {
+            if (request.getLrStatus() == LrStatus.WEIGHT_LOADED) {
+                // Weight recorded by supervisor — no order/vehicle/staff status change yet.
+                // Driver will explicitly start the trip from mobile (→ IN_TRANSIT).
+
+            } else if (request.getLrStatus() == LrStatus.IN_TRANSIT) {
                 allocation.setAllocationStatus(VehicleAllocationStatus.IN_TRANSIT);
                 // At least one vehicle is on the road → order is IN_TRANSIT
                 order.setOrderStatus(OrderStatus.IN_TRANSIT);
