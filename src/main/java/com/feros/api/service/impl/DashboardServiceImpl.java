@@ -182,6 +182,25 @@ public class DashboardServiceImpl implements DashboardService {
 
         int unreadCount = (int) notificationRepository.countUnread(tenantId, userId);
 
+        // Active trip — currently IN_TRANSIT
+        DriverDashboardResponse.UpcomingTrip activeTrip = myLrs.stream()
+                .filter(lr -> lr.getLrStatus() == LrStatus.IN_TRANSIT)
+                .findFirst()
+                .map(lr -> DriverDashboardResponse.UpcomingTrip.builder()
+                        .lrId(lr.getId())
+                        .lrNumber(lr.getLrNumber())
+                        .lrStatus(lr.getLrStatus().name())
+                        .clientName(lr.getOrder().getClient().getClientName())
+                        .fromCity(lr.getOrder().getSourceCity() != null
+                                ? lr.getOrder().getSourceCity().getName() : "—")
+                        .toCity(lr.getOrder().getDestinationCity() != null
+                                ? lr.getOrder().getDestinationCity().getName() : "—")
+                        .vehicleNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
+                        .expectedLoadDate(lr.getVehicleAllocation().getExpectedLoadDate())
+                        .expectedDeliveryDate(lr.getVehicleAllocation().getExpectedDeliveryDate())
+                        .build())
+                .orElse(null);
+
         List<DriverDashboardResponse.UpcomingTrip> upcoming = myLrs.stream()
                 .filter(lr -> lr.getLrStatus() == LrStatus.CREATED
                         || lr.getLrStatus() == LrStatus.WEIGHT_LOADED)
@@ -209,6 +228,7 @@ public class DashboardServiceImpl implements DashboardService {
                 .pendingTrips(pendingTrips)
                 .attendanceMarked(attendanceMarked)
                 .unreadNotifications(unreadCount)
+                .activeTrip(activeTrip)
                 .upcomingTrips(upcoming)
                 .build();
     }
