@@ -192,6 +192,28 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    public OrderResponse forceDeliverOrder(Long id) {
+        Order order = orderRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Order not found", HttpStatus.NOT_FOUND));
+
+        // Guard: all existing (non-cancelled) LRs must be DELIVERED
+        List<com.feros.api.entity.Lr> activeLrs = lrRepository.findByOrderIdAndIsActiveTrue(id);
+        boolean hasUndeliveredLr = activeLrs.stream()
+                .anyMatch(lr -> lr.getLrStatus() != com.feros.api.enums.LrStatus.CANCELLED
+                             && lr.getLrStatus() != com.feros.api.enums.LrStatus.DELIVERED);
+        if (hasUndeliveredLr) {
+            throw new FerosException(
+                "Cannot mark order as delivered — one or more LRs are not yet delivered",
+                HttpStatus.BAD_REQUEST);
+        }
+
+        order.setOrderStatus(OrderStatus.DELIVERED);
+        return mapToOrderResponse(orderRepository.save(order));
+    }
+
+    @Override
+    @Transactional
     public OrderResponse updateOrder(Long id, OrderRequest request) {
         Order order = orderRepository
                 .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())

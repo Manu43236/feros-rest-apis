@@ -219,13 +219,22 @@ public class LrServiceImpl implements LrService {
                 List<OrderVehicleAllocation> allAllocations =
                         vehicleAllocationRepository.findByOrderIdAndIsActiveTrue(order.getId());
 
+                // All non-cancelled allocations delivered?
                 boolean allAllocationsDelivered = allAllocations.stream()
                         .filter(va -> va.getAllocationStatus() != VehicleAllocationStatus.CANCELLED)
                         .allMatch(va ->
                                 va.getId().equals(allocation.getId())
                                 || va.getAllocationStatus() == VehicleAllocationStatus.DELIVERED);
 
-                if (allAllocationsDelivered) {
+                // Total weight assigned across all non-cancelled allocations
+                java.math.BigDecimal totalAllocated = allAllocations.stream()
+                        .filter(va -> va.getAllocationStatus() != VehicleAllocationStatus.CANCELLED)
+                        .map(OrderVehicleAllocation::getAllocatedWeight)
+                        .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+                boolean allWeightAllocated = totalAllocated.compareTo(order.getTotalWeight()) >= 0;
+
+                if (allAllocationsDelivered && allWeightAllocated) {
                     // All vehicle allocations are DELIVERED → fully done
                     order.setOrderStatus(OrderStatus.DELIVERED);
 

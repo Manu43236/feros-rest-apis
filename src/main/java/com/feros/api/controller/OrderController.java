@@ -109,4 +109,11 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Order status updated successfully", orderService.updateOrderStatus(id, status)));
     }
+
+    @PatchMapping("/{id}/force-deliver")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<OrderResponse>> forceDeliverOrder(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Order marked as delivered", orderService.forceDeliverOrder(id)));
+    }
 }

@@ -22,5 +22,6 @@ public interface OrderService {
     StaffAllocationResponse assignStaff(Long orderId, AssignStaffRequest request);
     void unassignStaff(Long orderId, Long staffAllocationId);
     OrderResponse updateOrderStatus(Long id, OrderStatus status);
+    OrderResponse forceDeliverOrder(Long id);
     OrderResponse updatePaymentStatus(Long id, OrderPaymentStatus paymentStatus);
 }
