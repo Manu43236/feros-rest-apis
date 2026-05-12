@@ -17,6 +17,8 @@ import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.LrService;
+import com.feros.api.entity.VehicleMeterReading;
+import com.feros.api.enums.MeterReadingType;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,7 @@ public class LrServiceImpl implements LrService {
     private final VehicleRepository vehicleRepository;
     private final ChargeTypeRepository chargeTypeRepository;
     private final UserRepository userRepository;
+    private final VehicleMeterReadingRepository vehicleMeterReadingRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -174,15 +177,38 @@ public class LrServiceImpl implements LrService {
                 // Driver will explicitly start the trip from mobile (→ IN_TRANSIT).
 
             } else if (request.getLrStatus() == LrStatus.IN_TRANSIT) {
+                // ODM validation — start odometer required
+                if (request.getStartOdometer() == null) {
+                    throw new FerosException("Start odometer reading is required to start the trip",
+                            HttpStatus.BAD_REQUEST);
+                }
+                com.feros.api.entity.Vehicle odmVehicle = allocation.getVehicle();
+                if (odmVehicle.getCurrentOdometerReading() != null &&
+                    request.getStartOdometer().compareTo(odmVehicle.getCurrentOdometerReading()) < 0) {
+                    throw new FerosException(
+                        "Start odometer (" + request.getStartOdometer() + " km) cannot be less than last recorded reading (" + odmVehicle.getCurrentOdometerReading() + " km)",
+                        HttpStatus.BAD_REQUEST);
+                }
+                VehicleMeterReading startReading = VehicleMeterReading.builder()
+                        .tenant(lr.getTenant())
+                        .vehicle(odmVehicle)
+                        .readingKm(request.getStartOdometer())
+                        .readingType(MeterReadingType.TRIP_START)
+                        .lr(lr)
+                        .photoUrl(request.getStartOdometerPhotoUrl())
+                        .recordedBy(getCurrentUser())
+                        .recordedAt(java.time.LocalDateTime.now())
+                        .isActive(true)
+                        .build();
+                vehicleMeterReadingRepository.save(startReading);
+                odmVehicle.setCurrentOdometerReading(request.getStartOdometer());
+                vehicleRepository.save(odmVehicle);
+
                 allocation.setAllocationStatus(VehicleAllocationStatus.IN_TRANSIT);
-                // At least one vehicle is on the road → order is IN_TRANSIT
                 order.setOrderStatus(OrderStatus.IN_TRANSIT);
                 orderRepository.save(order);
-
-                // Vehicle is now physically on the road → ON_TRIP
                 setVehicleStatus(allocation.getVehicle(), VehicleStatusType.ON_TRIP);
 
-                // Sync staff on this vehicle allocation → IN_TRANSIT
                 List<OrderStaffAllocation> staffAllocations =
                         staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(allocation.getId());
                 for (OrderStaffAllocation sa : staffAllocations) {
@@ -211,6 +237,39 @@ public class LrServiceImpl implements LrService {
                 staffAllocationRepository.saveAll(staffAllocations);
 
             } else if (request.getLrStatus() == LrStatus.DELIVERED) {
+                // ODM validation — end odometer required
+                if (request.getEndOdometer() == null) {
+                    throw new FerosException("End odometer reading is required to complete the trip",
+                            HttpStatus.BAD_REQUEST);
+                }
+                java.util.Optional<VehicleMeterReading> startReadingOpt =
+                        vehicleMeterReadingRepository
+                                .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
+                                        lr.getId(), MeterReadingType.TRIP_START);
+                java.math.BigDecimal startKm = startReadingOpt
+                        .map(VehicleMeterReading::getReadingKm)
+                        .orElse(java.math.BigDecimal.ZERO);
+                if (request.getEndOdometer().compareTo(startKm) <= 0) {
+                    throw new FerosException(
+                        "End odometer (" + request.getEndOdometer() + " km) must be greater than start odometer (" + startKm + " km)",
+                        HttpStatus.BAD_REQUEST);
+                }
+                com.feros.api.entity.Vehicle endVehicle = allocation.getVehicle();
+                VehicleMeterReading endReading = VehicleMeterReading.builder()
+                        .tenant(lr.getTenant())
+                        .vehicle(endVehicle)
+                        .readingKm(request.getEndOdometer())
+                        .readingType(MeterReadingType.TRIP_END)
+                        .lr(lr)
+                        .photoUrl(request.getEndOdometerPhotoUrl())
+                        .recordedBy(getCurrentUser())
+                        .recordedAt(java.time.LocalDateTime.now())
+                        .isActive(true)
+                        .build();
+                vehicleMeterReadingRepository.save(endReading);
+                endVehicle.setCurrentOdometerReading(request.getEndOdometer());
+                vehicleRepository.save(endVehicle);
+
                 allocation.setAllocationStatus(VehicleAllocationStatus.DELIVERED);
 
                 // Update order fulfilled weight
@@ -239,26 +298,22 @@ public class LrServiceImpl implements LrService {
 
                 boolean allWeightAllocated = totalAllocated.compareTo(order.getTotalWeight()) >= 0;
 
+                // Always complete staff for this vehicle allocation — their trip is done
+                List<OrderStaffAllocation> staffAllocations =
+                        staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(allocation.getId());
+                for (OrderStaffAllocation sa : staffAllocations) {
+                    sa.setAllocationStatus(StaffAllocationStatus.COMPLETED);
+                    sa.setActualEndDate(LocalDate.now());
+                }
+                staffAllocationRepository.saveAll(staffAllocations);
+
+                // Set actual delivery date and free the vehicle regardless
+                allocation.setActualDeliveryDate(LocalDate.now());
+                setVehicleStatus(allocation.getVehicle(), VehicleStatusType.AVAILABLE);
+
                 if (allAllocationsDelivered && allWeightAllocated) {
-                    // All vehicle allocations are DELIVERED → fully done
                     order.setOrderStatus(OrderStatus.DELIVERED);
-
-                    // Release all staff allocations for this vehicle allocation
-                    List<OrderStaffAllocation> staffAllocations =
-                            staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(allocation.getId());
-                    for (OrderStaffAllocation sa : staffAllocations) {
-                        sa.setAllocationStatus(StaffAllocationStatus.COMPLETED);
-                        sa.setActualEndDate(LocalDate.now());
-                    }
-                    staffAllocationRepository.saveAll(staffAllocations);
-
-                    // Set actual delivery date on vehicle allocation
-                    allocation.setActualDeliveryDate(LocalDate.now());
-
-                    // Vehicle is back in yard → AVAILABLE
-                    setVehicleStatus(allocation.getVehicle(), VehicleStatusType.AVAILABLE);
                 } else {
-                    // Some still in progress
                     order.setOrderStatus(OrderStatus.PARTIALLY_DELIVERED);
                 }
                 orderRepository.save(order);
@@ -375,6 +430,14 @@ public class LrServiceImpl implements LrService {
                 .isOverloaded(lr.getIsOverloaded())
                 .loadedAt(lr.getLoadedAt())
                 .deliveredAt(lr.getDeliveredAt())
+                .startOdometer(vehicleMeterReadingRepository
+                        .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
+                                lr.getId(), MeterReadingType.TRIP_START)
+                        .map(VehicleMeterReading::getReadingKm).orElse(null))
+                .endOdometer(vehicleMeterReadingRepository
+                        .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
+                                lr.getId(), MeterReadingType.TRIP_END)
+                        .map(VehicleMeterReading::getReadingKm).orElse(null))
                 .lrStatus(lr.getLrStatus())
                 .remarks(lr.getRemarks())
                 .checkposts(lrCheckpostRepository.findByLrIdAndIsActiveTrue(lr.getId())
