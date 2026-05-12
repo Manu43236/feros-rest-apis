@@ -7,6 +7,7 @@ import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.PayrollResponse;
 import com.feros.api.dto.response.SalaryAdvanceResponse;
 import com.feros.api.service.PayrollService;
+import com.feros.api.util.SecurityUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -77,6 +78,14 @@ public class PayrollController {
     public ResponseEntity<ApiResponse<PayrollResponse>> getPayrollById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Payroll fetched successfully", payrollService.getPayrollById(id)));
+    }
+
+    @GetMapping("/my")
+    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<List<PayrollResponse>>> getMyPayrolls() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Payrolls fetched successfully",
+                payrollService.getPayrollsByUser(SecurityUtil.getCurrentUserId())));
     }
 
     @GetMapping("/user/{userId}")
