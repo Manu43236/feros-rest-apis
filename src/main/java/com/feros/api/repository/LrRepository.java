@@ -38,4 +38,7 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
 
     @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true AND l.isOverloaded = true AND l.lrDate BETWEEN :from AND :to ORDER BY l.lrDate DESC")
     List<Lr> findOverloadedByTenantIdAndDateRange(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("SELECT l FROM Lr l JOIN OrderStaffAllocation sa ON sa.vehicleAllocation.id = l.vehicleAllocation.id WHERE l.tenant.id = :tenantId AND sa.user.id = :userId AND sa.isActive = true AND l.isActive = true ORDER BY l.id DESC")
+    List<Lr> findByTenantIdAndDriverUserId(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 }
