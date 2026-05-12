@@ -2,6 +2,7 @@ package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.AttendanceRequest;
 import com.feros.api.dto.request.BulkAttendanceRequest;
+import com.feros.api.dto.request.MarkMobilePresentRequest;
 import com.feros.api.dto.request.MarkOwnAttendanceRequest;
 import com.feros.api.dto.request.ReviewTripProofRequest;
 import com.feros.api.dto.request.TripProofRequest;
@@ -320,9 +321,59 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .approvedById(a.getApprovedBy() != null ? a.getApprovedBy().getId() : null)
                 .approvedByName(a.getApprovedBy() != null ? a.getApprovedBy().getName() : null)
                 .approvedAt(a.getApprovedAt())
+                .selfieUrl(a.getSelfieUrl())
+                .latitude(a.getLatitude())
+                .longitude(a.getLongitude())
                 .createdAt(a.getCreatedAt())
                 .updatedAt(a.getUpdatedAt())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public AttendanceResponse markMobilePresent(MarkMobilePresentRequest request) {
+        Long tenantId = getCurrentTenantId();
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        LocalDate today = LocalDate.now();
+
+        if (attendanceRepository.existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
+                currentUserId, tenantId, today)) {
+            throw new FerosException("You have already marked attendance for today", HttpStatus.CONFLICT);
+        }
+
+        com.feros.api.entity.master.AttendanceType presentType = attendanceTypeRepository
+                .findByNameIgnoreCase("PRESENT")
+                .orElseThrow(() -> new FerosException(
+                        "PRESENT attendance type not configured. Contact admin.", HttpStatus.NOT_FOUND));
+
+        Tenant tenant = getCurrentTenant();
+        User user = getCurrentUser();
+
+        Attendance attendance = Attendance.builder()
+                .tenant(tenant)
+                .user(user)
+                .attendanceDate(today)
+                .attendanceType(presentType)
+                .selfieUrl(request.getSelfieUrl())
+                .latitude(request.getLatitude())
+                .longitude(request.getLongitude())
+                .remarks(request.getRemarks())
+                .markedBy(user)
+                .markedAt(LocalDateTime.now())
+                .approvalStatus(AttendanceApprovalStatus.PENDING)
+                .isActive(true)
+                .build();
+
+        return mapToResponse(attendanceRepository.save(attendance));
+    }
+
+    @Override
+    public AttendanceResponse getTodayAttendanceStatus() {
+        return attendanceRepository
+                .findByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
+                        SecurityUtil.getCurrentUserId(), getCurrentTenantId(), LocalDate.now())
+                .map(this::mapToResponse)
+                .orElse(null);
     }
 
     private TripProofResponse mapToTripProofResponse(TripProof p) {

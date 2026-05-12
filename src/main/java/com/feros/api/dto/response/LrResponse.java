@@ -44,6 +44,9 @@ public class LrResponse {
     private LocalDateTime loadedAt;
     private LocalDateTime deliveredAt;
 
+    private java.math.BigDecimal startOdometer;
+    private java.math.BigDecimal endOdometer;
+
     private LrStatus lrStatus;
     private String remarks;
 

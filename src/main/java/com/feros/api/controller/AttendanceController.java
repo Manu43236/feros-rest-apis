@@ -2,6 +2,7 @@ package com.feros.api.controller;
 
 import com.feros.api.dto.request.AttendanceRequest;
 import com.feros.api.dto.request.BulkAttendanceRequest;
+import com.feros.api.dto.request.MarkMobilePresentRequest;
 import com.feros.api.dto.request.MarkOwnAttendanceRequest;
 import com.feros.api.dto.request.ReviewTripProofRequest;
 import com.feros.api.dto.request.TripProofRequest;
@@ -70,6 +71,21 @@ public class AttendanceController {
             @Valid @RequestBody MarkOwnAttendanceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Attendance marked successfully", attendanceService.markOwnAttendance(request)));
+    }
+
+    @PostMapping("/attendance/my/mark-present")
+    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<AttendanceResponse>> markMobilePresent(
+            @RequestBody MarkMobilePresentRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Attendance marked successfully", attendanceService.markMobilePresent(request)));
+    }
+
+    @GetMapping("/attendance/my/today-status")
+    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<AttendanceResponse>> getTodayAttendanceStatus() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Today attendance status fetched", attendanceService.getTodayAttendanceStatus()));
     }
 
     @GetMapping("/attendance/my")

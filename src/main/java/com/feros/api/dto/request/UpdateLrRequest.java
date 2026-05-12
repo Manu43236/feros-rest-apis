@@ -16,4 +16,10 @@ public class UpdateLrRequest {
     private LocalDateTime deliveredAt;
     private LrStatus lrStatus;
     private String remarks;
+
+    // Odometer readings (required when lrStatus = IN_TRANSIT or DELIVERED)
+    private BigDecimal startOdometer;
+    private String startOdometerPhotoUrl;
+    private BigDecimal endOdometer;
+    private String endOdometerPhotoUrl;
 }

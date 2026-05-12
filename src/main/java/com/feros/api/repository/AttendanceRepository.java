@@ -28,4 +28,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     @Query("SELECT a FROM Attendance a WHERE a.tenant.id = :tenantId AND a.isActive = true AND a.attendanceDate BETWEEN :from AND :to ORDER BY a.user.id, a.attendanceDate ASC")
     List<Attendance> findByTenantIdAndDateRange(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    Optional<Attendance> findByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
+            Long userId, Long tenantId, LocalDate date);
 }

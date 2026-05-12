@@ -31,6 +31,9 @@ public class AttendanceResponse {
     private Long approvedById;
     private String approvedByName;
     private LocalDateTime approvedAt;
+    private String selfieUrl;
+    private Double latitude;
+    private Double longitude;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

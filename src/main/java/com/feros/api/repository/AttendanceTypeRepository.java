@@ -8,4 +8,5 @@ import java.util.List;
 @Repository
 public interface AttendanceTypeRepository extends JpaRepository<AttendanceType, Long> {
     List<AttendanceType> findAllByIsActiveTrue();
+    java.util.Optional<AttendanceType> findByNameIgnoreCase(String name);
 }

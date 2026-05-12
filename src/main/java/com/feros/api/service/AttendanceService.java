@@ -2,6 +2,7 @@ package com.feros.api.service;
 
 import com.feros.api.dto.request.AttendanceRequest;
 import com.feros.api.dto.request.BulkAttendanceRequest;
+import com.feros.api.dto.request.MarkMobilePresentRequest;
 import com.feros.api.dto.request.MarkOwnAttendanceRequest;
 import com.feros.api.dto.request.ReviewTripProofRequest;
 import com.feros.api.dto.request.TripProofRequest;
@@ -31,6 +32,10 @@ public interface AttendanceService {
     List<AttendanceResponse> getPendingAttendance();
 
     List<AttendanceResponse> getMyAttendance(LocalDate from, LocalDate to);
+
+    AttendanceResponse markMobilePresent(MarkMobilePresentRequest request);
+
+    AttendanceResponse getTodayAttendanceStatus();
 
     TripProofResponse addTripProof(Long userId, TripProofRequest request);
 

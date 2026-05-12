@@ -65,6 +65,15 @@ public class Attendance extends BaseEntity {
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
 
+    @Column(name = "selfie_url")
+    private String selfieUrl;
+
+    @Column(name = "latitude", precision = 10, scale = 7)
+    private Double latitude;
+
+    @Column(name = "longitude", precision = 10, scale = 7)
+    private Double longitude;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 }
