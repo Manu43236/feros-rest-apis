@@ -123,6 +123,14 @@ public class LrServiceImpl implements LrService {
     }
 
     @Override
+    public List<LrResponse> getMyLrs() {
+        Long tenantId = getCurrentTenantId();
+        Long userId = SecurityUtil.getCurrentUserId();
+        return lrRepository.findByTenantIdAndDriverUserId(tenantId, userId)
+                .stream().map(this::mapToLrResponse).toList();
+    }
+
+    @Override
     public List<LrResponse> getAllLrs() {
         Long tenantId = getCurrentTenantId();
         String role = SecurityUtil.getCurrentRole();

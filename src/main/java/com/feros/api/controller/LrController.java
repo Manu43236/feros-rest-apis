@@ -24,6 +24,13 @@ public class LrController {
 
     private final LrService lrService;
 
+    @GetMapping("/my")
+    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER')")
+    public ResponseEntity<ApiResponse<List<LrResponse>>> getMyLrs() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "My LRs fetched successfully", lrService.getMyLrs()));
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<List<LrResponse>>> getAllLrs() {

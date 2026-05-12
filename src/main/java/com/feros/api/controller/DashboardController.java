@@ -2,6 +2,7 @@ package com.feros.api.controller;
 
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.DashboardResponse;
+import com.feros.api.dto.response.DriverDashboardResponse;
 import com.feros.api.dto.response.ExpiryAlertResponse;
 import com.feros.api.service.DashboardService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,13 @@ public class DashboardController {
     public ResponseEntity<ApiResponse<DashboardResponse>> getDashboard() {
         return ResponseEntity.ok(ApiResponse.success(
                 "Dashboard fetched successfully", dashboardService.getDashboard()));
+    }
+
+    @GetMapping("/my")
+    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<DriverDashboardResponse>> getMyDashboard() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Dashboard fetched successfully", dashboardService.getDriverDashboard()));
     }
 
     @GetMapping("/expiry-alerts")

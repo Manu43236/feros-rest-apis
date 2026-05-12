@@ -1,12 +1,15 @@
 package com.feros.api.service.impl;
 
 import com.feros.api.dto.response.DashboardResponse;
+import com.feros.api.dto.response.DriverDashboardResponse;
 import com.feros.api.dto.response.ExpiryAlertResponse;
 import com.feros.api.entity.Attendance;
+import com.feros.api.entity.Lr;
 import com.feros.api.entity.StaffDocument;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.VehicleDocument;
 import com.feros.api.enums.InvoiceStatus;
+import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.OrderStatus;
 import com.feros.api.enums.VehicleAllocationStatus;
 import com.feros.api.repository.*;
@@ -32,6 +35,8 @@ public class DashboardServiceImpl implements DashboardService {
     private final AttendanceRepository attendanceRepository;
     private final VehicleDocumentRepository vehicleDocumentRepository;
     private final StaffDocumentRepository staffDocumentRepository;
+    private final LrRepository lrRepository;
+    private final NotificationRepository notificationRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -152,6 +157,53 @@ public class DashboardServiceImpl implements DashboardService {
                 .vehicleAlerts(vehicleAlerts)
                 .staffDocumentAlerts(staffAlerts)
                 .totalAlerts(vehicleAlerts.size() + staffAlerts.size())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DriverDashboardResponse getDriverDashboard() {
+        Long userId = SecurityUtil.getCurrentUserId();
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDate today = LocalDate.now();
+
+        List<Lr> myLrs = lrRepository.findByTenantIdAndDriverUserId(tenantId, userId);
+
+        int totalTrips = myLrs.size();
+        int pendingTrips = (int) myLrs.stream()
+                .filter(lr -> lr.getLrStatus() == LrStatus.CREATED
+                        || lr.getLrStatus() == LrStatus.WEIGHT_LOADED
+                        || lr.getLrStatus() == LrStatus.IN_TRANSIT)
+                .count();
+
+        boolean attendanceMarked = attendanceRepository
+                .findByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(userId, tenantId, today)
+                .isPresent();
+
+        int unreadCount = (int) notificationRepository.countUnread(tenantId, userId);
+
+        List<DriverDashboardResponse.UpcomingTrip> upcoming = myLrs.stream()
+                .filter(lr -> lr.getLrStatus() == LrStatus.CREATED
+                        || lr.getLrStatus() == LrStatus.WEIGHT_LOADED)
+                .map(lr -> DriverDashboardResponse.UpcomingTrip.builder()
+                        .lrId(lr.getId())
+                        .lrNumber(lr.getLrNumber())
+                        .lrStatus(lr.getLrStatus().name())
+                        .clientName(lr.getOrder().getClient().getClientName())
+                        .fromCity(lr.getOrder().getSourceCity() != null
+                                ? lr.getOrder().getSourceCity().getName() : "—")
+                        .toCity(lr.getOrder().getDestinationCity() != null
+                                ? lr.getOrder().getDestinationCity().getName() : "—")
+                        .vehicleNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
+                        .build())
+                .toList();
+
+        return DriverDashboardResponse.builder()
+                .totalTrips(totalTrips)
+                .pendingTrips(pendingTrips)
+                .attendanceMarked(attendanceMarked)
+                .unreadNotifications(unreadCount)
+                .upcomingTrips(upcoming)
                 .build();
     }
 

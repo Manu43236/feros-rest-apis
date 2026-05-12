@@ -14,6 +14,7 @@ public interface LrService {
     LrResponse createLr(CreateLrRequest request);
     LrResponse getLrById(Long id);
     List<LrResponse> getAllLrs();
+    List<LrResponse> getMyLrs();
     List<LrResponse> getLrsByOrder(Long orderId);
     LrResponse updateLr(Long id, UpdateLrRequest request);
     LrCheckpostResponse addCheckpost(Long lrId, LrCheckpostRequest request);

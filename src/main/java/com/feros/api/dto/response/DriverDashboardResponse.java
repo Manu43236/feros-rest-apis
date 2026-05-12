@@ -1,0 +1,28 @@
+package com.feros.api.dto.response;
+
+import lombok.Builder;
+import lombok.Data;
+
+import java.util.List;
+
+@Data
+@Builder
+public class DriverDashboardResponse {
+    private int totalTrips;
+    private int pendingTrips;
+    private boolean attendanceMarked;
+    private int unreadNotifications;
+    private List<UpcomingTrip> upcomingTrips;
+
+    @Data
+    @Builder
+    public static class UpcomingTrip {
+        private Long lrId;
+        private String lrNumber;
+        private String lrStatus;
+        private String clientName;
+        private String fromCity;
+        private String toCity;
+        private String vehicleNumber;
+    }
+}
