@@ -32,8 +32,8 @@ public class Lr extends BaseEntity {
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "vehicle_allocation_id", nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehicle_allocation_id", nullable = false)
     private OrderVehicleAllocation vehicleAllocation;
 
     @Column(name = "lr_date", nullable = false)
