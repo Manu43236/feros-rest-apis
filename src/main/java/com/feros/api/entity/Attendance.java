@@ -68,10 +68,10 @@ public class Attendance extends BaseEntity {
     @Column(name = "selfie_url")
     private String selfieUrl;
 
-    @Column(name = "latitude", precision = 10, scale = 7)
+    @Column(name = "latitude")
     private Double latitude;
 
-    @Column(name = "longitude", precision = 10, scale = 7)
+    @Column(name = "longitude")
     private Double longitude;
 
     @Column(name = "is_active")
