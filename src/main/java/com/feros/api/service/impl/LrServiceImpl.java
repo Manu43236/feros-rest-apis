@@ -75,7 +75,8 @@ public class LrServiceImpl implements LrService {
         Long tenantId = getCurrentTenantId();
         Tenant tenant = getCurrentTenant();
 
-        if (lrRepository.existsByVehicleAllocationId(request.getVehicleAllocationId())) {
+        if (lrRepository.existsByVehicleAllocationIdAndLrStatusNot(
+                request.getVehicleAllocationId(), LrStatus.CANCELLED)) {
             throw new FerosException("LR already created for this vehicle allocation",
                     HttpStatus.CONFLICT);
         }

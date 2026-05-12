@@ -12,6 +12,7 @@ import com.feros.api.entity.master.MaterialType;
 import com.feros.api.entity.master.Route;
 import com.feros.api.entity.master.State;
 import com.feros.api.enums.BillingOn;
+import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.enums.OrderStatus;
 import com.feros.api.enums.StaffAllocationStatus;
@@ -395,7 +396,7 @@ public class OrderServiceImpl implements OrderService {
                     HttpStatus.BAD_REQUEST);
         }
 
-        if (lrRepository.existsByVehicleAllocationId(allocationId)) {
+        if (lrRepository.existsByVehicleAllocationIdAndLrStatusNot(allocationId, LrStatus.CANCELLED)) {
             throw new FerosException(
                     "Cannot unassign vehicle — an LR has already been created for this allocation",
                     HttpStatus.CONFLICT);
