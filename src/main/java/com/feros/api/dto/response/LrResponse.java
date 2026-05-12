@@ -29,6 +29,9 @@ public class LrResponse {
     private Long clientId;
     private String clientName;
 
+    private String fromCity;
+    private String toCity;
+
     private LocalDate lrDate;
     private BigDecimal vehicleCapacity;
     private BigDecimal allocatedWeight;

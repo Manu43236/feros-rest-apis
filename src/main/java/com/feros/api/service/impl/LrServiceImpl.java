@@ -363,6 +363,8 @@ public class LrServiceImpl implements LrService {
                         vehicle.getVehicleType().getName() : null)
                 .clientId(lr.getOrder().getClient().getId())
                 .clientName(lr.getOrder().getClient().getClientName())
+                .fromCity(lr.getOrder().getSourceCity() != null ? lr.getOrder().getSourceCity().getName() : null)
+                .toCity(lr.getOrder().getDestinationCity() != null ? lr.getOrder().getDestinationCity().getName() : null)
                 .lrDate(lr.getLrDate())
                 .vehicleCapacity(lr.getVehicleCapacity())
                 .allocatedWeight(lr.getAllocatedWeight())
