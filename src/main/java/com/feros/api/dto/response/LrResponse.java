@@ -56,6 +56,11 @@ public class LrResponse {
     private Long createdById;
     private String createdByName;
 
+    private String startedByName;
+    private String startedByRole;
+    private String completedByName;
+    private String completedByRole;
+
     private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

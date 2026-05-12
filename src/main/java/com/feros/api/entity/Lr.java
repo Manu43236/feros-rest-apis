@@ -77,6 +77,14 @@ public class Lr extends BaseEntity {
     private String remarks;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "started_by_user_id")
+    private User startedBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "completed_by_user_id")
+    private User completedBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
 

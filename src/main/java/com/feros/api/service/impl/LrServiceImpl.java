@@ -212,6 +212,7 @@ public class LrServiceImpl implements LrService {
                 odmVehicle.setCurrentOdometerReading(request.getStartOdometer());
                 vehicleRepository.save(odmVehicle);
 
+                lr.setStartedBy(getCurrentUser());
                 allocation.setAllocationStatus(VehicleAllocationStatus.IN_TRANSIT);
                 order.setOrderStatus(OrderStatus.IN_TRANSIT);
                 orderRepository.save(order);
@@ -278,6 +279,7 @@ public class LrServiceImpl implements LrService {
                 endVehicle.setCurrentOdometerReading(request.getEndOdometer());
                 vehicleRepository.save(endVehicle);
 
+                lr.setCompletedBy(getCurrentUser());
                 allocation.setAllocationStatus(VehicleAllocationStatus.DELIVERED);
 
                 // Note: order.totalWeightFulfilled tracks assigned weight (set at allocation time).
@@ -451,10 +453,21 @@ public class LrServiceImpl implements LrService {
                         .stream().map(this::mapToChargeResponse).toList())
                 .createdById(lr.getCreatedBy().getId())
                 .createdByName(lr.getCreatedBy().getName())
+                .startedByName(lr.getStartedBy() != null ? lr.getStartedBy().getName() : null)
+                .startedByRole(lr.getStartedBy() != null ? firstRole(lr.getStartedBy()) : null)
+                .completedByName(lr.getCompletedBy() != null ? lr.getCompletedBy().getName() : null)
+                .completedByRole(lr.getCompletedBy() != null ? firstRole(lr.getCompletedBy()) : null)
                 .isActive(lr.getIsActive())
                 .createdAt(lr.getCreatedAt())
                 .updatedAt(lr.getUpdatedAt())
                 .build();
+    }
+
+    private String firstRole(com.feros.api.entity.User user) {
+        return user.getRoles().stream()
+                .findFirst()
+                .map(r -> r.getName().name())
+                .orElse(null);
     }
 
     private LrCheckpostResponse mapToCheckpostResponse(LrCheckpost c) {

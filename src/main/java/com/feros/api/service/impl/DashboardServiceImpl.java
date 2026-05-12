@@ -198,6 +198,10 @@ public class DashboardServiceImpl implements DashboardService {
                         .vehicleNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
                         .expectedLoadDate(lr.getVehicleAllocation().getExpectedLoadDate())
                         .expectedDeliveryDate(lr.getVehicleAllocation().getExpectedDeliveryDate())
+                        .startedByName(lr.getStartedBy() != null ? lr.getStartedBy().getName() : null)
+                        .startedByRole(lr.getStartedBy() != null
+                                ? lr.getStartedBy().getRoles().stream()
+                                        .findFirst().map(r -> r.getName().name()).orElse(null) : null)
                         .build())
                 .orElse(null);
 
