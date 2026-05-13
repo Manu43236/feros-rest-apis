@@ -16,6 +16,7 @@ import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.AttendanceService;
+import com.feros.api.service.S3Service;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -38,6 +39,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final LrRepository lrRepository;
     private final AttendanceTypeRepository attendanceTypeRepository;
     private final LeaveTypeRepository leaveTypeRepository;
+    private final S3Service s3Service;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -322,7 +324,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .approvedById(a.getApprovedBy() != null ? a.getApprovedBy().getId() : null)
                 .approvedByName(a.getApprovedBy() != null ? a.getApprovedBy().getName() : null)
                 .approvedAt(a.getApprovedAt())
-                .selfieUrl(a.getSelfieUrl())
+                .selfieUrl(a.getSelfieUrl() != null ? s3Service.getPublicUrl(a.getSelfieUrl()) : null)
                 .latitude(a.getLatitude())
                 .longitude(a.getLongitude())
                 .createdAt(a.getCreatedAt())
