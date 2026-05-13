@@ -9,8 +9,11 @@ import com.feros.api.dto.response.LrChargeResponse;
 import com.feros.api.dto.response.LrCheckpostResponse;
 import com.feros.api.dto.response.LrResponse;
 import com.feros.api.service.LrService;
+import com.feros.api.service.impl.LrPdfService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -22,7 +25,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class LrController {
 
-    private final LrService lrService;
+    private final LrService    lrService;
+    private final LrPdfService lrPdfService;
 
     @GetMapping("/my")
     @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER')")
@@ -99,6 +103,16 @@ public class LrController {
             @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Charges fetched successfully", lrService.getCharges(id)));
+    }
+
+    @GetMapping(value = "/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER')")
+    public ResponseEntity<byte[]> downloadLrPdf(@PathVariable Long id) {
+        byte[] pdf = lrPdfService.generatePdf(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"LR-" + id + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @DeleteMapping("/{id}/checkposts/{checkpostId}")
