@@ -30,6 +30,7 @@ public interface AttendanceService {
     AttendanceResponse rejectAttendance(Long id);
 
     List<AttendanceResponse> getPendingAttendance();
+    List<AttendanceResponse> getRejectedAttendance();
 
     List<AttendanceResponse> getMyAttendance(LocalDate from, LocalDate to);
 

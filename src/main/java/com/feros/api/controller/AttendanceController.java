@@ -118,6 +118,13 @@ public class AttendanceController {
                 "Attendance rejected successfully", attendanceService.rejectAttendance(id)));
     }
 
+    @GetMapping("/attendance/rejected")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getRejectedAttendance() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Rejected attendance fetched", attendanceService.getRejectedAttendance()));
+    }
+
     @PutMapping("/attendance/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> updateAttendance(

@@ -134,6 +134,13 @@ public class AttendanceServiceImpl implements AttendanceService {
     }
 
     @Override
+    public List<AttendanceResponse> getRejectedAttendance() {
+        return attendanceRepository
+                .findByTenantIdAndApprovalStatusAndIsActiveTrue(getCurrentTenantId(), AttendanceApprovalStatus.REJECTED)
+                .stream().map(this::mapToResponse).toList();
+    }
+
+    @Override
     public List<AttendanceResponse> getMyAttendance(java.time.LocalDate from, java.time.LocalDate to) {
         Long currentUserId = SecurityUtil.getCurrentUserId();
         return attendanceRepository
