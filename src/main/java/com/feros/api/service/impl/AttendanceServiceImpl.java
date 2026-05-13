@@ -339,8 +339,8 @@ public class AttendanceServiceImpl implements AttendanceService {
         Long currentUserId = SecurityUtil.getCurrentUserId();
         LocalDate today = TimeUtil.today();
 
-        if (attendanceRepository.existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
-                currentUserId, tenantId, today)) {
+        if (attendanceRepository.existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrueAndApprovalStatusNot(
+                currentUserId, tenantId, today, AttendanceApprovalStatus.REJECTED)) {
             throw new FerosException("You have already marked attendance for today", HttpStatus.CONFLICT);
         }
 
