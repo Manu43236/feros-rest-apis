@@ -349,23 +349,29 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .orElseThrow(() -> new FerosException(
                         "PRESENT attendance type not configured. Contact admin.", HttpStatus.NOT_FOUND));
 
-        Tenant tenant = getCurrentTenant();
         User user = getCurrentUser();
 
-        Attendance attendance = Attendance.builder()
-                .tenant(tenant)
-                .user(user)
-                .attendanceDate(today)
-                .attendanceType(presentType)
-                .selfieUrl(request.getSelfieUrl())
-                .latitude(request.getLatitude())
-                .longitude(request.getLongitude())
-                .remarks(request.getRemarks())
-                .markedBy(user)
-                .markedAt(TimeUtil.nowIst())
-                .approvalStatus(AttendanceApprovalStatus.PENDING)
-                .isActive(true)
-                .build();
+        // If a rejected record exists for today, reset it instead of inserting a new one
+        // (unique constraint allows only one record per user per day)
+        Attendance attendance = attendanceRepository
+                .findByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(currentUserId, tenantId, today)
+                .orElseGet(() -> Attendance.builder()
+                        .tenant(getCurrentTenant())
+                        .user(user)
+                        .attendanceDate(today)
+                        .isActive(true)
+                        .build());
+
+        attendance.setAttendanceType(presentType);
+        attendance.setSelfieUrl(request.getSelfieUrl());
+        attendance.setLatitude(request.getLatitude());
+        attendance.setLongitude(request.getLongitude());
+        attendance.setRemarks(request.getRemarks());
+        attendance.setMarkedBy(user);
+        attendance.setMarkedAt(TimeUtil.nowIst());
+        attendance.setApprovalStatus(AttendanceApprovalStatus.PENDING);
+        attendance.setApprovedBy(null);
+        attendance.setApprovedAt(null);
 
         return mapToResponse(attendanceRepository.save(attendance));
     }
