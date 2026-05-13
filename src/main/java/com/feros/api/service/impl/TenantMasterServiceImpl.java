@@ -375,6 +375,10 @@ public class TenantMasterServiceImpl implements TenantMasterService {
             settings.setIsTripBonusEnabled(request.getIsTripBonusEnabled());
         if (request.getTripBonusAmount() != null)
             settings.setTripBonusAmount(request.getTripBonusAmount());
+        if (request.getAttendanceEnforced() != null)
+            settings.setAttendanceEnforced(request.getAttendanceEnforced());
+        if (request.getAttendanceDeadlineTime() != null)
+            settings.setAttendanceDeadlineTime(request.getAttendanceDeadlineTime());
 
         return mapSettings(tenantSettingsRepository.save(settings));
     }
@@ -459,6 +463,8 @@ public class TenantMasterServiceImpl implements TenantMasterService {
                 .maxAdvanceDeductionPerCycle(s.getMaxAdvanceDeductionPerCycle())
                 .isTripBonusEnabled(s.getIsTripBonusEnabled())
                 .tripBonusAmount(s.getTripBonusAmount())
+                .attendanceEnforced(s.getAttendanceEnforced())
+                .attendanceDeadlineTime(s.getAttendanceDeadlineTime())
                 .isActive(s.getIsActive()).createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt()).build();
     }

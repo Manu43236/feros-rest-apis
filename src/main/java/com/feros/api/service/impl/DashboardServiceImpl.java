@@ -38,6 +38,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final StaffDocumentRepository staffDocumentRepository;
     private final LrRepository lrRepository;
     private final NotificationRepository notificationRepository;
+    private final TenantSettingsRepository tenantSettingsRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -183,6 +184,10 @@ public class DashboardServiceImpl implements DashboardService {
 
         int unreadCount = (int) notificationRepository.countUnread(tenantId, userId);
 
+        boolean attendanceEnforced = tenantSettingsRepository.findByTenantId(tenantId)
+                .map(s -> Boolean.TRUE.equals(s.getAttendanceEnforced()))
+                .orElse(false);
+
         // Active trip — currently IN_TRANSIT
         DriverDashboardResponse.UpcomingTrip activeTrip = myLrs.stream()
                 .filter(lr -> lr.getLrStatus() == LrStatus.IN_TRANSIT)
@@ -232,6 +237,7 @@ public class DashboardServiceImpl implements DashboardService {
                 .totalTrips(totalTrips)
                 .pendingTrips(pendingTrips)
                 .attendanceMarked(attendanceMarked)
+                .attendanceEnforced(attendanceEnforced)
                 .unreadNotifications(unreadCount)
                 .activeTrip(activeTrip)
                 .upcomingTrips(upcoming)

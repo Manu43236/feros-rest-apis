@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "tenant_settings")
@@ -46,6 +47,12 @@ public class TenantSettings extends BaseEntity {
 
     @Column(name = "trip_bonus_amount")
     private BigDecimal tripBonusAmount = BigDecimal.ZERO;
+
+    @Column(name = "attendance_enforced")
+    private Boolean attendanceEnforced = false;
+
+    @Column(name = "attendance_deadline_time")
+    private LocalTime attendanceDeadlineTime = LocalTime.of(8, 0);
 
     @Column(name = "is_active")
     private Boolean isActive = true;

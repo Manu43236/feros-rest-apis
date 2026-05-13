@@ -11,6 +11,7 @@ public class DriverDashboardResponse {
     private int totalTrips;
     private int pendingTrips;
     private boolean attendanceMarked;
+    private boolean attendanceEnforced;
     private int unreadNotifications;
     private UpcomingTrip activeTrip;       // IN_TRANSIT right now, null if none
     private List<UpcomingTrip> upcomingTrips;

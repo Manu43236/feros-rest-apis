@@ -4,6 +4,7 @@ import com.feros.api.enums.PayCycle;
 import lombok.Getter;
 import lombok.Setter;
 import java.math.BigDecimal;
+import java.time.LocalTime;
 
 @Getter
 @Setter
@@ -15,4 +16,6 @@ public class TenantSettingsRequest {
     private BigDecimal maxAdvanceDeductionPerCycle;
     private Boolean isTripBonusEnabled;
     private BigDecimal tripBonusAmount;
+    private Boolean attendanceEnforced;
+    private LocalTime attendanceDeadlineTime;
 }

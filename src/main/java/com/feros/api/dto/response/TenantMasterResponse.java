@@ -7,6 +7,7 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Getter
 @Setter
@@ -53,6 +54,8 @@ public class TenantMasterResponse {
     private BigDecimal maxAdvanceDeductionPerCycle;
     private Boolean isTripBonusEnabled;
     private BigDecimal tripBonusAmount;
+    private Boolean attendanceEnforced;
+    private LocalTime attendanceDeadlineTime;
 
     private Boolean isActive;
     private LocalDateTime createdAt;

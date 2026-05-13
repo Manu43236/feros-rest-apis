@@ -46,6 +46,8 @@ public class LrServiceImpl implements LrService {
     private final ChargeTypeRepository chargeTypeRepository;
     private final UserRepository userRepository;
     private final VehicleMeterReadingRepository vehicleMeterReadingRepository;
+    private final TenantSettingsRepository tenantSettingsRepository;
+    private final AttendanceRepository attendanceRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -186,6 +188,22 @@ public class LrServiceImpl implements LrService {
                 // Driver will explicitly start the trip from mobile (→ IN_TRANSIT).
 
             } else if (request.getLrStatus() == LrStatus.IN_TRANSIT) {
+                // Attendance gate check
+                tenantSettingsRepository.findByTenantId(getCurrentTenantId()).ifPresent(settings -> {
+                    if (Boolean.TRUE.equals(settings.getAttendanceEnforced())) {
+                        Long userId = SecurityUtil.getCurrentUserId();
+                        LocalDate today = TimeUtil.today();
+                        boolean marked = attendanceRepository
+                                .existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
+                                        userId, getCurrentTenantId(), today);
+                        if (!marked) {
+                            throw new FerosException(
+                                    "Attendance not marked for today. Please mark attendance before starting the trip.",
+                                    HttpStatus.FORBIDDEN);
+                        }
+                    }
+                });
+
                 // ODM validation — start odometer required
                 if (request.getStartOdometer() == null) {
                     throw new FerosException("Start odometer reading is required to start the trip",

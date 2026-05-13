@@ -76,6 +76,18 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    public void sendToUser(Tenant tenant, User user, NotificationType type, String title, String message) {
+        Notification notification = Notification.builder()
+                .tenant(tenant)
+                .userId(user.getId())
+                .type(type)
+                .title(title)
+                .message(message)
+                .build();
+        notificationRepository.save(notification);
+    }
+
+    @Override
     public void sendToRoles(Tenant tenant, List<RoleName> roles, NotificationType type, String title, String message) {
         List<User> users = userRepository.findByTenantIdAndRoleNames(tenant.getId(), roles);
         for (User user : users) {
