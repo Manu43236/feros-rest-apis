@@ -31,4 +31,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     Optional<Attendance> findByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
             Long userId, Long tenantId, LocalDate date);
+
+    boolean existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrueAndApprovalStatusNot(
+            Long userId, Long tenantId, LocalDate date, AttendanceApprovalStatus status);
 }

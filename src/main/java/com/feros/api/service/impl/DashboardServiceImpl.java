@@ -9,6 +9,7 @@ import com.feros.api.entity.Lr;
 import com.feros.api.entity.StaffDocument;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.VehicleDocument;
+import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.enums.InvoiceStatus;
 import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.OrderStatus;
@@ -179,8 +180,8 @@ public class DashboardServiceImpl implements DashboardService {
                 .count();
 
         boolean attendanceMarked = attendanceRepository
-                .findByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(userId, tenantId, today)
-                .isPresent();
+                .existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrueAndApprovalStatusNot(
+                        userId, tenantId, today, AttendanceApprovalStatus.REJECTED);
 
         int unreadCount = (int) notificationRepository.countUnread(tenantId, userId);
 
