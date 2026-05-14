@@ -56,6 +56,10 @@ public class LrResponse {
     private Long createdById;
     private String createdByName;
 
+    private Long driverId;
+    private String driverName;
+    private String driverPhone;
+
     private String startedByName;
     private String startedByRole;
     private String completedByName;

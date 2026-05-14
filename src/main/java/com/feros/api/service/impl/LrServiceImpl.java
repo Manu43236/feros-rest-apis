@@ -472,6 +472,9 @@ public class LrServiceImpl implements LrService {
                         .stream().map(this::mapToChargeResponse).toList())
                 .createdById(lr.getCreatedBy().getId())
                 .createdByName(lr.getCreatedBy().getName())
+                .driverId(driverOf(lr.getVehicleAllocation()).map(u -> u.getId()).orElse(null))
+                .driverName(driverOf(lr.getVehicleAllocation()).map(u -> u.getName()).orElse(null))
+                .driverPhone(driverOf(lr.getVehicleAllocation()).map(u -> u.getPhone()).orElse(null))
                 .startedByName(lr.getStartedBy() != null ? lr.getStartedBy().getName() : null)
                 .startedByRole(lr.getStartedBy() != null ? firstRole(lr.getStartedBy()) : null)
                 .completedByName(lr.getCompletedBy() != null ? lr.getCompletedBy().getName() : null)
@@ -480,6 +483,16 @@ public class LrServiceImpl implements LrService {
                 .createdAt(lr.getCreatedAt())
                 .updatedAt(lr.getUpdatedAt())
                 .build();
+    }
+
+    private java.util.Optional<com.feros.api.entity.User> driverOf(OrderVehicleAllocation allocation) {
+        return staffAllocationRepository
+                .findByVehicleAllocationIdAndIsActiveTrue(allocation.getId())
+                .stream()
+                .filter(sa -> sa.getRole() != null &&
+                        sa.getRole().getName() == com.feros.api.enums.RoleName.DRIVER)
+                .findFirst()
+                .map(sa -> sa.getUser());
     }
 
     private String firstRole(com.feros.api.entity.User user) {
