@@ -164,7 +164,7 @@ public class OrderServiceImpl implements OrderService {
     public List<OrderResponse> getAllOrders() {
         Long tenantId = getCurrentTenantId();
         String role = SecurityUtil.getCurrentRole();
-        if ("SUPERVISOR".equals(role) || "DRIVER".equals(role) || "CLEANER".equals(role)) {
+        if ("DRIVER".equals(role) || "CLEANER".equals(role)) {
             return orderRepository.findByTenantIdAndSupervisorId(tenantId, SecurityUtil.getCurrentUserId())
                     .stream().map(this::mapToOrderResponse).toList();
         }
