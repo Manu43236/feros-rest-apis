@@ -8,13 +8,12 @@ import com.feros.api.dto.response.StaffAllocationResponse;
 import com.feros.api.dto.response.VehicleAllocationResponse;
 import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.enums.OrderStatus;
-
-import java.util.List;
+import org.springframework.data.domain.Page;
 
 public interface OrderService {
     OrderResponse createOrder(OrderRequest request);
     OrderResponse getOrderById(Long id);
-    List<OrderResponse> getAllOrders();
+    Page<OrderResponse> getAllOrders(int page, int size, String search, OrderStatus status);
     OrderResponse updateOrder(Long id, OrderRequest request);
     void cancelOrder(Long id);
     VehicleAllocationResponse assignVehicle(Long orderId, AssignVehicleRequest request);

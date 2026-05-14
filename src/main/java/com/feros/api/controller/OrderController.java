@@ -16,7 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import org.springframework.data.domain.Page;
 
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -27,9 +27,13 @@ public class OrderController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER')")
-    public ResponseEntity<ApiResponse<List<OrderResponse>>> getAllOrders() {
+    public ResponseEntity<ApiResponse<Page<OrderResponse>>> getAllOrders(
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false)    String search,
+            @RequestParam(required = false)    OrderStatus status) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Orders fetched successfully", orderService.getAllOrders()));
+                "Orders fetched successfully", orderService.getAllOrders(page, size, search, status)));
     }
 
     @GetMapping("/{id}")

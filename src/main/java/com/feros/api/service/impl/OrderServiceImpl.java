@@ -30,6 +30,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -161,15 +166,50 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public List<OrderResponse> getAllOrders() {
+    public Page<OrderResponse> getAllOrders(int page, int size, String search, OrderStatus status) {
         Long tenantId = getCurrentTenantId();
         String role = SecurityUtil.getCurrentRole();
-        if ("DRIVER".equals(role) || "CLEANER".equals(role)) {
-            return orderRepository.findByTenantIdAndSupervisorId(tenantId, SecurityUtil.getCurrentUserId())
-                    .stream().map(this::mapToOrderResponse).toList();
-        }
-        return orderRepository.findByTenantIdAndIsActiveTrue(tenantId)
-                .stream().map(this::mapToOrderResponse).toList();
+
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+
+        Specification<Order> spec = buildOrderSpec(tenantId, role, search, status);
+        return orderRepository.findAll(spec, pageable).map(this::mapToOrderResponse);
+    }
+
+    private Specification<Order> buildOrderSpec(Long tenantId, String role, String search, OrderStatus status) {
+        return (root, query, cb) -> {
+            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+
+            predicates.add(cb.equal(root.get("tenant").get("id"), tenantId));
+            predicates.add(cb.isTrue(root.get("isActive")));
+
+            // DRIVER / CLEANER only see orders they are staff-allocated on
+            if (("DRIVER".equals(role) || "CLEANER".equals(role)) && query != null) {
+                Long userId = SecurityUtil.getCurrentUserId();
+                var sub = query.subquery(Long.class);
+                var saRoot = sub.from(com.feros.api.entity.OrderStaffAllocation.class);
+                sub.select(saRoot.get("order").get("id"))
+                   .where(cb.equal(saRoot.get("user").get("id"), userId),
+                          cb.isTrue(saRoot.get("isActive")));
+                predicates.add(root.get("id").in(sub));
+            }
+
+            if (status != null) {
+                predicates.add(cb.equal(root.get("orderStatus"), status));
+            }
+
+            if (search != null && !search.isBlank()) {
+                String like = "%" + search.trim().toLowerCase() + "%";
+                predicates.add(cb.or(
+                    cb.like(cb.lower(root.get("orderNumber")), like),
+                    cb.like(cb.lower(root.join("client", jakarta.persistence.criteria.JoinType.LEFT).get("clientName")), like),
+                    cb.like(cb.lower(root.join("sourceCity", jakarta.persistence.criteria.JoinType.LEFT).get("name")), like),
+                    cb.like(cb.lower(root.join("destinationCity", jakarta.persistence.criteria.JoinType.LEFT).get("name")), like)
+                ));
+            }
+
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
     }
 
     @Override
