@@ -142,7 +142,7 @@ public class LrServiceImpl implements LrService {
                     .stream().map(this::mapToLrResponse).toList();
         }
         if ("SUPERVISOR".equals(role)) {
-            return lrRepository.findByTenantIdAndCreatedByIdAndIsActiveTrue(tenantId, SecurityUtil.getCurrentUserId())
+            return lrRepository.findByTenantIdAndIsActiveTrue(tenantId)
                     .stream().map(this::mapToLrResponse).toList();
         }
         return lrRepository.findByTenantIdAndIsActiveTrue(tenantId)
