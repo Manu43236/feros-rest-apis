@@ -13,7 +13,7 @@ public class DriverDashboardResponse {
     private boolean attendanceMarked;
     private boolean attendanceEnforced;
     private int unreadNotifications;
-    private UpcomingTrip activeTrip;       // IN_TRANSIT right now, null if none
+    private UpcomingTrip activeTrip;
     private List<UpcomingTrip> upcomingTrips;
 
     @Data

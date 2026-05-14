@@ -4,6 +4,7 @@ import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.response.DashboardResponse;
 import com.feros.api.dto.response.DriverDashboardResponse;
 import com.feros.api.dto.response.ExpiryAlertResponse;
+import com.feros.api.dto.response.SupervisorDashboardResponse;
 import com.feros.api.entity.Attendance;
 import com.feros.api.entity.Lr;
 import com.feros.api.entity.StaffDocument;
@@ -242,6 +243,55 @@ public class DashboardServiceImpl implements DashboardService {
                 .unreadNotifications(unreadCount)
                 .activeTrip(activeTrip)
                 .upcomingTrips(upcoming)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SupervisorDashboardResponse getSupervisorDashboard() {
+        Long userId   = SecurityUtil.getCurrentUserId();
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDate today = TimeUtil.today();
+
+        int totalOrders = (int) orderRepository.countByTenantIdAndIsActiveTrue(tenantId);
+        int activeOrders = (int) (
+                orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.IN_TRANSIT) +
+                orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.PARTIALLY_DELIVERED));
+        int pendingAssignments = (int) (
+                orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.PENDING) +
+                orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.PARTIALLY_ASSIGNED));
+
+        int todayPresent = (int) attendanceRepository
+                .findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, today)
+                .stream()
+                .filter(a -> a.getAttendanceType().getName().toLowerCase().contains("present"))
+                .count();
+
+        int unreadCount = (int) notificationRepository.countUnread(tenantId, userId);
+
+        List<SupervisorDashboardResponse.ActiveTripItem> activeTrips = lrRepository
+                .findByTenantIdAndLrStatus(tenantId, LrStatus.IN_TRANSIT)
+                .stream()
+                .map(lr -> SupervisorDashboardResponse.ActiveTripItem.builder()
+                        .lrId(lr.getId())
+                        .lrNumber(lr.getLrNumber())
+                        .vehicleNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
+                        .clientName(lr.getOrder().getClient().getClientName())
+                        .fromCity(lr.getOrder().getSourceCity() != null
+                                ? lr.getOrder().getSourceCity().getName() : "—")
+                        .toCity(lr.getOrder().getDestinationCity() != null
+                                ? lr.getOrder().getDestinationCity().getName() : "—")
+                        .expectedDeliveryDate(lr.getVehicleAllocation().getExpectedDeliveryDate())
+                        .build())
+                .toList();
+
+        return SupervisorDashboardResponse.builder()
+                .totalOrders(totalOrders)
+                .activeOrders(activeOrders)
+                .pendingAssignments(pendingAssignments)
+                .todayPresent(todayPresent)
+                .unreadNotifications(unreadCount)
+                .activeTrips(activeTrips)
                 .build();
     }
 

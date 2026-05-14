@@ -1,10 +1,9 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.response.ApiResponse;
-import com.feros.api.dto.response.DashboardResponse;
-import com.feros.api.dto.response.DriverDashboardResponse;
 import com.feros.api.dto.response.ExpiryAlertResponse;
 import com.feros.api.service.DashboardService;
+import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,17 +20,16 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
-    public ResponseEntity<ApiResponse<DashboardResponse>> getDashboard() {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Dashboard fetched successfully", dashboardService.getDashboard()));
-    }
-
-    @GetMapping("/my")
-    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
-    public ResponseEntity<ApiResponse<DriverDashboardResponse>> getMyDashboard() {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Dashboard fetched successfully", dashboardService.getDriverDashboard()));
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MEN', 'STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<Object>> getDashboard() {
+        String role = SecurityUtil.getCurrentRole();
+        Object data = switch (role) {
+            case "SUPERVISOR"              -> dashboardService.getSupervisorDashboard();
+            case "DRIVER", "CLEANER",
+                 "SERVICE_MEN", "STORE_KEEPER" -> dashboardService.getDriverDashboard();
+            default                        -> dashboardService.getDashboard(); // ADMIN, OFFICE_STAFF
+        };
+        return ResponseEntity.ok(ApiResponse.success("Dashboard fetched successfully", data));
     }
 
     @GetMapping("/expiry-alerts")
