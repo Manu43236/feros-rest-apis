@@ -23,7 +23,7 @@ public class ClientController {
     private final ClientService clientService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<ClientResponse>>> getAllClients() {
         return ResponseEntity.ok(ApiResponse.success(
                 "Clients fetched successfully", clientService.getAllClients()));
