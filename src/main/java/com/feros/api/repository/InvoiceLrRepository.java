@@ -17,4 +17,7 @@ public interface InvoiceLrRepository extends JpaRepository<InvoiceLr, Long> {
     List<Long> findActiveLrIds(@Param("tenantId") Long tenantId);
 
     List<InvoiceLr> findByTenantIdAndIsActiveTrue(Long tenantId);
+
+    @Query("SELECT DISTINCT il.invoice FROM InvoiceLr il WHERE il.order.id = :orderId AND il.isActive = true")
+    List<com.feros.api.entity.Invoice> findDistinctInvoicesByOrderId(@Param("orderId") Long orderId);
 }

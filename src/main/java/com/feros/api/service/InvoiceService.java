@@ -20,4 +20,5 @@ public interface InvoiceService {
     List<InvoicePaymentResponse> getPayments(Long id);
     void deletePayment(Long invoiceId, Long paymentId);
     List<Long> getInvoicedLrIds();
+    List<InvoiceResponse> getInvoicesByOrder(Long orderId);
 }

@@ -94,6 +94,14 @@ public class InvoiceController {
         return ResponseEntity.ok(ApiResponse.success("Payment deleted", null));
     }
 
+    @GetMapping("/order/{orderId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<InvoiceResponse>>> getInvoicesByOrder(
+            @PathVariable Long orderId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Invoices fetched successfully", invoiceService.getInvoicesByOrder(orderId)));
+    }
+
     @GetMapping("/invoiced-lr-ids")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<List<Long>>> getInvoicedLrIds() {

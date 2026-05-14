@@ -464,4 +464,11 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .createdAt(p.getCreatedAt())
                 .build();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<InvoiceResponse> getInvoicesByOrder(Long orderId) {
+        return invoiceLrRepository.findDistinctInvoicesByOrderId(orderId)
+                .stream().map(this::mapToInvoiceResponse).toList();
+    }
 }
