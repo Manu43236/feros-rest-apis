@@ -95,6 +95,12 @@ public class InventoryController {
 
     // ─── Service Parts (Request + Approval) ──────────────────────────────────
 
+    @GetMapping("/service-parts")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<List<ServicePartResponse>>> getAllRequests() {
+        return ResponseEntity.ok(ApiResponse.success("All requests fetched", inventoryService.getAllRequests()));
+    }
+
     @GetMapping("/service-parts/pending")
     @PreAuthorize("hasAnyRole('ADMIN', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<List<ServicePartResponse>>> getPendingRequests() {

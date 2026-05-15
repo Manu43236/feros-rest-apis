@@ -13,6 +13,7 @@ import java.util.Optional;
 public interface ServicePartRepository extends JpaRepository<ServicePart, Long> {
     List<ServicePart> findByServiceIdOrderByCreatedAtDesc(Long serviceId);
     List<ServicePart> findByService_TenantIdAndStatusOrderByCreatedAtDesc(Long tenantId, ServicePartStatus status);
+    List<ServicePart> findByService_TenantIdOrderByCreatedAtDesc(Long tenantId);
     Optional<ServicePart> findByIdAndService_TenantId(Long id, Long tenantId);
     List<ServicePart> findByService_TenantIdAndService_ServiceDateBetweenAndStatus(Long tenantId, LocalDate from, LocalDate to, ServicePartStatus status);
 }

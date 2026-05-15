@@ -25,6 +25,7 @@ public interface InventoryService {
     void removeServicePart(Long servicePartId);
     List<ServicePartResponse> getPartsForService(Long serviceId);
     List<ServicePartResponse> getPendingRequests();
+    List<ServicePartResponse> getAllRequests();
 
     // Transactions
     List<SparePartsTransactionResponse> getTransactions();

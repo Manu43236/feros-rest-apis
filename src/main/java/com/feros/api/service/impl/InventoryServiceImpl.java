@@ -282,6 +282,13 @@ public class InventoryServiceImpl implements InventoryService {
                 .stream().map(this::toServicePartResponse).toList();
     }
 
+    @Override
+    public List<ServicePartResponse> getAllRequests() {
+        return servicePartRepository
+                .findByService_TenantIdOrderByCreatedAtDesc(getTenantId())
+                .stream().map(this::toServicePartResponse).toList();
+    }
+
     // ─── Transactions ─────────────────────────────────────────────────────────
 
     @Override
