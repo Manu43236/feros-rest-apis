@@ -2,6 +2,7 @@ package com.feros.api.controller;
 
 import com.feros.api.dto.request.*;
 import com.feros.api.dto.response.*;
+import com.feros.api.repository.RoleRepository;
 import com.feros.api.service.GlobalMasterService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/masters/global")
@@ -17,6 +19,20 @@ import java.util.List;
 public class GlobalMasterController {
 
     private final GlobalMasterService globalMasterService;
+    private final RoleRepository roleRepository;
+
+    @GetMapping("/roles")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getAllRoles() {
+        List<Map<String, Object>> roles = roleRepository.findAll().stream()
+                .filter(r -> Boolean.TRUE.equals(r.getIsActive()))
+                .map(r -> Map.<String, Object>of(
+                        "id",          r.getId(),
+                        "name",        r.getName().name(),
+                        "description", r.getDescription() != null ? r.getDescription() : ""
+                ))
+                .toList();
+        return ResponseEntity.ok(ApiResponse.success("Roles fetched successfully", roles));
+    }
 
     // ===================== STATES =====================
     @GetMapping("/states")
