@@ -163,7 +163,7 @@ public class AttendanceController {
     }
 
     @PutMapping("/trip-proofs/{proofId}/review")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<TripProofResponse>> reviewTripProof(
             @PathVariable Long proofId, @RequestBody ReviewTripProofRequest request) {
         return ResponseEntity.ok(ApiResponse.success(

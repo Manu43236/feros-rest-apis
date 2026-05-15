@@ -1,7 +1,9 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.dto.request.ChangePinRequest;
 import com.feros.api.dto.request.LoginRequest;
 import com.feros.api.dto.response.LoginResponse;
+import com.feros.api.util.SecurityUtil;
 import com.feros.api.entity.Role;
 import com.feros.api.entity.User;
 import com.feros.api.exception.FerosException;
@@ -85,5 +87,20 @@ public class AuthServiceImpl implements AuthService {
                 .logoUrl(logoUrl)
                 .isPinResetRequired(user.getIsPinResetRequired())
                 .build();
+    }
+
+    @Override
+    public void changePin(ChangePinRequest request) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
+
+        if (!passwordEncoder.matches(request.getCurrentPin(), user.getPin())) {
+            throw new FerosException("Current PIN is incorrect", HttpStatus.BAD_REQUEST);
+        }
+
+        user.setPin(passwordEncoder.encode(request.getNewPin()));
+        user.setIsPinResetRequired(false);
+        userRepository.save(user);
     }
 }
