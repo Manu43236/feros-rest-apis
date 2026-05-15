@@ -14,4 +14,9 @@ public class MarkOwnAttendanceRequest {
     private Long leaveTypeId;
     private String leaveReason;
     private String remarks;
+
+    // Selfie + location (optional, from mobile self-attendance)
+    private String selfieUrl;
+    private Double latitude;
+    private Double longitude;
 }

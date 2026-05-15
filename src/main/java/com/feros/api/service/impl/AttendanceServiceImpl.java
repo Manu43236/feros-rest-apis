@@ -89,7 +89,11 @@ public class AttendanceServiceImpl implements AttendanceService {
         req.setLeaveReason(request.getLeaveReason());
         req.setRemarks(request.getRemarks());
 
-        return mapToResponse(saveAttendance(req, tenantId, AttendanceApprovalStatus.PENDING));
+        Attendance saved = saveAttendance(req, tenantId, AttendanceApprovalStatus.PENDING);
+        if (request.getSelfieUrl() != null) saved.setSelfieUrl(request.getSelfieUrl());
+        if (request.getLatitude()  != null) saved.setLatitude(request.getLatitude());
+        if (request.getLongitude() != null) saved.setLongitude(request.getLongitude());
+        return mapToResponse(attendanceRepository.save(saved));
     }
 
     @Override
