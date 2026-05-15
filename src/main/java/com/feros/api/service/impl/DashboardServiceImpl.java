@@ -270,6 +270,7 @@ public class DashboardServiceImpl implements DashboardService {
                 orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.FULLY_ASSIGNED) +
                 orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.IN_TRANSIT) +
                 orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.PARTIALLY_DELIVERED));
+        int orderCompleted = (int) orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.COMPLETED);
         int orderDelivered = (int) orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.DELIVERED);
         int orderCancelled = (int) orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.CANCELLED);
 
@@ -314,14 +315,17 @@ public class DashboardServiceImpl implements DashboardService {
         for (Attendance a : todayAll) {
             Long uid  = a.getUser().getId();
             if (!driverIds.contains(uid) && !cleanerIds.contains(uid)) continue;
-            String typeName = a.getAttendanceType().getName();
+            String t = a.getAttendanceType().getName().toUpperCase();
             attTotal++;
-            switch (typeName) {
-                case "PRESENT"    -> { attPresent++;   if (driverIds.contains(uid)) driverPresent++; else cleanerPresent++; }
-                case "ABSENT"     -> attAbsent++;
-                case "HALF_DAY"   -> attHalfDay++;
-                case "WEEKLY_OFF" -> attWeeklyOff++;
-                default           -> {}
+            if (t.contains("PRESENT") && !t.contains("HALF")) {
+                attPresent++;
+                if (driverIds.contains(uid)) driverPresent++; else cleanerPresent++;
+            } else if (t.contains("ABSENT")) {
+                attAbsent++;
+            } else if (t.contains("HALF")) {
+                attHalfDay++;
+            } else if (t.contains("WEEK") || t.contains("OFF")) {
+                attWeeklyOff++;
             }
         }
 
@@ -344,7 +348,7 @@ public class DashboardServiceImpl implements DashboardService {
         return SupervisorDashboardResponse.builder()
                 .orders(SupervisorDashboardResponse.OrderSummary.builder()
                         .total(orderTotal).pending(orderPending).active(orderActive)
-                        .delivered(orderDelivered).cancelled(orderCancelled).build())
+                        .completed(orderCompleted).delivered(orderDelivered).cancelled(orderCancelled).build())
                 .vehicles(SupervisorDashboardResponse.VehicleSummary.builder()
                         .total(vehicleTotal).available(vehicleAvailable).onTrip(vehicleOnTrip)
                         .breakdown(vehicleBreakdown).inactive(vehicleInactive).build())

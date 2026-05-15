@@ -20,6 +20,7 @@ public class SupervisorDashboardResponse {
         private int total;
         private int pending;
         private int active;
+        private int completed;
         private int delivered;
         private int cancelled;
     }
