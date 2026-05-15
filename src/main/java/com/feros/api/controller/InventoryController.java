@@ -73,6 +73,13 @@ public class InventoryController {
         return ResponseEntity.ok(ApiResponse.success("Stock added successfully", null));
     }
 
+    @PostMapping("/stock-out")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<Void>> stockOut(@Valid @RequestBody StockOutRequest request) {
+        inventoryService.stockOut(request);
+        return ResponseEntity.ok(ApiResponse.success("Stock recorded successfully", null));
+    }
+
     @PostMapping("/stock-in/bulk-upload")
     @PreAuthorize("hasAnyRole('ADMIN', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<BulkTenantUploadResponse>> bulkUploadStockIn(@RequestParam("file") MultipartFile file) {

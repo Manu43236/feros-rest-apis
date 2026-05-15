@@ -161,6 +161,41 @@ public class InventoryServiceImpl implements InventoryService {
         transactionRepository.save(tx);
     }
 
+    @Override
+    @Transactional
+    public void stockOut(StockOutRequest request) {
+        Long tenantId = getTenantId();
+        Tenant tenant = getTenant();
+        User user = getCurrentUser();
+
+        SparePart part = sparePartRepository.findByIdAndTenantIdAndIsActiveTrue(request.getSparePartId(), tenantId)
+                .orElseThrow(() -> new FerosException("Spare part not found", HttpStatus.NOT_FOUND));
+
+        SparePartsInventory inv = inventoryRepository.findByTenantIdAndSparePartId(tenantId, part.getId())
+                .orElseThrow(() -> new FerosException("No inventory record found", HttpStatus.NOT_FOUND));
+
+        if (inv.getQuantity() < request.getQuantity())
+            throw new FerosException("Insufficient stock. Available: " + inv.getQuantity(), HttpStatus.BAD_REQUEST);
+
+        inv.setQuantity(inv.getQuantity() - request.getQuantity());
+        inv.setLastUpdated(TimeUtil.nowIst());
+        inventoryRepository.save(inv);
+
+        boolean isDamage = "DAMAGE".equalsIgnoreCase(request.getType());
+        SparePartsTransaction tx = SparePartsTransaction.builder()
+                .tenant(tenant)
+                .sparePart(part)
+                .transactionType(isDamage ? StockTransactionType.DAMAGE : StockTransactionType.OUT)
+                .quantity(request.getQuantity())
+                .unitCost(java.math.BigDecimal.ZERO)
+                .totalCost(java.math.BigDecimal.ZERO)
+                .referenceType(isDamage ? StockReferenceType.DAMAGE : StockReferenceType.ADJUSTMENT)
+                .notes(request.getNotes())
+                .createdBy(user)
+                .build();
+        transactionRepository.save(tx);
+    }
+
     // ─── Service Parts ────────────────────────────────────────────────────────
 
     @Override
