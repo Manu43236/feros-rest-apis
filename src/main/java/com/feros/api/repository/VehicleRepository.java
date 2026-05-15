@@ -1,6 +1,7 @@
 package com.feros.api.repository;
 
 import com.feros.api.entity.Vehicle;
+import com.feros.api.enums.VehicleStatusType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,6 +23,13 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Long> {
     boolean existsByRegistrationNumberAndTenantIdAndIdNot(String registrationNumber, Long tenantId, Long id);
     boolean existsByRegistrationNumberAndOwnershipTypeNameContainingIgnoreCase(String registrationNumber, String ownershipNamePart);
     long countByTenantIdAndIsActiveTrue(Long tenantId);
+    long countByTenantIdAndIsActiveFalse(Long tenantId);
+
+    @Query("SELECT COUNT(v) FROM Vehicle v WHERE v.tenant.id = :tenantId AND v.isActive = true " +
+           "AND v.currentStatus IS NOT NULL AND v.currentStatus.statusType = :type")
+    long countByTenantIdAndIsActiveTrueAndStatusType(@Param("tenantId") Long tenantId,
+                                                     @Param("type") VehicleStatusType type);
+
     @Query("SELECT v FROM Vehicle v WHERE v.tenant.id = :tenantId AND v.isActive = true AND (" +
            "v.insuranceExpiryDate <= :alertDate OR v.permitExpiryDate <= :alertDate OR " +
            "v.fitnessExpiryDate <= :alertDate OR v.pollutionExpiryDate <= :alertDate OR " +

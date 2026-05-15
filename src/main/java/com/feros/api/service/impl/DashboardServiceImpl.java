@@ -8,13 +8,17 @@ import com.feros.api.dto.response.SupervisorDashboardResponse;
 import com.feros.api.entity.Attendance;
 import com.feros.api.entity.Lr;
 import com.feros.api.entity.StaffDocument;
+import com.feros.api.entity.User;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.VehicleDocument;
 import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.enums.InvoiceStatus;
 import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.OrderStatus;
+import com.feros.api.enums.RoleName;
+import com.feros.api.enums.StaffAllocationStatus;
 import com.feros.api.enums.VehicleAllocationStatus;
+import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.repository.*;
 import com.feros.api.service.DashboardService;
 import com.feros.api.util.SecurityUtil;
@@ -26,6 +30,8 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +39,7 @@ public class DashboardServiceImpl implements DashboardService {
 
     private final OrderRepository orderRepository;
     private final OrderVehicleAllocationRepository allocationRepository;
+    private final OrderStaffAllocationRepository staffAllocationRepository;
     private final InvoiceRepository invoiceRepository;
     private final VehicleRepository vehicleRepository;
     private final AttendanceRepository attendanceRepository;
@@ -41,6 +48,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final LrRepository lrRepository;
     private final NotificationRepository notificationRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -253,45 +261,108 @@ public class DashboardServiceImpl implements DashboardService {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         LocalDate today = TimeUtil.today();
 
-        int totalOrders = (int) orderRepository.countByTenantIdAndIsActiveTrue(tenantId);
-        int activeOrders = (int) (
-                orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.IN_TRANSIT) +
-                orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.PARTIALLY_DELIVERED));
-        int pendingAssignments = (int) (
+        // ── Orders ───────────────────────────────────────────────────────────
+        int orderTotal     = (int) orderRepository.countByTenantIdAndIsActiveTrue(tenantId);
+        int orderPending   = (int) (
                 orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.PENDING) +
                 orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.PARTIALLY_ASSIGNED));
+        int orderActive    = (int) (
+                orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.FULLY_ASSIGNED) +
+                orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.IN_TRANSIT) +
+                orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.PARTIALLY_DELIVERED));
+        int orderDelivered = (int) orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.DELIVERED);
+        int orderCancelled = (int) orderRepository.countByTenantIdAndOrderStatusAndIsActiveTrue(tenantId, OrderStatus.CANCELLED);
 
-        int todayPresent = (int) attendanceRepository
-                .findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, today)
-                .stream()
-                .filter(a -> a.getAttendanceType().getName().toLowerCase().contains("present"))
-                .count();
+        // ── Vehicles ─────────────────────────────────────────────────────────
+        int vehicleTotal     = (int) vehicleRepository.countByTenantIdAndIsActiveTrue(tenantId);
+        int vehicleAvailable = (int) vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.AVAILABLE);
+        int vehicleOnTrip    = (int) (
+                vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.ON_TRIP) +
+                vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.ASSIGNED));
+        int vehicleBreakdown = (int) (
+                vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.BREAKDOWN) +
+                vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.IN_REPAIR));
+        int vehicleInactive  = (int) vehicleRepository.countByTenantIdAndIsActiveFalse(tenantId);
 
-        int unreadCount = (int) notificationRepository.countUnread(tenantId, userId);
+        // ── Staff — Drivers & Cleaners ────────────────────────────────────────
+        List<User> allStaff = userRepository.findByTenantIdAndRoleNames(
+                tenantId, List.of(RoleName.DRIVER, RoleName.CLEANER));
 
-        List<SupervisorDashboardResponse.ActiveTripItem> activeTrips = lrRepository
-                .findByTenantIdAndLrStatus(tenantId, LrStatus.IN_TRANSIT)
-                .stream()
-                .map(lr -> SupervisorDashboardResponse.ActiveTripItem.builder()
-                        .lrId(lr.getId())
-                        .lrNumber(lr.getLrNumber())
-                        .vehicleNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
-                        .clientName(lr.getOrder().getClient().getClientName())
-                        .fromCity(lr.getOrder().getSourceCity() != null
-                                ? lr.getOrder().getSourceCity().getName() : "—")
-                        .toCity(lr.getOrder().getDestinationCity() != null
-                                ? lr.getOrder().getDestinationCity().getName() : "—")
-                        .expectedDeliveryDate(lr.getVehicleAllocation().getExpectedDeliveryDate())
-                        .build())
+        List<User> drivers  = allStaff.stream()
+                .filter(u -> Boolean.TRUE.equals(u.getIsActive()) &&
+                        u.getRoles().stream().anyMatch(r -> r.getName() == RoleName.DRIVER))
+                .toList();
+        List<User> cleaners = allStaff.stream()
+                .filter(u -> Boolean.TRUE.equals(u.getIsActive()) &&
+                        u.getRoles().stream().anyMatch(r -> r.getName() == RoleName.CLEANER))
                 .toList();
 
+        int driversOnTrip  = (int) staffAllocationRepository
+                .countDistinctUsersByTenantIdAndRoleAndStatus(tenantId, RoleName.DRIVER, StaffAllocationStatus.IN_TRANSIT);
+        int cleanersOnTrip = (int) staffAllocationRepository
+                .countDistinctUsersByTenantIdAndRoleAndStatus(tenantId, RoleName.CLEANER, StaffAllocationStatus.IN_TRANSIT);
+
+        // ── Today's Attendance ────────────────────────────────────────────────
+        List<Attendance> todayAll = attendanceRepository
+                .findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, today);
+
+        Set<Long> driverIds  = drivers.stream().map(User::getId).collect(Collectors.toSet());
+        Set<Long> cleanerIds = cleaners.stream().map(User::getId).collect(Collectors.toSet());
+
+        int attTotal = 0, attPresent = 0, attAbsent = 0, attHalfDay = 0, attWeeklyOff = 0;
+        int driverPresent = 0, cleanerPresent = 0;
+        for (Attendance a : todayAll) {
+            Long uid  = a.getUser().getId();
+            if (!driverIds.contains(uid) && !cleanerIds.contains(uid)) continue;
+            String typeName = a.getAttendanceType().getName();
+            attTotal++;
+            switch (typeName) {
+                case "PRESENT"    -> { attPresent++;   if (driverIds.contains(uid)) driverPresent++; else cleanerPresent++; }
+                case "ABSENT"     -> attAbsent++;
+                case "HALF_DAY"   -> attHalfDay++;
+                case "WEEKLY_OFF" -> attWeeklyOff++;
+                default           -> {}
+            }
+        }
+
+        // ── LRs ──────────────────────────────────────────────────────────────
+        List<Lr> allLrs = lrRepository.findByTenantIdAndIsActiveTrue(tenantId);
+        int lrCreated = 0, lrLoaded = 0, lrInTransit = 0, lrDelivered = 0, lrCancelled = 0;
+        for (Lr lr : allLrs) {
+            switch (lr.getLrStatus()) {
+                case CREATED       -> lrCreated++;
+                case WEIGHT_LOADED -> lrLoaded++;
+                case IN_TRANSIT    -> lrInTransit++;
+                case DELIVERED     -> lrDelivered++;
+                case CANCELLED     -> lrCancelled++;
+            }
+        }
+
+        // ── Notifications ─────────────────────────────────────────────────────
+        int unreadCount = (int) notificationRepository.countUnread(tenantId, userId);
+
         return SupervisorDashboardResponse.builder()
-                .totalOrders(totalOrders)
-                .activeOrders(activeOrders)
-                .pendingAssignments(pendingAssignments)
-                .todayPresent(todayPresent)
+                .orders(SupervisorDashboardResponse.OrderSummary.builder()
+                        .total(orderTotal).pending(orderPending).active(orderActive)
+                        .delivered(orderDelivered).cancelled(orderCancelled).build())
+                .vehicles(SupervisorDashboardResponse.VehicleSummary.builder()
+                        .total(vehicleTotal).available(vehicleAvailable).onTrip(vehicleOnTrip)
+                        .breakdown(vehicleBreakdown).inactive(vehicleInactive).build())
+                .drivers(SupervisorDashboardResponse.StaffSummary.builder()
+                        .total(drivers.size()).onTrip(driversOnTrip)
+                        .available(Math.max(0, drivers.size() - driversOnTrip))
+                        .todayPresent(driverPresent).build())
+                .cleaners(SupervisorDashboardResponse.StaffSummary.builder()
+                        .total(cleaners.size()).onTrip(cleanersOnTrip)
+                        .available(Math.max(0, cleaners.size() - cleanersOnTrip))
+                        .todayPresent(cleanerPresent).build())
+                .lrs(SupervisorDashboardResponse.LrSummary.builder()
+                        .total(allLrs.size()).created(lrCreated).loaded(lrLoaded)
+                        .inTransit(lrInTransit).delivered(lrDelivered).cancelled(lrCancelled).build())
+                .attendance(SupervisorDashboardResponse.AttendanceSummary.builder()
+                        .total(attTotal).present(attPresent).absent(attAbsent)
+                        .halfDay(attHalfDay).weeklyOff(attWeeklyOff).build())
                 .unreadNotifications(unreadCount)
-                .activeTrips(activeTrips)
                 .build();
     }
 

@@ -1,6 +1,7 @@
 package com.feros.api.repository;
 
 import com.feros.api.entity.OrderStaffAllocation;
+import com.feros.api.enums.RoleName;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -57,4 +58,11 @@ public interface OrderStaffAllocationRepository extends JpaRepository<OrderStaff
     @Query("SELECT sa FROM OrderStaffAllocation sa WHERE sa.tenant.id = :tenantId AND sa.isActive = true " +
            "AND sa.order.id = :orderId")
     List<OrderStaffAllocation> findByTenantIdAndOrderId(@Param("tenantId") Long tenantId, @Param("orderId") Long orderId);
+
+    @Query("SELECT COUNT(DISTINCT sa.user.id) FROM OrderStaffAllocation sa " +
+           "WHERE sa.tenant.id = :tenantId AND sa.isActive = true " +
+           "AND sa.role.name = :roleName AND sa.allocationStatus = :status")
+    long countDistinctUsersByTenantIdAndRoleAndStatus(@Param("tenantId") Long tenantId,
+                                                      @Param("roleName") RoleName roleName,
+                                                      @Param("status") com.feros.api.enums.StaffAllocationStatus status);
 }
