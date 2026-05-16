@@ -22,7 +22,7 @@ public class VehicleBreakdownController {
 
     // Admin / Supervisor / OfficeStaff — report breakdown by order + allocation
     @PostMapping("/orders/{orderId}/vehicle-allocations/{allocationId}/breakdown")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MEN')")
     public ResponseEntity<ApiResponse<BreakdownResponse>> reportBreakdown(
             @PathVariable Long orderId,
             @PathVariable Long allocationId,
