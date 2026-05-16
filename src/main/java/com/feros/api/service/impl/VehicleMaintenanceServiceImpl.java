@@ -111,7 +111,8 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                     });
         }
 
-        for (VehicleServiceTaskRequest taskReq : request.getTasks()) {
+        List<VehicleServiceTaskRequest> taskRequests = request.getTasks() != null ? request.getTasks() : new ArrayList<>();
+        for (VehicleServiceTaskRequest taskReq : taskRequests) {
             ServiceTaskType taskType = null;
             if (taskReq.getTaskTypeId() != null) {
                 taskType = serviceTaskTypeRepository.findById(taskReq.getTaskTypeId()).orElse(null);
@@ -262,6 +263,38 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .orElseThrow(() -> new FerosException("Task not found", HttpStatus.NOT_FOUND));
 
         task.setStatus(ServiceTaskStatus.COMPLETED);
+        vehicleServiceTaskRepository.save(task);
+
+        return mapToResponse(vehicleServiceRepository.findById(vs.getId()).orElse(vs));
+    }
+
+    @Override
+    @Transactional
+    public VehicleServiceResponse addTask(Long serviceId, VehicleServiceTaskRequest request) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        VehicleService vs = vehicleServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+
+        if (vs.getStatus() == ServiceStatus.COMPLETED) {
+            throw new FerosException("Cannot add tasks to a completed service", HttpStatus.BAD_REQUEST);
+        }
+
+        ServiceTaskType taskType = null;
+        if (request.getTaskTypeId() != null) {
+            taskType = serviceTaskTypeRepository.findById(request.getTaskTypeId()).orElse(null);
+        }
+
+        VehicleServiceTask task = VehicleServiceTask.builder()
+                .service(vs)
+                .taskType(taskType)
+                .customName(request.getCustomName())
+                .isRecurring(Boolean.TRUE.equals(request.getIsRecurring()))
+                .frequencyKm(request.getFrequencyKm())
+                .cost(request.getCost())
+                .status(ServiceTaskStatus.PENDING)
+                .build();
         vehicleServiceTaskRepository.save(task);
 
         return mapToResponse(vehicleServiceRepository.findById(vs.getId()).orElse(vs));

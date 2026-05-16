@@ -3,7 +3,6 @@ package com.feros.api.dto.request;
 import com.feros.api.enums.ServicePayerType;
 import com.feros.api.enums.ServiceTriggeredBy;
 import com.feros.api.enums.VehicleServiceType;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
@@ -48,6 +47,5 @@ public class VehicleServiceRequest {
     // Escalation flag (internal mechanic escalated to 3rd party)
     private Boolean isEscalated;
 
-    @NotEmpty(message = "At least one task is required")
     private List<VehicleServiceTaskRequest> tasks;
 }

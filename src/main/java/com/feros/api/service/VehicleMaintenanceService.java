@@ -2,6 +2,7 @@ package com.feros.api.service;
 
 import com.feros.api.dto.request.CompleteServiceRequest;
 import com.feros.api.dto.request.VehicleServiceRequest;
+import com.feros.api.dto.request.VehicleServiceTaskRequest;
 import com.feros.api.dto.response.VehicleServiceResponse;
 
 import java.util.List;
@@ -16,5 +17,6 @@ public interface VehicleMaintenanceService {
     VehicleServiceResponse updateNotes(Long id, String notes);
     VehicleServiceResponse complete(Long id, CompleteServiceRequest request);
     VehicleServiceResponse completeTask(Long serviceId, Long taskId);
+    VehicleServiceResponse addTask(Long serviceId, VehicleServiceTaskRequest request);
     void delete(Long id);
 }

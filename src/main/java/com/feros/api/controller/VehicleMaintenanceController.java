@@ -2,6 +2,7 @@ package com.feros.api.controller;
 
 import com.feros.api.dto.request.CompleteServiceRequest;
 import com.feros.api.dto.request.VehicleServiceRequest;
+import com.feros.api.dto.request.VehicleServiceTaskRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.VehicleServiceResponse;
 import com.feros.api.service.VehicleMaintenanceService;
@@ -77,6 +78,14 @@ public class VehicleMaintenanceController {
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> completeTask(
             @PathVariable Long serviceId, @PathVariable Long taskId) {
         return ResponseEntity.ok(ApiResponse.success("Task marked complete", vehicleMaintenanceService.completeTask(serviceId, taskId)));
+    }
+
+    @PostMapping("/{id}/tasks")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MEN')")
+    public ResponseEntity<ApiResponse<VehicleServiceResponse>> addTask(
+            @PathVariable Long id,
+            @RequestBody VehicleServiceTaskRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Task added successfully", vehicleMaintenanceService.addTask(id, request)));
     }
 
     @DeleteMapping("/{id}")
