@@ -10,8 +10,11 @@ import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.StockReferenceType;
 import com.feros.api.enums.StockTransactionType;
 import com.feros.api.exception.FerosException;
+import com.feros.api.enums.NotificationType;
+import com.feros.api.enums.RoleName;
 import com.feros.api.repository.*;
 import com.feros.api.service.InventoryService;
+import com.feros.api.service.NotificationService;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import com.opencsv.CSVReader;
@@ -39,6 +42,7 @@ public class InventoryServiceImpl implements InventoryService {
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
+    private final NotificationService notificationService;
 
     private Long getTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -267,7 +271,17 @@ public class InventoryServiceImpl implements InventoryService {
                 .requestedBy(user)
                 .build();
 
-        return toServicePartResponse(servicePartRepository.save(sp));
+        ServicePart saved = servicePartRepository.save(sp);
+
+        // Notify STORE_KEEPER of the new part request
+        notificationService.sendToRoles(getTenant(),
+                java.util.Arrays.asList(RoleName.STORE_KEEPER),
+                NotificationType.PART_REQUESTED,
+                "Part Requested",
+                user.getName() + " requested " + request.getQuantityRequested() + "x " + part.getName()
+                        + " for service #" + service.getId());
+
+        return toServicePartResponse(saved);
     }
 
     @Override

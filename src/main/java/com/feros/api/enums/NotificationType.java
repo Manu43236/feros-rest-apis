@@ -12,5 +12,6 @@ public enum NotificationType {
     TYRE_ROTATION,
     TYRE_EXPIRY,
     TYRE_ROTATION_DUE,
-    ATTENDANCE
+    ATTENDANCE,
+    PART_REQUESTED
 }
