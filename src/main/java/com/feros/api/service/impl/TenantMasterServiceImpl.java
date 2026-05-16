@@ -379,6 +379,10 @@ public class TenantMasterServiceImpl implements TenantMasterService {
             settings.setAttendanceEnforced(request.getAttendanceEnforced());
         if (request.getAttendanceDeadlineTime() != null)
             settings.setAttendanceDeadlineTime(request.getAttendanceDeadlineTime());
+        if (request.getRequireTireApproval() != null)
+            settings.setRequireTireApproval(request.getRequireTireApproval());
+        if (request.getRequireSparePartApproval() != null)
+            settings.setRequireSparePartApproval(request.getRequireSparePartApproval());
 
         return mapSettings(tenantSettingsRepository.save(settings));
     }
@@ -465,6 +469,8 @@ public class TenantMasterServiceImpl implements TenantMasterService {
                 .tripBonusAmount(s.getTripBonusAmount())
                 .attendanceEnforced(s.getAttendanceEnforced())
                 .attendanceDeadlineTime(s.getAttendanceDeadlineTime())
+                .requireTireApproval(s.getRequireTireApproval())
+                .requireSparePartApproval(s.getRequireSparePartApproval())
                 .isActive(s.getIsActive()).createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt()).build();
     }

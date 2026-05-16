@@ -642,7 +642,10 @@
       "Bash(cd /Users/manu/Documents/FEROS/mobile && flutter analyze --no-pub 2>&1 | grep \"• error •\")",
       "Bash(mvn compile -q 2>&1 | tail -40)",
       "Bash(ls /Users/manu/Documents/FEROS/api/src/main/java/com/feros/api/dto/request/Tire*.java)",
-      "Bash(mvn compile 2>&1 | grep -E \"ERROR|BUILD|INFO: BUILD\" | tail -20)"
+      "Bash(mvn compile 2>&1 | grep -E \"ERROR|BUILD|INFO: BUILD\" | tail -20)",
+      "Bash(git commit -m \"$\\(cat <<'EOF'\nfeat: add tenant approval toggles for tire fitting and spare parts\n\n- Add requireTireApproval + requireSparePartApproval flags to TenantSettings\n- New TireIssueRequest entity + TireRequestStatus enum for tire request flow\n- TireRequestController: POST /tire-requests, GET pending/all, PATCH approve/reject\n- TireRequestService/Impl: approve creates VehicleTireFitting via TireService\n- TenantController: GET /tenants/settings + PATCH /tenants/my/settings \\(all roles can read\\)\n- TireServiceImpl.fitTire\\(\\): blocks SERVICE_MEN direct fit if requireTireApproval = true\n- InventoryServiceImpl.requestPart\\(\\): auto-approves + deducts stock if requireSparePartApproval = false\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(mvn compile 2>&1 | grep -E \"ERROR|BUILD\" | tail -10)",
+      "Bash(git add -A && git commit -m \"$\\(cat <<'EOF'\nfeat: expose requireTireApproval and requireSparePartApproval in tenant settings API\n\n- Add fields to TenantSettingsRequest, TenantMasterResponse\n- Update TenantMasterServiceImpl to save and return new approval toggle fields\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push)"
     ]
   }
 }

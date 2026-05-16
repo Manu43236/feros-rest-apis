@@ -56,6 +56,8 @@ public class TenantMasterResponse {
     private BigDecimal tripBonusAmount;
     private Boolean attendanceEnforced;
     private LocalTime attendanceDeadlineTime;
+    private Boolean requireTireApproval;
+    private Boolean requireSparePartApproval;
 
     private Boolean isActive;
     private LocalDateTime createdAt;
