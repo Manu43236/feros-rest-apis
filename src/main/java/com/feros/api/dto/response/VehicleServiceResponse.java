@@ -45,4 +45,6 @@ public class VehicleServiceResponse {
     private LocalDateTime startedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Long invoiceId;
+    private String invoiceNumber;
 }

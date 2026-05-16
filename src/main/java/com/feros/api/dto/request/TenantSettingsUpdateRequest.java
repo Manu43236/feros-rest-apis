@@ -18,4 +18,5 @@ public class TenantSettingsUpdateRequest {
     private LocalTime attendanceDeadlineTime;
     private Boolean requireTireApproval;
     private Boolean requireSparePartApproval;
+    private BigDecimal serviceGstRate;
 }

@@ -25,4 +25,5 @@ public class TenantSettingsResponse {
     private LocalTime attendanceDeadlineTime;
     private Boolean requireTireApproval;
     private Boolean requireSparePartApproval;
+    private java.math.BigDecimal serviceGstRate;
 }

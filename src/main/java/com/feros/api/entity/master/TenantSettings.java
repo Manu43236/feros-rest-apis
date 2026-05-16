@@ -63,6 +63,10 @@ public class TenantSettings extends BaseEntity {
     private Boolean requireSparePartApproval = false;
 
     @Builder.Default
+    @Column(name = "service_gst_rate", precision = 5, scale = 2)
+    private java.math.BigDecimal serviceGstRate = java.math.BigDecimal.valueOf(18.00);
+
+    @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;
 }

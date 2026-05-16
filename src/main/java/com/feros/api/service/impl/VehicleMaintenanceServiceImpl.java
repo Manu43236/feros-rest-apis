@@ -8,7 +8,10 @@ import com.feros.api.dto.response.VehicleServiceResponse;
 import com.feros.api.dto.response.VehicleServiceTaskResponse;
 import com.feros.api.entity.*;
 import com.feros.api.entity.master.ServiceTaskType;
+import com.feros.api.entity.master.TenantSettings;
 import com.feros.api.enums.BreakdownStatus;
+import com.feros.api.enums.ServiceInvoiceStatus;
+import com.feros.api.enums.ServiceInvoiceType;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTaskStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
@@ -25,6 +28,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +46,8 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     private final VehicleBreakdownRepository vehicleBreakdownRepository;
     private final VehicleStatusRepository vehicleStatusRepository;
     private final ServiceTaskTypeRepository serviceTaskTypeRepository;
+    private final ServiceInvoiceRepository serviceInvoiceRepository;
+    private final TenantSettingsRepository tenantSettingsRepository;
 
     @Override
     @Transactional
@@ -245,6 +252,11 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
             autoScheduleNextServices(vs);
         }
 
+        // Auto-create service invoice if not already created
+        if (!serviceInvoiceRepository.findByServiceIdAndIsActiveTrue(id).isPresent()) {
+            createServiceInvoice(vs, request);
+        }
+
         return mapToResponse(vehicleServiceRepository.findById(vs.getId()).orElse(vs));
     }
 
@@ -308,6 +320,60 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
         vs.setIsActive(false);
         vehicleServiceRepository.save(vs);
+    }
+
+    private void createServiceInvoice(VehicleService vs, CompleteServiceRequest request) {
+        boolean isInternal = vs.getServiceType() == VehicleServiceType.INTERNAL;
+
+        String prefix = vs.getTenant().getPrefix() != null && !vs.getTenant().getPrefix().isBlank()
+                ? vs.getTenant().getPrefix().trim().toUpperCase()
+                : "T" + vs.getTenant().getId();
+        String invoiceNumber = prefix + "_SERVICEINV_" +
+                TimeUtil.nowIst().format(DateTimeFormatter.ofPattern("ddMMyyHHmmssSSS"));
+
+        ServiceInvoice.ServiceInvoiceBuilder builder = ServiceInvoice.builder()
+                .tenant(vs.getTenant())
+                .service(vs)
+                .invoiceNumber(invoiceNumber)
+                .invoiceType(isInternal ? ServiceInvoiceType.INTERNAL : ServiceInvoiceType.EXTERNAL)
+                .paymentStatus(ServiceInvoiceStatus.PENDING)
+                .isActive(true);
+
+        if (isInternal) {
+            // Sum task costs
+            BigDecimal tasksTotal = vs.getTasks().stream()
+                    .map(t -> t.getCost() != null ? t.getCost() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal labour = request.getLabourCharges() != null
+                    ? request.getLabourCharges() : BigDecimal.ZERO;
+            BigDecimal subTotal = tasksTotal.add(labour);
+
+            // Get GST rate from tenant settings
+            BigDecimal gstRate = tenantSettingsRepository.findByTenantId(vs.getTenant().getId())
+                    .map(TenantSettings::getServiceGstRate)
+                    .orElse(BigDecimal.valueOf(18.00));
+            BigDecimal gstAmount = subTotal.multiply(gstRate)
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            BigDecimal total = subTotal.add(gstAmount);
+
+            builder.tasksTotal(tasksTotal)
+                    .labourCharges(labour)
+                    .subTotal(subTotal)
+                    .gstRate(gstRate)
+                    .gstAmount(gstAmount)
+                    .totalAmount(total);
+        } else {
+            BigDecimal vendorAmt = request.getVendorAmount() != null ? request.getVendorAmount() : BigDecimal.ZERO;
+            builder.vendorAmount(vendorAmt)
+                    .vendorInvoiceNo(request.getVendorInvoiceNo())
+                    .totalAmount(vendorAmt)
+                    .gstRate(BigDecimal.ZERO)
+                    .gstAmount(BigDecimal.ZERO)
+                    .subTotal(vendorAmt);
+        }
+
+        serviceInvoiceRepository.save(builder.build());
     }
 
     private void autoScheduleNextServices(VehicleService completedService) {
@@ -390,6 +456,9 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                         .build())
                 .toList();
 
+        // Look up linked invoice if any
+        ServiceInvoice invoice = serviceInvoiceRepository.findByServiceIdAndIsActiveTrue(vs.getId()).orElse(null);
+
         return VehicleServiceResponse.builder()
                 .id(vs.getId())
                 .tenantId(vs.getTenant().getId())
@@ -419,6 +488,8 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .startedAt(vs.getStartedAt())
                 .createdAt(vs.getCreatedAt())
                 .updatedAt(vs.getUpdatedAt())
+                .invoiceId(invoice != null ? invoice.getId() : null)
+                .invoiceNumber(invoice != null ? invoice.getInvoiceNumber() : null)
                 .build();
     }
 }

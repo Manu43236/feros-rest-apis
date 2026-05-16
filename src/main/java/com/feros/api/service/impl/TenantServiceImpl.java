@@ -489,6 +489,7 @@ public class TenantServiceImpl implements TenantService {
         if (request.getAttendanceDeadlineTime() != null)         settings.setAttendanceDeadlineTime(request.getAttendanceDeadlineTime());
         if (request.getRequireTireApproval() != null)            settings.setRequireTireApproval(request.getRequireTireApproval());
         if (request.getRequireSparePartApproval() != null)       settings.setRequireSparePartApproval(request.getRequireSparePartApproval());
+        if (request.getServiceGstRate() != null)                 settings.setServiceGstRate(request.getServiceGstRate());
 
         return mapSettingsToResponse(tenantSettingsRepository.save(settings));
     }
@@ -508,6 +509,7 @@ public class TenantServiceImpl implements TenantService {
                 .attendanceDeadlineTime(s.getAttendanceDeadlineTime())
                 .requireTireApproval(s.getRequireTireApproval())
                 .requireSparePartApproval(s.getRequireSparePartApproval())
+                .serviceGstRate(s.getServiceGstRate())
                 .build();
     }
 
