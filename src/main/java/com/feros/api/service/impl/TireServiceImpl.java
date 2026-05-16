@@ -229,7 +229,7 @@ public class TireServiceImpl implements TireService {
                 .vehicle(vehicle)
                 .tire(tire)
                 .position(position)
-                .fittedAtKm(request.getFittedAtKm())
+                .fittedAtKm(request.getFittedAtKm() != null ? request.getFittedAtKm() : java.math.BigDecimal.ZERO)
                 .fittedDate(request.getFittedDate() != null ? request.getFittedDate() : TimeUtil.today())
                 .fittedBy(fittedBy)
                 .notes(request.getNotes())
