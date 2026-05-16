@@ -156,7 +156,7 @@ public class TireServiceImpl implements TireService {
 
         // Get all active fittings for this vehicle indexed by positionId
         Map<Long, VehicleTireFitting> fittingByPosition = fittingRepository
-                .findByVehicleIdAndRemovedAtKmIsNullAndIsActiveTrueOrderByPositionDisplayOrderAsc(vehicleId)
+                .findByVehicleIdAndRemovedDateIsNullAndIsActiveTrueOrderByPositionDisplayOrderAsc(vehicleId)
                 .stream().collect(Collectors.toMap(f -> f.getPosition().getId(), f -> f));
 
         return positions.stream()
@@ -184,7 +184,7 @@ public class TireServiceImpl implements TireService {
         VehicleTirePosition position = findPosition(id, tenantId);
 
         // Cannot delete if a tire is currently fitted here
-        fittingRepository.findByPositionIdAndRemovedAtKmIsNullAndIsActiveTrue(id)
+        fittingRepository.findByPositionIdAndRemovedDateIsNullAndIsActiveTrue(id)
                 .ifPresent(f -> { throw new FerosException("Cannot remove position — tire is currently fitted here", HttpStatus.CONFLICT); });
 
         position.setIsActive(false);
@@ -209,7 +209,7 @@ public class TireServiceImpl implements TireService {
         if (tire.getStatus() != TireStatus.IN_STOCK) {
             throw new FerosException("Tire is not available (status: " + tire.getStatus() + ")", HttpStatus.CONFLICT);
         }
-        fittingRepository.findByPositionIdAndRemovedAtKmIsNullAndIsActiveTrue(position.getId())
+        fittingRepository.findByPositionIdAndRemovedDateIsNullAndIsActiveTrue(position.getId())
                 .ifPresent(f -> { throw new FerosException("Position already has a tire fitted", HttpStatus.CONFLICT); });
 
         VehicleTireFitting fitting = VehicleTireFitting.builder()
@@ -250,7 +250,7 @@ public class TireServiceImpl implements TireService {
         if (!fitting.getTenant().getId().equals(tenantId)) {
             throw new FerosException("Fitting not found", HttpStatus.NOT_FOUND);
         }
-        if (fitting.getRemovedAtKm() != null) {
+        if (fitting.getRemovedDate() != null) {
             throw new FerosException("Tire already removed from this fitting", HttpStatus.CONFLICT);
         }
 
@@ -348,7 +348,7 @@ public class TireServiceImpl implements TireService {
 
             // Find and close the old fitting
             VehicleTireFitting oldFitting = fittingRepository
-                    .findByPositionIdAndRemovedAtKmIsNullAndIsActiveTrue(fromPos.getId())
+                    .findByPositionIdAndRemovedDateIsNullAndIsActiveTrue(fromPos.getId())
                     .orElseThrow(() -> new FerosException("No active fitting found for position: " + fromPos.getPositionCode(), HttpStatus.NOT_FOUND));
 
             oldFitting.setRemovedAtKm(request.getOdometerKm());

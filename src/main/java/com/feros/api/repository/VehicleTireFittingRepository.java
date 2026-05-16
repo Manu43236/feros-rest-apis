@@ -10,11 +10,11 @@ import java.util.Optional;
 
 public interface VehicleTireFittingRepository extends JpaRepository<VehicleTireFitting, Long> {
 
-    // Currently fitted (not yet removed)
-    List<VehicleTireFitting> findByVehicleIdAndRemovedAtKmIsNullAndIsActiveTrueOrderByPositionDisplayOrderAsc(Long vehicleId);
+    // Currently fitted (not yet removed) — use removedDate as the canonical removed flag
+    List<VehicleTireFitting> findByVehicleIdAndRemovedDateIsNullAndIsActiveTrueOrderByPositionDisplayOrderAsc(Long vehicleId);
 
     // Currently fitted tire at a specific position
-    Optional<VehicleTireFitting> findByPositionIdAndRemovedAtKmIsNullAndIsActiveTrue(Long positionId);
+    Optional<VehicleTireFitting> findByPositionIdAndRemovedDateIsNullAndIsActiveTrue(Long positionId);
 
     // History for a vehicle
     List<VehicleTireFitting> findByVehicleIdAndIsActiveTrueOrderByFittedDateDescIdDesc(Long vehicleId);
@@ -23,11 +23,11 @@ public interface VehicleTireFittingRepository extends JpaRepository<VehicleTireF
     List<VehicleTireFitting> findByTireIdAndIsActiveTrueOrderByFittedDateDescIdDesc(Long tireId);
 
     // Check if a tire is currently fitted anywhere
-    @Query("SELECT f FROM VehicleTireFitting f WHERE f.tire.id = :tireId AND f.removedAtKm IS NULL AND f.isActive = true")
+    @Query("SELECT f FROM VehicleTireFitting f WHERE f.tire.id = :tireId AND f.removedDate IS NULL AND f.isActive = true")
     Optional<VehicleTireFitting> findCurrentFittingForTire(@Param("tireId") Long tireId);
 
     // All active fittings for a tenant — used to build vehicle context on tire list
-    @Query("SELECT f FROM VehicleTireFitting f WHERE f.tenant.id = :tenantId AND f.removedAtKm IS NULL AND f.isActive = true")
+    @Query("SELECT f FROM VehicleTireFitting f WHERE f.tenant.id = :tenantId AND f.removedDate IS NULL AND f.isActive = true")
     List<VehicleTireFitting> findAllActiveFittingsByTenantId(@Param("tenantId") Long tenantId);
 
     // All fittings (active + historical) for a tenant — for km/cost analysis
