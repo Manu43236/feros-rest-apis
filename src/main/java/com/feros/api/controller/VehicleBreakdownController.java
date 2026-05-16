@@ -94,7 +94,7 @@ public class VehicleBreakdownController {
 
     // Standalone — mark available vehicle as BREAKDOWN (not on any order)
     @PostMapping("/vehicles/{vehicleId}/breakdown")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MEN')")
     public ResponseEntity<ApiResponse<BreakdownResponse>> reportStandaloneBreakdown(
             @PathVariable Long vehicleId,
             @Valid @RequestBody BreakdownRequest request) {
