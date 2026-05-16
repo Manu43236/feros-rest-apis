@@ -13,5 +13,7 @@ public interface TireRepository extends JpaRepository<Tire, Long> {
 
     List<Tire> findByTenantIdAndStatusAndIsActiveTrueOrderByIdDesc(Long tenantId, TireStatus status);
 
+    Optional<Tire> findFirstByTenantIdAndStatusAndIsActiveTrueOrderByIdAsc(Long tenantId, TireStatus status);
+
     Optional<Tire> findByTenantIdAndSerialNumberAndIsActiveTrue(Long tenantId, String serialNumber);
 }

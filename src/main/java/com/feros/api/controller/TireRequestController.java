@@ -48,7 +48,8 @@ public class TireRequestController {
     @PatchMapping("/{id}/approve")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<TireRequestResponse>> approveRequest(
-            @PathVariable Long id, @RequestBody TireRequestApproveRequest request) {
+            @PathVariable Long id,
+            @RequestBody(required = false) TireRequestApproveRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Tire request approved, tire fitted", tireRequestService.approveRequest(id, request)));
     }
 

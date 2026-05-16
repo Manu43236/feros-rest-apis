@@ -7,6 +7,7 @@ import com.feros.api.dto.request.TireRequestRejectRequest;
 import com.feros.api.dto.response.TireRequestResponse;
 import com.feros.api.entity.*;
 import com.feros.api.enums.TireRequestStatus;
+import com.feros.api.enums.TireStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.TireRequestService;
@@ -105,23 +106,26 @@ public class TireRequestServiceImpl implements TireRequestService {
         User approvedBy = userRepository.findById(userId)
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
 
+        // Auto-select the oldest IN_STOCK tire (FIFO)
+        Tire issuedTire = tireRepository.findFirstByTenantIdAndStatusAndIsActiveTrueOrderByIdAsc(
+                        tenantId, TireStatus.IN_STOCK)
+                .orElseThrow(() -> new FerosException("No tires available in stock", HttpStatus.BAD_REQUEST));
+
         // Create the fitting via TireService — handles all validations + notifications
         TireFitRequest fitRequest = new TireFitRequest();
         fitRequest.setVehicleId(tireRequest.getVehicle().getId());
-        fitRequest.setTireId(request.getTireId());
+        fitRequest.setTireId(issuedTire.getId());
         fitRequest.setPositionId(tireRequest.getPosition().getId());
-        fitRequest.setFittedAtKm(request.getFittedAtKm());
+        fitRequest.setFittedAtKm(request != null ? request.getFittedAtKm() : null);
         fitRequest.setFittedDate(TimeUtil.today());
 
         tireService.fitTire(fitRequest);
 
-        Tire issuedTire = tireRepository.findById(request.getTireId())
-                .orElseThrow(() -> new FerosException("Tire not found", HttpStatus.NOT_FOUND));
         tireRequest.setIssuedTire(issuedTire);
         tireRequest.setStatus(TireRequestStatus.APPROVED);
         tireRequest.setApprovedBy(approvedBy);
         tireRequest.setApprovedAt(TimeUtil.nowIst());
-        tireRequest.setFittedAtKm(request.getFittedAtKm());
+        tireRequest.setFittedAtKm(request != null ? request.getFittedAtKm() : null);
 
         return toResponse(tireRequestRepository.save(tireRequest));
     }

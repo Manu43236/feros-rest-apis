@@ -6,6 +6,5 @@ import java.math.BigDecimal;
 
 @Data
 public class TireRequestApproveRequest {
-    private Long tireId;
     private BigDecimal fittedAtKm;
 }
