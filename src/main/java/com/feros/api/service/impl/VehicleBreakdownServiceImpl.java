@@ -351,6 +351,16 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
                 .toList();
     }
 
+    @Override
+    public List<BreakdownResponse> getAllBreakdowns() {
+        Long tenantId = getTenantId();
+        return breakdownRepository
+                .findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(tenantId)
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
     // ── standalone breakdown (available vehicle — not on any order) ───────────
 
     @Override

@@ -29,6 +29,9 @@ public interface VehicleBreakdownService {
     // Full breakdown history for a vehicle (maintenance view)
     List<BreakdownResponse> getBreakdownHistoryByVehicle(Long vehicleId);
 
+    // All breakdowns for the tenant (service men mobile view)
+    List<BreakdownResponse> getAllBreakdowns();
+
     // Standalone — mark an AVAILABLE vehicle as BREAKDOWN (not on any order)
     BreakdownResponse reportStandaloneBreakdown(Long vehicleId, BreakdownRequest request);
 

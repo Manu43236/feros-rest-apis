@@ -40,7 +40,7 @@ public class VehicleMaintenanceController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MEN')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> create(@Valid @RequestBody VehicleServiceRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Service created successfully", vehicleMaintenanceService.create(request)));
     }

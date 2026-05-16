@@ -83,11 +83,13 @@ public class VehicleBreakdownController {
 
     // Vehicle breakdown history — for maintenance tracking
     @GetMapping("/vehicle-breakdowns")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MEN')")
     public ResponseEntity<ApiResponse<List<BreakdownResponse>>> getVehicleBreakdownHistory(
-            @RequestParam Long vehicleId) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Breakdown history fetched", breakdownService.getBreakdownHistoryByVehicle(vehicleId)));
+            @RequestParam(required = false) Long vehicleId) {
+        List<BreakdownResponse> data = (vehicleId != null)
+                ? breakdownService.getBreakdownHistoryByVehicle(vehicleId)
+                : breakdownService.getAllBreakdowns();
+        return ResponseEntity.ok(ApiResponse.success("Breakdown history fetched", data));
     }
 
     // Standalone — mark available vehicle as BREAKDOWN (not on any order)
@@ -102,7 +104,7 @@ public class VehicleBreakdownController {
 
     // Standalone — resolve breakdown and mark vehicle back to AVAILABLE
     @PostMapping("/vehicles/{vehicleId}/breakdown/{breakdownId}/resolve")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MEN')")
     public ResponseEntity<ApiResponse<BreakdownResponse>> resolveStandaloneBreakdown(
             @PathVariable Long vehicleId,
             @PathVariable Long breakdownId) {
