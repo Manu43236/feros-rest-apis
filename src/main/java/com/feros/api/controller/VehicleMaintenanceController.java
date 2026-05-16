@@ -46,7 +46,7 @@ public class VehicleMaintenanceController {
     }
 
     @PutMapping("/{id}/start")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MEN')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> start(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Service started successfully", vehicleMaintenanceService.start(id)));
     }
@@ -65,11 +65,18 @@ public class VehicleMaintenanceController {
     }
 
     @PutMapping("/{id}/complete")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MEN')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> complete(
             @PathVariable Long id,
             @Valid @RequestBody CompleteServiceRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Service completed successfully", vehicleMaintenanceService.complete(id, request)));
+    }
+
+    @PatchMapping("/{serviceId}/tasks/{taskId}/complete")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MEN')")
+    public ResponseEntity<ApiResponse<VehicleServiceResponse>> completeTask(
+            @PathVariable Long serviceId, @PathVariable Long taskId) {
+        return ResponseEntity.ok(ApiResponse.success("Task marked complete", vehicleMaintenanceService.completeTask(serviceId, taskId)));
     }
 
     @DeleteMapping("/{id}")

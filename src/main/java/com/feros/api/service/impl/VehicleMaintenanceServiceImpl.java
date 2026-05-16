@@ -248,6 +248,26 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     }
 
     @Override
+    @Transactional
+    public VehicleServiceResponse completeTask(Long serviceId, Long taskId) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        VehicleService vs = vehicleServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+
+        VehicleServiceTask task = vs.getTasks().stream()
+                .filter(t -> t.getId().equals(taskId))
+                .findFirst()
+                .orElseThrow(() -> new FerosException("Task not found", HttpStatus.NOT_FOUND));
+
+        task.setStatus(ServiceTaskStatus.COMPLETED);
+        vehicleServiceTaskRepository.save(task);
+
+        return mapToResponse(vehicleServiceRepository.findById(vs.getId()).orElse(vs));
+    }
+
+    @Override
     public void delete(Long id) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         VehicleService vs = vehicleServiceRepository
