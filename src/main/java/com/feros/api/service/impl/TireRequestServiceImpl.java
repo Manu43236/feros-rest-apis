@@ -81,6 +81,14 @@ public class TireRequestServiceImpl implements TireRequestService {
     }
 
     @Override
+    public List<TireRequestResponse> getMyRequests() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        Long userId   = SecurityUtil.getCurrentUserId();
+        return tireRequestRepository.findByTenantIdAndRequestedByIdAndIsActiveTrueOrderByCreatedAtDesc(tenantId, userId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    @Override
     @Transactional
     public TireRequestResponse approveRequest(Long id, TireRequestApproveRequest request) {
         Long tenantId = SecurityUtil.getCurrentTenantId();

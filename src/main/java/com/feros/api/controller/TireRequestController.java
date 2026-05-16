@@ -39,6 +39,12 @@ public class TireRequestController {
         return ResponseEntity.ok(ApiResponse.success("Pending tire requests fetched", tireRequestService.getPending()));
     }
 
+    @GetMapping("/my")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MEN')")
+    public ResponseEntity<ApiResponse<List<TireRequestResponse>>> getMyRequests() {
+        return ResponseEntity.ok(ApiResponse.success("My tire requests fetched", tireRequestService.getMyRequests()));
+    }
+
     @PatchMapping("/{id}/approve")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<TireRequestResponse>> approveRequest(

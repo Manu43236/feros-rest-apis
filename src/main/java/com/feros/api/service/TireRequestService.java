@@ -11,6 +11,7 @@ public interface TireRequestService {
     TireRequestResponse createRequest(TireRequestCreateRequest request);
     List<TireRequestResponse> getAll();
     List<TireRequestResponse> getPending();
+    List<TireRequestResponse> getMyRequests();
     TireRequestResponse approveRequest(Long id, TireRequestApproveRequest request);
     TireRequestResponse rejectRequest(Long id, TireRequestRejectRequest request);
 }

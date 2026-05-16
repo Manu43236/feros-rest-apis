@@ -11,4 +11,6 @@ public interface TireRequestRepository extends JpaRepository<TireIssueRequest, L
     List<TireIssueRequest> findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(Long tenantId);
 
     List<TireIssueRequest> findByTenantIdAndStatusAndIsActiveTrueOrderByCreatedAtDesc(Long tenantId, TireRequestStatus status);
+
+    List<TireIssueRequest> findByTenantIdAndRequestedByIdAndIsActiveTrueOrderByCreatedAtDesc(Long tenantId, Long requestedById);
 }
