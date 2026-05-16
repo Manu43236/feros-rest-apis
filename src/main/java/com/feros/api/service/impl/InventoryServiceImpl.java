@@ -38,6 +38,7 @@ public class InventoryServiceImpl implements InventoryService {
     private final VehicleServiceRepository vehicleServiceRepository;
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
+    private final TenantSettingsRepository tenantSettingsRepository;
 
     private Long getTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -213,6 +214,51 @@ public class InventoryServiceImpl implements InventoryService {
         SparePart part = sparePartRepository.findByIdAndTenantIdAndIsActiveTrue(request.getSparePartId(), tenantId)
                 .orElseThrow(() -> new FerosException("Spare part not found", HttpStatus.NOT_FOUND));
 
+        // If requireSparePartApproval = true → await STORE_KEEPER; false/null → auto-approve
+        com.feros.api.entity.master.TenantSettings settings =
+                tenantSettingsRepository.findByTenantId(tenantId).orElse(null);
+        boolean autoApprove = settings == null || !Boolean.TRUE.equals(settings.getRequireSparePartApproval());
+
+        if (autoApprove) {
+            SparePartsInventory inv = inventoryRepository
+                    .findByTenantIdAndSparePartId(tenantId, part.getId())
+                    .orElseThrow(() -> new FerosException("No inventory record found for this part", HttpStatus.NOT_FOUND));
+
+            ServicePart sp = ServicePart.builder()
+                    .service(service)
+                    .sparePart(part)
+                    .quantityRequested(request.getQuantityRequested())
+                    .quantityApproved(request.getQuantityRequested())
+                    .status(ServicePartStatus.APPROVED)
+                    .requestedBy(user)
+                    .approvedBy(user)
+                    .approvedAt(com.feros.api.util.TimeUtil.nowIst())
+                    .build();
+            sp = servicePartRepository.save(sp);
+
+            // Deduct stock
+            inv.setQuantity(inv.getQuantity() - request.getQuantityRequested());
+            inv.setLastUpdated(com.feros.api.util.TimeUtil.nowIst());
+            inventoryRepository.save(inv);
+
+            // Record OUT transaction
+            SparePartsTransaction tx = SparePartsTransaction.builder()
+                    .tenant(service.getTenant())
+                    .sparePart(part)
+                    .transactionType(StockTransactionType.OUT)
+                    .quantity(request.getQuantityRequested())
+                    .unitCost(BigDecimal.ZERO)
+                    .totalCost(BigDecimal.ZERO)
+                    .referenceType(StockReferenceType.SERVICE)
+                    .notes("Auto-approved for service " + service.getServiceNumber())
+                    .createdBy(user)
+                    .build();
+            transactionRepository.save(tx);
+
+            return toServicePartResponse(sp);
+        }
+
+        // Standard flow — create as REQUESTED, await STORE_KEEPER approval
         ServicePart sp = ServicePart.builder()
                 .service(service)
                 .sparePart(part)

@@ -2,8 +2,10 @@ package com.feros.api.controller;
 
 import com.feros.api.config.UserPrincipal;
 import com.feros.api.dto.request.CreateTenantRequest;
+import com.feros.api.dto.request.TenantSettingsUpdateRequest;
 import com.feros.api.dto.request.UpdateMyTenantRequest;
 import com.feros.api.dto.request.CreateUserRequest;
+import com.feros.api.dto.response.TenantSettingsResponse;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.LoginResponse;
@@ -103,6 +105,23 @@ public class TenantController {
         return ResponseEntity.ok(
                 ApiResponse.success("Bulk upload completed", response));
     }
+
+    // ─── Settings ──────────────────────────────────────────────────────────────
+
+    @GetMapping("/settings")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER', 'DRIVER')")
+    public ResponseEntity<ApiResponse<TenantSettingsResponse>> getSettings() {
+        return ResponseEntity.ok(ApiResponse.success("Settings fetched", tenantService.getSettings()));
+    }
+
+    @PatchMapping("/my/settings")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<TenantSettingsResponse>> updateSettings(
+            @RequestBody TenantSettingsUpdateRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Settings updated", tenantService.updateSettings(request)));
+    }
+
+    // ─── My Tenant ─────────────────────────────────────────────────────────────
 
     @GetMapping("/my")
     @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")

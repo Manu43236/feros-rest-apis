@@ -54,6 +54,15 @@ public class TenantSettings extends BaseEntity {
     @Column(name = "attendance_deadline_time")
     private LocalTime attendanceDeadlineTime = LocalTime.of(8, 0);
 
+    @Builder.Default
+    @Column(name = "require_tire_approval")
+    private Boolean requireTireApproval = false;
+
+    @Builder.Default
+    @Column(name = "require_spare_part_approval")
+    private Boolean requireSparePartApproval = false;
+
+    @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;
 }

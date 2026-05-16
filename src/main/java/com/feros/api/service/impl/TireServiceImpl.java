@@ -10,6 +10,7 @@ import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.TireService;
 import com.feros.api.service.NotificationService;
+import com.feros.api.entity.master.TenantSettings;
 import com.feros.api.enums.RoleName;
 import java.util.Arrays;
 import com.feros.api.util.SecurityUtil;
@@ -36,6 +37,7 @@ public class TireServiceImpl implements TireService {
     private final NotificationService notificationService;
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
+    private final TenantSettingsRepository tenantSettingsRepository;
 
     // ── Tire CRUD ─────────────────────────────────────────────────────────────
 
@@ -204,6 +206,16 @@ public class TireServiceImpl implements TireService {
         Tire tire = findTire(request.getTireId(), tenantId);
         VehicleTirePosition position = findPosition(request.getPositionId(), tenantId);
         User fittedBy = getUser(userId);
+
+        // Check tenant setting — SERVICE_MEN must go through STORE_KEEPER if approval required
+        String currentRole = SecurityUtil.getCurrentRole();
+        if ("SERVICE_MEN".equals(currentRole)) {
+            TenantSettings settings = tenantSettingsRepository.findByTenantId(tenantId).orElse(null);
+            if (settings != null && Boolean.TRUE.equals(settings.getRequireTireApproval())) {
+                throw new FerosException(
+                        "Tire fitting requires Store Keeper approval. Please submit a tire request.", HttpStatus.FORBIDDEN);
+            }
+        }
 
         // Validations
         if (tire.getStatus() != TireStatus.IN_STOCK) {

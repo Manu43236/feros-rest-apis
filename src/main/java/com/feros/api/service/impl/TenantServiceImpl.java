@@ -2,7 +2,9 @@ package com.feros.api.service.impl;
 
 import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.CreateTenantRequest;
+import com.feros.api.dto.request.TenantSettingsUpdateRequest;
 import com.feros.api.dto.request.UpdateMyTenantRequest;
+import com.feros.api.dto.response.TenantSettingsResponse;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.LoginResponse;
 import com.feros.api.dto.response.TenantDocumentResponse;
@@ -458,6 +460,55 @@ public class TenantServiceImpl implements TenantService {
         tenant.setOwnerEmail(request.getOwnerEmail());
 
         return mapToResponse(tenantRepository.save(tenant));
+    }
+
+    // ===================== SETTINGS =====================
+
+    @Override
+    public TenantSettingsResponse getSettings() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        TenantSettings settings = tenantSettingsRepository.findByTenantId(tenantId)
+                .orElseThrow(() -> new FerosException("Settings not found", HttpStatus.NOT_FOUND));
+        return mapSettingsToResponse(settings);
+    }
+
+    @Override
+    public TenantSettingsResponse updateSettings(TenantSettingsUpdateRequest request) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        TenantSettings settings = tenantSettingsRepository.findByTenantId(tenantId)
+                .orElseThrow(() -> new FerosException("Settings not found", HttpStatus.NOT_FOUND));
+
+        if (request.getPayCycle() != null)                       settings.setPayCycle(com.feros.api.enums.PayCycle.valueOf(request.getPayCycle()));
+        if (request.getOvertimeThresholdHours() != null)         settings.setOvertimeThresholdHours(request.getOvertimeThresholdHours());
+        if (request.getOvertimeRateMultiplier() != null)         settings.setOvertimeRateMultiplier(request.getOvertimeRateMultiplier());
+        if (request.getMaxAdvanceAmount() != null)               settings.setMaxAdvanceAmount(request.getMaxAdvanceAmount());
+        if (request.getMaxAdvanceDeductionPerCycle() != null)    settings.setMaxAdvanceDeductionPerCycle(request.getMaxAdvanceDeductionPerCycle());
+        if (request.getIsTripBonusEnabled() != null)             settings.setIsTripBonusEnabled(request.getIsTripBonusEnabled());
+        if (request.getTripBonusAmount() != null)                settings.setTripBonusAmount(request.getTripBonusAmount());
+        if (request.getAttendanceEnforced() != null)             settings.setAttendanceEnforced(request.getAttendanceEnforced());
+        if (request.getAttendanceDeadlineTime() != null)         settings.setAttendanceDeadlineTime(request.getAttendanceDeadlineTime());
+        if (request.getRequireTireApproval() != null)            settings.setRequireTireApproval(request.getRequireTireApproval());
+        if (request.getRequireSparePartApproval() != null)       settings.setRequireSparePartApproval(request.getRequireSparePartApproval());
+
+        return mapSettingsToResponse(tenantSettingsRepository.save(settings));
+    }
+
+    private TenantSettingsResponse mapSettingsToResponse(TenantSettings s) {
+        return TenantSettingsResponse.builder()
+                .id(s.getId())
+                .tenantId(s.getTenant().getId())
+                .payCycle(s.getPayCycle())
+                .overtimeThresholdHours(s.getOvertimeThresholdHours())
+                .overtimeRateMultiplier(s.getOvertimeRateMultiplier())
+                .maxAdvanceAmount(s.getMaxAdvanceAmount())
+                .maxAdvanceDeductionPerCycle(s.getMaxAdvanceDeductionPerCycle())
+                .isTripBonusEnabled(s.getIsTripBonusEnabled())
+                .tripBonusAmount(s.getTripBonusAmount())
+                .attendanceEnforced(s.getAttendanceEnforced())
+                .attendanceDeadlineTime(s.getAttendanceDeadlineTime())
+                .requireTireApproval(s.getRequireTireApproval())
+                .requireSparePartApproval(s.getRequireSparePartApproval())
+                .build();
     }
 
     // ===================== IMPERSONATION =====================
