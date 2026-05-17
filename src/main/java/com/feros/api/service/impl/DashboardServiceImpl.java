@@ -9,7 +9,6 @@ import com.feros.api.entity.Attendance;
 import com.feros.api.entity.Lr;
 import com.feros.api.entity.StaffDocument;
 import com.feros.api.entity.User;
-import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.VehicleDocument;
 import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.enums.InvoiceStatus;
@@ -123,17 +122,6 @@ public class DashboardServiceImpl implements DashboardService {
         LocalDate alertDate = today.plusDays(days);
 
         List<ExpiryAlertResponse.VehicleAlert> vehicleAlerts = new ArrayList<>();
-
-        // Vehicle entity-level expiry fields
-        List<Vehicle> vehicles = vehicleRepository.findVehiclesWithExpiringDocs(tenantId, alertDate);
-        for (Vehicle v : vehicles) {
-            addVehicleAlert(vehicleAlerts, v, "RC", v.getRcExpiryDate(), today);
-            addVehicleAlert(vehicleAlerts, v, "INSURANCE", v.getInsuranceExpiryDate(), today);
-            addVehicleAlert(vehicleAlerts, v, "PERMIT", v.getPermitExpiryDate(), today);
-            addVehicleAlert(vehicleAlerts, v, "FITNESS", v.getFitnessExpiryDate(), today);
-            addVehicleAlert(vehicleAlerts, v, "PUC", v.getPollutionExpiryDate(), today);
-            addVehicleAlert(vehicleAlerts, v, "ROAD_TAX", v.getRoadTaxExpiryDate(), today);
-        }
 
         // Vehicle documents table
         List<VehicleDocument> vehicleDocs = vehicleDocumentRepository.findExpiringDocuments(tenantId, alertDate);
@@ -370,17 +358,4 @@ public class DashboardServiceImpl implements DashboardService {
                 .build();
     }
 
-    private void addVehicleAlert(List<ExpiryAlertResponse.VehicleAlert> alerts,
-                                  Vehicle v, String type, LocalDate expiryDate, LocalDate today) {
-        if (expiryDate == null) return;
-        long daysLeft = ChronoUnit.DAYS.between(today, expiryDate);
-        alerts.add(ExpiryAlertResponse.VehicleAlert.builder()
-                .vehicleId(v.getId())
-                .registrationNumber(v.getRegistrationNumber())
-                .alertType(type)
-                .expiryDate(expiryDate)
-                .daysLeft(daysLeft)
-                .expired(daysLeft < 0)
-                .build());
-    }
 }

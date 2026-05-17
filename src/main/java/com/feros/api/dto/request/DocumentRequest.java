@@ -17,5 +17,7 @@ public class DocumentRequest {
     private LocalDate issueDate;
     private LocalDate expiryDate;
     private String fileUrl;
+    private String issuerName;
+    private String permitType;
     private String remarks;
 }

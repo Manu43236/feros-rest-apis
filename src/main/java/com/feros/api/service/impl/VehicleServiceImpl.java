@@ -10,8 +10,8 @@ import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.VehicleBreakdown;
 import com.feros.api.entity.VehicleTirePosition;
 import com.feros.api.entity.master.*;
-import com.feros.api.enums.TirePositionType;
 import com.feros.api.enums.BreakdownStatus;
+import com.feros.api.enums.TirePositionType;
 import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.entity.OrderVehicleAllocation;
@@ -114,22 +114,6 @@ public class VehicleServiceImpl implements VehicleService {
                 .color(request.getColor())
                 .chassisNumber(request.getChassisNumber())
                 .engineNumber(request.getEngineNumber())
-                .rcNumber(request.getRcNumber())
-                .rcExpiryDate(request.getRcExpiryDate())
-                .insuranceCompanyName(request.getInsuranceCompanyName())
-                .insurancePolicyNumber(request.getInsurancePolicyNumber())
-                .insuranceStartDate(request.getInsuranceStartDate())
-                .insuranceExpiryDate(request.getInsuranceExpiryDate())
-                .permitNumber(request.getPermitNumber())
-                .permitType(request.getPermitType())
-                .permitStartDate(request.getPermitStartDate())
-                .permitExpiryDate(request.getPermitExpiryDate())
-                .fitnessCertificateNumber(request.getFitnessCertificateNumber())
-                .fitnessExpiryDate(request.getFitnessExpiryDate())
-                .pucNumber(request.getPucNumber())
-                .pollutionExpiryDate(request.getPollutionExpiryDate())
-                .roadTaxPaidDate(request.getRoadTaxPaidDate())
-                .roadTaxExpiryDate(request.getRoadTaxExpiryDate())
                 .ownerName(request.getOwnerName())
                 .ownerPhone(request.getOwnerPhone())
                 .ownerAddress(request.getOwnerAddress())
@@ -261,22 +245,6 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setColor(request.getColor());
         vehicle.setChassisNumber(request.getChassisNumber());
         vehicle.setEngineNumber(request.getEngineNumber());
-        vehicle.setRcNumber(request.getRcNumber());
-        vehicle.setRcExpiryDate(request.getRcExpiryDate());
-        vehicle.setInsuranceCompanyName(request.getInsuranceCompanyName());
-        vehicle.setInsurancePolicyNumber(request.getInsurancePolicyNumber());
-        vehicle.setInsuranceStartDate(request.getInsuranceStartDate());
-        vehicle.setInsuranceExpiryDate(request.getInsuranceExpiryDate());
-        vehicle.setPermitNumber(request.getPermitNumber());
-        vehicle.setPermitType(request.getPermitType());
-        vehicle.setPermitStartDate(request.getPermitStartDate());
-        vehicle.setPermitExpiryDate(request.getPermitExpiryDate());
-        vehicle.setFitnessCertificateNumber(request.getFitnessCertificateNumber());
-        vehicle.setFitnessExpiryDate(request.getFitnessExpiryDate());
-        vehicle.setPucNumber(request.getPucNumber());
-        vehicle.setPollutionExpiryDate(request.getPollutionExpiryDate());
-        vehicle.setRoadTaxPaidDate(request.getRoadTaxPaidDate());
-        vehicle.setRoadTaxExpiryDate(request.getRoadTaxExpiryDate());
         vehicle.setOwnerName(request.getOwnerName());
         vehicle.setOwnerPhone(request.getOwnerPhone());
         vehicle.setOwnerAddress(request.getOwnerAddress());
@@ -549,7 +517,6 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     private VehicleResponse mapToResponse(Vehicle v) {
-        LocalDate today = TimeUtil.today();
         return VehicleResponse.builder()
                 .id(v.getId())
                 .tenantId(v.getTenant().getId())
@@ -570,28 +537,6 @@ public class VehicleServiceImpl implements VehicleService {
                 .color(v.getColor())
                 .chassisNumber(v.getChassisNumber())
                 .engineNumber(v.getEngineNumber())
-                .rcNumber(v.getRcNumber())
-                .rcExpiryDate(v.getRcExpiryDate())
-                .rcExpired(v.getRcExpiryDate() != null && v.getRcExpiryDate().isBefore(today))
-                .insuranceCompanyName(v.getInsuranceCompanyName())
-                .insurancePolicyNumber(v.getInsurancePolicyNumber())
-                .insuranceStartDate(v.getInsuranceStartDate())
-                .insuranceExpiryDate(v.getInsuranceExpiryDate())
-                .insuranceExpired(v.getInsuranceExpiryDate() != null && v.getInsuranceExpiryDate().isBefore(today))
-                .permitNumber(v.getPermitNumber())
-                .permitType(v.getPermitType())
-                .permitStartDate(v.getPermitStartDate())
-                .permitExpiryDate(v.getPermitExpiryDate())
-                .permitExpired(v.getPermitExpiryDate() != null && v.getPermitExpiryDate().isBefore(today))
-                .fitnessCertificateNumber(v.getFitnessCertificateNumber())
-                .fitnessExpiryDate(v.getFitnessExpiryDate())
-                .fitnessExpired(v.getFitnessExpiryDate() != null && v.getFitnessExpiryDate().isBefore(today))
-                .pucNumber(v.getPucNumber())
-                .pollutionExpiryDate(v.getPollutionExpiryDate())
-                .pollutionExpired(v.getPollutionExpiryDate() != null && v.getPollutionExpiryDate().isBefore(today))
-                .roadTaxPaidDate(v.getRoadTaxPaidDate())
-                .roadTaxExpiryDate(v.getRoadTaxExpiryDate())
-                .roadTaxExpired(v.getRoadTaxExpiryDate() != null && v.getRoadTaxExpiryDate().isBefore(today))
                 .ownerName(v.getOwnerName())
                 .ownerPhone(v.getOwnerPhone())
                 .ownerAddress(v.getOwnerAddress())

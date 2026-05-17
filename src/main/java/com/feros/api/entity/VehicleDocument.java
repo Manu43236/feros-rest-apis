@@ -1,6 +1,7 @@
 package com.feros.api.entity;
 
 import com.feros.api.entity.master.DocumentType;
+import com.feros.api.enums.PermitType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -39,6 +40,13 @@ public class VehicleDocument extends BaseEntity {
 
     @Column(name = "expiry_date")
     private LocalDate expiryDate;
+
+    @Column(name = "issuer_name")
+    private String issuerName;
+
+    @Column(name = "permit_type")
+    @Enumerated(EnumType.STRING)
+    private PermitType permitType;
 
     @Column(name = "file_url")
     private String fileUrl;

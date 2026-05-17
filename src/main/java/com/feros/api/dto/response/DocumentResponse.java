@@ -19,6 +19,8 @@ public class DocumentResponse {
     private LocalDate expiryDate;
     private Boolean isExpired;
     private String fileUrl;
+    private String issuerName;
+    private String permitType;
     private Boolean isVerified;
     private String remarks;
     private LocalDateTime createdAt;

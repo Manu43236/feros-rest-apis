@@ -8,6 +8,7 @@ import com.feros.api.dto.response.StaffProfileResponse;
 import com.feros.api.dto.response.VehicleImageResponse;
 import com.feros.api.entity.*;
 import com.feros.api.entity.master.*;
+import com.feros.api.enums.PermitType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.StaffProfileService;
@@ -180,6 +181,8 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .vehicle(vehicle)
                 .documentType(documentType)
                 .documentNumber(request.getDocumentNumber())
+                .issuerName(request.getIssuerName())
+                .permitType(request.getPermitType() != null ? PermitType.valueOf(request.getPermitType()) : null)
                 .issueDate(request.getIssueDate())
                 .expiryDate(request.getExpiryDate())
                 .fileUrl(request.getFileUrl())
@@ -325,6 +328,8 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .documentTypeId(d.getDocumentType().getId())
                 .documentTypeName(d.getDocumentType().getName())
                 .documentNumber(d.getDocumentNumber())
+                .issuerName(d.getIssuerName())
+                .permitType(d.getPermitType() != null ? d.getPermitType().name() : null)
                 .issueDate(d.getIssueDate())
                 .expiryDate(d.getExpiryDate())
                 .isExpired(d.getExpiryDate() != null &&

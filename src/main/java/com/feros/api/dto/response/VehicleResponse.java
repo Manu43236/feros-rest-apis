@@ -1,6 +1,5 @@
 package com.feros.api.dto.response;
 
-import com.feros.api.enums.PermitType;
 import com.feros.api.enums.VehicleStatusType;
 import lombok.*;
 
@@ -39,40 +38,6 @@ public class VehicleResponse {
     private String color;
     private String chassisNumber;
     private String engineNumber;
-
-    // RC
-    private String rcNumber;
-    private LocalDate rcExpiryDate;
-    private Boolean rcExpired;
-
-    // Insurance
-    private String insuranceCompanyName;
-    private String insurancePolicyNumber;
-    private LocalDate insuranceStartDate;
-    private LocalDate insuranceExpiryDate;
-    private Boolean insuranceExpired;
-
-    // Permit
-    private String permitNumber;
-    private PermitType permitType;
-    private LocalDate permitStartDate;
-    private LocalDate permitExpiryDate;
-    private Boolean permitExpired;
-
-    // Fitness
-    private String fitnessCertificateNumber;
-    private LocalDate fitnessExpiryDate;
-    private Boolean fitnessExpired;
-
-    // PUC
-    private String pucNumber;
-    private LocalDate pollutionExpiryDate;
-    private Boolean pollutionExpired;
-
-    // Road Tax
-    private LocalDate roadTaxPaidDate;
-    private LocalDate roadTaxExpiryDate;
-    private Boolean roadTaxExpired;
 
     // Owner info
     private String ownerName;

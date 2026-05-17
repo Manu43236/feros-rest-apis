@@ -1,7 +1,6 @@
 package com.feros.api.entity;
 
 import com.feros.api.entity.master.*;
-import com.feros.api.enums.PermitType;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -63,61 +62,6 @@ public class Vehicle extends BaseEntity {
 
     @Column(name = "engine_number")
     private String engineNumber;
-
-    // RC
-    @Column(name = "rc_number")
-    private String rcNumber;
-
-    @Column(name = "rc_expiry_date")
-    private LocalDate rcExpiryDate;
-
-    // Insurance
-    @Column(name = "insurance_company_name")
-    private String insuranceCompanyName;
-
-    @Column(name = "insurance_policy_number")
-    private String insurancePolicyNumber;
-
-    @Column(name = "insurance_start_date")
-    private LocalDate insuranceStartDate;
-
-    @Column(name = "insurance_expiry_date")
-    private LocalDate insuranceExpiryDate;
-
-    // Permit
-    @Column(name = "permit_number")
-    private String permitNumber;
-
-    @Column(name = "permit_type")
-    @Enumerated(EnumType.STRING)
-    private PermitType permitType;
-
-    @Column(name = "permit_start_date")
-    private LocalDate permitStartDate;
-
-    @Column(name = "permit_expiry_date")
-    private LocalDate permitExpiryDate;
-
-    // Fitness
-    @Column(name = "fitness_certificate_number")
-    private String fitnessCertificateNumber;
-
-    @Column(name = "fitness_certificate_expiry_date")
-    private LocalDate fitnessExpiryDate;
-
-    // PUC / Pollution
-    @Column(name = "puc_number")
-    private String pucNumber;
-
-    @Column(name = "puc_expiry_date")
-    private LocalDate pollutionExpiryDate;
-
-    // Road Tax
-    @Column(name = "road_tax_paid_date")
-    private LocalDate roadTaxPaidDate;
-
-    @Column(name = "road_tax_expiry_date")
-    private LocalDate roadTaxExpiryDate;
 
     // Attached owner info (for hired vehicles)
     @Column(name = "attached_owner_name")

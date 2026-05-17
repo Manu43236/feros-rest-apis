@@ -1,6 +1,5 @@
 package com.feros.api.dto.request;
 
-import com.feros.api.enums.PermitType;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -26,34 +25,6 @@ public class VehicleRequest {
     private String color;
     private String chassisNumber;
     private String engineNumber;
-
-    // RC
-    private String rcNumber;
-    private LocalDate rcExpiryDate;
-
-    // Insurance
-    private String insuranceCompanyName;
-    private String insurancePolicyNumber;
-    private LocalDate insuranceStartDate;
-    private LocalDate insuranceExpiryDate;
-
-    // Permit
-    private String permitNumber;
-    private PermitType permitType;
-    private LocalDate permitStartDate;
-    private LocalDate permitExpiryDate;
-
-    // Fitness
-    private String fitnessCertificateNumber;
-    private LocalDate fitnessExpiryDate;
-
-    // PUC
-    private String pucNumber;
-    private LocalDate pollutionExpiryDate;
-
-    // Road Tax
-    private LocalDate roadTaxPaidDate;
-    private LocalDate roadTaxExpiryDate;
 
     // Owner info (hired vehicles)
     private String ownerName;
