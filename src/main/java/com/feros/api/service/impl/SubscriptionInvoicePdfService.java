@@ -1,0 +1,160 @@
+package com.feros.api.service.impl;
+
+import com.feros.api.entity.SubscriptionInvoice;
+import com.lowagie.text.*;
+import com.lowagie.text.pdf.*;
+import org.springframework.stereotype.Service;
+
+import java.awt.Color;
+import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.format.DateTimeFormatter;
+
+@Service
+public class SubscriptionInvoicePdfService {
+
+    private static final Color NAVY    = new Color(15, 33, 55);
+    private static final Color GRAY    = new Color(90, 105, 120);
+    private static final Color SUCCESS = new Color(21, 128, 61);
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+
+    private static final Font FONT_HEADER = new Font(Font.HELVETICA, 18, Font.BOLD, Color.WHITE);
+    private static final Font FONT_TITLE  = new Font(Font.HELVETICA, 11, Font.BOLD, NAVY);
+    private static final Font FONT_BODY   = new Font(Font.HELVETICA, 9, Font.NORMAL, Color.BLACK);
+    private static final Font FONT_BOLD   = new Font(Font.HELVETICA, 9, Font.BOLD, Color.BLACK);
+    private static final Font FONT_GRAY   = new Font(Font.HELVETICA, 8, Font.NORMAL, GRAY);
+    private static final Font FONT_TOTAL  = new Font(Font.HELVETICA, 11, Font.BOLD, NAVY);
+
+    public byte[] generate(SubscriptionInvoice inv) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            Document doc = new Document(PageSize.A4, 40, 40, 40, 40);
+            PdfWriter.getInstance(doc, baos);
+            doc.open();
+
+            var tenant = inv.getTenant();
+            String company = tenant.getCompanyName() != null ? tenant.getCompanyName().toUpperCase() : "FEROS";
+
+            // ── Header banner ─────────────────────────────────────────────────
+            PdfPTable header = new PdfPTable(1);
+            header.setWidthPercentage(100);
+            PdfPCell hCell = new PdfPCell();
+            hCell.setBackgroundColor(NAVY);
+            hCell.setPadding(14);
+            hCell.setBorder(Rectangle.NO_BORDER);
+            hCell.addElement(new Phrase(company, FONT_HEADER));
+            hCell.addElement(new Phrase("Subscription Invoice", new Font(Font.HELVETICA, 10, Font.NORMAL, new Color(180, 200, 230))));
+            header.addCell(hCell);
+            doc.add(header);
+            doc.add(Chunk.NEWLINE);
+
+            // ── Company address block ──────────────────────────────────────────
+            if (tenant.getAddress() != null || tenant.getCity() != null) {
+                StringBuilder addr = new StringBuilder();
+                if (tenant.getAddress() != null) addr.append(tenant.getAddress());
+                if (tenant.getCity() != null) addr.append(", ").append(tenant.getCity());
+                if (tenant.getState() != null) addr.append(", ").append(tenant.getState());
+                if (tenant.getPincode() != null) addr.append(" - ").append(tenant.getPincode());
+                Paragraph addrPara = new Paragraph(addr.toString(), FONT_GRAY);
+                addrPara.setSpacingAfter(2);
+                doc.add(addrPara);
+            }
+            if (tenant.getGstin() != null) {
+                doc.add(new Paragraph("GSTIN: " + tenant.getGstin(), FONT_GRAY));
+            }
+            doc.add(Chunk.NEWLINE);
+
+            // ── Invoice meta ──────────────────────────────────────────────────
+            PdfPTable meta = new PdfPTable(new float[]{1, 1});
+            meta.setWidthPercentage(100);
+            addMetaCell(meta, "Invoice No", inv.getInvoiceNumber());
+            addMetaCell(meta, "Invoice Date",
+                    inv.getCreatedAt() != null ? inv.getCreatedAt().format(DATE_FMT) : "—");
+            addMetaCell(meta, "Plan", inv.getPlanName() != null ? inv.getPlanName() : "—");
+            addMetaCell(meta, "Billing Cycle", formatCycle(inv.getBillingCycle()));
+            addMetaCell(meta, "Vehicle Count",
+                    inv.getVehicleCount() != null ? inv.getVehicleCount() + " vehicles" : "—");
+            addMetaCell(meta, "Price / Vehicle / Month",
+                    inv.getPricePerVehicle() != null ? "₹" + inv.getPricePerVehicle().setScale(2, RoundingMode.HALF_UP) : "—");
+            addMetaCell(meta, "Period Start",
+                    inv.getPeriodStart() != null ? inv.getPeriodStart().format(DATE_FMT) : "—");
+            addMetaCell(meta, "Period End",
+                    inv.getPeriodEnd() != null ? inv.getPeriodEnd().format(DATE_FMT) : "—");
+            if (inv.getPaymentRef() != null) {
+                addMetaCell(meta, "Payment Ref", inv.getPaymentRef());
+            }
+            doc.add(meta);
+            doc.add(Chunk.NEWLINE);
+
+            // ── Amount summary ────────────────────────────────────────────────
+            doc.add(sectionTitle("AMOUNT SUMMARY"));
+            PdfPTable totals = new PdfPTable(new float[]{3, 1.5f});
+            totals.setWidthPercentage(60);
+            totals.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            addTotalRow(totals, "Base Amount", inv.getAmount(), false);
+            addTotalRow(totals, "GST (18%)", inv.getGstAmount(), false);
+            addTotalRow(totals, "TOTAL", inv.getTotalAmount(), true);
+            doc.add(totals);
+
+            // ── Footer ────────────────────────────────────────────────────────
+            doc.add(Chunk.NEWLINE);
+            doc.add(Chunk.NEWLINE);
+            Paragraph footer = new Paragraph(
+                    "This is a system-generated subscription invoice. — FEROS Fleet Management", FONT_GRAY);
+            footer.setAlignment(Element.ALIGN_CENTER);
+            doc.add(footer);
+
+            doc.close();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate subscription invoice PDF", e);
+        }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private void addMetaCell(PdfPTable table, String label, String value) {
+        PdfPCell cell = new PdfPCell();
+        cell.setBorder(Rectangle.BOTTOM);
+        cell.setBorderColor(new Color(220, 228, 240));
+        cell.setPadding(6);
+        cell.addElement(new Phrase(label, FONT_GRAY));
+        cell.addElement(new Phrase(value != null ? value : "—", FONT_BOLD));
+        table.addCell(cell);
+    }
+
+    private Paragraph sectionTitle(String title) {
+        Paragraph p = new Paragraph(title, FONT_TITLE);
+        p.setSpacingBefore(4);
+        p.setSpacingAfter(6);
+        return p;
+    }
+
+    private void addTotalRow(PdfPTable table, String label, BigDecimal amount, boolean highlight) {
+        Font lf = highlight ? FONT_TOTAL : FONT_BODY;
+        Font vf = highlight ? new Font(Font.HELVETICA, 11, Font.BOLD, SUCCESS) : FONT_BODY;
+        PdfPCell lc = new PdfPCell(new Phrase(label, lf));
+        lc.setPadding(5);
+        lc.setBorder(highlight ? Rectangle.TOP : Rectangle.BOTTOM);
+        lc.setBorderColor(new Color(220, 228, 240));
+        PdfPCell vc = new PdfPCell(new Phrase(
+                "₹" + (amount != null ? amount.setScale(2, RoundingMode.HALF_UP) : "0.00"), vf));
+        vc.setPadding(5);
+        vc.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        vc.setBorder(highlight ? Rectangle.TOP : Rectangle.BOTTOM);
+        vc.setBorderColor(new Color(220, 228, 240));
+        table.addCell(lc);
+        table.addCell(vc);
+    }
+
+    private String formatCycle(String cycle) {
+        if (cycle == null) return "—";
+        return switch (cycle) {
+            case "MONTHLY" -> "Monthly";
+            case "THREE_MONTHS" -> "3 Months";
+            case "SIX_MONTHS" -> "6 Months";
+            case "YEARLY" -> "Annual";
+            default -> cycle;
+        };
+    }
+}

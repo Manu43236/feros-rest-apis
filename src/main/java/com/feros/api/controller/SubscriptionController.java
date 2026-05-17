@@ -12,6 +12,8 @@ import com.feros.api.service.SubscriptionService;
 import com.feros.api.util.SecurityUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -121,6 +123,18 @@ public class SubscriptionController {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         return ResponseEntity.ok(ApiResponse.success("Invoice fetched",
                 subscriptionService.getInvoiceById(tenantId, invoiceId)));
+    }
+
+    @GetMapping("/my/invoices/{invoiceId}/pdf")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<byte[]> getMyInvoicePdf(@PathVariable Long invoiceId) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        byte[] pdf = subscriptionService.generateInvoicePdf(tenantId, invoiceId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=\"subscription-invoice-" + invoiceId + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     // ─── Upgrade Requests ─────────────────────────────────────────────────────

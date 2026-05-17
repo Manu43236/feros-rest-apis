@@ -19,6 +19,7 @@ public interface SubscriptionService {
     List<SubscriptionHistoryResponse> getHistory(Long tenantId);
     List<SubscriptionInvoiceResponse> getInvoices(Long tenantId);
     SubscriptionInvoiceResponse getInvoiceById(Long tenantId, Long invoiceId);
+    byte[] generateInvoicePdf(Long tenantId, Long invoiceId);
     SubscriptionHistoryResponse getCurrentSubscription(Long tenantId);
     UpgradeRequestResponse submitUpgradeRequest(Long tenantId, UpgradeRequestRequest request);
     List<UpgradeRequestResponse> getUpgradeRequests();

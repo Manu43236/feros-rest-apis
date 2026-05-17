@@ -45,6 +45,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final SubscriptionInvoiceRepository invoiceRepository;
     private final UpgradeRequestRepository upgradeRequestRepository;
     private final NotificationService notificationService;
+    private final SubscriptionInvoicePdfService subscriptionInvoicePdfService;
 
     // ─── Activate ─────────────────────────────────────────────────────────────
 
@@ -300,6 +301,13 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
                 .orElseThrow(() -> new com.feros.api.exception.FerosException("Invoice not found", org.springframework.http.HttpStatus.NOT_FOUND));
         return toInvoiceResponse(invoice, tenant);
+    }
+
+    @Override
+    public byte[] generateInvoicePdf(Long tenantId, Long invoiceId) {
+        SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
+                .orElseThrow(() -> new com.feros.api.exception.FerosException("Invoice not found", org.springframework.http.HttpStatus.NOT_FOUND));
+        return subscriptionInvoicePdfService.generate(invoice);
     }
 
     @Override
