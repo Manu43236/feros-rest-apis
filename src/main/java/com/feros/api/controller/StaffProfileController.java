@@ -89,7 +89,7 @@ public class StaffProfileController {
     }
 
     @PostMapping("/vehicles/{vehicleId}/documents")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<DocumentResponse>> addVehicleDocument(
             @PathVariable Long vehicleId, @Valid @RequestBody DocumentRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -98,7 +98,7 @@ public class StaffProfileController {
     }
 
     @PutMapping("/vehicles/documents/{documentId}/verify")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<DocumentResponse>> verifyVehicleDocument(
             @PathVariable Long documentId) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -107,7 +107,7 @@ public class StaffProfileController {
     }
 
     @DeleteMapping("/vehicles/documents/{documentId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<Void>> deleteVehicleDocument(
             @PathVariable Long documentId) {
         staffProfileService.deleteVehicleDocument(documentId);
@@ -125,7 +125,7 @@ public class StaffProfileController {
     }
 
     @PostMapping("/vehicles/{vehicleId}/images")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<VehicleImageResponse>> addVehicleImage(
             @PathVariable Long vehicleId, @RequestBody AddImageRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -134,7 +134,7 @@ public class StaffProfileController {
     }
 
     @DeleteMapping("/vehicles/images/{imageId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<Void>> deleteVehicleImage(@PathVariable Long imageId) {
         staffProfileService.deleteVehicleImage(imageId);
         return ResponseEntity.ok(ApiResponse.success("Image deleted successfully", null));

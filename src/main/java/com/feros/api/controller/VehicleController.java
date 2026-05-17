@@ -43,7 +43,7 @@ public class VehicleController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<VehicleResponse>> createVehicle(
             @Valid @RequestBody VehicleRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -51,7 +51,7 @@ public class VehicleController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<VehicleResponse>> updateVehicle(
             @PathVariable Long id, @RequestBody VehicleRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -59,14 +59,14 @@ public class VehicleController {
     }
 
     @PatchMapping("/{id}/active")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<VehicleResponse>> toggleVehicleActive(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Vehicle active status updated", vehicleService.toggleVehicleActive(id)));
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<VehicleResponse>> updateVehicleStatus(
             @PathVariable Long id, @RequestBody UpdateStatusRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -75,7 +75,7 @@ public class VehicleController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<Void>> deleteVehicle(@PathVariable Long id) {
         vehicleService.deleteVehicle(id);
         return ResponseEntity.ok(ApiResponse.success("Vehicle deleted successfully", null));
