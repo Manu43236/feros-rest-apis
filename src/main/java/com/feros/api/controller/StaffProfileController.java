@@ -80,7 +80,7 @@ public class StaffProfileController {
 
     // ===================== VEHICLE DOCUMENTS =====================
     @GetMapping("/vehicles/{vehicleId}/documents")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<DocumentResponse>>> getVehicleDocuments(
             @PathVariable Long vehicleId) {
         return ResponseEntity.ok(ApiResponse.success(
