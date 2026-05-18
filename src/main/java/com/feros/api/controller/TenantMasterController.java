@@ -3,6 +3,8 @@ package com.feros.api.controller;
 import com.feros.api.dto.request.*;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.TenantMasterResponse;
+import com.feros.api.dto.request.RbacLoginAccessRequest;
+import com.feros.api.dto.response.RbacLoginAccessResponse;
 import com.feros.api.service.TenantMasterService;
 import com.feros.api.util.SecurityUtil;
 
@@ -309,4 +311,22 @@ public class TenantMasterController {
                 "userId", SecurityUtil.getCurrentUserId(),
                 "role", SecurityUtil.getCurrentRole()));
     }
+
+    // ===================== RBAC — LOGIN ACCESS =====================
+
+    @GetMapping("/rbac/login-access")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<RbacLoginAccessResponse>> getLoginAccess() {
+        return ResponseEntity.ok(ApiResponse.success("Login access config fetched",
+                tenantMasterService.getLoginAccess()));
+    }
+
+    @PutMapping("/rbac/login-access")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<RbacLoginAccessResponse>> saveLoginAccess(
+            @RequestBody RbacLoginAccessRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Login access config saved",
+                tenantMasterService.saveLoginAccess(request)));
+    }
+
 }

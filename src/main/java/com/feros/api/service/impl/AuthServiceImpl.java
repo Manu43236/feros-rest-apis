@@ -8,6 +8,9 @@ import com.feros.api.repository.UserSessionRepository;
 import com.feros.api.util.SecurityUtil;
 import com.feros.api.entity.User;
 import com.feros.api.exception.FerosException;
+import com.feros.api.entity.RbacLoginAccess;
+import com.feros.api.enums.RoleName;
+import com.feros.api.repository.RbacLoginAccessRepository;
 import com.feros.api.repository.UserRepository;
 import com.feros.api.service.AuthService;
 import com.feros.api.service.S3Service;
@@ -28,6 +31,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final S3Service s3Service;
+    private final RbacLoginAccessRepository rbacLoginAccessRepository;
 
     @Override
     public LoginResponse login(LoginRequest request, String ipAddress) {
@@ -70,6 +74,25 @@ public class AuthServiceImpl implements AuthService {
         String companyName = user.getTenant() != null ? user.getTenant().getCompanyName() : "FEROS";
         String logoKey = user.getTenant() != null ? user.getTenant().getLogoUrl() : null;
         String logoUrl = logoKey != null ? s3Service.getPublicUrl(logoKey) : null;
+
+        // 5b. Enforce login access RBAC (skip for SUPER_ADMIN and ADMIN)
+        if (tenantId != null && !role.equals("SUPER_ADMIN") && !role.equals("ADMIN")) {
+            try {
+                RoleName roleName = RoleName.valueOf(role);
+                rbacLoginAccessRepository
+                        .findByTenantIdAndRoleAndPlatform(tenantId, roleName, request.getDeviceType())
+                        .ifPresent(entry -> {
+                            if (Boolean.FALSE.equals(entry.getAllowed())) {
+                                String platform = request.getDeviceType().name().toLowerCase();
+                                throw new com.feros.api.exception.FerosException(
+                                        "Your role is not permitted to log in on the " + platform + " platform.",
+                                        HttpStatus.FORBIDDEN);
+                            }
+                        });
+            } catch (IllegalArgumentException ignored) {
+                // Unknown role — allow through
+            }
+        }
 
         // 6. Generate JWT token
         String token = jwtUtil.generateToken(

@@ -1,6 +1,7 @@
 package com.feros.api.service;
 
 import com.feros.api.dto.request.*;
+import com.feros.api.dto.response.RbacLoginAccessResponse;
 import com.feros.api.dto.response.TenantMasterResponse;
 import java.util.List;
 
@@ -58,4 +59,8 @@ public interface TenantMasterService {
     // Tenant Settings
     TenantMasterResponse createOrUpdateSettings(TenantSettingsRequest request);
     TenantMasterResponse getSettings();
+
+    // RBAC — Login Access
+    RbacLoginAccessResponse getLoginAccess();
+    RbacLoginAccessResponse saveLoginAccess(RbacLoginAccessRequest request);
 }

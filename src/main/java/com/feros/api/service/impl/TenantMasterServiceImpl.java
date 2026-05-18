@@ -1,6 +1,12 @@
 package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.*;
+import com.feros.api.dto.response.RbacLoginAccessResponse;
+import com.feros.api.entity.RbacLoginAccess;
+import com.feros.api.enums.DeviceType;
+import com.feros.api.enums.RoleName;
+import com.feros.api.repository.RbacLoginAccessRepository;
+import jakarta.transaction.Transactional;
 import com.feros.api.dto.response.TenantMasterResponse;
 import com.feros.api.entity.Designation;
 import com.feros.api.entity.Tenant;
@@ -28,6 +34,7 @@ public class TenantMasterServiceImpl implements TenantMasterService {
     private final PaymentTermsRepository paymentTermsRepository;
     private final ClientTypeRepository clientTypeRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
+    private final RbacLoginAccessRepository rbacLoginAccessRepository;
     private final CityRepository cityRepository;
     private final VehicleTypeRepository vehicleTypeRepository;
 
@@ -473,5 +480,50 @@ public class TenantMasterServiceImpl implements TenantMasterService {
                 .requireSparePartApproval(s.getRequireSparePartApproval())
                 .isActive(s.getIsActive()).createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt()).build();
+    }
+
+    // ===================== RBAC — LOGIN ACCESS =====================
+
+    @Override
+    public RbacLoginAccessResponse getLoginAccess() {
+        Long tenantId = getCurrentTenantId();
+        List<RbacLoginAccess> records = rbacLoginAccessRepository.findByTenantId(tenantId);
+
+        // Build full matrix with defaults (true) for any missing entries
+        List<RbacLoginAccessResponse.Entry> entries = new java.util.ArrayList<>();
+        for (RoleName role : new RoleName[]{RoleName.OFFICE_STAFF, RoleName.SUPERVISOR,
+                RoleName.DRIVER, RoleName.CLEANER, RoleName.STORE_KEEPER, RoleName.SERVICE_MEN}) {
+            for (DeviceType platform : DeviceType.values()) {
+                boolean allowed = records.stream()
+                        .filter(r -> r.getRole() == role && r.getPlatform() == platform)
+                        .map(RbacLoginAccess::getAllowed)
+                        .findFirst()
+                        .orElse(true);
+                entries.add(RbacLoginAccessResponse.Entry.builder()
+                        .role(role).platform(platform).allowed(allowed).build());
+            }
+        }
+        return RbacLoginAccessResponse.builder().entries(entries).build();
+    }
+
+    @Override
+    @Transactional
+    public RbacLoginAccessResponse saveLoginAccess(RbacLoginAccessRequest request) {
+        Tenant tenant = getCurrentTenant();
+        rbacLoginAccessRepository.deleteByTenantId(tenant.getId());
+
+        List<RbacLoginAccess> toSave = new java.util.ArrayList<>();
+        if (request.getEntries() != null) {
+            for (RbacLoginAccessRequest.Entry e : request.getEntries()) {
+                toSave.add(RbacLoginAccess.builder()
+                        .tenant(tenant)
+                        .role(e.getRole())
+                        .platform(e.getPlatform())
+                        .allowed(Boolean.TRUE.equals(e.getAllowed()))
+                        .build());
+            }
+        }
+        rbacLoginAccessRepository.saveAll(toSave);
+        return getLoginAccess();
     }
 }
