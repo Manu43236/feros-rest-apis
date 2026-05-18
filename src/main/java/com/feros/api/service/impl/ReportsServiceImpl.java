@@ -507,7 +507,7 @@ public class ReportsServiceImpl implements ReportsService {
 
         List<TodayAttendanceSummaryResponse.TodayAttendanceRow> rows = allUsers.stream().map(u -> {
             Attendance att = byUser.get(u.getId());
-            String status = att != null ? att.getAttendanceType().getName() : "NOT_MARKED";
+            String status = att != null ? att.getAttendanceType().getName().toUpperCase() : "NOT_MARKED";
             return TodayAttendanceSummaryResponse.TodayAttendanceRow.builder()
                     .userId(u.getId())
                     .userName(u.getName())
