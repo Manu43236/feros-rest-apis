@@ -2,6 +2,8 @@ package com.feros.api.dto.response;
 
 import lombok.*;
 
+import java.util.List;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -17,4 +19,6 @@ public class LoginResponse {
     private String companyName;
     private String logoUrl;
     private boolean isPinResetRequired;
+    /** Null for ADMIN/SUPER_ADMIN (all modules visible). Non-null list of enabled module keys for other roles. */
+    private List<String> allowedModules;
 }

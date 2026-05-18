@@ -13,6 +13,7 @@ import com.feros.api.enums.RoleName;
 import com.feros.api.repository.RbacLoginAccessRepository;
 import com.feros.api.repository.UserRepository;
 import com.feros.api.service.AuthService;
+import com.feros.api.service.RoleModuleAccessService;
 import com.feros.api.service.S3Service;
 import com.feros.api.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +34,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtUtil jwtUtil;
     private final S3Service s3Service;
     private final RbacLoginAccessRepository rbacLoginAccessRepository;
+    private final RoleModuleAccessService roleModuleAccessService;
 
     @Override
     public LoginResponse login(LoginRequest request, String ipAddress) {
@@ -122,7 +125,18 @@ public class AuthServiceImpl implements AuthService {
         session.setLastActiveAt(now);
         userSessionRepository.save(session);
 
-        // 8. Return response
+        // 8. Resolve allowed modules (null for ADMIN/SUPER_ADMIN — means all visible)
+        List<String> allowedModules = null;
+        if (tenantId != null && !role.equals("SUPER_ADMIN") && !role.equals("ADMIN")) {
+            try {
+                RoleName roleName = RoleName.valueOf(role);
+                allowedModules = roleModuleAccessService.getEnabledModules(tenantId, roleName);
+            } catch (IllegalArgumentException ignored) {
+                // Unknown role — no module filtering
+            }
+        }
+
+        // 9. Return response
         return LoginResponse.builder()
                 .token(token)
                 .userId(user.getId())
@@ -133,6 +147,7 @@ public class AuthServiceImpl implements AuthService {
                 .companyName(companyName)
                 .logoUrl(logoUrl)
                 .isPinResetRequired(user.getIsPinResetRequired())
+                .allowedModules(allowedModules)
                 .build();
     }
 
