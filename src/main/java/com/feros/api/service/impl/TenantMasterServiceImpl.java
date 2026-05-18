@@ -6,7 +6,7 @@ import com.feros.api.entity.RbacLoginAccess;
 import com.feros.api.enums.DeviceType;
 import com.feros.api.enums.RoleName;
 import com.feros.api.repository.RbacLoginAccessRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import com.feros.api.dto.response.TenantMasterResponse;
 import com.feros.api.entity.Designation;
 import com.feros.api.entity.Tenant;
