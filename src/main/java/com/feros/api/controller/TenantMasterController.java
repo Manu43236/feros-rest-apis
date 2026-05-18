@@ -322,7 +322,7 @@ public class TenantMasterController {
     }
 
     @PutMapping("/rbac/login-access")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<RbacLoginAccessResponse>> saveLoginAccess(
             @RequestBody RbacLoginAccessRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Login access config saved",

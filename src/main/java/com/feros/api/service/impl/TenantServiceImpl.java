@@ -13,6 +13,11 @@ import com.feros.api.entity.Designation;
 import com.feros.api.entity.SubscriptionHistory;
 import com.feros.api.entity.SubscriptionPlan;
 import com.feros.api.entity.Tenant;
+import com.feros.api.entity.User;
+import com.feros.api.entity.UserSession;
+import com.feros.api.enums.DeviceType;
+import com.feros.api.repository.UserRepository;
+import com.feros.api.repository.UserSessionRepository;
 import com.feros.api.entity.TenantDocument;
 import com.feros.api.entity.master.*;
 import com.feros.api.enums.PayCycle;
@@ -58,6 +63,8 @@ public class TenantServiceImpl implements TenantService {
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final S3Service s3Service;
     private final JwtUtil jwtUtil;
+    private final UserSessionRepository userSessionRepository;
+    private final UserRepository userRepository;
 
     @Override
     public TenantResponse createTenant(CreateTenantRequest request) {
@@ -520,6 +527,21 @@ public class TenantServiceImpl implements TenantService {
                 .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
 
         String token = jwtUtil.generateToken(saUserId, tenant.getId(), saPhone, "ADMIN");
+
+        // Save impersonation session so JwtAuthenticationFilter can validate it
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        UserSession session = userSessionRepository
+                .findByUserIdAndDeviceType(saUserId, DeviceType.WEB)
+                .orElse(UserSession.builder()
+                        .user(userRepository.getReferenceById(saUserId))
+                        .deviceType(DeviceType.WEB)
+                        .loggedInAt(now)
+                        .build());
+        session.setToken(token);
+        session.setLoggedInAt(now);
+        session.setLastActiveAt(now);
+        session.setLoggedOutAt(null);
+        userSessionRepository.save(session);
 
         return LoginResponse.builder()
                 .token(token)
