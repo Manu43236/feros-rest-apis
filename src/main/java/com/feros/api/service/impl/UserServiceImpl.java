@@ -17,7 +17,9 @@ import com.feros.api.enums.RoleName;
 import com.feros.api.enums.StaffAllocationStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
+import com.feros.api.service.NotificationService;
 import com.feros.api.service.UserService;
+import com.feros.api.enums.NotificationType;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import com.opencsv.CSVReader;
@@ -50,6 +52,7 @@ public class UserServiceImpl implements UserService {
     private final EmploymentTypeRepository employmentTypeRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -214,6 +217,10 @@ public class UserServiceImpl implements UserService {
         user.setPinGeneratedAt(TimeUtil.nowIst());
         user.setIsPinResetRequired(true);
         userRepository.save(user);
+
+        notificationService.sendToUser(user.getTenant(), user, NotificationType.PIN_RESET,
+                "PIN Reset",
+                "Your login PIN has been reset by admin. Please use your new PIN to login.");
 
         return PinResponse.builder()
                 .userId(user.getId())

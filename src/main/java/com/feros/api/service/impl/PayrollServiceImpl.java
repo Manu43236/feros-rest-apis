@@ -12,7 +12,9 @@ import com.feros.api.entity.master.DeductionType;
 import com.feros.api.enums.PayrollStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
+import com.feros.api.service.NotificationService;
 import com.feros.api.service.PayrollService;
+import com.feros.api.enums.NotificationType;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -38,6 +40,7 @@ public class PayrollServiceImpl implements PayrollService {
     private final UserRepository userRepository;
     private final AttendanceRepository attendanceRepository;
     private final DeductionTypeRepository deductionTypeRepository;
+    private final NotificationService notificationService;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -276,7 +279,14 @@ public class PayrollServiceImpl implements PayrollService {
         if (request.getRemarks() != null)
             payroll.setRemarks(request.getRemarks());
 
-        return mapToPayrollResponse(payrollRepository.save(payroll));
+        Payroll saved = payrollRepository.save(payroll);
+
+        notificationService.sendToUser(saved.getTenant(), saved.getUser(), NotificationType.PAYSLIP_GENERATED,
+                "Payslip Ready",
+                "Your payslip for " + saved.getPayCycleStartDate().getMonth().getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
+                + " " + saved.getPayCycleStartDate().getYear() + " is ready. Net pay: \u20b9" + saved.getNetPay());
+
+        return mapToPayrollResponse(saved);
     }
 
     @Override

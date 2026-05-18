@@ -18,6 +18,8 @@ import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.LrService;
+import com.feros.api.service.NotificationService;
+import com.feros.api.enums.NotificationType;
 import com.feros.api.entity.VehicleMeterReading;
 import com.feros.api.enums.MeterReadingType;
 import com.feros.api.util.NumberUtil;
@@ -48,6 +50,7 @@ public class LrServiceImpl implements LrService {
     private final VehicleMeterReadingRepository vehicleMeterReadingRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
     private final AttendanceRepository attendanceRepository;
+    private final NotificationService notificationService;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -247,6 +250,16 @@ public class LrServiceImpl implements LrService {
                 }
                 staffAllocationRepository.saveAll(staffAllocations);
 
+                String tripStartVehicleReg = allocation.getVehicle().getRegistrationNumber();
+                String tripStartDest = order.getDestinationCity().getName();
+                for (OrderStaffAllocation sa : staffAllocations) {
+                    if (sa.getAllocationStatus() == StaffAllocationStatus.IN_TRANSIT) {
+                        notificationService.sendToUser(lr.getTenant(), sa.getUser(), NotificationType.TRIP_STARTED,
+                                "Trip Started",
+                                "Your trip to " + tripStartDest + " has started. Vehicle: " + tripStartVehicleReg + " (LR: " + lr.getLrNumber() + ")");
+                    }
+                }
+
             } else if (request.getLrStatus() == LrStatus.CANCELLED) {
                 // Revert allocation back to ALLOCATED — vehicle is still assigned to order, just no LR
                 allocation.setAllocationStatus(VehicleAllocationStatus.ALLOCATED);
@@ -332,6 +345,14 @@ public class LrServiceImpl implements LrService {
                     sa.setActualEndDate(TimeUtil.today());
                 }
                 staffAllocationRepository.saveAll(staffAllocations);
+
+                String tripEndVehicleReg = allocation.getVehicle().getRegistrationNumber();
+                String tripEndDest = order.getDestinationCity().getName();
+                for (OrderStaffAllocation sa : staffAllocations) {
+                    notificationService.sendToUser(lr.getTenant(), sa.getUser(), NotificationType.TRIP_COMPLETED,
+                            "Trip Completed",
+                            "Your trip to " + tripEndDest + " is complete. Vehicle: " + tripEndVehicleReg + " (LR: " + lr.getLrNumber() + ")");
+                }
 
                 // Set actual delivery date and free the vehicle regardless
                 allocation.setActualDeliveryDate(TimeUtil.today());

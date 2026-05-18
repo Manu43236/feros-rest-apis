@@ -22,7 +22,9 @@ import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.repository.LrRepository;
+import com.feros.api.service.NotificationService;
 import com.feros.api.service.OrderService;
+import com.feros.api.enums.NotificationType;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +59,7 @@ public class OrderServiceImpl implements OrderService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final LrRepository lrRepository;
+    private final NotificationService notificationService;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -567,7 +570,15 @@ public class OrderServiceImpl implements OrderService {
                 .isActive(true)
                 .build();
 
-        return mapToStaffAllocationResponse(staffAllocationRepository.save(staffAllocation));
+        OrderStaffAllocation saved = staffAllocationRepository.save(staffAllocation);
+
+        String vehicleReg = vehicleAllocation.getVehicle().getRegistrationNumber();
+        String destination = order.getDestinationCity().getName();
+        notificationService.sendToUser(saved.getTenant(), user, NotificationType.TRIP_ASSIGNED,
+                "Trip Assigned",
+                "You have been assigned to vehicle " + vehicleReg + " for trip to " + destination + " (Order: " + order.getOrderNumber() + ")");
+
+        return mapToStaffAllocationResponse(saved);
     }
 
     @Override
@@ -601,6 +612,11 @@ public class OrderServiceImpl implements OrderService {
         allocation.setAllocationStatus(StaffAllocationStatus.CANCELLED);
         allocation.setIsActive(false);
         staffAllocationRepository.save(allocation);
+
+        String vehicleReg = allocation.getVehicleAllocation().getVehicle().getRegistrationNumber();
+        notificationService.sendToUser(allocation.getTenant(), allocation.getUser(), NotificationType.TRIP_UNASSIGNED,
+                "Trip Unassigned",
+                "You have been removed from vehicle " + vehicleReg + " (Order: " + allocation.getOrder().getOrderNumber() + ")");
     }
 
     @Override
