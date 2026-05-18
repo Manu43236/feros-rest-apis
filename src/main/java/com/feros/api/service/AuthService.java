@@ -5,6 +5,7 @@ import com.feros.api.dto.request.LoginRequest;
 import com.feros.api.dto.response.LoginResponse;
 
 public interface AuthService {
-    LoginResponse login(LoginRequest request);
+    LoginResponse login(LoginRequest request, String ipAddress);
+    void logout();
     void changePin(ChangePinRequest request);
 }

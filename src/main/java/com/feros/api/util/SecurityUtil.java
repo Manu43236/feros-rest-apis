@@ -75,6 +75,14 @@ public class SecurityUtil {
         return getCurrentRole().equals("ADMIN");
     }
 
+    public static String getCurrentToken() {
+        String bearer = getRequestHeader("Authorization");
+        if (bearer != null && bearer.startsWith("Bearer ")) {
+            return bearer.substring(7);
+        }
+        throw new FerosException("No token found in request", HttpStatus.UNAUTHORIZED);
+    }
+
     private static String getRequestHeader(String headerName) {
         try {
             ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();

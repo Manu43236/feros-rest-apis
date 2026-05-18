@@ -3,8 +3,9 @@ package com.feros.api.service.impl;
 import com.feros.api.dto.request.ChangePinRequest;
 import com.feros.api.dto.request.LoginRequest;
 import com.feros.api.dto.response.LoginResponse;
+import com.feros.api.entity.UserSession;
+import com.feros.api.repository.UserSessionRepository;
 import com.feros.api.util.SecurityUtil;
-import com.feros.api.entity.Role;
 import com.feros.api.entity.User;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.UserRepository;
@@ -16,17 +17,20 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
+    private final UserSessionRepository userSessionRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final S3Service s3Service;
 
     @Override
-    public LoginResponse login(LoginRequest request) {
+    public LoginResponse login(LoginRequest request, String ipAddress) {
 
         // 1. Find user by phone
         User user = userRepository.findByPhone(request.getPhone())
@@ -75,7 +79,27 @@ public class AuthServiceImpl implements AuthService {
                 role
         );
 
-        // 7. Return response
+        // 7. Upsert session — replaces any existing session for this user + device type
+        LocalDateTime now = LocalDateTime.now();
+        UserSession session = userSessionRepository
+                .findByUserIdAndDeviceType(user.getId(), request.getDeviceType())
+                .orElse(UserSession.builder()
+                        .user(user)
+                        .deviceType(request.getDeviceType())
+                        .loggedInAt(now)
+                        .build());
+
+        session.setToken(token);
+        session.setIpAddress(ipAddress);
+        session.setDeviceInfo(request.getDeviceInfo());
+        session.setFcmToken(request.getFcmToken());
+        session.setAppVersion(request.getAppVersion());
+        session.setLoggedInAt(now);
+        session.setLoggedOutAt(null);
+        session.setLastActiveAt(now);
+        userSessionRepository.save(session);
+
+        // 8. Return response
         return LoginResponse.builder()
                 .token(token)
                 .userId(user.getId())
@@ -87,6 +111,18 @@ public class AuthServiceImpl implements AuthService {
                 .logoUrl(logoUrl)
                 .isPinResetRequired(user.getIsPinResetRequired())
                 .build();
+    }
+
+    @Override
+    public void logout() {
+        Long userId = SecurityUtil.getCurrentUserId();
+        String token = SecurityUtil.getCurrentToken();
+
+        userSessionRepository.findByToken(token).ifPresent(session -> {
+            session.setLoggedOutAt(LocalDateTime.now());
+            userSessionRepository.save(session);
+            userSessionRepository.deleteByUserIdAndDeviceType(userId, session.getDeviceType());
+        });
     }
 
     @Override
