@@ -20,6 +20,7 @@ import com.feros.api.repository.*;
 import com.feros.api.service.LrService;
 import com.feros.api.service.NotificationService;
 import com.feros.api.enums.NotificationType;
+import com.feros.api.enums.RoleName;
 import com.feros.api.entity.VehicleMeterReading;
 import com.feros.api.enums.MeterReadingType;
 import com.feros.api.util.NumberUtil;
@@ -259,6 +260,10 @@ public class LrServiceImpl implements LrService {
                                 "Your trip to " + tripStartDest + " has started. Vehicle: " + tripStartVehicleReg + " (LR: " + lr.getLrNumber() + ")");
                     }
                 }
+                notificationService.sendToRoles(lr.getTenant(), List.of(RoleName.OFFICE_STAFF, RoleName.ADMIN),
+                        NotificationType.TRIP_STARTED,
+                        "Trip Started",
+                        "LR " + lr.getLrNumber() + " to " + tripStartDest + " has started. Vehicle: " + tripStartVehicleReg);
 
             } else if (request.getLrStatus() == LrStatus.CANCELLED) {
                 // Revert allocation back to ALLOCATED — vehicle is still assigned to order, just no LR
@@ -269,13 +274,25 @@ public class LrServiceImpl implements LrService {
                 // Revert staff on this vehicle allocation back to ALLOCATED
                 List<OrderStaffAllocation> staffAllocations =
                         staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(allocation.getId());
+                List<OrderStaffAllocation> wasInTransit = new java.util.ArrayList<>();
                 for (OrderStaffAllocation sa : staffAllocations) {
                     if (sa.getAllocationStatus() == StaffAllocationStatus.IN_TRANSIT) {
+                        wasInTransit.add(sa);
                         sa.setAllocationStatus(StaffAllocationStatus.ALLOCATED);
                         sa.setActualStartDate(null);
                     }
                 }
                 staffAllocationRepository.saveAll(staffAllocations);
+                String cancelledDest = order.getDestinationCity().getName();
+                for (OrderStaffAllocation sa : wasInTransit) {
+                    notificationService.sendToUser(lr.getTenant(), sa.getUser(), NotificationType.TRIP_CANCELLED,
+                            "Trip Cancelled",
+                            "LR " + lr.getLrNumber() + " to " + cancelledDest + " has been cancelled. Your trip has been cancelled.");
+                }
+                notificationService.sendToRoles(lr.getTenant(), List.of(RoleName.OFFICE_STAFF, RoleName.ADMIN),
+                        NotificationType.TRIP_CANCELLED,
+                        "LR Cancelled",
+                        "LR " + lr.getLrNumber() + " to " + cancelledDest + " has been cancelled.");
 
             } else if (request.getLrStatus() == LrStatus.DELIVERED) {
                 // ODM validation — end odometer required
@@ -353,6 +370,10 @@ public class LrServiceImpl implements LrService {
                             "Trip Completed",
                             "Your trip to " + tripEndDest + " is complete. Vehicle: " + tripEndVehicleReg + " (LR: " + lr.getLrNumber() + ")");
                 }
+                notificationService.sendToRoles(lr.getTenant(), List.of(RoleName.OFFICE_STAFF, RoleName.ADMIN),
+                        NotificationType.TRIP_COMPLETED,
+                        "Trip Completed",
+                        "LR " + lr.getLrNumber() + " to " + tripEndDest + " has been delivered. Ready for invoicing.");
 
                 // Set actual delivery date and free the vehicle regardless
                 allocation.setActualDeliveryDate(TimeUtil.today());

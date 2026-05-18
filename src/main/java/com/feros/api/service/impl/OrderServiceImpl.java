@@ -13,6 +13,7 @@ import com.feros.api.entity.master.MaterialType;
 import com.feros.api.entity.master.Route;
 import com.feros.api.entity.master.State;
 import com.feros.api.enums.BillingOn;
+import com.feros.api.enums.RoleName;
 import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.enums.OrderStatus;
@@ -158,7 +159,12 @@ public class OrderServiceImpl implements OrderService {
             order.setRoute(routeRepository.findByIdAndTenantId(request.getRouteId(), tenant.getId())
                     .orElseThrow(() -> new FerosException("Route not found", HttpStatus.NOT_FOUND)));
 
-        return mapToOrderResponse(orderRepository.save(order));
+        Order savedOrder = orderRepository.save(order);
+        notificationService.sendToRoles(savedOrder.getTenant(), List.of(RoleName.SUPERVISOR, RoleName.ADMIN),
+                NotificationType.ORDER_CREATED,
+                "New Order Created",
+                "Order " + savedOrder.getOrderNumber() + " from " + savedOrder.getSourceCity().getName() + " to " + savedOrder.getDestinationCity().getName() + " is ready for vehicle assignment.");
+        return mapToOrderResponse(savedOrder);
     }
 
     @Override
@@ -330,6 +336,11 @@ public class OrderServiceImpl implements OrderService {
                 sa.setIsActive(false);
             }
             staffAllocationRepository.saveAll(staffAllocations);
+            for (OrderStaffAllocation sa : staffAllocations) {
+                notificationService.sendToUser(order.getTenant(), sa.getUser(), NotificationType.TRIP_UNASSIGNED,
+                        "Order Cancelled",
+                        "Order " + order.getOrderNumber() + " has been cancelled. Your trip assignment has been removed.");
+            }
 
             va.setAllocationStatus(VehicleAllocationStatus.CANCELLED);
             va.setIsActive(false);
@@ -485,6 +496,12 @@ public class OrderServiceImpl implements OrderService {
             sa.setIsActive(false);
         }
         staffAllocationRepository.saveAll(linkedStaff);
+        String unassignedVehicleReg = allocation.getVehicle().getRegistrationNumber();
+        for (OrderStaffAllocation sa : linkedStaff) {
+            notificationService.sendToUser(order.getTenant(), sa.getUser(), NotificationType.TRIP_UNASSIGNED,
+                    "Vehicle Unassigned",
+                    "Vehicle " + unassignedVehicleReg + " has been removed from Order " + order.getOrderNumber() + ". Your trip assignment has been removed.");
+        }
 
         // Deduct the allocated weight from order
         BigDecimal newFulfilled = order.getTotalWeightFulfilled()

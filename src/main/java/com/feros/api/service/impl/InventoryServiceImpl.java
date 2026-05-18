@@ -186,6 +186,16 @@ public class InventoryServiceImpl implements InventoryService {
         inv.setLastUpdated(TimeUtil.nowIst());
         inventoryRepository.save(inv);
 
+        // Notify STORE_KEEPER + ADMIN if stock is at or below minimum level
+        if (inv.getQuantity() <= part.getMinStockLevel()) {
+            notificationService.sendToRoles(tenant,
+                    java.util.Arrays.asList(RoleName.STORE_KEEPER, RoleName.ADMIN),
+                    NotificationType.LOW_STOCK,
+                    "Low Stock Alert",
+                    part.getName() + " is low on stock. Current: "
+                            + inv.getQuantity() + ", Min: " + part.getMinStockLevel());
+        }
+
         boolean isDamage = "DAMAGE".equalsIgnoreCase(request.getType());
         SparePartsTransaction tx = SparePartsTransaction.builder()
                 .tenant(tenant)
@@ -334,6 +344,16 @@ public class InventoryServiceImpl implements InventoryService {
                     .build();
             transactionRepository.save(tx);
 
+            // Notify STORE_KEEPER + ADMIN if stock is at or below minimum level
+            if (inv.getQuantity() <= sp.getSparePart().getMinStockLevel()) {
+                notificationService.sendToRoles(sp.getService().getTenant(),
+                        java.util.Arrays.asList(RoleName.STORE_KEEPER, RoleName.ADMIN),
+                        NotificationType.LOW_STOCK,
+                        "Low Stock Alert",
+                        sp.getSparePart().getName() + " is low on stock. Current: "
+                                + inv.getQuantity() + ", Min: " + sp.getSparePart().getMinStockLevel());
+            }
+
         } else if (request.getStatus() == ServicePartStatus.REJECTED) {
             if (request.getRejectionReason() == null || request.getRejectionReason().isBlank())
                 throw new FerosException("Rejection reason is required", HttpStatus.BAD_REQUEST);
@@ -345,7 +365,24 @@ public class InventoryServiceImpl implements InventoryService {
             throw new FerosException("Status must be APPROVED or REJECTED", HttpStatus.BAD_REQUEST);
         }
 
-        return toServicePartResponse(servicePartRepository.save(sp));
+        ServicePart saved = servicePartRepository.save(sp);
+
+        // Notify the requester of the outcome
+        if (saved.getStatus() == ServicePartStatus.APPROVED) {
+            notificationService.sendToUser(saved.getService().getTenant(), saved.getRequestedBy(),
+                    NotificationType.PART_APPROVED,
+                    "Part Request Approved",
+                    saved.getQuantityApproved() + "x " + saved.getSparePart().getName()
+                            + " approved for service #" + saved.getService().getServiceNumber());
+        } else if (saved.getStatus() == ServicePartStatus.REJECTED) {
+            notificationService.sendToUser(saved.getService().getTenant(), saved.getRequestedBy(),
+                    NotificationType.PART_REJECTED,
+                    "Part Request Rejected",
+                    saved.getSparePart().getName() + " request rejected for service #"
+                            + saved.getService().getServiceNumber() + ": " + saved.getRejectionReason());
+        }
+
+        return toServicePartResponse(saved);
     }
 
     @Override

@@ -12,6 +12,7 @@ import com.feros.api.enums.UpgradeRequestStatus;
 import com.feros.api.entity.*;
 import com.feros.api.enums.BillingCycle;
 import com.feros.api.enums.NotificationType;
+import com.feros.api.enums.RoleName;
 import com.feros.api.enums.SubscriptionStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
@@ -108,7 +109,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                     upgradeRequestRepository.save(ur);
                 });
 
-        notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_ACTIVATED,
+        notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.SUBSCRIPTION_ACTIVATED,
                 "Subscription Activated",
                 "Your " + plan.getName() + " plan has been activated"
                 + (endDate != null ? " until " + endDate : "") + ".");
@@ -143,7 +144,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .build();
         history = historyRepository.save(history);
 
-        notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_ACTIVATED,
+        notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.SUBSCRIPTION_ACTIVATED,
                 "Trial Extended", "Your trial has been extended to " + newEnd + ".");
 
         return toHistoryResponse(history, tenant, "Trial");
@@ -216,7 +217,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                     request.getPaymentRef(), vehicleCount, pricePerVehicle);
         }
 
-        notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_ACTIVATED,
+        notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.SUBSCRIPTION_ACTIVATED,
                 "Subscription Renewed", "Your subscription has been renewed until " + newEnd + ".");
 
         String planName = plan != null ? plan.getName() : "-";
@@ -242,7 +243,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .build();
         history = historyRepository.save(history);
 
-        notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_SUSPENDED,
+        notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.SUBSCRIPTION_SUSPENDED,
                 "Subscription Suspended",
                 "Your subscription has been suspended. Reason: " + request.getNotes());
 
@@ -271,7 +272,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .build();
         history = historyRepository.save(history);
 
-        notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_ACTIVATED,
+        notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.SUBSCRIPTION_ACTIVATED,
                 "Subscription Reactivated", "Your subscription has been reactivated.");
 
         return toHistoryResponse(history, tenant, "-");
@@ -333,7 +334,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             Tenant tenant = h.getTenant();
             tenant.setSubscriptionStatus(SubscriptionStatus.EXPIRED);
             tenantRepository.save(tenant);
-            notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_EXPIRY,
+            notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.SUBSCRIPTION_EXPIRY,
                     "Subscription Expired",
                     "Your subscription has expired. Please contact FEROS support to renew.");
             log.info("Auto-expired subscription for tenant {}", tenant.getId());
@@ -346,7 +347,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             Tenant tenant = h.getTenant();
             tenant.setSubscriptionStatus(SubscriptionStatus.EXPIRED);
             tenantRepository.save(tenant);
-            notificationService.sendToTenant(tenant, NotificationType.SUBSCRIPTION_EXPIRY,
+            notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.SUBSCRIPTION_EXPIRY,
                     "Trial Expired",
                     "Your 30-day free trial has expired. Contact FEROS to activate a plan and continue using the platform.");
             log.info("Auto-expired trial for tenant {}", tenant.getId());
@@ -360,25 +361,25 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
         // 7-day warning — ACTIVE
         historyRepository.findActiveExpiringOn(sevenDays).forEach(h ->
-                notificationService.sendToTenant(h.getTenant(), NotificationType.TRIAL_ENDING,
+                notificationService.sendToRoles(h.getTenant(), List.of(RoleName.ADMIN), NotificationType.TRIAL_ENDING,
                         "Subscription Expiring in 7 Days",
                         "Your subscription expires on " + h.getEndDate() + ". Please renew to avoid interruption."));
 
         // 7-day warning — TRIAL
         historyRepository.findTrialsExpiringOn(sevenDays).forEach(h ->
-                notificationService.sendToTenant(h.getTenant(), NotificationType.TRIAL_ENDING,
+                notificationService.sendToRoles(h.getTenant(), List.of(RoleName.ADMIN), NotificationType.TRIAL_ENDING,
                         "Trial Ending in 7 Days",
                         "Your free trial expires on " + h.getEndDate() + ". Contact FEROS to activate a paid plan."));
 
         // 1-day warning — ACTIVE
         historyRepository.findActiveExpiringOn(tomorrow).forEach(h ->
-                notificationService.sendToTenant(h.getTenant(), NotificationType.TRIAL_ENDING,
+                notificationService.sendToRoles(h.getTenant(), List.of(RoleName.ADMIN), NotificationType.TRIAL_ENDING,
                         "Subscription Expires Tomorrow",
                         "Your subscription expires tomorrow (" + h.getEndDate() + "). Renew now to avoid access loss."));
 
         // 1-day warning — TRIAL
         historyRepository.findTrialsExpiringOn(tomorrow).forEach(h ->
-                notificationService.sendToTenant(h.getTenant(), NotificationType.TRIAL_ENDING,
+                notificationService.sendToRoles(h.getTenant(), List.of(RoleName.ADMIN), NotificationType.TRIAL_ENDING,
                         "Trial Expires Tomorrow",
                         "Your free trial expires tomorrow (" + h.getEndDate() + "). Contact FEROS to activate a plan."));
     }
@@ -518,7 +519,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         ur = upgradeRequestRepository.save(ur);
 
         // Confirm to tenant
-        notificationService.sendToTenant(tenant, NotificationType.UPGRADE_REQUEST,
+        notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.UPGRADE_REQUEST,
                 "Upgrade Request Received",
                 "Your request to upgrade to " + plan.getName() + " plan (" + request.getVehicleCount()
                         + " vehicles) has been received. We'll contact you shortly.");

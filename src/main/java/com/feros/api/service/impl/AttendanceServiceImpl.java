@@ -13,9 +13,12 @@ import com.feros.api.entity.*;
 import com.feros.api.entity.master.AttendanceType;
 import com.feros.api.entity.master.LeaveType;
 import com.feros.api.enums.AttendanceApprovalStatus;
+import com.feros.api.enums.NotificationType;
+import com.feros.api.enums.RoleName;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.AttendanceService;
+import com.feros.api.service.NotificationService;
 import com.feros.api.service.S3Service;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +43,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final AttendanceTypeRepository attendanceTypeRepository;
     private final LeaveTypeRepository leaveTypeRepository;
     private final S3Service s3Service;
+    private final NotificationService notificationService;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -93,7 +97,12 @@ public class AttendanceServiceImpl implements AttendanceService {
         if (request.getSelfieUrl() != null) saved.setSelfieUrl(request.getSelfieUrl());
         if (request.getLatitude()  != null) saved.setLatitude(request.getLatitude());
         if (request.getLongitude() != null) saved.setLongitude(request.getLongitude());
-        return mapToResponse(attendanceRepository.save(saved));
+        Attendance finalSaved = attendanceRepository.save(saved);
+        notificationService.sendToRoles(finalSaved.getTenant(), List.of(RoleName.SUPERVISOR),
+                NotificationType.ATTENDANCE_PENDING,
+                "Attendance Pending Approval",
+                finalSaved.getUser().getName() + " has marked attendance for " + finalSaved.getAttendanceDate() + ". Please review.");
+        return mapToResponse(finalSaved);
     }
 
     @Override
@@ -127,7 +136,11 @@ public class AttendanceServiceImpl implements AttendanceService {
         attendance.setApprovalStatus(AttendanceApprovalStatus.REJECTED);
         attendance.setApprovedBy(getCurrentUser());
         attendance.setApprovedAt(TimeUtil.nowIst());
-        return mapToResponse(attendanceRepository.save(attendance));
+        Attendance saved = attendanceRepository.save(attendance);
+        notificationService.sendToUser(saved.getTenant(), saved.getUser(), NotificationType.ATTENDANCE_REJECTED,
+                "Attendance Rejected",
+                "Your attendance for " + saved.getAttendanceDate() + " has been rejected. Please re-submit.");
+        return mapToResponse(saved);
     }
 
     @Override

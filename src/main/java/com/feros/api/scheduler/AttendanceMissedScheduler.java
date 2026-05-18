@@ -55,7 +55,7 @@ public class AttendanceMissedScheduler {
 
             // Find all DRIVER and CLEANER users for this tenant
             List<User> fieldStaff = userRepository.findByTenantIdAndRoleNames(
-                    tenant.getId(), List.of(RoleName.DRIVER, RoleName.CLEANER));
+                    tenant.getId(), List.of(RoleName.DRIVER, RoleName.CLEANER, RoleName.SERVICE_MEN));
 
             for (User staff : fieldStaff) {
                 boolean marked = attendanceRepository.existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
