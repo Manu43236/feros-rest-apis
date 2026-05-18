@@ -23,7 +23,7 @@ public interface RoleModuleAccessRepository extends JpaRepository<RoleModuleAcce
 
     boolean existsByTenantIdAndModuleKey(Long tenantId, ModuleKey moduleKey);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Transactional
     @Query("DELETE FROM RoleModuleAccess r WHERE r.tenant.id = :tenantId")
     void deleteByTenantId(@Param("tenantId") Long tenantId);
