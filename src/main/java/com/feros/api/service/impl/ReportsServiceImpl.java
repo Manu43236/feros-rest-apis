@@ -1045,11 +1045,10 @@ public class ReportsServiceImpl implements ReportsService {
             List<OrderStaffAllocation> userAllocs = entry.getValue();
             User driver = userAllocs.get(0).getUser();
 
-            // Collect LRs from the vehicle allocations
+            // Collect LRs from the vehicle allocations (one allocation may have multiple LRs)
             List<Lr> driverLrs = userAllocs.stream()
-                    .map(sa -> lrRepository.findByVehicleAllocationId(sa.getVehicleAllocation().getId()))
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
+                    .flatMap(sa -> lrRepository.findAllByVehicleAllocationId(sa.getVehicleAllocation().getId()).stream())
+                    .distinct()
                     .toList();
 
             BigDecimal totalLoaded = driverLrs.stream()

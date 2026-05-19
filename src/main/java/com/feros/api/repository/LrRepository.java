@@ -17,6 +17,7 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
     boolean existsByVehicleAllocationId(Long vehicleAllocationId);
     boolean existsByVehicleAllocationIdAndLrStatusNot(Long vehicleAllocationId, com.feros.api.enums.LrStatus status);
     java.util.Optional<Lr> findByVehicleAllocationId(Long vehicleAllocationId);
+    List<Lr> findAllByVehicleAllocationId(Long vehicleAllocationId);
     List<Lr> findByOrderIdAndIsActiveTrue(Long orderId);
     List<Lr> findByTenantIdAndCreatedByIdAndIsActiveTrue(Long tenantId, Long createdById);
     @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true AND l.lrDate BETWEEN :from AND :to ORDER BY l.lrDate DESC")
