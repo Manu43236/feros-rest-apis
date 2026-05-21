@@ -20,6 +20,8 @@ public class DriverDashboardResponse {
     @Builder
     public static class UpcomingTrip {
         private Long lrId;
+        private Long orderId;
+        private Long vehicleAllocationId;
         private String lrNumber;
         private String lrStatus;
         private String clientName;
@@ -30,5 +32,6 @@ public class DriverDashboardResponse {
         private java.time.LocalDate expectedDeliveryDate;
         private String startedByName;
         private String startedByRole;
+        private boolean hasActiveBreakdown;
     }
 }

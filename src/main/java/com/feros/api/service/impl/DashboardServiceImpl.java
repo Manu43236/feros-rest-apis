@@ -11,6 +11,7 @@ import com.feros.api.entity.StaffDocument;
 import com.feros.api.entity.User;
 import com.feros.api.entity.VehicleDocument;
 import com.feros.api.enums.AttendanceApprovalStatus;
+import com.feros.api.enums.BreakdownStatus;
 import com.feros.api.enums.InvoiceStatus;
 import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.OrderStatus;
@@ -45,6 +46,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final VehicleDocumentRepository vehicleDocumentRepository;
     private final StaffDocumentRepository staffDocumentRepository;
     private final LrRepository lrRepository;
+    private final VehicleBreakdownRepository vehicleBreakdownRepository;
     private final NotificationRepository notificationRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
     private final UserRepository userRepository;
@@ -190,23 +192,33 @@ public class DashboardServiceImpl implements DashboardService {
         DriverDashboardResponse.UpcomingTrip activeTrip = myLrs.stream()
                 .filter(lr -> lr.getLrStatus() == LrStatus.IN_TRANSIT)
                 .findFirst()
-                .map(lr -> DriverDashboardResponse.UpcomingTrip.builder()
-                        .lrId(lr.getId())
-                        .lrNumber(lr.getLrNumber())
-                        .lrStatus(lr.getLrStatus().name())
-                        .clientName(lr.getOrder().getClient().getClientName())
-                        .fromCity(lr.getOrder().getSourceCity() != null
-                                ? lr.getOrder().getSourceCity().getName() : "—")
-                        .toCity(lr.getOrder().getDestinationCity() != null
-                                ? lr.getOrder().getDestinationCity().getName() : "—")
-                        .vehicleNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
-                        .expectedLoadDate(lr.getVehicleAllocation().getExpectedLoadDate())
-                        .expectedDeliveryDate(lr.getVehicleAllocation().getExpectedDeliveryDate())
-                        .startedByName(lr.getStartedBy() != null ? lr.getStartedBy().getName() : null)
-                        .startedByRole(lr.getStartedBy() != null
-                                ? lr.getStartedBy().getRoles().stream()
-                                        .findFirst().map(r -> r.getName().name()).orElse(null) : null)
-                        .build())
+                .map(lr -> {
+                        Long allocationId = lr.getVehicleAllocation().getId();
+                        boolean hasBreakdown = vehicleBreakdownRepository
+                                .findFirstByVehicleAllocationIdAndIsActiveTrueOrderByCreatedAtDesc(allocationId)
+                                .map(b -> b.getStatus() == BreakdownStatus.REPORTED)
+                                .orElse(false);
+                        return DriverDashboardResponse.UpcomingTrip.builder()
+                                .lrId(lr.getId())
+                                .orderId(lr.getOrder().getId())
+                                .vehicleAllocationId(allocationId)
+                                .lrNumber(lr.getLrNumber())
+                                .lrStatus(lr.getLrStatus().name())
+                                .clientName(lr.getOrder().getClient().getClientName())
+                                .fromCity(lr.getOrder().getSourceCity() != null
+                                        ? lr.getOrder().getSourceCity().getName() : "—")
+                                .toCity(lr.getOrder().getDestinationCity() != null
+                                        ? lr.getOrder().getDestinationCity().getName() : "—")
+                                .vehicleNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
+                                .expectedLoadDate(lr.getVehicleAllocation().getExpectedLoadDate())
+                                .expectedDeliveryDate(lr.getVehicleAllocation().getExpectedDeliveryDate())
+                                .startedByName(lr.getStartedBy() != null ? lr.getStartedBy().getName() : null)
+                                .startedByRole(lr.getStartedBy() != null
+                                        ? lr.getStartedBy().getRoles().stream()
+                                                .findFirst().map(r -> r.getName().name()).orElse(null) : null)
+                                .hasActiveBreakdown(hasBreakdown)
+                                .build();
+                })
                 .orElse(null);
 
         List<DriverDashboardResponse.UpcomingTrip> upcoming = myLrs.stream()
