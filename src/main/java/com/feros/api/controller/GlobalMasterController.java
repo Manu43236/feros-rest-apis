@@ -11,6 +11,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.web.bind.annotation.RequestParam;
 import java.util.Map;
 
 @RestController
@@ -36,8 +38,14 @@ public class GlobalMasterController {
 
     // ===================== STATES =====================
     @GetMapping("/states")
-    public ResponseEntity<ApiResponse<List<StateResponse>>> getAllStates() {
-        return ResponseEntity.ok(ApiResponse.success("States fetched successfully", globalMasterService.getAllStates()));
+    public ResponseEntity<?> getAllStates(
+            @RequestParam(defaultValue = "-1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "") String search) {
+        if (page < 0) {
+            return ResponseEntity.ok(ApiResponse.success("States fetched successfully", globalMasterService.getAllStates()));
+        }
+        return ResponseEntity.ok(ApiResponse.success("States fetched successfully", globalMasterService.getStatesPaged(page, size, search)));
     }
 
     @GetMapping("/states/{id}")
@@ -66,8 +74,15 @@ public class GlobalMasterController {
 
     // ===================== CITIES =====================
     @GetMapping("/cities")
-    public ResponseEntity<ApiResponse<List<CityResponse>>> getAllCities() {
-        return ResponseEntity.ok(ApiResponse.success("Cities fetched successfully", globalMasterService.getAllCities()));
+    public ResponseEntity<?> getAllCities(
+            @RequestParam(defaultValue = "-1") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "") String search,
+            @RequestParam(required = false) Long stateId) {
+        if (page < 0) {
+            return ResponseEntity.ok(ApiResponse.success("Cities fetched successfully", globalMasterService.getAllCities()));
+        }
+        return ResponseEntity.ok(ApiResponse.success("Cities fetched successfully", globalMasterService.getCitiesPaged(page, size, search, stateId)));
     }
 
     @GetMapping("/cities/{id}")

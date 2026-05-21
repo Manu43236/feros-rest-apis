@@ -11,6 +11,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import java.util.stream.Collectors;
 
 @Service
@@ -57,6 +60,15 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
     }
 
     @Override
+    public Page<StateResponse> getStatesPaged(int page, int size, String search) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<com.feros.api.entity.master.State> p = (search != null && !search.isBlank())
+                ? stateRepository.findByIsActiveTrueAndNameContainingIgnoreCaseOrderByNameAsc(search, pageable)
+                : stateRepository.findByIsActiveTrueOrderByNameAsc(pageable);
+        return p.map(this::mapToStateResponse);
+    }
+
+    @Override
     public StateResponse updateState(Long id, StateRequest request) {
         State state = stateRepository.findById(id)
                 .orElseThrow(() -> new FerosException("State not found", HttpStatus.NOT_FOUND));
@@ -91,6 +103,23 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
     @Override
     public List<CityResponse> getAllCities() {
         return cityRepository.findAll(org.springframework.data.domain.Sort.by("name")).stream().map(this::mapToCityResponse).toList();
+    }
+
+    @Override
+    public Page<CityResponse> getCitiesPaged(int page, int size, String search, Long stateId) {
+        Pageable pageable = PageRequest.of(page, size);
+        boolean hasSearch = search != null && !search.isBlank();
+        Page<com.feros.api.entity.master.City> p;
+        if (stateId != null && hasSearch) {
+            p = cityRepository.findByStateIdAndIsActiveTrueAndNameContainingIgnoreCaseOrderByNameAsc(stateId, search, pageable);
+        } else if (stateId != null) {
+            p = cityRepository.findByStateIdAndIsActiveTrueOrderByNameAsc(stateId, pageable);
+        } else if (hasSearch) {
+            p = cityRepository.findByIsActiveTrueAndNameContainingIgnoreCaseOrderByNameAsc(search, pageable);
+        } else {
+            p = cityRepository.findByIsActiveTrueOrderByNameAsc(pageable);
+        }
+        return p.map(this::mapToCityResponse);
     }
 
     @Override

@@ -4,6 +4,8 @@ import com.feros.api.dto.request.*;
 import com.feros.api.dto.response.*;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface GlobalMasterService {
 
@@ -11,6 +13,7 @@ public interface GlobalMasterService {
     StateResponse createState(StateRequest request);
     StateResponse getStateById(Long id);
     List<StateResponse> getAllStates();
+    Page<StateResponse> getStatesPaged(int page, int size, String search);
     StateResponse updateState(Long id, StateRequest request);
     void deleteState(Long id);
 
@@ -18,6 +21,7 @@ public interface GlobalMasterService {
     CityResponse createCity(CityRequest request);
     CityResponse getCityById(Long id);
     List<CityResponse> getAllCities();
+    Page<CityResponse> getCitiesPaged(int page, int size, String search, Long stateId);
     List<CityResponse> getCitiesByState(Long stateId);
     CityResponse updateCity(Long id, CityRequest request);
     void deleteCity(Long id);
