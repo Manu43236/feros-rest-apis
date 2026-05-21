@@ -236,6 +236,19 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
+        if (status == OrderStatus.CANCELLED) {
+            List<com.feros.api.entity.Lr> activeLrs = lrRepository.findByOrderIdAndIsActiveTrue(id);
+            boolean hasNonCancellableLr = activeLrs.stream().anyMatch(lr ->
+                    lr.getLrStatus() == com.feros.api.enums.LrStatus.DELIVERED
+                    || lr.getLrStatus() == com.feros.api.enums.LrStatus.IN_TRANSIT
+                    || lr.getLrStatus() == com.feros.api.enums.LrStatus.WEIGHT_LOADED);
+            if (hasNonCancellableLr) {
+                throw new FerosException(
+                        "Cannot cancel order — one or more LRs are already delivered or in transit",
+                        HttpStatus.BAD_REQUEST);
+            }
+        }
+
         order.setOrderStatus(status);
         return mapToOrderResponse(orderRepository.save(order));
     }
@@ -443,7 +456,12 @@ public class OrderServiceImpl implements OrderService {
         if (newFulfilled.compareTo(order.getTotalWeight()) >= 0) {
             order.setOrderStatus(OrderStatus.FULLY_ASSIGNED);
         } else {
-            order.setOrderStatus(OrderStatus.PARTIALLY_ASSIGNED);
+            // Don't downgrade if order already has deliveries in progress
+            boolean hasActiveDelivery = order.getOrderStatus() == OrderStatus.PARTIALLY_DELIVERED
+                    || order.getOrderStatus() == OrderStatus.IN_TRANSIT;
+            if (!hasActiveDelivery) {
+                order.setOrderStatus(OrderStatus.PARTIALLY_ASSIGNED);
+            }
         }
         orderRepository.save(order);
 
@@ -715,7 +733,7 @@ public class OrderServiceImpl implements OrderService {
                 .materialTypeName(o.getMaterialType().getName())
                 .totalWeight(o.getTotalWeight())
                 .totalWeightFulfilled(o.getTotalWeightFulfilled())
-                .remainingWeight(o.getTotalWeight().subtract(o.getTotalWeightFulfilled()))
+                .remainingWeight(o.getTotalWeight().subtract(o.getTotalWeightFulfilled()).setScale(2, java.math.RoundingMode.HALF_UP))
                 .sourceAddress(o.getSourceAddress())
                 .sourceCityId(o.getSourceCity().getId())
                 .sourceCityName(o.getSourceCity().getName())
