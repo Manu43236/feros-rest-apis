@@ -52,7 +52,7 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
 
     @Override
     public List<StateResponse> getAllStates() {
-        return stateRepository.findAllByIsActiveTrue()
+        return stateRepository.findAllByIsActiveTrueOrderByNameAsc()
                 .stream().map(this::mapToStateResponse).toList();
     }
 
@@ -90,12 +90,12 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
 
     @Override
     public List<CityResponse> getAllCities() {
-        return cityRepository.findAll().stream().map(this::mapToCityResponse).toList();
+        return cityRepository.findAll(org.springframework.data.domain.Sort.by("name")).stream().map(this::mapToCityResponse).toList();
     }
 
     @Override
     public List<CityResponse> getCitiesByState(Long stateId) {
-        return cityRepository.findByStateIdAndIsActiveTrue(stateId)
+        return cityRepository.findByStateIdAndIsActiveTrueOrderByNameAsc(stateId)
                 .stream().map(this::mapToCityResponse).toList();
     }
 
