@@ -243,10 +243,10 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         // Set replacement vehicle status → ASSIGNED (then ON_TRIP when LR dispatched)
         setVehicleStatus(replacementVehicle, VehicleStatusType.ASSIGNED);
 
-        // Update breakdown record
+        // Update breakdown record — VEHICLE_REPLACED means trip handed off,
+        // NOT that the vehicle is repaired. resolvedAt stays null until service man resolves it.
         breakdown.setStatus(BreakdownStatus.VEHICLE_REPLACED);
         breakdown.setReplacementVehicleAllocation(replacementAllocation);
-        breakdown.setResolvedAt(TimeUtil.nowIst());
 
         return mapToResponse(breakdownRepository.save(breakdown));
     }
