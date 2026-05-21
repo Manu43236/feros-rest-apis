@@ -14,7 +14,7 @@ import java.util.Optional;
 @Repository
 public interface VehicleBreakdownRepository extends JpaRepository<VehicleBreakdown, Long> {
 
-    Optional<VehicleBreakdown> findByVehicleAllocationIdAndIsActiveTrue(Long vehicleAllocationId);
+    Optional<VehicleBreakdown> findFirstByVehicleAllocationIdAndIsActiveTrueOrderByCreatedAtDesc(Long vehicleAllocationId);
 
     boolean existsByVehicleAllocationIdAndIsActiveTrueAndStatusNotIn(
             Long vehicleAllocationId, List<BreakdownStatus> excludedStatuses);

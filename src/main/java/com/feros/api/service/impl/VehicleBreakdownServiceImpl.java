@@ -336,7 +336,7 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
                 .orElseThrow(() -> new FerosException("Order not found", HttpStatus.NOT_FOUND));
 
         VehicleBreakdown breakdown = breakdownRepository
-                .findByVehicleAllocationIdAndIsActiveTrue(allocationId)
+                .findFirstByVehicleAllocationIdAndIsActiveTrueOrderByCreatedAtDesc(allocationId)
                 .orElseThrow(() -> new FerosException("No breakdown found for this allocation", HttpStatus.NOT_FOUND));
 
         return mapToResponse(breakdown);
