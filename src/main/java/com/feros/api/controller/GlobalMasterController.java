@@ -80,6 +80,10 @@ public class GlobalMasterController {
             @RequestParam(defaultValue = "") String search,
             @RequestParam(required = false) Long stateId) {
         if (page < 0) {
+            // Non-paginated: filter by stateId if provided (used by mobile/web dropdowns)
+            if (stateId != null) {
+                return ResponseEntity.ok(ApiResponse.success("Cities fetched successfully", globalMasterService.getCitiesByState(stateId)));
+            }
             return ResponseEntity.ok(ApiResponse.success("Cities fetched successfully", globalMasterService.getAllCities()));
         }
         return ResponseEntity.ok(ApiResponse.success("Cities fetched successfully", globalMasterService.getCitiesPaged(page, size, search, stateId)));
