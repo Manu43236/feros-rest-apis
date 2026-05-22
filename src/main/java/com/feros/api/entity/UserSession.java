@@ -7,10 +7,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(
-    name = "user_sessions",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "device_type"})
-)
+@Table(name = "user_sessions")
 @Getter
 @Setter
 @NoArgsConstructor

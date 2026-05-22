@@ -105,24 +105,19 @@ public class AuthServiceImpl implements AuthService {
                 role
         );
 
-        // 7. Upsert session — replaces any existing session for this user + device type
+        // 7. Create a new session (multiple concurrent sessions allowed)
         LocalDateTime now = LocalDateTime.now();
-        UserSession session = userSessionRepository
-                .findByUserIdAndDeviceType(user.getId(), request.getDeviceType())
-                .orElse(UserSession.builder()
-                        .user(user)
-                        .deviceType(request.getDeviceType())
-                        .loggedInAt(now)
-                        .build());
-
-        session.setToken(token);
-        session.setIpAddress(ipAddress);
-        session.setDeviceInfo(request.getDeviceInfo());
-        session.setFcmToken(request.getFcmToken());
-        session.setAppVersion(request.getAppVersion());
-        session.setLoggedInAt(now);
-        session.setLoggedOutAt(null);
-        session.setLastActiveAt(now);
+        UserSession session = UserSession.builder()
+                .user(user)
+                .deviceType(request.getDeviceType())
+                .token(token)
+                .ipAddress(ipAddress)
+                .deviceInfo(request.getDeviceInfo())
+                .fcmToken(request.getFcmToken())
+                .appVersion(request.getAppVersion())
+                .loggedInAt(now)
+                .lastActiveAt(now)
+                .build();
         userSessionRepository.save(session);
 
         // 8. Resolve allowed modules (null for ADMIN/SUPER_ADMIN — means all visible)
@@ -153,14 +148,9 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void logout() {
-        Long userId = SecurityUtil.getCurrentUserId();
         String token = SecurityUtil.getCurrentToken();
 
-        userSessionRepository.findByToken(token).ifPresent(session -> {
-            session.setLoggedOutAt(LocalDateTime.now());
-            userSessionRepository.save(session);
-            userSessionRepository.deleteByUserIdAndDeviceType(userId, session.getDeviceType());
-        });
+        userSessionRepository.findByToken(token).ifPresent(userSessionRepository::delete);
     }
 
     @Override
