@@ -105,19 +105,23 @@ public class AuthServiceImpl implements AuthService {
                 role
         );
 
-        // 7. Create a new session (multiple concurrent sessions allowed)
+        // 7. Upsert session — one row per user+device type
         LocalDateTime now = LocalDateTime.now();
-        UserSession session = UserSession.builder()
-                .user(user)
-                .deviceType(request.getDeviceType())
-                .token(token)
-                .ipAddress(ipAddress)
-                .deviceInfo(request.getDeviceInfo())
-                .fcmToken(request.getFcmToken())
-                .appVersion(request.getAppVersion())
-                .loggedInAt(now)
-                .lastActiveAt(now)
-                .build();
+        UserSession session = userSessionRepository
+                .findByUserIdAndDeviceType(user.getId(), request.getDeviceType())
+                .orElse(UserSession.builder()
+                        .user(user)
+                        .deviceType(request.getDeviceType())
+                        .loggedInAt(now)
+                        .build());
+        session.setToken(token);
+        session.setIpAddress(ipAddress);
+        session.setDeviceInfo(request.getDeviceInfo());
+        session.setFcmToken(request.getFcmToken());
+        session.setAppVersion(request.getAppVersion());
+        session.setLoggedInAt(now);
+        session.setLastActiveAt(now);
+        session.setLoggedOutAt(null);
         userSessionRepository.save(session);
 
         // 8. Resolve allowed modules (null for ADMIN/SUPER_ADMIN — means all visible)
