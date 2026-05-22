@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "vehicle_fuel_logs")
@@ -37,7 +37,7 @@ public class VehicleFuelLog extends BaseEntity {
     private User filledBy;
 
     @Column(name = "fill_date", nullable = false)
-    private LocalDate fillDate;
+    private LocalDateTime fillDate;
 
     @Column(name = "litres_filled", nullable = false, precision = 10, scale = 2)
     private BigDecimal litresFilled;

@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -82,7 +81,8 @@ public class MeterReadingServiceImpl implements MeterReadingService {
         // Sync fuel log odometer if this is a FUEL_FILL reading
         if (request.getReadingType() == MeterReadingType.FUEL_FILL) {
             LocalDate today = reading.getRecordedAt().toLocalDate();
-            fuelLogRepository.findLatestForVehicleOnDate(vehicle.getId(), today)
+            fuelLogRepository.findLatestForVehicleOnDate(vehicle.getId(),
+                    today.atStartOfDay(), today.plusDays(1).atStartOfDay())
                     .ifPresent(fuelLog -> {
                         fuelLog.setOdometerReading(request.getReadingKm());
                         fuelLogRepository.save(fuelLog);

@@ -4,7 +4,6 @@ import com.feros.api.enums.FuelPaymentMode;
 import lombok.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
@@ -26,7 +25,7 @@ public class FuelLogResponse {
     private Long filledById;
     private String filledByName;
 
-    private LocalDate fillDate;
+    private LocalDateTime fillDate;
     private BigDecimal litresFilled;
     private BigDecimal odometerReading;
     private BigDecimal costPerLitre;

@@ -5,7 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -14,7 +14,7 @@ public class FuelLogRequest {
     private Long vehicleId;
     private Long orderId;
 
-    private LocalDate fillDate;
+    private LocalDateTime fillDate;
     private BigDecimal litresFilled;
     private BigDecimal odometerReading;
     private BigDecimal costPerLitre;
