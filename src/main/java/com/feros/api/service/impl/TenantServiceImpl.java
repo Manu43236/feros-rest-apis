@@ -37,6 +37,8 @@ import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalTime;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStreamReader;
@@ -66,6 +68,7 @@ public class TenantServiceImpl implements TenantService {
     private final UserSessionRepository userSessionRepository;
     private final UserRepository userRepository;
 
+    @Transactional
     @Override
     public TenantResponse createTenant(CreateTenantRequest request) {
 
@@ -417,6 +420,8 @@ public class TenantServiceImpl implements TenantService {
                 .maxAdvanceDeductionPerCycle(BigDecimal.valueOf(2000))
                 .isTripBonusEnabled(false)
                 .tripBonusAmount(BigDecimal.ZERO)
+                .attendanceEnforced(false)
+                .attendanceDeadlineTime(LocalTime.of(8, 0))
                 .isActive(true)
                 .build());
     }

@@ -48,9 +48,11 @@ public class TenantSettings extends BaseEntity {
     @Column(name = "trip_bonus_amount")
     private BigDecimal tripBonusAmount = BigDecimal.ZERO;
 
+    @Builder.Default
     @Column(name = "attendance_enforced")
     private Boolean attendanceEnforced = false;
 
+    @Builder.Default
     @Column(name = "attendance_deadline_time")
     private LocalTime attendanceDeadlineTime = LocalTime.of(8, 0);
 
