@@ -131,6 +131,10 @@ public class FuelLogServiceImpl implements FuelLogService {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         VehicleFuelLog log = findLog(id, tenantId);
 
+        // Capture old values before update for vehicle adjustment
+        BigDecimal oldLitres = log.getLitresFilled();
+        boolean    oldFull   = Boolean.TRUE.equals(log.getIsFullTank());
+
         if (request.getFillDate() != null)        log.setFillDate(request.getFillDate());
         if (request.getLitresFilled() != null)    log.setLitresFilled(request.getLitresFilled());
         if (request.getOdometerReading() != null) log.setOdometerReading(request.getOdometerReading());
@@ -142,6 +146,24 @@ public class FuelLogServiceImpl implements FuelLogService {
         if (request.getFuelStationCity() != null) log.setFuelStationCity(request.getFuelStationCity());
         if (request.getReceiptUrl() != null)      log.setReceiptUrl(request.getReceiptUrl());
         if (request.getNotes() != null)           log.setNotes(request.getNotes());
+
+        // Update vehicle fuel level by the difference in litres
+        Vehicle vehicle = log.getVehicle();
+        boolean newFull = Boolean.TRUE.equals(log.getIsFullTank());
+        if (newFull) {
+            vehicle.setCurrentFuelLevel(vehicle.getFuelTankCapacity());
+        } else if (log.getLitresFilled() != null) {
+            BigDecimal prev    = oldFull ? vehicle.getFuelTankCapacity() : (oldLitres != null ? oldLitres : BigDecimal.ZERO);
+            BigDecimal current = vehicle.getCurrentFuelLevel() != null ? vehicle.getCurrentFuelLevel() : BigDecimal.ZERO;
+            BigDecimal updated = current.subtract(prev).add(log.getLitresFilled());
+            if (updated.compareTo(BigDecimal.ZERO) < 0) updated = BigDecimal.ZERO;
+            if (vehicle.getFuelTankCapacity() != null && updated.compareTo(vehicle.getFuelTankCapacity()) > 0)
+                updated = vehicle.getFuelTankCapacity();
+            vehicle.setCurrentFuelLevel(updated);
+        }
+        if (request.getOdometerReading() != null)
+            vehicle.setCurrentOdometerReading(request.getOdometerReading());
+        vehicleRepository.save(vehicle);
 
         return toResponse(fuelLogRepository.save(log));
     }
