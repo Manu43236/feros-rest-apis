@@ -76,14 +76,28 @@ public class FuelLogServiceImpl implements FuelLogService {
 
         log = fuelLogRepository.save(log);
 
-        // Update vehicle's current odometer reading
+        // Update vehicle's current odometer and fuel level
+        boolean vehicleDirty = false;
         if (request.getOdometerReading() != null) {
             vehicle.setCurrentOdometerReading(request.getOdometerReading());
-            if (request.getIsFullTank() != null && request.getIsFullTank()) {
-                vehicle.setCurrentFuelLevel(vehicle.getFuelTankCapacity());
-            }
-            vehicleRepository.save(vehicle);
+            vehicleDirty = true;
         }
+        if (request.getLitresFilled() != null) {
+            if (Boolean.TRUE.equals(request.getIsFullTank())) {
+                vehicle.setCurrentFuelLevel(vehicle.getFuelTankCapacity());
+            } else {
+                BigDecimal current = vehicle.getCurrentFuelLevel() != null
+                        ? vehicle.getCurrentFuelLevel() : BigDecimal.ZERO;
+                BigDecimal updated = current.add(request.getLitresFilled());
+                if (vehicle.getFuelTankCapacity() != null
+                        && updated.compareTo(vehicle.getFuelTankCapacity()) > 0) {
+                    updated = vehicle.getFuelTankCapacity();
+                }
+                vehicle.setCurrentFuelLevel(updated);
+            }
+            vehicleDirty = true;
+        }
+        if (vehicleDirty) vehicleRepository.save(vehicle);
 
         return toResponse(log);
     }
