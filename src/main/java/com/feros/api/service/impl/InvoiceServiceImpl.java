@@ -232,6 +232,10 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         if (request.getInvoiceStatus() == InvoiceStatus.CANCELLED) {
             invoice.setIsActive(false);
+            // Release LRs so they can be re-invoiced
+            List<InvoiceLr> lrLinks = invoiceLrRepository.findByInvoiceIdAndIsActiveTrue(invoice.getId());
+            lrLinks.forEach(link -> link.setIsActive(false));
+            invoiceLrRepository.saveAll(lrLinks);
         }
 
         return mapToInvoiceResponse(invoiceRepository.save(invoice));
