@@ -10,6 +10,8 @@ import com.feros.api.entity.Lr;
 import com.feros.api.entity.StaffDocument;
 import com.feros.api.entity.User;
 import com.feros.api.entity.VehicleDocument;
+import com.feros.api.entity.VehicleMeterReading;
+import com.feros.api.enums.MeterReadingType;
 import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.enums.BreakdownStatus;
 import com.feros.api.enums.InvoiceStatus;
@@ -48,6 +50,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final LrRepository lrRepository;
     private final VehicleBreakdownRepository vehicleBreakdownRepository;
     private final NotificationRepository notificationRepository;
+    private final VehicleMeterReadingRepository vehicleMeterReadingRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
     private final UserRepository userRepository;
 
@@ -211,6 +214,11 @@ public class DashboardServiceImpl implements DashboardService {
                                         ? lr.getOrder().getDestinationCity().getName() : "—")
                                 .vehicleNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
                                 .currentVehicleOdometer(lr.getVehicleAllocation().getVehicle().getCurrentOdometerReading())
+                                .startOdometer(vehicleMeterReadingRepository
+                                        .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
+                                                lr.getId(), MeterReadingType.TRIP_START)
+                                        .map(VehicleMeterReading::getReadingKm).orElse(null))
+                                .loadedWeight(lr.getLoadedWeight())
                                 .expectedLoadDate(lr.getVehicleAllocation().getExpectedLoadDate())
                                 .expectedDeliveryDate(lr.getVehicleAllocation().getExpectedDeliveryDate())
                                 .startedByName(lr.getStartedBy() != null ? lr.getStartedBy().getName() : null)

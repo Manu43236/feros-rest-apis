@@ -29,6 +29,8 @@ public class DriverDashboardResponse {
         private String toCity;
         private String vehicleNumber;
         private java.math.BigDecimal currentVehicleOdometer;
+        private java.math.BigDecimal startOdometer;
+        private java.math.BigDecimal loadedWeight;
         private java.time.LocalDate expectedLoadDate;
         private java.time.LocalDate expectedDeliveryDate;
         private String startedByName;
