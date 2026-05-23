@@ -28,7 +28,7 @@ public class RoleModuleAccessServiceImpl implements RoleModuleAccessService {
     /** Modules that are configurable per role. Always-ON items (dashboard, my attendance, etc.) are excluded. */
     private static final Map<RoleName, List<ModuleKey>> ROLE_MODULES = Map.of(
         RoleName.OFFICE_STAFF, List.of(
-            ModuleKey.CLIENTS, ModuleKey.ORDERS, ModuleKey.LR_REGISTER,
+            ModuleKey.CLIENTS, ModuleKey.ORDERS, ModuleKey.ASSIGNMENTS, ModuleKey.LR_REGISTER,
             ModuleKey.INVOICES, ModuleKey.CREDIT_NOTES, ModuleKey.SERVICE_INVOICES,
             ModuleKey.ATTENDANCE, ModuleKey.REPORTS
         ),
