@@ -16,6 +16,9 @@ public class AssignStaffRequest {
     @NotNull(message = "User is required")
     private Long userId;
 
+    /** DRIVER or CLEANER — validated against the user's actual role */
+    private String slotRole;
+
     private LocalDate expectedStartDate;
     private LocalDate expectedEndDate;
     private String remarks;

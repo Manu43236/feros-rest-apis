@@ -592,6 +592,20 @@ public class OrderServiceImpl implements OrderService {
         Role role = user.getRoles().stream().findFirst()
                 .orElseThrow(() -> new FerosException("User has no role", HttpStatus.BAD_REQUEST));
 
+        // Validate role matches the slot (DRIVER slot → must be DRIVER, CLEANER slot → must be CLEANER)
+        if (request.getSlotRole() != null) {
+            String userRoleName = role.getName().name();
+            if (!userRoleName.equals(request.getSlotRole())) {
+                String expected = request.getSlotRole().equals("DRIVER") ? "a Driver" : "a Cleaner";
+                throw new FerosException("Selected user is not " + expected + ". Only " + request.getSlotRole().toLowerCase() + "s can be assigned to this slot.", HttpStatus.BAD_REQUEST);
+            }
+        }
+
+        // Validate user is not currently on an active trip
+        boolean currentlyAssigned = !staffAllocationRepository.findActiveAllocationsForUser(request.getUserId(), activeStatuses).isEmpty();
+        if (currentlyAssigned)
+            throw new FerosException("This " + role.getName().name().toLowerCase() + " is currently assigned to another order and is not available.", HttpStatus.CONFLICT);
+
         OrderStaffAllocation staffAllocation = OrderStaffAllocation.builder()
                 .tenant(tenantRepository.findByIdAndIsActiveTrue(tenantId).orElseThrow())
                 .order(order)
