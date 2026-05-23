@@ -27,7 +27,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -227,17 +226,87 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     @Override
     public List<AttendanceResponse> getAttendanceByDate(LocalDate date) {
+        String role = SecurityUtil.getCurrentRole();
         return attendanceRepository
                 .findByTenantIdAndAttendanceDateAndIsActiveTrue(getCurrentTenantId(), date)
-                .stream().map(this::mapToResponse).toList();
+                .stream()
+                .filter(a -> isVisibleToRole(a, role))
+                .map(this::mapToResponse).toList();
+    }
+
+    private boolean isVisibleToRole(Attendance a, String callerRole) {
+        String targetRole = a.getUser().getRoles().stream()
+                .findFirst().map(r -> r.getName().name()).orElse("");
+        return switch (callerRole) {
+            case "SUPERVISOR" -> targetRole.equals("DRIVER") || targetRole.equals("CLEANER");
+            case "OFFICE_STAFF" -> !targetRole.equals("ADMIN");
+            default -> true; // ADMIN, SUPER_ADMIN see all
+        };
     }
 
     @Override
     public List<AttendanceResponse> getAttendanceByUser(Long userId, LocalDate from, LocalDate to) {
+        String role = SecurityUtil.getCurrentRole();
+        User targetUser = userRepository.findById(userId)
+                .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
+        String targetRole = targetUser.getRoles().stream()
+                .findFirst().map(r -> r.getName().name()).orElse("");
+
+        if ("SUPERVISOR".equals(role) && !targetRole.equals("DRIVER") && !targetRole.equals("CLEANER")) {
+            throw new FerosException("Access denied", HttpStatus.FORBIDDEN);
+        }
+        if ("OFFICE_STAFF".equals(role) && targetRole.equals("ADMIN")) {
+            throw new FerosException("Access denied", HttpStatus.FORBIDDEN);
+        }
+
         return attendanceRepository
                 .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrue(
                         userId, getCurrentTenantId(), from, to)
                 .stream().map(this::mapToResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public List<AttendanceResponse> bulkApproveAttendance(List<Long> ids) {
+        Long tenantId = getCurrentTenantId();
+        User approver = getCurrentUser();
+        List<AttendanceResponse> results = new ArrayList<>();
+        for (Long id : ids) {
+            Attendance attendance = attendanceRepository
+                    .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
+                    .orElseThrow(() -> new FerosException("Attendance not found: " + id, HttpStatus.NOT_FOUND));
+            if (attendance.getApprovalStatus() == AttendanceApprovalStatus.PENDING) {
+                attendance.setApprovalStatus(AttendanceApprovalStatus.APPROVED);
+                attendance.setApprovedBy(approver);
+                attendance.setApprovedAt(TimeUtil.nowIst());
+                results.add(mapToResponse(attendanceRepository.save(attendance)));
+            }
+        }
+        return results;
+    }
+
+    @Override
+    @Transactional
+    public List<AttendanceResponse> bulkRejectAttendance(List<Long> ids) {
+        Long tenantId = getCurrentTenantId();
+        User approver = getCurrentUser();
+        List<AttendanceResponse> results = new ArrayList<>();
+        for (Long id : ids) {
+            Attendance attendance = attendanceRepository
+                    .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
+                    .orElseThrow(() -> new FerosException("Attendance not found: " + id, HttpStatus.NOT_FOUND));
+            if (attendance.getApprovalStatus() == AttendanceApprovalStatus.PENDING) {
+                attendance.setApprovalStatus(AttendanceApprovalStatus.REJECTED);
+                attendance.setApprovedBy(approver);
+                attendance.setApprovedAt(TimeUtil.nowIst());
+                Attendance saved = attendanceRepository.save(attendance);
+                notificationService.sendToUser(saved.getTenant(), saved.getUser(), NotificationType.ATTENDANCE_REJECTED,
+                        "Attendance Rejected",
+                        "Your attendance for " + saved.getAttendanceDate() + " has been rejected. Please re-submit.");
+                results.add(mapToResponse(saved));
+            }
+        }
+        return results;
     }
 
     @Override

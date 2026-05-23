@@ -1,6 +1,7 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.request.AttendanceRequest;
+import com.feros.api.dto.request.BulkActionRequest;
 import com.feros.api.dto.request.BulkAttendanceRequest;
 import com.feros.api.dto.request.MarkMobilePresentRequest;
 import com.feros.api.dto.request.MarkOwnAttendanceRequest;
@@ -28,16 +29,19 @@ public class AttendanceController {
     private final AttendanceService attendanceService;
 
     // ===================== ATTENDANCE =====================
+
+    // Admin marks for any staff member
     @PostMapping("/attendance")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> markAttendance(
             @Valid @RequestBody AttendanceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Attendance marked successfully", attendanceService.markAttendance(request)));
     }
 
+    // Admin bulk marks for multiple staff
     @PostMapping("/attendance/bulk")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> markBulkAttendance(
             @Valid @RequestBody BulkAttendanceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -45,8 +49,9 @@ public class AttendanceController {
                 attendanceService.markBulkAttendance(request)));
     }
 
+    // Admin, Office Staff, Supervisor can view (filtered by role in service)
     @GetMapping("/attendance")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getAttendanceByDate(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -54,8 +59,9 @@ public class AttendanceController {
                 attendanceService.getAttendanceByDate(date)));
     }
 
+    // View a specific user's attendance history (role-filtered in service)
     @GetMapping("/attendance/user/{userId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getAttendanceByUser(
             @PathVariable Long userId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -65,8 +71,9 @@ public class AttendanceController {
                 attendanceService.getAttendanceByUser(userId, from, to)));
     }
 
+    // All roles can self-mark attendance
     @PostMapping("/attendance/my")
-    @PreAuthorize("hasAnyRole('SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MEN', 'STORE_KEEPER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MEN', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> markOwnAttendance(
             @Valid @RequestBody MarkOwnAttendanceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -82,14 +89,14 @@ public class AttendanceController {
     }
 
     @GetMapping("/attendance/my/today-status")
-    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> getTodayAttendanceStatus() {
         return ResponseEntity.ok(ApiResponse.success(
                 "Today attendance status fetched", attendanceService.getTodayAttendanceStatus()));
     }
 
     @GetMapping("/attendance/my")
-    @PreAuthorize("hasAnyRole('SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MEN', 'STORE_KEEPER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MEN', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getMyAttendance(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
@@ -97,36 +104,55 @@ public class AttendanceController {
                 "Attendance fetched successfully", attendanceService.getMyAttendance(from, to)));
     }
 
+    // Admin-only: pending, rejected, approve, reject, update, bulk approve/reject
     @GetMapping("/attendance/pending")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getPendingAttendance() {
         return ResponseEntity.ok(ApiResponse.success(
                 "Pending attendance fetched successfully", attendanceService.getPendingAttendance()));
     }
 
+    @GetMapping("/attendance/rejected")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getRejectedAttendance() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Rejected attendance fetched", attendanceService.getRejectedAttendance()));
+    }
+
     @PutMapping("/attendance/{id}/approve")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> approveAttendance(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Attendance approved successfully", attendanceService.approveAttendance(id)));
     }
 
     @PutMapping("/attendance/{id}/reject")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> rejectAttendance(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Attendance rejected successfully", attendanceService.rejectAttendance(id)));
     }
 
-    @GetMapping("/attendance/rejected")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
-    public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getRejectedAttendance() {
+    @PutMapping("/attendance/bulk-approve")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<AttendanceResponse>>> bulkApproveAttendance(
+            @Valid @RequestBody BulkActionRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Rejected attendance fetched", attendanceService.getRejectedAttendance()));
+                "Attendance bulk approved successfully",
+                attendanceService.bulkApproveAttendance(request.getIds())));
+    }
+
+    @PutMapping("/attendance/bulk-reject")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<AttendanceResponse>>> bulkRejectAttendance(
+            @Valid @RequestBody BulkActionRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Attendance bulk rejected successfully",
+                attendanceService.bulkRejectAttendance(request.getIds())));
     }
 
     @PutMapping("/attendance/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> updateAttendance(
             @PathVariable Long id, @Valid @RequestBody AttendanceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(

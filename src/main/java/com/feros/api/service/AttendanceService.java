@@ -34,6 +34,10 @@ public interface AttendanceService {
 
     List<AttendanceResponse> getMyAttendance(LocalDate from, LocalDate to);
 
+    List<AttendanceResponse> bulkApproveAttendance(List<Long> ids);
+
+    List<AttendanceResponse> bulkRejectAttendance(List<Long> ids);
+
     AttendanceResponse markMobilePresent(MarkMobilePresentRequest request);
 
     AttendanceResponse getTodayAttendanceStatus();
