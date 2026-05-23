@@ -30,4 +30,8 @@ public class DocumentType extends BaseEntity {
 
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+    @Builder.Default
+    @Column(name = "allow_multiple", nullable = false)
+    private Boolean allowMultiple = true;
 }

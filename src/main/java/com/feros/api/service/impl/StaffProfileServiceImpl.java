@@ -176,6 +176,17 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .orElseThrow(() -> new FerosException("Document type not found",
                         HttpStatus.NOT_FOUND));
 
+        if (Boolean.FALSE.equals(documentType.getAllowMultiple())) {
+            boolean exists = vehicleDocumentRepository
+                    .findByVehicleIdAndTenantIdAndIsActiveTrue(vehicleId, tenantId)
+                    .stream()
+                    .anyMatch(d -> d.getDocumentType().getId().equals(documentType.getId()));
+            if (exists)
+                throw new FerosException(
+                        documentType.getName() + " already exists for this vehicle. Delete the existing one before uploading a new one.",
+                        HttpStatus.CONFLICT);
+        }
+
         VehicleDocument doc = VehicleDocument.builder()
                 .tenant(getCurrentTenant())
                 .vehicle(vehicle)

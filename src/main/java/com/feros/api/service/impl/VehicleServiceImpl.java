@@ -106,6 +106,10 @@ public class VehicleServiceImpl implements VehicleService {
                         HttpStatus.CONFLICT);
         }
 
+        if (request.getFuelTankCapacity() != null && request.getCurrentFuelLevel() != null
+                && request.getCurrentFuelLevel().compareTo(request.getFuelTankCapacity()) > 0)
+            throw new FerosException("Current fuel level cannot exceed tank capacity", HttpStatus.BAD_REQUEST);
+
         Vehicle vehicle = Vehicle.builder()
                 .tenant(tenant)
                 .registrationNumber(regNum)
@@ -238,6 +242,10 @@ public class VehicleServiceImpl implements VehicleService {
                             HttpStatus.CONFLICT);
             }
         }
+        if (request.getFuelTankCapacity() != null && request.getCurrentFuelLevel() != null
+                && request.getCurrentFuelLevel().compareTo(request.getFuelTankCapacity()) > 0)
+            throw new FerosException("Current fuel level cannot exceed tank capacity", HttpStatus.BAD_REQUEST);
+
         vehicle.setRegistrationNumber(newRegNum);
         if (request.getIsActive() != null) vehicle.setIsActive(request.getIsActive());
         vehicle.setCapacityInTons(request.getCapacityInTons());
