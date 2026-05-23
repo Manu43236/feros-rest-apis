@@ -498,6 +498,7 @@ public class LrServiceImpl implements LrService {
                 .isOverloaded(lr.getIsOverloaded())
                 .loadedAt(lr.getLoadedAt())
                 .deliveredAt(lr.getDeliveredAt())
+                .currentVehicleOdometer(vehicle.getCurrentOdometerReading())
                 .startOdometer(vehicleMeterReadingRepository
                         .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
                                 lr.getId(), MeterReadingType.TRIP_START)
