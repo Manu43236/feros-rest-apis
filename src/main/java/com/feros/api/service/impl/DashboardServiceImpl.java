@@ -210,6 +210,7 @@ public class DashboardServiceImpl implements DashboardService {
                                 .toCity(lr.getOrder().getDestinationCity() != null
                                         ? lr.getOrder().getDestinationCity().getName() : "—")
                                 .vehicleNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
+                                .currentVehicleOdometer(lr.getVehicleAllocation().getVehicle().getCurrentOdometerReading())
                                 .expectedLoadDate(lr.getVehicleAllocation().getExpectedLoadDate())
                                 .expectedDeliveryDate(lr.getVehicleAllocation().getExpectedDeliveryDate())
                                 .startedByName(lr.getStartedBy() != null ? lr.getStartedBy().getName() : null)
@@ -238,6 +239,7 @@ public class DashboardServiceImpl implements DashboardService {
                         .toCity(lr.getOrder().getDestinationCity() != null
                                 ? lr.getOrder().getDestinationCity().getName() : "—")
                         .vehicleNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
+                        .currentVehicleOdometer(lr.getVehicleAllocation().getVehicle().getCurrentOdometerReading())
                         .expectedLoadDate(lr.getVehicleAllocation().getExpectedLoadDate())
                         .expectedDeliveryDate(lr.getVehicleAllocation().getExpectedDeliveryDate())
                         .build())
