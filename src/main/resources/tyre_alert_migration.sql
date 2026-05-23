@@ -5,8 +5,8 @@
 
 USE feros_db;
 
--- Add tyre lifecycle columns to tires table
-ALTER TABLE tires
+-- Add tyre lifecycle columns to tyres table
+ALTER TABLE tyres
   ADD COLUMN tyre_life_years INT NULL,
   ADD COLUMN expiry_date DATE NULL,
   ADD COLUMN max_lifetime_km DECIMAL(12,2) NULL,

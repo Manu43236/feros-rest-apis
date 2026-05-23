@@ -499,7 +499,7 @@ public class TenantServiceImpl implements TenantService {
         if (request.getTripBonusAmount() != null)                settings.setTripBonusAmount(request.getTripBonusAmount());
         if (request.getAttendanceEnforced() != null)             settings.setAttendanceEnforced(request.getAttendanceEnforced());
         if (request.getAttendanceDeadlineTime() != null)         settings.setAttendanceDeadlineTime(request.getAttendanceDeadlineTime());
-        if (request.getRequireTireApproval() != null)            settings.setRequireTireApproval(request.getRequireTireApproval());
+        if (request.getRequireTyreApproval() != null)            settings.setRequireTyreApproval(request.getRequireTyreApproval());
         if (request.getRequireSparePartApproval() != null)       settings.setRequireSparePartApproval(request.getRequireSparePartApproval());
         if (request.getServiceGstRate() != null)                 settings.setServiceGstRate(request.getServiceGstRate());
 
@@ -519,7 +519,7 @@ public class TenantServiceImpl implements TenantService {
                 .tripBonusAmount(s.getTripBonusAmount())
                 .attendanceEnforced(s.getAttendanceEnforced())
                 .attendanceDeadlineTime(s.getAttendanceDeadlineTime())
-                .requireTireApproval(s.getRequireTireApproval())
+                .requireTyreApproval(s.getRequireTyreApproval())
                 .requireSparePartApproval(s.getRequireSparePartApproval())
                 .serviceGstRate(s.getServiceGstRate())
                 .build();

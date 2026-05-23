@@ -4,7 +4,7 @@ import com.feros.api.util.TimeUtil;
 import com.feros.api.entity.*;
 import com.feros.api.enums.NotificationType;
 import com.feros.api.enums.RoleName;
-import com.feros.api.enums.TireStatus;
+import com.feros.api.enums.TyreStatus;
 import com.feros.api.repository.*;
 import com.feros.api.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -24,8 +24,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TyreAlertScheduler {
 
-    private final TireRepository tireRepository;
-    private final VehicleTireFittingRepository fittingRepository;
+    private final TyreRepository tyreRepository;
+    private final VehicleTyreFittingRepository fittingRepository;
     private final VehicleMeterReadingRepository meterReadingRepository;
     private final TenantRepository tenantRepository;
     private final NotificationService notificationService;
@@ -54,25 +54,25 @@ public class TyreAlertScheduler {
     // ── 1. Expiry Date Alerts ─────────────────────────────────────────────────
     // Alert every day for 15 days before expiry
     private void checkExpiryDateAlerts(Tenant tenant) {
-        List<Tire> tires = tireRepository.findByTenantIdAndIsActiveTrueOrderByIdDesc(tenant.getId());
+        List<Tyre> tyres = tyreRepository.findByTenantIdAndIsActiveTrueOrderByIdDesc(tenant.getId());
         LocalDate today = TimeUtil.today();
 
-        for (Tire tire : tires) {
-            if (tire.getExpiryDate() == null) continue;
-            if (tire.getStatus() == TireStatus.SCRAPPED || tire.getStatus() == TireStatus.DISPOSED) continue;
+        for (Tyre tyre : tyres) {
+            if (tyre.getExpiryDate() == null) continue;
+            if (tyre.getStatus() == TyreStatus.SCRAPPED || tyre.getStatus() == TyreStatus.DISPOSED) continue;
 
-            long daysLeft = today.until(tire.getExpiryDate()).getDays();
+            long daysLeft = today.until(tyre.getExpiryDate()).getDays();
             if (daysLeft < 0) {
                 // Already expired
                 notificationService.sendToRoles(tenant, TYRE_ALERT_ROLES,
                         NotificationType.TYRE_EXPIRY,
                         "Tyre Expired",
-                        tire.getSerialNumber() + " (" + tire.getBrand() + " " + tire.getSize() + ") has expired. Please replace immediately.");
+                        tyre.getSerialNumber() + " (" + tyre.getBrand() + " " + tyre.getSize() + ") has expired. Please replace immediately.");
             } else if (daysLeft <= 15) {
                 notificationService.sendToRoles(tenant, TYRE_ALERT_ROLES,
                         NotificationType.TYRE_EXPIRY,
                         "Tyre Expiring Soon",
-                        tire.getSerialNumber() + " (" + tire.getBrand() + " " + tire.getSize() + ") expires in " + daysLeft + " day(s) on " + tire.getExpiryDate() + ".");
+                        tyre.getSerialNumber() + " (" + tyre.getBrand() + " " + tyre.getSize() + ") expires in " + daysLeft + " day(s) on " + tyre.getExpiryDate() + ".");
             }
         }
     }
@@ -81,15 +81,15 @@ public class TyreAlertScheduler {
     // Alert from 85% of maxLifetimeKm, every 2000 km thereafter
     private void checkKmLifeAlerts(Tenant tenant) {
         // Get all active fittings for this tenant
-        List<Tire> fittedTires = tireRepository.findByTenantIdAndIsActiveTrueOrderByIdDesc(tenant.getId())
-                .stream().filter(t -> t.getStatus() == TireStatus.FITTED && t.getMaxLifetimeKm() != null).toList();
+        List<Tyre> fittedTyres = tyreRepository.findByTenantIdAndIsActiveTrueOrderByIdDesc(tenant.getId())
+                .stream().filter(t -> t.getStatus() == TyreStatus.FITTED && t.getMaxLifetimeKm() != null).toList();
 
-        for (Tire tire : fittedTires) {
-            BigDecimal maxKm = tire.getMaxLifetimeKm();
+        for (Tyre tyre : fittedTyres) {
+            BigDecimal maxKm = tyre.getMaxLifetimeKm();
             BigDecimal threshold85 = maxKm.multiply(BigDecimal.valueOf(0.85));
 
             // Get current fitting
-            fittingRepository.findCurrentFittingForTire(tire.getId()).ifPresent(fitting -> {
+            fittingRepository.findCurrentFittingForTyre(tyre.getId()).ifPresent(fitting -> {
                 // Get vehicle's latest odometer
                 List<VehicleMeterReading> readings = meterReadingRepository
                         .findTopByVehicleOrderByReadingKmDesc(fitting.getVehicle().getId());
@@ -99,14 +99,14 @@ public class TyreAlertScheduler {
                 BigDecimal kmSinceFitting = latestOdometer.subtract(fitting.getFittedAtKm());
                 if (kmSinceFitting.compareTo(BigDecimal.ZERO) < 0) return;
 
-                BigDecimal totalKmOnTyre = tire.getTotalLifetimeKm().add(kmSinceFitting);
+                BigDecimal totalKmOnTyre = tyre.getTotalLifetimeKm().add(kmSinceFitting);
 
                 if (totalKmOnTyre.compareTo(threshold85) < 0) return;
 
                 // Check if we need to alert: every 2000 km bucket
                 BigDecimal bucket2k = BigDecimal.valueOf(2000);
                 BigDecimal currentBucket = totalKmOnTyre.divide(bucket2k, 0, RoundingMode.FLOOR).multiply(bucket2k);
-                BigDecimal lastAlerted = tire.getLastKmAlertKm() != null ? tire.getLastKmAlertKm() : BigDecimal.ZERO;
+                BigDecimal lastAlerted = tyre.getLastKmAlertKm() != null ? tyre.getLastKmAlertKm() : BigDecimal.ZERO;
 
                 if (currentBucket.compareTo(lastAlerted) > 0) {
                     BigDecimal kmLeft = maxKm.subtract(totalKmOnTyre);
@@ -116,13 +116,13 @@ public class TyreAlertScheduler {
                     notificationService.sendToRoles(tenant, TYRE_ALERT_ROLES,
                             NotificationType.TYRE_EXPIRY,
                             "Tyre Life Warning",
-                            tire.getSerialNumber() + " on " + vehicle + " [" + position + "] has driven " +
+                            tyre.getSerialNumber() + " on " + vehicle + " [" + position + "] has driven " +
                             String.format("%,.0f", totalKmOnTyre) + " km. Only " +
                             String.format("%,.0f", kmLeft.max(BigDecimal.ZERO)) + " km remaining (max " +
                             String.format("%,.0f", maxKm) + " km).");
 
-                    tire.setLastKmAlertKm(currentBucket);
-                    tireRepository.save(tire);
+                    tyre.setLastKmAlertKm(currentBucket);
+                    tyreRepository.save(tyre);
                 }
             });
         }
@@ -151,7 +151,7 @@ public class TyreAlertScheduler {
 
                     // Find oldest fitting (longest since rotation)
                     fittings.stream()
-                            .min(java.util.Comparator.comparing(VehicleTireFitting::getFittedAtKm))
+                            .min(java.util.Comparator.comparing(VehicleTyreFitting::getFittedAtKm))
                             .ifPresent(oldestFitting -> {
                                 BigDecimal kmSinceRotation = latestOdometer.subtract(oldestFitting.getFittedAtKm());
                                 if (kmSinceRotation.compareTo(alertAt) >= 0) {

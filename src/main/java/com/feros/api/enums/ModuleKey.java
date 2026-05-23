@@ -12,8 +12,8 @@ public enum ModuleKey {
     ATTENDANCE,
     REPORTS,
     SPARE_PARTS,
-    TIRES,
+    TYRES,
     PART_REQUESTS,
-    TIRE_REQUESTS,
+    TYRE_REQUESTS,
     VEHICLE_SERVICES
 }

@@ -74,9 +74,9 @@ public interface ReportsService {
     List<PartConsumptionByTypeResponse> getPartsByType(LocalDate from, LocalDate to);
     List<ServiceCostBreakdownResponse> getServiceCostBreakdown(LocalDate from, LocalDate to);
 
-    // Section J — Tire Reports
-    List<TiresByVehicleResponse> getTiresByVehicle();
-    List<KmPerTireResponse> getKmPerTire();
-    List<TireReplacementProjectionResponse> getTireReplacementProjection();
-    List<TireCostPerKmResponse> getTireCostPerKm();
+    // Section J — Tyre Reports
+    List<TyresByVehicleResponse> getTyresByVehicle();
+    List<KmPerTyreResponse> getKmPerTyre();
+    List<TyreReplacementProjectionResponse> getTyreReplacementProjection();
+    List<TyreCostPerKmResponse> getTyreCostPerKm();
 }

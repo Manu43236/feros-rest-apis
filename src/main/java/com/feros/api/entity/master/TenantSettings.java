@@ -57,8 +57,8 @@ public class TenantSettings extends BaseEntity {
     private LocalTime attendanceDeadlineTime = LocalTime.of(8, 0);
 
     @Builder.Default
-    @Column(name = "require_tire_approval")
-    private Boolean requireTireApproval = false;
+    @Column(name = "require_tyre_approval")
+    private Boolean requireTyreApproval = false;
 
     @Builder.Default
     @Column(name = "require_spare_part_approval")

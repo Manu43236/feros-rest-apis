@@ -23,7 +23,7 @@ public class TenantSettingsResponse {
     private BigDecimal tripBonusAmount;
     private Boolean attendanceEnforced;
     private LocalTime attendanceDeadlineTime;
-    private Boolean requireTireApproval;
+    private Boolean requireTyreApproval;
     private Boolean requireSparePartApproval;
     private java.math.BigDecimal serviceGstRate;
 }

@@ -437,29 +437,29 @@ public class ReportsController {
         return ResponseEntity.ok(ApiResponse.success("Service cost breakdown fetched", reportsService.getServiceCostBreakdown(from, to)));
     }
 
-    // ─── Section J — Tire Reports ─────────────────────────────────────────────
+    // ─── Section J — Tyre Reports ─────────────────────────────────────────────
 
-    @GetMapping("/tires-by-vehicle")
+    @GetMapping("/tyres-by-vehicle")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
-    public ResponseEntity<ApiResponse<List<TiresByVehicleResponse>>> getTiresByVehicle() {
-        return ResponseEntity.ok(ApiResponse.success("Tires by vehicle fetched", reportsService.getTiresByVehicle()));
+    public ResponseEntity<ApiResponse<List<TyresByVehicleResponse>>> getTyresByVehicle() {
+        return ResponseEntity.ok(ApiResponse.success("Tyres by vehicle fetched", reportsService.getTyresByVehicle()));
     }
 
-    @GetMapping("/km-per-tire")
+    @GetMapping("/km-per-tyre")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
-    public ResponseEntity<ApiResponse<List<KmPerTireResponse>>> getKmPerTire() {
-        return ResponseEntity.ok(ApiResponse.success("Km per tire fetched", reportsService.getKmPerTire()));
+    public ResponseEntity<ApiResponse<List<KmPerTyreResponse>>> getKmPerTyre() {
+        return ResponseEntity.ok(ApiResponse.success("Km per tyre fetched", reportsService.getKmPerTyre()));
     }
 
-    @GetMapping("/tire-replacement-projection")
+    @GetMapping("/tyre-replacement-projection")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
-    public ResponseEntity<ApiResponse<List<TireReplacementProjectionResponse>>> getTireReplacementProjection() {
-        return ResponseEntity.ok(ApiResponse.success("Tire replacement projection fetched", reportsService.getTireReplacementProjection()));
+    public ResponseEntity<ApiResponse<List<TyreReplacementProjectionResponse>>> getTyreReplacementProjection() {
+        return ResponseEntity.ok(ApiResponse.success("Tyre replacement projection fetched", reportsService.getTyreReplacementProjection()));
     }
 
-    @GetMapping("/tire-cost-per-km")
+    @GetMapping("/tyre-cost-per-km")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
-    public ResponseEntity<ApiResponse<List<TireCostPerKmResponse>>> getTireCostPerKm() {
-        return ResponseEntity.ok(ApiResponse.success("Tire cost per km fetched", reportsService.getTireCostPerKm()));
+    public ResponseEntity<ApiResponse<List<TyreCostPerKmResponse>>> getTyreCostPerKm() {
+        return ResponseEntity.ok(ApiResponse.success("Tyre cost per km fetched", reportsService.getTyreCostPerKm()));
     }
 }

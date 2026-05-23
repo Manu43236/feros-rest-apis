@@ -44,8 +44,8 @@ public class ReportsServiceImpl implements ReportsService {
     private final SparePartsInventoryRepository sparePartsInventoryRepository;
     private final SparePartsTransactionRepository sparePartsTransactionRepository;
     private final ServicePartRepository servicePartRepository;
-    private final VehicleTireFittingRepository vehicleTireFittingRepository;
-    private final TireRepository tireRepository;
+    private final VehicleTyreFittingRepository vehicleTyreFittingRepository;
+    private final TyreRepository tyreRepository;
 
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
 
@@ -1655,58 +1655,58 @@ public class ReportsServiceImpl implements ReportsService {
                 .collect(Collectors.toList());
     }
 
-    // ─── Section J — Tire Reports ─────────────────────────────────────────────
+    // ─── Section J — Tyre Reports ─────────────────────────────────────────────
 
     @Override
     @Transactional(readOnly = true)
-    public List<TiresByVehicleResponse> getTiresByVehicle() {
+    public List<TyresByVehicleResponse> getTyresByVehicle() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        List<VehicleTireFitting> fittings = vehicleTireFittingRepository.findAllActiveFittingsByTenantId(tenantId);
+        List<VehicleTyreFitting> fittings = vehicleTyreFittingRepository.findAllActiveFittingsByTenantId(tenantId);
 
-        Map<Long, List<VehicleTireFitting>> byVehicle = fittings.stream()
+        Map<Long, List<VehicleTyreFitting>> byVehicle = fittings.stream()
                 .collect(Collectors.groupingBy(f -> f.getVehicle().getId()));
 
         return byVehicle.entrySet().stream()
                 .map(e -> {
                     Vehicle v = e.getValue().get(0).getVehicle();
-                    List<TiresByVehicleResponse.TireFittingItem> items = e.getValue().stream()
-                            .map(f -> TiresByVehicleResponse.TireFittingItem.builder()
+                    List<TyresByVehicleResponse.TyreFittingItem> items = e.getValue().stream()
+                            .map(f -> TyresByVehicleResponse.TyreFittingItem.builder()
                                     .fittingId(f.getId())
-                                    .tireId(f.getTire().getId())
-                                    .serialNumber(f.getTire().getSerialNumber())
-                                    .brand(f.getTire().getBrand())
-                                    .size(f.getTire().getSize())
-                                    .tireType(f.getTire().getTireType().name())
+                                    .tyreId(f.getTyre().getId())
+                                    .serialNumber(f.getTyre().getSerialNumber())
+                                    .brand(f.getTyre().getBrand())
+                                    .size(f.getTyre().getSize())
+                                    .tyreType(f.getTyre().getTyreType().name())
                                     .positionCode(f.getPosition().getPositionCode())
                                     .fittedDate(f.getFittedDate())
                                     .fittedAtKm(f.getFittedAtKm())
                                     .kmDriven(f.getKmDriven())
                                     .build())
                             .collect(Collectors.toList());
-                    return TiresByVehicleResponse.builder()
+                    return TyresByVehicleResponse.builder()
                             .vehicleId(v.getId())
                             .regNo(v.getRegistrationNumber())
                             .vehicleType(v.getVehicleType() != null ? v.getVehicleType().getName() : null)
-                            .activeTireCount(items.size())
-                            .tires(items)
+                            .activeTyreCount(items.size())
+                            .tyres(items)
                             .build();
                 })
-                .sorted(Comparator.comparing(TiresByVehicleResponse::getRegNo))
+                .sorted(Comparator.comparing(TyresByVehicleResponse::getRegNo))
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<KmPerTireResponse> getKmPerTire() {
+    public List<KmPerTyreResponse> getKmPerTyre() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        return vehicleTireFittingRepository.findAllFittingsByTenantId(tenantId).stream()
-                .map(f -> KmPerTireResponse.builder()
+        return vehicleTyreFittingRepository.findAllFittingsByTenantId(tenantId).stream()
+                .map(f -> KmPerTyreResponse.builder()
                         .fittingId(f.getId())
-                        .tireId(f.getTire().getId())
-                        .serialNumber(f.getTire().getSerialNumber())
-                        .brand(f.getTire().getBrand())
-                        .size(f.getTire().getSize())
-                        .tireType(f.getTire().getTireType().name())
+                        .tyreId(f.getTyre().getId())
+                        .serialNumber(f.getTyre().getSerialNumber())
+                        .brand(f.getTyre().getBrand())
+                        .size(f.getTyre().getSize())
+                        .tyreType(f.getTyre().getTyreType().name())
                         .vehicleId(f.getVehicle().getId())
                         .vehicleRegNo(f.getVehicle().getRegistrationNumber())
                         .positionCode(f.getPosition().getPositionCode())
@@ -1721,23 +1721,23 @@ public class ReportsServiceImpl implements ReportsService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<TireReplacementProjectionResponse> getTireReplacementProjection() {
+    public List<TyreReplacementProjectionResponse> getTyreReplacementProjection() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        return vehicleTireFittingRepository.findAllActiveFittingsByTenantId(tenantId).stream()
-                .filter(f -> f.getTire().getMaxLifetimeKm() != null
-                        && f.getTire().getMaxLifetimeKm().compareTo(BigDecimal.ZERO) > 0)
+        return vehicleTyreFittingRepository.findAllActiveFittingsByTenantId(tenantId).stream()
+                .filter(f -> f.getTyre().getMaxLifetimeKm() != null
+                        && f.getTyre().getMaxLifetimeKm().compareTo(BigDecimal.ZERO) > 0)
                 .map(f -> {
-                    BigDecimal total = f.getTire().getTotalLifetimeKm() != null
-                            ? f.getTire().getTotalLifetimeKm() : BigDecimal.ZERO;
-                    BigDecimal max = f.getTire().getMaxLifetimeKm();
+                    BigDecimal total = f.getTyre().getTotalLifetimeKm() != null
+                            ? f.getTyre().getTotalLifetimeKm() : BigDecimal.ZERO;
+                    BigDecimal max = f.getTyre().getMaxLifetimeKm();
                     BigDecimal remaining = max.subtract(total);
                     double pct = remaining.divide(max, 4, RoundingMode.HALF_UP).doubleValue();
                     String urgency = pct < 0.10 ? "HIGH" : pct < 0.30 ? "MEDIUM" : "LOW";
-                    return TireReplacementProjectionResponse.builder()
-                            .tireId(f.getTire().getId())
-                            .serialNumber(f.getTire().getSerialNumber())
-                            .brand(f.getTire().getBrand())
-                            .size(f.getTire().getSize())
+                    return TyreReplacementProjectionResponse.builder()
+                            .tyreId(f.getTyre().getId())
+                            .serialNumber(f.getTyre().getSerialNumber())
+                            .brand(f.getTyre().getBrand())
+                            .size(f.getTyre().getSize())
                             .vehicleId(f.getVehicle().getId())
                             .vehicleRegNo(f.getVehicle().getRegistrationNumber())
                             .positionCode(f.getPosition().getPositionCode())
@@ -1748,32 +1748,32 @@ public class ReportsServiceImpl implements ReportsService {
                             .urgency(urgency)
                             .build();
                 })
-                .sorted(Comparator.comparing(TireReplacementProjectionResponse::getRemainingKm))
+                .sorted(Comparator.comparing(TyreReplacementProjectionResponse::getRemainingKm))
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<TireCostPerKmResponse> getTireCostPerKm() {
+    public List<TyreCostPerKmResponse> getTyreCostPerKm() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        return tireRepository.findByTenantIdAndIsActiveTrueOrderByIdDesc(tenantId).stream()
+        return tyreRepository.findByTenantIdAndIsActiveTrueOrderByIdDesc(tenantId).stream()
                 .filter(t -> t.getPurchaseCost() != null
                         && t.getTotalLifetimeKm() != null
                         && t.getTotalLifetimeKm().compareTo(BigDecimal.ZERO) > 0)
                 .map(t -> {
                     BigDecimal costPerKm = t.getPurchaseCost().divide(t.getTotalLifetimeKm(), 4, RoundingMode.HALF_UP);
-                    return TireCostPerKmResponse.builder()
-                            .tireId(t.getId())
+                    return TyreCostPerKmResponse.builder()
+                            .tyreId(t.getId())
                             .serialNumber(t.getSerialNumber())
                             .brand(t.getBrand())
                             .size(t.getSize())
-                            .tireType(t.getTireType().name())
+                            .tyreType(t.getTyreType().name())
                             .purchaseCost(t.getPurchaseCost())
                             .totalLifetimeKm(t.getTotalLifetimeKm())
                             .costPerKm(costPerKm)
                             .build();
                 })
-                .sorted(Comparator.comparing(TireCostPerKmResponse::getCostPerKm).reversed())
+                .sorted(Comparator.comparing(TyreCostPerKmResponse::getCostPerKm).reversed())
                 .collect(Collectors.toList());
     }
 }

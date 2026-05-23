@@ -81,10 +81,10 @@ public class VehicleController {
         return ResponseEntity.ok(ApiResponse.success("Vehicle deleted successfully", null));
     }
 
-    @PostMapping("/backfill-tire-positions")
+    @PostMapping("/backfill-tyre-positions")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
-    public ResponseEntity<ApiResponse<String>> backfillTirePositions() {
-        int count = vehicleService.backfillTirePositions();
+    public ResponseEntity<ApiResponse<String>> backfillTyrePositions() {
+        int count = vehicleService.backfillTyrePositions();
         return ResponseEntity.ok(ApiResponse.success("Backfill complete", count + " vehicles updated"));
     }
 
