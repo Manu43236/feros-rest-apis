@@ -14,6 +14,7 @@ import java.util.Optional;
 @Repository
 public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     List<Invoice> findByTenantIdAndIsActiveTrue(Long tenantId);
+    List<Invoice> findByTenantIdOrderByCreatedAtDesc(Long tenantId);
     Optional<Invoice> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     List<Invoice> findByClientIdAndTenantIdAndIsActiveTrue(Long clientId, Long tenantId);
     long countByTenantIdAndInvoiceStatusAndIsActiveTrue(Long tenantId, InvoiceStatus status);

@@ -209,7 +209,7 @@ public class InvoiceServiceImpl implements InvoiceService {
 
     @Override
     public List<InvoiceResponse> getAllInvoices() {
-        return invoiceRepository.findByTenantIdAndIsActiveTrue(getCurrentTenantId())
+        return invoiceRepository.findByTenantIdOrderByCreatedAtDesc(getCurrentTenantId())
                 .stream().map(this::mapToInvoiceResponse).toList();
     }
 
