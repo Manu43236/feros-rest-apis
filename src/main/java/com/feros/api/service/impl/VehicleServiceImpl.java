@@ -29,6 +29,7 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -133,6 +134,10 @@ public class VehicleServiceImpl implements VehicleService {
                 .currentOdometerReading(request.getCurrentOdometerReading())
                 .fuelTankCapacity(request.getFuelTankCapacity())
                 .currentFuelLevel(request.getCurrentFuelLevel())
+                .isFinanced(Boolean.TRUE.equals(request.getIsFinanced()))
+                .financerName(request.getFinancerName())
+                .financeStartDate(request.getFinanceStartDate())
+                .financeEndDate(request.getFinanceEndDate())
                 .notes(request.getNotes())
                 .tyreRotationIntervalKm(request.getTyreRotationIntervalKm())
                 .isActive(true)
@@ -270,6 +275,10 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setCurrentOdometerReading(request.getCurrentOdometerReading());
         vehicle.setFuelTankCapacity(request.getFuelTankCapacity());
         vehicle.setCurrentFuelLevel(request.getCurrentFuelLevel());
+        vehicle.setIsFinanced(Boolean.TRUE.equals(request.getIsFinanced()));
+        vehicle.setFinancerName(request.getFinancerName());
+        vehicle.setFinanceStartDate(request.getFinanceStartDate());
+        vehicle.setFinanceEndDate(request.getFinanceEndDate());
         vehicle.setNotes(request.getNotes());
         vehicle.setTyreRotationIntervalKm(request.getTyreRotationIntervalKm());
 
@@ -564,12 +573,23 @@ public class VehicleServiceImpl implements VehicleService {
                 .currentOdometerReading(v.getCurrentOdometerReading())
                 .fuelTankCapacity(v.getFuelTankCapacity())
                 .currentFuelLevel(v.getCurrentFuelLevel())
+                .isFinanced(Boolean.TRUE.equals(v.getIsFinanced()))
+                .financerName(v.getFinancerName())
+                .financeStartDate(v.getFinanceStartDate())
+                .financeEndDate(v.getFinanceEndDate())
+                .financeMonthsRemaining(computeFinanceMonthsRemaining(v))
                 .notes(v.getNotes())
                 .tyreRotationIntervalKm(v.getTyreRotationIntervalKm())
                 .isActive(v.getIsActive())
                 .createdAt(v.getCreatedAt())
                 .updatedAt(v.getUpdatedAt())
                 .build();
+    }
+
+    private Integer computeFinanceMonthsRemaining(Vehicle v) {
+        if (!Boolean.TRUE.equals(v.getIsFinanced()) || v.getFinanceEndDate() == null) return null;
+        long months = ChronoUnit.MONTHS.between(TimeUtil.today(), v.getFinanceEndDate());
+        return (int) Math.max(0, months);
     }
 
     @Override

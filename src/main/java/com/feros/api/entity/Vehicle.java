@@ -112,6 +112,19 @@ public class Vehicle extends BaseEntity {
     @Column(name = "current_fuel_level")
     private BigDecimal currentFuelLevel;
 
+    // Finance
+    @Column(name = "is_financed")
+    private Boolean isFinanced = false;
+
+    @Column(name = "financer_name")
+    private String financerName;
+
+    @Column(name = "finance_start_date")
+    private LocalDate financeStartDate;
+
+    @Column(name = "finance_end_date")
+    private LocalDate financeEndDate;
+
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 

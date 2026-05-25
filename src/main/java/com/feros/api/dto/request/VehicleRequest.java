@@ -45,6 +45,12 @@ public class VehicleRequest {
     private BigDecimal currentOdometerReading;
     private BigDecimal fuelTankCapacity;
     private BigDecimal currentFuelLevel;
+    // Finance
+    private Boolean isFinanced;
+    private String financerName;
+    private LocalDate financeStartDate;
+    private LocalDate financeEndDate;
+
     private String notes;
     private Integer tyreRotationIntervalKm;
 }

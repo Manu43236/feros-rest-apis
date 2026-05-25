@@ -58,6 +58,13 @@ public class VehicleResponse {
     private BigDecimal currentOdometerReading;
     private BigDecimal fuelTankCapacity;
     private BigDecimal currentFuelLevel;
+    // Finance
+    private Boolean isFinanced;
+    private String financerName;
+    private LocalDate financeStartDate;
+    private LocalDate financeEndDate;
+    private Integer financeMonthsRemaining;
+
     private String notes;
     private Integer tyreRotationIntervalKm;
 
