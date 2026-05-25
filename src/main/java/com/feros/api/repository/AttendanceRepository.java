@@ -34,4 +34,10 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     boolean existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrueAndApprovalStatusNot(
             Long userId, Long tenantId, LocalDate date, AttendanceApprovalStatus status);
+
+    boolean existsByUserIdAndTenantIdAndAttendanceDateAndApprovalStatusInAndIsActiveTrue(
+            Long userId, Long tenantId, LocalDate date, List<AttendanceApprovalStatus> statuses);
+
+    @Query("SELECT a.user.id FROM Attendance a WHERE a.tenant.id = :tenantId AND a.attendanceDate = :date AND a.approvalStatus IN :statuses AND a.isActive = true")
+    List<Long> findUserIdsWithAttendanceOnDate(@Param("tenantId") Long tenantId, @Param("date") LocalDate date, @Param("statuses") List<AttendanceApprovalStatus> statuses);
 }

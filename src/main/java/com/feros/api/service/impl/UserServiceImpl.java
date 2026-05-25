@@ -16,6 +16,7 @@ import com.feros.api.entity.master.State;
 import com.feros.api.enums.RoleName;
 import com.feros.api.enums.StaffAllocationStatus;
 import com.feros.api.exception.FerosException;
+import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.repository.*;
 import com.feros.api.service.NotificationService;
 import com.feros.api.service.UserService;
@@ -53,6 +54,7 @@ public class UserServiceImpl implements UserService {
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
     private final NotificationService notificationService;
+    private final AttendanceRepository attendanceRepository;
 
     @Override
     @Transactional
@@ -130,7 +132,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<UserResponse> getAllUsers() {
+    public List<UserResponse> getAllUsers(Boolean hasAttendanceToday) {
         if (SecurityUtil.isSuperAdmin()) {
             return userRepository.findAll()
                     .stream()
@@ -138,8 +140,19 @@ public class UserServiceImpl implements UserService {
                     .toList();
         }
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        return userRepository.findAllByTenantId(tenantId)
-                .stream()
+        List<User> users = userRepository.findAllByTenantId(tenantId);
+
+        if (Boolean.TRUE.equals(hasAttendanceToday)) {
+            List<AttendanceApprovalStatus> validStatuses = List.of(
+                    AttendanceApprovalStatus.PENDING, AttendanceApprovalStatus.APPROVED);
+            List<Long> presentUserIds = attendanceRepository.findUserIdsWithAttendanceOnDate(
+                    tenantId, TimeUtil.today(), validStatuses);
+            users = users.stream()
+                    .filter(u -> presentUserIds.contains(u.getId()))
+                    .toList();
+        }
+
+        return users.stream()
                 .map(u -> mapToResponse(u, null))
                 .toList();
     }

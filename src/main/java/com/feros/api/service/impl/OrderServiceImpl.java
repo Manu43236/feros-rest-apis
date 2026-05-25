@@ -11,6 +11,7 @@ import com.feros.api.entity.*;
 import com.feros.api.entity.master.City;
 import com.feros.api.entity.master.MaterialType;
 import com.feros.api.entity.master.State;
+import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.enums.BillingOn;
 import com.feros.api.enums.RoleName;
 import com.feros.api.enums.LrStatus;
@@ -58,6 +59,7 @@ public class OrderServiceImpl implements OrderService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final LrRepository lrRepository;
+    private final AttendanceRepository attendanceRepository;
     private final NotificationService notificationService;
 
     private Long getCurrentTenantId() {
@@ -598,6 +600,18 @@ public class OrderServiceImpl implements OrderService {
                 String expected = request.getSlotRole().equals("DRIVER") ? "a Driver" : "a Cleaner";
                 throw new FerosException("Selected user is not " + expected + ". Only " + request.getSlotRole().toLowerCase() + "s can be assigned to this slot.", HttpStatus.BAD_REQUEST);
             }
+        }
+
+        // Validate staff has marked attendance today (PENDING or APPROVED)
+        List<AttendanceApprovalStatus> validAttendanceStatuses = List.of(
+                AttendanceApprovalStatus.PENDING, AttendanceApprovalStatus.APPROVED);
+        boolean hasAttendanceToday = attendanceRepository
+                .existsByUserIdAndTenantIdAndAttendanceDateAndApprovalStatusInAndIsActiveTrue(
+                        request.getUserId(), tenantId, TimeUtil.today(), validAttendanceStatuses);
+        if (!hasAttendanceToday) {
+            throw new FerosException(
+                    "This " + role.getName().name().toLowerCase() + " has not marked attendance today and cannot be assigned.",
+                    HttpStatus.BAD_REQUEST);
         }
 
         // Validate user is not currently on an active trip

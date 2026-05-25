@@ -35,8 +35,9 @@ public class UserController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR')")
-    public ResponseEntity<ApiResponse<List<UserResponse>>> getAllUsers() {
-        List<UserResponse> response = userService.getAllUsers();
+    public ResponseEntity<ApiResponse<List<UserResponse>>> getAllUsers(
+            @RequestParam(required = false) Boolean hasAttendanceToday) {
+        List<UserResponse> response = userService.getAllUsers(hasAttendanceToday);
         return ResponseEntity.ok(
                 ApiResponse.success("Users fetched successfully", response)
         );
