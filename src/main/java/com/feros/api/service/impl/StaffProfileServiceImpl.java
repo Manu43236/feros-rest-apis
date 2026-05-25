@@ -3,6 +3,7 @@ package com.feros.api.service.impl;
 import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.DocumentRequest;
 import com.feros.api.dto.request.StaffProfileRequest;
+import com.feros.api.dto.request.UpdateDocumentRequest;
 import com.feros.api.dto.response.DocumentResponse;
 import com.feros.api.dto.response.StaffProfileResponse;
 import com.feros.api.dto.response.VehicleImageResponse;
@@ -201,6 +202,24 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .remarks(request.getRemarks())
                 .isActive(true)
                 .build();
+
+        return mapToDocumentResponse(vehicleDocumentRepository.save(doc));
+    }
+
+    @Override
+    @Transactional
+    public DocumentResponse updateVehicleDocument(Long documentId, UpdateDocumentRequest request) {
+        VehicleDocument doc = vehicleDocumentRepository
+                .findByIdAndTenantIdAndIsActiveTrue(documentId, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Document not found", HttpStatus.NOT_FOUND));
+
+        if (request.getDocumentNumber() != null) doc.setDocumentNumber(request.getDocumentNumber());
+        if (request.getIssueDate()       != null) doc.setIssueDate(request.getIssueDate());
+        if (request.getExpiryDate()      != null) doc.setExpiryDate(request.getExpiryDate());
+        if (request.getFileUrl()         != null) doc.setFileUrl(request.getFileUrl());
+        if (request.getIssuerName()      != null) doc.setIssuerName(request.getIssuerName());
+        if (request.getPermitType()      != null) doc.setPermitType(PermitType.valueOf(request.getPermitType()));
+        if (request.getRemarks()         != null) doc.setRemarks(request.getRemarks());
 
         return mapToDocumentResponse(vehicleDocumentRepository.save(doc));
     }

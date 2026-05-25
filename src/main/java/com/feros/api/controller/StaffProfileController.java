@@ -97,6 +97,16 @@ public class StaffProfileController {
                 staffProfileService.addVehicleDocument(vehicleId, request)));
     }
 
+    @PutMapping("/vehicles/documents/{documentId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<DocumentResponse>> updateVehicleDocument(
+            @PathVariable Long documentId,
+            @RequestBody com.feros.api.dto.request.UpdateDocumentRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Document updated successfully",
+                staffProfileService.updateVehicleDocument(documentId, request)));
+    }
+
     @PutMapping("/vehicles/documents/{documentId}/verify")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<DocumentResponse>> verifyVehicleDocument(

@@ -2,6 +2,7 @@ package com.feros.api.service;
 
 import com.feros.api.dto.request.DocumentRequest;
 import com.feros.api.dto.request.StaffProfileRequest;
+import com.feros.api.dto.request.UpdateDocumentRequest;
 import com.feros.api.dto.response.DocumentResponse;
 import com.feros.api.dto.response.StaffProfileResponse;
 import com.feros.api.dto.response.VehicleImageResponse;
@@ -18,6 +19,7 @@ public interface StaffProfileService {
     DocumentResponse verifyStaffDocument(Long documentId);
 
     DocumentResponse addVehicleDocument(Long vehicleId, DocumentRequest request);
+    DocumentResponse updateVehicleDocument(Long documentId, UpdateDocumentRequest request);
     List<DocumentResponse> getVehicleDocuments(Long vehicleId);
     DocumentResponse verifyVehicleDocument(Long documentId);
     void deleteVehicleDocument(Long documentId);
