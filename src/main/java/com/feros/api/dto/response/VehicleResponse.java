@@ -19,6 +19,7 @@ public class VehicleResponse {
 
     private Long brandId;
     private String brandName;
+    private String model;
 
     private Long vehicleTypeId;
     private String vehicleTypeName;
@@ -34,6 +35,7 @@ public class VehicleResponse {
     private VehicleStatusType currentStatusType;
 
     private BigDecimal capacityInTons;
+    private BigDecimal grossVehicleWeight;
     private Integer manufactureYear;
     private String color;
     private String chassisNumber;

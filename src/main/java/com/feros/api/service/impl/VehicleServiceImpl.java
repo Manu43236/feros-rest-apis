@@ -113,7 +113,9 @@ public class VehicleServiceImpl implements VehicleService {
         Vehicle vehicle = Vehicle.builder()
                 .tenant(tenant)
                 .registrationNumber(regNum)
+                .model(request.getModel())
                 .capacityInTons(request.getCapacityInTons())
+                .grossVehicleWeight(request.getGrossVehicleWeight())
                 .manufactureYear(request.getManufactureYear())
                 .color(request.getColor())
                 .chassisNumber(request.getChassisNumber())
@@ -248,7 +250,9 @@ public class VehicleServiceImpl implements VehicleService {
 
         vehicle.setRegistrationNumber(newRegNum);
         if (request.getIsActive() != null) vehicle.setIsActive(request.getIsActive());
+        vehicle.setModel(request.getModel());
         vehicle.setCapacityInTons(request.getCapacityInTons());
+        vehicle.setGrossVehicleWeight(request.getGrossVehicleWeight());
         vehicle.setManufactureYear(request.getManufactureYear());
         vehicle.setColor(request.getColor());
         vehicle.setChassisNumber(request.getChassisNumber());
@@ -531,6 +535,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .registrationNumber(v.getRegistrationNumber())
                 .brandId(v.getBrand() != null ? v.getBrand().getId() : null)
                 .brandName(v.getBrand() != null ? v.getBrand().getName() : null)
+                .model(v.getModel())
                 .vehicleTypeId(v.getVehicleType() != null ? v.getVehicleType().getId() : null)
                 .vehicleTypeName(v.getVehicleType() != null ? v.getVehicleType().getName() : null)
                 .fuelTypeId(v.getFuelType() != null ? v.getFuelType().getId() : null)
@@ -541,6 +546,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .currentStatusName(v.getCurrentStatus() != null ? v.getCurrentStatus().getName() : null)
                 .currentStatusType(v.getCurrentStatus() != null ? v.getCurrentStatus().getStatusType() : null)
                 .capacityInTons(v.getCapacityInTons())
+                .grossVehicleWeight(v.getGrossVehicleWeight())
                 .manufactureYear(v.getManufactureYear())
                 .color(v.getColor())
                 .chassisNumber(v.getChassisNumber())

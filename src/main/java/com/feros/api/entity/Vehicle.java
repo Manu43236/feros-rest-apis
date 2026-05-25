@@ -32,6 +32,9 @@ public class Vehicle extends BaseEntity {
     @JoinColumn(name = "vehicle_brand_id")
     private VehicleBrand brand;
 
+    @Column(name = "model")
+    private String model;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vehicle_type_id")
     private VehicleType vehicleType;
@@ -50,6 +53,9 @@ public class Vehicle extends BaseEntity {
 
     @Column(name = "capacity_in_tons")
     private BigDecimal capacityInTons;
+
+    @Column(name = "gross_vehicle_weight")
+    private BigDecimal grossVehicleWeight;
 
     @Column(name = "manufacture_year")
     private Integer manufactureYear;

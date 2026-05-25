@@ -15,12 +15,14 @@ public class VehicleRequest {
     private Boolean isActive;
 
     private Long brandId;
+    private String model;
     private Long vehicleTypeId;
     private Long fuelTypeId;
     private Long ownershipTypeId;
     private Long currentStatusId;
 
     private BigDecimal capacityInTons;
+    private BigDecimal grossVehicleWeight;
     private Integer manufactureYear;
     private String color;
     private String chassisNumber;
