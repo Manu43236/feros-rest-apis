@@ -642,7 +642,7 @@ public class VehicleServiceImpl implements VehicleService {
                         if (docNumber.isBlank() && issueDateStr.isBlank() && expiryDateStr.isBlank()) continue;
 
                         final String typeName        = docTypeNames[i];
-                        final String finalDocNumber  = docNumber;
+                        final String finalDocNumber  = docNumber.isBlank() ? regNum : docNumber;
                         final String finalIssueDate  = issueDateStr;
                         final String finalExpiryDate = expiryDateStr;
                         documentTypeRepository.findByNameIgnoreCase(typeName).ifPresent(docType -> {
@@ -650,7 +650,7 @@ public class VehicleServiceImpl implements VehicleService {
                                     .tenant(tenant)
                                     .vehicle(saved)
                                     .documentType(docType)
-                                    .documentNumber(finalDocNumber.isBlank() ? null : finalDocNumber)
+                                    .documentNumber(finalDocNumber)
                                     .issueDate(parseDate(finalIssueDate))
                                     .expiryDate(parseDate(finalExpiryDate))
                                     .isActive(true)
