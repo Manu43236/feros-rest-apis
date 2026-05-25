@@ -621,27 +621,39 @@ public class VehicleServiceImpl implements VehicleService {
                     Vehicle saved = vehicleRepository.save(builder.build());
                     successCount++;
 
-                    // cols 31+: documents in groups of 4 (docType, docNumber, issueDate, expiryDate)
-                    int docStart = 31;
-                    while (row.length > docStart) {
-                        String docTypeName  = row[docStart].trim();
-                        String docNumber    = row.length > docStart + 1 ? row[docStart + 1].trim() : "";
-                        String issueDateStr = row.length > docStart + 2 ? row[docStart + 2].trim() : "";
-                        String expiryDateStr= row.length > docStart + 3 ? row[docStart + 3].trim() : "";
-                        docStart += 4;
+                    // cols 31-51: fixed document columns — 7 doc types × 3 cols (number, issueDate, expiryDate)
+                    String[] docTypeNames = {
+                        "Registration Certificate (RC)",
+                        "Insurance Certificate",
+                        "Fitness Certificate",
+                        "National Permit",
+                        "State Permit",
+                        "Pollution Under Control (PUC)",
+                        "Road Tax Receipt"
+                    };
+                    for (int i = 0; i < docTypeNames.length; i++) {
+                        int base = 31 + (i * 3);
+                        if (row.length <= base) break;
+                        String docNumber     = row[base].trim();
+                        String issueDateStr  = row.length > base + 1 ? row[base + 1].trim() : "";
+                        String expiryDateStr = row.length > base + 2 ? row[base + 2].trim() : "";
 
-                        if (docTypeName.isBlank()) continue;
+                        if (docNumber.isBlank() && issueDateStr.isBlank() && expiryDateStr.isBlank()) continue;
 
-                        documentTypeRepository.findByNameIgnoreCase(docTypeName).ifPresent(docType -> {
-                            VehicleDocument.VehicleDocumentBuilder docBuilder = VehicleDocument.builder()
+                        final String typeName        = docTypeNames[i];
+                        final String finalDocNumber  = docNumber;
+                        final String finalIssueDate  = issueDateStr;
+                        final String finalExpiryDate = expiryDateStr;
+                        documentTypeRepository.findByNameIgnoreCase(typeName).ifPresent(docType -> {
+                            vehicleDocumentRepository.save(VehicleDocument.builder()
                                     .tenant(tenant)
                                     .vehicle(saved)
                                     .documentType(docType)
-                                    .documentNumber(docNumber.isBlank() ? null : docNumber)
-                                    .issueDate(parseDate(issueDateStr))
-                                    .expiryDate(parseDate(expiryDateStr))
-                                    .isActive(true);
-                            vehicleDocumentRepository.save(docBuilder.build());
+                                    .documentNumber(finalDocNumber.isBlank() ? null : finalDocNumber)
+                                    .issueDate(parseDate(finalIssueDate))
+                                    .expiryDate(parseDate(finalExpiryDate))
+                                    .isActive(true)
+                                    .build());
                         });
                     }
 
