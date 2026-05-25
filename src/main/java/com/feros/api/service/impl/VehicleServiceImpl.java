@@ -21,6 +21,7 @@ import com.feros.api.service.VehicleService;
 import com.feros.api.util.SecurityUtil;
 import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -657,6 +658,19 @@ public class VehicleServiceImpl implements VehicleService {
                         });
                     }
 
+                } catch (DataIntegrityViolationException e) {
+                    String msg = e.getMessage() != null ? e.getMessage() : "";
+                    if (msg.contains("vehicle_type_id"))
+                        errors.add("Row " + rowNum + ": Vehicle type '" + (row.length > 1 ? row[1] : "") + "' not found — check Masters → Vehicle Types");
+                    else if (msg.contains("vehicle_brand_id"))
+                        errors.add("Row " + rowNum + ": Brand '" + (row.length > 2 ? row[2] : "") + "' not found — check Masters → Brands");
+                    else if (msg.contains("fuel_type_id"))
+                        errors.add("Row " + rowNum + ": Fuel type '" + (row.length > 3 ? row[3] : "") + "' not found — check Masters → Fuel Types");
+                    else if (msg.contains("ownership_type_id"))
+                        errors.add("Row " + rowNum + ": Ownership type '" + (row.length > 4 ? row[4] : "") + "' not found — check Masters → Ownership Types");
+                    else
+                        errors.add("Row " + rowNum + ": Failed to save vehicle — one or more required fields are invalid");
+                    failureCount++;
                 } catch (Exception e) {
                     errors.add("Row " + rowNum + ": " + e.getMessage());
                     failureCount++;
