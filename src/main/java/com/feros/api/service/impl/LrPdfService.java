@@ -190,13 +190,13 @@ public class LrPdfService {
             rightInner.addCell(vehCell);
 
             // E-Way Bill (if present)
-            if (order.getEwayBillNumber() != null && !order.getEwayBillNumber().isBlank()) {
+            if (lr.getEwayBillNumber() != null && !lr.getEwayBillNumber().isBlank()) {
                 PdfPCell ewayCell = new PdfPCell();
                 ewayCell.setBorderWidthBottom(0); ewayCell.setBorderWidthTop(0);
                 ewayCell.setBorderWidthLeft(0); ewayCell.setBorderWidthRight(0);
                 ewayCell.setPadding(5); ewayCell.setMinimumHeight(18);
                 ewayCell.addElement(new Paragraph("E-Way Bill", gray6));
-                ewayCell.addElement(new Paragraph(order.getEwayBillNumber(), bold8));
+                ewayCell.addElement(new Paragraph(lr.getEwayBillNumber(), bold8));
                 rightInner.addCell(ewayCell);
             } else {
                 // Empty filler so right panel matches left panel height

@@ -73,6 +73,15 @@ public class Lr extends BaseEntity {
     @Column(name = "lr_status")
     private LrStatus lrStatus = LrStatus.CREATED;
 
+    @Column(name = "eway_bill_number", length = 50)
+    private String ewayBillNumber;
+
+    @Column(name = "eway_bill_date")
+    private LocalDate ewayBillDate;
+
+    @Column(name = "eway_bill_valid_upto")
+    private LocalDate ewayBillValidUpto;
+
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 

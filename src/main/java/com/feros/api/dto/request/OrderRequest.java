@@ -54,7 +54,4 @@ public class OrderRequest {
     private BillingOn billingOn;
     private String specialInstructions;
     private String remarks;
-    private String ewayBillNumber;
-    private LocalDate ewayBillDate;
-    private LocalDate ewayBillValidUpto;
 }

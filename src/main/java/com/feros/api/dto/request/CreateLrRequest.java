@@ -18,5 +18,8 @@ public class CreateLrRequest {
     private LocalDate lrDate;
     private BigDecimal loadedWeight;
     private LocalDateTime loadedAt;
+    private String ewayBillNumber;
+    private LocalDate ewayBillDate;
+    private LocalDate ewayBillValidUpto;
     private String remarks;
 }

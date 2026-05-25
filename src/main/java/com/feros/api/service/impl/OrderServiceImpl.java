@@ -10,7 +10,6 @@ import com.feros.api.dto.response.VehicleAllocationResponse;
 import com.feros.api.entity.*;
 import com.feros.api.entity.master.City;
 import com.feros.api.entity.master.MaterialType;
-import com.feros.api.entity.master.Route;
 import com.feros.api.entity.master.State;
 import com.feros.api.enums.BillingOn;
 import com.feros.api.enums.RoleName;
@@ -39,7 +38,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -149,9 +147,6 @@ public class OrderServiceImpl implements OrderService {
                 .orderStatus(OrderStatus.PENDING)
                 .specialInstructions(request.getSpecialInstructions())
                 .remarks(request.getRemarks())
-                .ewayBillNumber(request.getEwayBillNumber())
-                .ewayBillDate(request.getEwayBillDate())
-                .ewayBillValidUpto(request.getEwayBillValidUpto())
                 .isActive(true)
                 .build();
 
@@ -318,9 +313,6 @@ public class OrderServiceImpl implements OrderService {
         order.setFreightRate(request.getFreightRate());
         order.setSpecialInstructions(request.getSpecialInstructions());
         order.setRemarks(request.getRemarks());
-        order.setEwayBillNumber(request.getEwayBillNumber());
-        order.setEwayBillDate(request.getEwayBillDate());
-        order.setEwayBillValidUpto(request.getEwayBillValidUpto());
 
         if (request.getBillingOn() != null) order.setBillingOn(request.getBillingOn());
         if (request.getRouteId() != null)
@@ -768,9 +760,6 @@ public class OrderServiceImpl implements OrderService {
                 .orderPaymentStatus(o.getOrderPaymentStatus())
                 .specialInstructions(o.getSpecialInstructions())
                 .remarks(o.getRemarks())
-                .ewayBillNumber(o.getEwayBillNumber())
-                .ewayBillDate(o.getEwayBillDate())
-                .ewayBillValidUpto(o.getEwayBillValidUpto())
                 .createdById(o.getCreatedBy().getId())
                 .createdByName(o.getCreatedBy().getName())
                 .vehicleAllocations(vehicleAllocations)

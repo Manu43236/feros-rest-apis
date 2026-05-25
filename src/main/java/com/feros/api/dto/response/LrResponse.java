@@ -48,6 +48,10 @@ public class LrResponse {
     private java.math.BigDecimal startOdometer;
     private java.math.BigDecimal endOdometer;
 
+    private String ewayBillNumber;
+    private LocalDate ewayBillDate;
+    private LocalDate ewayBillValidUpto;
+
     private LrStatus lrStatus;
     private String remarks;
 

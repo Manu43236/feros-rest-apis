@@ -57,9 +57,6 @@ public class OrderResponse {
     private OrderPaymentStatus orderPaymentStatus;
     private String specialInstructions;
     private String remarks;
-    private String ewayBillNumber;
-    private LocalDate ewayBillDate;
-    private LocalDate ewayBillValidUpto;
 
     private Long createdById;
     private String createdByName;

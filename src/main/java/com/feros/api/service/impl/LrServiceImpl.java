@@ -109,6 +109,9 @@ public class LrServiceImpl implements LrService {
                 .allocatedWeight(allocation.getAllocatedWeight())
                 .loadedWeight(request.getLoadedWeight())
                 .loadedAt(request.getLoadedAt())
+                .ewayBillNumber(request.getEwayBillNumber())
+                .ewayBillDate(request.getEwayBillDate())
+                .ewayBillValidUpto(request.getEwayBillValidUpto())
                 .lrStatus(LrStatus.CREATED)
                 .remarks(request.getRemarks())
                 .createdBy(getCurrentUser())
@@ -167,6 +170,9 @@ public class LrServiceImpl implements LrService {
 
         if (request.getLoadedWeight() != null) lr.setLoadedWeight(request.getLoadedWeight());
         if (request.getLoadedAt() != null) lr.setLoadedAt(request.getLoadedAt());
+        if (request.getEwayBillNumber() != null) lr.setEwayBillNumber(request.getEwayBillNumber());
+        if (request.getEwayBillDate() != null) lr.setEwayBillDate(request.getEwayBillDate());
+        if (request.getEwayBillValidUpto() != null) lr.setEwayBillValidUpto(request.getEwayBillValidUpto());
         if (request.getDeliveredWeight() != null) {
             java.math.BigDecimal effectiveLoaded = request.getLoadedWeight() != null
                     ? request.getLoadedWeight() : lr.getLoadedWeight();
@@ -507,6 +513,9 @@ public class LrServiceImpl implements LrService {
                         .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
                                 lr.getId(), MeterReadingType.TRIP_END)
                         .map(VehicleMeterReading::getReadingKm).orElse(null))
+                .ewayBillNumber(lr.getEwayBillNumber())
+                .ewayBillDate(lr.getEwayBillDate())
+                .ewayBillValidUpto(lr.getEwayBillValidUpto())
                 .lrStatus(lr.getLrStatus())
                 .remarks(lr.getRemarks())
                 .checkposts(lrCheckpostRepository.findByLrIdAndIsActiveTrue(lr.getId())
