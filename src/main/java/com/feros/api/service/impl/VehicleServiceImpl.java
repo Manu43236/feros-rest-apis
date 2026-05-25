@@ -8,6 +8,7 @@ import com.feros.api.dto.response.VehicleResponse;
 import com.feros.api.entity.Tenant;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.VehicleBreakdown;
+import com.feros.api.entity.VehicleDocument;
 import com.feros.api.entity.VehicleTyrePosition;
 import com.feros.api.entity.master.*;
 import com.feros.api.enums.BreakdownStatus;
@@ -49,6 +50,8 @@ public class VehicleServiceImpl implements VehicleService {
     private final UserRepository userRepository;
     private final VehicleTyrePositionRepository tyrePositionRepository;
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
+    private final VehicleDocumentRepository vehicleDocumentRepository;
+    private final DocumentTypeRepository documentTypeRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -473,51 +476,160 @@ public class VehicleServiceImpl implements VehicleService {
                             .registrationNumber(regNum)
                             .isActive(true);
 
-                    // vehicleType (col 1)
-                    if (row.length > 1 && !row[1].isBlank()) {
-                        vehicleTypeRepository.findByNameIgnoreCase(row[1].trim())
-                                .ifPresent(builder::vehicleType);
-                    }
+                    // col 1: vehicleType
+                    if (row.length > 1 && !row[1].isBlank())
+                        vehicleTypeRepository.findByNameIgnoreCase(row[1].trim()).ifPresent(builder::vehicleType);
 
-                    // brand (col 2)
-                    if (row.length > 2 && !row[2].isBlank()) {
-                        vehicleBrandRepository.findByNameIgnoreCase(row[2].trim())
-                                .ifPresent(builder::brand);
-                    }
+                    // col 2: brand
+                    if (row.length > 2 && !row[2].isBlank())
+                        vehicleBrandRepository.findByNameIgnoreCase(row[2].trim()).ifPresent(builder::brand);
 
-                    // fuelType (col 3)
-                    if (row.length > 3 && !row[3].isBlank()) {
-                        fuelTypeRepository.findByNameIgnoreCase(row[3].trim())
-                                .ifPresent(builder::fuelType);
-                    }
+                    // col 3: fuelType
+                    if (row.length > 3 && !row[3].isBlank())
+                        fuelTypeRepository.findByNameIgnoreCase(row[3].trim()).ifPresent(builder::fuelType);
 
-                    // ownershipType (col 4)
-                    if (row.length > 4 && !row[4].isBlank()) {
-                        ownershipTypeRepository.findByNameIgnoreCase(row[4].trim())
-                                .ifPresent(builder::ownershipType);
-                    }
+                    // col 4: ownershipType
+                    if (row.length > 4 && !row[4].isBlank())
+                        ownershipTypeRepository.findByNameIgnoreCase(row[4].trim()).ifPresent(builder::ownershipType);
 
-                    // capacityInTons (col 5)
-                    if (row.length > 5 && !row[5].isBlank()) {
+                    // col 5: capacityInTons
+                    if (row.length > 5 && !row[5].isBlank())
                         try { builder.capacityInTons(new BigDecimal(row[5].trim())); } catch (NumberFormatException ignored) {}
-                    }
 
-                    // manufactureYear (col 6)
-                    if (row.length > 6 && !row[6].isBlank()) {
+                    // col 6: manufactureYear
+                    if (row.length > 6 && !row[6].isBlank())
                         try { builder.manufactureYear(Integer.parseInt(row[6].trim())); } catch (NumberFormatException ignored) {}
+
+                    // col 7: color
+                    if (row.length > 7 && !row[7].isBlank())
+                        builder.color(row[7].trim());
+
+                    // col 8: model
+                    if (row.length > 8 && !row[8].isBlank())
+                        builder.model(row[8].trim());
+
+                    // col 9: grossVehicleWeight
+                    if (row.length > 9 && !row[9].isBlank())
+                        try { builder.grossVehicleWeight(new BigDecimal(row[9].trim())); } catch (NumberFormatException ignored) {}
+
+                    // col 10: chassisNumber
+                    if (row.length > 10 && !row[10].isBlank())
+                        builder.chassisNumber(row[10].trim());
+
+                    // col 11: engineNumber
+                    if (row.length > 11 && !row[11].isBlank())
+                        builder.engineNumber(row[11].trim());
+
+                    // col 12: currentOdometerReading
+                    if (row.length > 12 && !row[12].isBlank())
+                        try { builder.currentOdometerReading(new BigDecimal(row[12].trim())); } catch (NumberFormatException ignored) {}
+
+                    // col 13: fuelTankCapacity
+                    if (row.length > 13 && !row[13].isBlank())
+                        try { builder.fuelTankCapacity(new BigDecimal(row[13].trim())); } catch (NumberFormatException ignored) {}
+
+                    // col 14: currentFuelLevel
+                    if (row.length > 14 && !row[14].isBlank())
+                        try { builder.currentFuelLevel(new BigDecimal(row[14].trim())); } catch (NumberFormatException ignored) {}
+
+                    // col 15: tyreRotationIntervalKm
+                    if (row.length > 15 && !row[15].isBlank())
+                        try { builder.tyreRotationIntervalKm(Integer.parseInt(row[15].trim())); } catch (NumberFormatException ignored) {}
+
+                    // col 16: gpsDeviceNumber
+                    if (row.length > 16 && !row[16].isBlank())
+                        builder.gpsDeviceNumber(row[16].trim());
+
+                    // col 17: gpsDeviceImei
+                    if (row.length > 17 && !row[17].isBlank())
+                        builder.gpsDeviceImei(row[17].trim());
+
+                    // col 18: gpsProvider
+                    if (row.length > 18 && !row[18].isBlank())
+                        builder.gpsProvider(row[18].trim());
+
+                    // col 19: isFinanced (true/yes/1)
+                    if (row.length > 19 && !row[19].isBlank()) {
+                        String val = row[19].trim().toLowerCase();
+                        builder.isFinanced(val.equals("true") || val.equals("yes") || val.equals("1"));
                     }
 
-                    // color (col 7)
-                    if (row.length > 7 && !row[7].isBlank()) {
-                        builder.color(row[7].trim());
-                    }
+                    // col 20: financerName
+                    if (row.length > 20 && !row[20].isBlank())
+                        builder.financerName(row[20].trim());
+
+                    // col 21: financeStartDate
+                    if (row.length > 21 && !row[21].isBlank())
+                        try { builder.financeStartDate(LocalDate.parse(row[21].trim())); } catch (Exception ignored) {}
+
+                    // col 22: financeEndDate
+                    if (row.length > 22 && !row[22].isBlank())
+                        try { builder.financeEndDate(LocalDate.parse(row[22].trim())); } catch (Exception ignored) {}
+
+                    // col 23: ownerName
+                    if (row.length > 23 && !row[23].isBlank())
+                        builder.ownerName(row[23].trim());
+
+                    // col 24: ownerPhone
+                    if (row.length > 24 && !row[24].isBlank())
+                        builder.ownerPhone(row[24].trim());
+
+                    // col 25: ownerAddress
+                    if (row.length > 25 && !row[25].isBlank())
+                        builder.ownerAddress(row[25].trim());
+
+                    // col 26: ownerPan
+                    if (row.length > 26 && !row[26].isBlank())
+                        builder.ownerPan(row[26].trim());
+
+                    // col 27: agreementStartDate
+                    if (row.length > 27 && !row[27].isBlank())
+                        try { builder.agreementStartDate(LocalDate.parse(row[27].trim())); } catch (Exception ignored) {}
+
+                    // col 28: agreementEndDate
+                    if (row.length > 28 && !row[28].isBlank())
+                        try { builder.agreementEndDate(LocalDate.parse(row[28].trim())); } catch (Exception ignored) {}
+
+                    // col 29: agreementAmount
+                    if (row.length > 29 && !row[29].isBlank())
+                        try { builder.agreementAmount(new BigDecimal(row[29].trim())); } catch (NumberFormatException ignored) {}
+
+                    // col 30: notes
+                    if (row.length > 30 && !row[30].isBlank())
+                        builder.notes(row[30].trim());
 
                     // default status → Available
                     vehicleStatusRepository.findByStatusTypeAndIsActiveTrue(VehicleStatusType.AVAILABLE)
                             .ifPresent(builder::currentStatus);
 
-                    vehicleRepository.save(builder.build());
+                    Vehicle saved = vehicleRepository.save(builder.build());
                     successCount++;
+
+                    // cols 31+: documents in groups of 4 (docType, docNumber, issueDate, expiryDate)
+                    int docStart = 31;
+                    while (row.length > docStart) {
+                        String docTypeName  = row[docStart].trim();
+                        String docNumber    = row.length > docStart + 1 ? row[docStart + 1].trim() : "";
+                        String issueDateStr = row.length > docStart + 2 ? row[docStart + 2].trim() : "";
+                        String expiryDateStr= row.length > docStart + 3 ? row[docStart + 3].trim() : "";
+                        docStart += 4;
+
+                        if (docTypeName.isBlank()) continue;
+
+                        documentTypeRepository.findByNameIgnoreCase(docTypeName).ifPresent(docType -> {
+                            VehicleDocument.VehicleDocumentBuilder docBuilder = VehicleDocument.builder()
+                                    .tenant(tenant)
+                                    .vehicle(saved)
+                                    .documentType(docType)
+                                    .documentNumber(docNumber.isBlank() ? null : docNumber)
+                                    .isActive(true);
+                            if (!issueDateStr.isBlank())
+                                try { docBuilder.issueDate(LocalDate.parse(issueDateStr)); } catch (Exception ignored) {}
+                            if (!expiryDateStr.isBlank())
+                                try { docBuilder.expiryDate(LocalDate.parse(expiryDateStr)); } catch (Exception ignored) {}
+                            vehicleDocumentRepository.save(docBuilder.build());
+                        });
+                    }
 
                 } catch (Exception e) {
                     errors.add("Row " + rowNum + ": " + e.getMessage());
