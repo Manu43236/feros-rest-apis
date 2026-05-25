@@ -168,6 +168,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         user.setPin(passwordEncoder.encode(request.getNewPin()));
+        user.setPlainPin(request.getNewPin());
         user.setIsPinResetRequired(false);
         userRepository.save(user);
     }
