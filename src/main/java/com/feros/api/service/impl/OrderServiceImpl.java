@@ -355,8 +355,15 @@ public class OrderServiceImpl implements OrderService {
         }
         vehicleAllocationRepository.saveAll(vehicleAllocations);
 
+        // Cancel all LRs linked to this order
+        List<com.feros.api.entity.Lr> lrs = lrRepository.findByOrderIdAndIsActiveTrue(order.getId());
+        for (com.feros.api.entity.Lr lr : lrs) {
+            lr.setLrStatus(com.feros.api.enums.LrStatus.CANCELLED);
+            lr.setIsActive(false);
+        }
+        lrRepository.saveAll(lrs);
+
         order.setOrderStatus(OrderStatus.CANCELLED);
-        order.setIsActive(false);
         orderRepository.save(order);
     }
 
