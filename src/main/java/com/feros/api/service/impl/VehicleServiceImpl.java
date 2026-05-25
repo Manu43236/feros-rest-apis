@@ -30,6 +30,7 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -424,6 +425,21 @@ public class VehicleServiceImpl implements VehicleService {
         vehicleRepository.save(vehicle);
     }
 
+    private static final List<DateTimeFormatter> DATE_FORMATTERS = List.of(
+            DateTimeFormatter.ofPattern("yyyy-MM-dd"),   // 2025-12-17
+            DateTimeFormatter.ofPattern("dd.MM.yyyy"),   // 17.12.2025
+            DateTimeFormatter.ofPattern("dd/MM/yyyy"),   // 17/12/2025
+            DateTimeFormatter.ofPattern("MM/dd/yyyy")    // 12/17/2025
+    );
+
+    private LocalDate parseDate(String s) {
+        if (s == null || s.isBlank()) return null;
+        for (DateTimeFormatter fmt : DATE_FORMATTERS) {
+            try { return LocalDate.parse(s.trim(), fmt); } catch (Exception ignored) {}
+        }
+        return null;
+    }
+
     @Override
     public BulkTenantUploadResponse bulkUpload(MultipartFile file) {
         int successCount = 0;
@@ -560,11 +576,11 @@ public class VehicleServiceImpl implements VehicleService {
 
                     // col 21: financeStartDate
                     if (row.length > 21 && !row[21].isBlank())
-                        try { builder.financeStartDate(LocalDate.parse(row[21].trim())); } catch (Exception ignored) {}
+                        builder.financeStartDate(parseDate(row[21]));
 
                     // col 22: financeEndDate
                     if (row.length > 22 && !row[22].isBlank())
-                        try { builder.financeEndDate(LocalDate.parse(row[22].trim())); } catch (Exception ignored) {}
+                        builder.financeEndDate(parseDate(row[22]));
 
                     // col 23: ownerName
                     if (row.length > 23 && !row[23].isBlank())
@@ -584,11 +600,11 @@ public class VehicleServiceImpl implements VehicleService {
 
                     // col 27: agreementStartDate
                     if (row.length > 27 && !row[27].isBlank())
-                        try { builder.agreementStartDate(LocalDate.parse(row[27].trim())); } catch (Exception ignored) {}
+                        builder.agreementStartDate(parseDate(row[27]));
 
                     // col 28: agreementEndDate
                     if (row.length > 28 && !row[28].isBlank())
-                        try { builder.agreementEndDate(LocalDate.parse(row[28].trim())); } catch (Exception ignored) {}
+                        builder.agreementEndDate(parseDate(row[28]));
 
                     // col 29: agreementAmount
                     if (row.length > 29 && !row[29].isBlank())
@@ -622,11 +638,9 @@ public class VehicleServiceImpl implements VehicleService {
                                     .vehicle(saved)
                                     .documentType(docType)
                                     .documentNumber(docNumber.isBlank() ? null : docNumber)
+                                    .issueDate(parseDate(issueDateStr))
+                                    .expiryDate(parseDate(expiryDateStr))
                                     .isActive(true);
-                            if (!issueDateStr.isBlank())
-                                try { docBuilder.issueDate(LocalDate.parse(issueDateStr)); } catch (Exception ignored) {}
-                            if (!expiryDateStr.isBlank())
-                                try { docBuilder.expiryDate(LocalDate.parse(expiryDateStr)); } catch (Exception ignored) {}
                             vehicleDocumentRepository.save(docBuilder.build());
                         });
                     }
