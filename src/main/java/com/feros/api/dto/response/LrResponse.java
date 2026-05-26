@@ -30,7 +30,9 @@ public class LrResponse {
     private String clientName;
 
     private String fromCity;
+    private String fromState;
     private String toCity;
+    private String toState;
 
     private LocalDate lrDate;
     private BigDecimal vehicleCapacity;

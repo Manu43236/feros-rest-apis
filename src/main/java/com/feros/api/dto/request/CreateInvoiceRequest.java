@@ -21,7 +21,8 @@ public class CreateInvoiceRequest {
 
     private LocalDate invoiceDate;
     private LocalDate dueDate;
-    private BigDecimal cgstPercentage; // e.g. 9 for 9% CGST
-    private BigDecimal sgstPercentage; // e.g. 9 for 9% SGST (use 0 + igstPercentage for interstate)
+    private BigDecimal cgstPercentage; // e.g. 9 for 9% CGST (intra-state)
+    private BigDecimal sgstPercentage; // e.g. 9 for 9% SGST (intra-state)
+    private BigDecimal igstPercentage; // e.g. 18 for 18% IGST (inter-state)
     private String remarks;
 }

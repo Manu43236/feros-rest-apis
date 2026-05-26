@@ -27,8 +27,10 @@ public class InvoiceResponse {
     private BigDecimal subtotal;
     private BigDecimal cgstPercentage;
     private BigDecimal sgstPercentage;
+    private BigDecimal igstPercentage;
     private BigDecimal cgstAmount;
     private BigDecimal sgstAmount;
+    private BigDecimal igstAmount;
     private BigDecimal taxAmount;
     private BigDecimal totalAmount;
     private BigDecimal advanceAdjusted;

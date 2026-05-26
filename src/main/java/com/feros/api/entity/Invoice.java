@@ -46,11 +46,17 @@ public class Invoice extends BaseEntity {
     @Column(name = "sgst_percentage")
     private BigDecimal sgstPercentage = BigDecimal.ZERO;
 
+    @Column(name = "igst_percentage")
+    private BigDecimal igstPercentage = BigDecimal.ZERO;
+
     @Column(name = "cgst_amount")
     private BigDecimal cgstAmount = BigDecimal.ZERO;
 
     @Column(name = "sgst_amount")
     private BigDecimal sgstAmount = BigDecimal.ZERO;
+
+    @Column(name = "igst_amount")
+    private BigDecimal igstAmount = BigDecimal.ZERO;
 
     @Column(name = "tax_amount")
     private BigDecimal taxAmount = BigDecimal.ZERO;

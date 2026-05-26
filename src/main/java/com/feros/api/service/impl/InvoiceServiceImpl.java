@@ -150,23 +150,38 @@ public class InvoiceServiceImpl implements InvoiceService {
             subtotal = subtotal.add(lrTotal);
         }
 
-        // Apply CGST / SGST and update totals
-        BigDecimal cgstPct = request.getCgstPercentage() != null
-                ? request.getCgstPercentage() : BigDecimal.ZERO;
-        BigDecimal sgstPct = request.getSgstPercentage() != null
-                ? request.getSgstPercentage() : BigDecimal.ZERO;
-        BigDecimal cgstAmt = subtotal.multiply(cgstPct)
-                .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
-        BigDecimal sgstAmt = subtotal.multiply(sgstPct)
-                .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
-        BigDecimal taxAmt = cgstAmt.add(sgstAmt);
+        // Apply tax: either IGST (inter-state) or CGST+SGST (intra-state)
+        BigDecimal igstPct = request.getIgstPercentage() != null
+                ? request.getIgstPercentage() : BigDecimal.ZERO;
+        BigDecimal cgstPct = BigDecimal.ZERO;
+        BigDecimal sgstPct = BigDecimal.ZERO;
+        BigDecimal cgstAmt = BigDecimal.ZERO;
+        BigDecimal sgstAmt = BigDecimal.ZERO;
+        BigDecimal igstAmt = BigDecimal.ZERO;
+
+        if (igstPct.compareTo(BigDecimal.ZERO) > 0) {
+            // Inter-state: IGST only
+            igstAmt = subtotal.multiply(igstPct)
+                    .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+        } else {
+            // Intra-state: CGST + SGST
+            cgstPct = request.getCgstPercentage() != null ? request.getCgstPercentage() : BigDecimal.ZERO;
+            sgstPct = request.getSgstPercentage() != null ? request.getSgstPercentage() : BigDecimal.ZERO;
+            cgstAmt = subtotal.multiply(cgstPct)
+                    .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+            sgstAmt = subtotal.multiply(sgstPct)
+                    .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+        }
+        BigDecimal taxAmt = cgstAmt.add(sgstAmt).add(igstAmt);
         BigDecimal total  = subtotal.add(taxAmt);
 
         savedInvoice.setSubtotal(subtotal);
         savedInvoice.setCgstPercentage(cgstPct);
         savedInvoice.setSgstPercentage(sgstPct);
+        savedInvoice.setIgstPercentage(igstPct);
         savedInvoice.setCgstAmount(cgstAmt);
         savedInvoice.setSgstAmount(sgstAmt);
+        savedInvoice.setIgstAmount(igstAmt);
         savedInvoice.setTaxAmount(taxAmt);
         savedInvoice.setTotalAmount(total);
         savedInvoice.setBalanceDue(total);
@@ -382,8 +397,10 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .subtotal(inv.getSubtotal())
                 .cgstPercentage(inv.getCgstPercentage())
                 .sgstPercentage(inv.getSgstPercentage())
+                .igstPercentage(inv.getIgstPercentage())
                 .cgstAmount(inv.getCgstAmount())
                 .sgstAmount(inv.getSgstAmount())
+                .igstAmount(inv.getIgstAmount())
                 .taxAmount(inv.getTaxAmount())
                 // Tenant print details
                 .tenantCompanyName(t.getCompanyName())
