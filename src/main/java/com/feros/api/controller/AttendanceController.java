@@ -30,18 +30,18 @@ public class AttendanceController {
 
     // ===================== ATTENDANCE =====================
 
-    // Admin marks for any staff member
+    // Admin/Supervisor marks for any staff member
     @PostMapping("/attendance")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> markAttendance(
             @Valid @RequestBody AttendanceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Attendance marked successfully", attendanceService.markAttendance(request)));
     }
 
-    // Admin bulk marks for multiple staff
+    // Admin/Supervisor bulk marks for multiple staff
     @PostMapping("/attendance/bulk")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> markBulkAttendance(
             @Valid @RequestBody BulkAttendanceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
