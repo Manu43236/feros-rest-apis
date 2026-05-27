@@ -794,7 +794,18 @@
       "Bash(cd /Users/manu/Documents/FEROS/mobile && flutter analyze --no-fatal-infos 2>&1 | tail -20)",
       "Bash(flutter analyze --no-fatal-infos 2>&1 | grep \"error\")",
       "Bash(find /Users/manu/Documents/FEROS/mobile/lib -name \"*.dart\" | xargs grep -l \"Icons.tyre_repair\" | xargs sed -i '' 's/Icons\\\\.tyre_repair_outlined/Icons.tire_repair_outlined/g; s/Icons\\\\.tyre_repair/Icons.tire_repair/g'\necho \"Done\")",
-      "Bash(find /Users/manu/Documents/FEROS/mobile/lib -name \"*.dart\" | xargs grep -l \"Icons.tyre_repair\" | xargs sed -i '' 's/Icons\\\\.tyre_repair_outlined/Icons.tire_repair_outlined/g; s/Icons\\\\.tyre_repair/Icons.tire_repair/g')"
+      "Bash(find /Users/manu/Documents/FEROS/mobile/lib -name \"*.dart\" | xargs grep -l \"Icons.tyre_repair\" | xargs sed -i '' 's/Icons\\\\.tyre_repair_outlined/Icons.tire_repair_outlined/g; s/Icons\\\\.tyre_repair/Icons.tire_repair/g')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/api/v1/vehicles 2>&1 || echo \"not reachable\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/api/v1/vehicles 2>&1)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/api/v1/auth/login -X POST -H \"Content-Type: application/json\" -d '{\"phone\":\"test\",\"pin\":\"1234\"}' 2>&1)",
+      "Bash(mvn spring-boot:run 2>&1)",
+      "Bash(curl -s \"http://localhost:8080/api/v1/vehicles\" -H \"Authorization: Bearer test\" 2>&1 | head -5)",
+      "Bash(git add \\\\\n  src/main/java/com/feros/api/controller/VehicleController.java \\\\\n  src/main/java/com/feros/api/dto/response/VehicleResponse.java \\\\\n  src/main/java/com/feros/api/entity/Vehicle.java \\\\\n  src/main/java/com/feros/api/repository/VehicleRepository.java \\\\\n  src/main/java/com/feros/api/service/VehicleService.java \\\\\n  src/main/java/com/feros/api/service/impl/OrderServiceImpl.java \\\\\n  src/main/java/com/feros/api/service/impl/VehicleServiceImpl.java \\\\\n  src/main/resources/vehicle_staff_migration.sql)",
+      "Bash(git commit -m \"$\\(cat <<'EOF'\nadd vehicle-level staff assignment feature\n\n- Add current_driver_id and current_cleaner_id FK columns to Vehicle entity\n- Add 4 endpoints: PUT/DELETE /vehicles/{id}/staff/driver and /cleaner\n- Sync vehicle-level driver/cleaner when staff assigned to order \\(replace updates vehicle\\)\n- Vehicle-level staff persists through order completion — only cleared by manual unassign\n- Add migration SQL for new columns\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git add src/pages/vehicles/VehiclesPage.tsx && git commit -m \"$\\(cat <<'EOF'\nredesign vehicle staff assign dialog — inline search + user list\n\n- Replace overflowing SearchableSelect with inline search input + scrollable user list\n- Show avatar initials, name, phone per user row\n- Highlight selected user with colored checkmark\n- Current assigned user shown as disabled row labeled \"Current\"\n- Remove button in banner instead of Unassign\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push origin main)",
+      "Bash(git add src/pages/vehicles/VehiclesPage.tsx && git commit -m \"show driver list only on search input in staff assign dialog\" && git push origin main)",
+      "Bash(git add src/pages/vehicles/VehiclesPage.tsx && git commit -m \"show all drivers by default in staff assign dialog with search filter\" && git push origin main)",
+      "Bash(grep -n \"tenant_id\\\\|@Table\\\\|@Column\" /Users/manu/Documents/FEROS/feros-rest-apis/src/main/java/com/feros/api/entity/master/VehicleStatus.java 2>/dev/null || grep -rn \"vehicle_statuses\" /Users/manu/Documents/FEROS/feros-rest-apis/src/main/resources/*.sql 2>/dev/null | head -10)"
     ]
   }
 }
