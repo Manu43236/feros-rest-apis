@@ -233,6 +233,19 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
+        if (status == OrderStatus.COMPLETED) {
+            List<com.feros.api.entity.Lr> activeLrs = lrRepository.findByOrderIdAndIsActiveTrue(id);
+            boolean hasInTransitLr = activeLrs.stream().anyMatch(lr ->
+                    lr.getLrStatus() == com.feros.api.enums.LrStatus.IN_TRANSIT
+                    || lr.getLrStatus() == com.feros.api.enums.LrStatus.WEIGHT_LOADED
+                    || lr.getLrStatus() == com.feros.api.enums.LrStatus.CREATED);
+            if (hasInTransitLr) {
+                throw new FerosException(
+                        "Cannot mark order as complete — one or more LRs are still in transit or not yet delivered",
+                        HttpStatus.BAD_REQUEST);
+            }
+        }
+
         if (status == OrderStatus.CANCELLED) {
             List<com.feros.api.entity.Lr> activeLrs = lrRepository.findByOrderIdAndIsActiveTrue(id);
             boolean hasNonCancellableLr = activeLrs.stream().anyMatch(lr ->
