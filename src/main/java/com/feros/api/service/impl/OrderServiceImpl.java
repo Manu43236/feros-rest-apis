@@ -246,6 +246,29 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
+        if (status == OrderStatus.CANCELLED) {
+            List<OrderVehicleAllocation> vehicleAllocations =
+                    vehicleAllocationRepository.findByOrderIdAndIsActiveTrue(order.getId());
+            for (OrderVehicleAllocation va : vehicleAllocations) {
+                List<OrderStaffAllocation> staffAllocations =
+                        staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(va.getId());
+                for (OrderStaffAllocation sa : staffAllocations) {
+                    sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
+                    sa.setIsActive(false);
+                }
+                staffAllocationRepository.saveAll(staffAllocations);
+                for (OrderStaffAllocation sa : staffAllocations) {
+                    notificationService.sendToUser(order.getTenant(), sa.getUser(), NotificationType.TRIP_UNASSIGNED,
+                            "Order Cancelled",
+                            "Order " + order.getOrderNumber() + " has been cancelled. Your trip assignment has been removed.");
+                }
+                va.setAllocationStatus(VehicleAllocationStatus.CANCELLED);
+                va.setIsActive(false);
+                setVehicleStatus(va.getVehicle(), VehicleStatusType.AVAILABLE);
+            }
+            vehicleAllocationRepository.saveAll(vehicleAllocations);
+        }
+
         order.setOrderStatus(status);
         return mapToOrderResponse(orderRepository.save(order));
     }
