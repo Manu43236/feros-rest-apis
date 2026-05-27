@@ -81,6 +81,36 @@ public class VehicleController {
         return ResponseEntity.ok(ApiResponse.success("Vehicle deleted successfully", null));
     }
 
+    @PutMapping("/{id}/staff/driver")
+    @PreAuthorize("hasAnyRole('SUPERVISOR', 'OFFICE_STAFF', 'ADMIN')")
+    public ResponseEntity<ApiResponse<VehicleResponse>> assignDriver(
+            @PathVariable Long id, @RequestBody AssignStaffToVehicleRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Driver assigned successfully", vehicleService.assignDriver(id, request.getUserId())));
+    }
+
+    @DeleteMapping("/{id}/staff/driver")
+    @PreAuthorize("hasAnyRole('SUPERVISOR', 'OFFICE_STAFF', 'ADMIN')")
+    public ResponseEntity<ApiResponse<VehicleResponse>> unassignDriver(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Driver unassigned successfully", vehicleService.unassignDriver(id)));
+    }
+
+    @PutMapping("/{id}/staff/cleaner")
+    @PreAuthorize("hasAnyRole('SUPERVISOR', 'OFFICE_STAFF', 'ADMIN')")
+    public ResponseEntity<ApiResponse<VehicleResponse>> assignCleaner(
+            @PathVariable Long id, @RequestBody AssignStaffToVehicleRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Cleaner assigned successfully", vehicleService.assignCleaner(id, request.getUserId())));
+    }
+
+    @DeleteMapping("/{id}/staff/cleaner")
+    @PreAuthorize("hasAnyRole('SUPERVISOR', 'OFFICE_STAFF', 'ADMIN')")
+    public ResponseEntity<ApiResponse<VehicleResponse>> unassignCleaner(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Cleaner unassigned successfully", vehicleService.unassignCleaner(id)));
+    }
+
     @PostMapping("/backfill-tyre-positions")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<String>> backfillTyrePositions() {
@@ -94,6 +124,12 @@ public class VehicleController {
             @RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Bulk upload completed", vehicleService.bulkUpload(file)));
+    }
+
+    @Getter
+    @Setter
+    public static class AssignStaffToVehicleRequest {
+        private Long userId;
     }
 
     @Getter

@@ -6,11 +6,13 @@ import com.feros.api.dto.request.VehicleRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
 import com.feros.api.dto.response.VehicleResponse;
 import com.feros.api.entity.Tenant;
+import com.feros.api.entity.User;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.VehicleBreakdown;
 import com.feros.api.entity.VehicleDocument;
 import com.feros.api.entity.VehicleTyrePosition;
 import com.feros.api.entity.master.*;
+import com.feros.api.enums.RoleName;
 import com.feros.api.enums.BreakdownStatus;
 import com.feros.api.enums.TyrePositionType;
 import com.feros.api.enums.VehicleStatusType;
@@ -732,10 +734,78 @@ public class VehicleServiceImpl implements VehicleService {
                 .financeMonthsRemaining(computeFinanceMonthsRemaining(v))
                 .notes(v.getNotes())
                 .tyreRotationIntervalKm(v.getTyreRotationIntervalKm())
+                .currentDriverId(v.getCurrentDriver() != null ? v.getCurrentDriver().getId() : null)
+                .currentDriverName(v.getCurrentDriver() != null ? v.getCurrentDriver().getName() : null)
+                .currentCleanerId(v.getCurrentCleaner() != null ? v.getCurrentCleaner().getId() : null)
+                .currentCleanerName(v.getCurrentCleaner() != null ? v.getCurrentCleaner().getName() : null)
                 .isActive(v.getIsActive())
                 .createdAt(v.getCreatedAt())
                 .updatedAt(v.getUpdatedAt())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public VehicleResponse assignDriver(Long vehicleId, Long userId) {
+        Long tenantId = getCurrentTenantId();
+        Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(vehicleId, tenantId)
+                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+
+        User driver = userRepository.findById(userId)
+                .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
+
+        boolean isDriver = driver.getRoles().stream()
+                .anyMatch(r -> r.getName() == RoleName.DRIVER);
+        if (!isDriver)
+            throw new FerosException("Selected user is not a driver", HttpStatus.BAD_REQUEST);
+
+        if (vehicleRepository.existsByCurrentDriver_IdAndIdNot(userId, vehicleId))
+            throw new FerosException("This driver is already assigned to another vehicle", HttpStatus.CONFLICT);
+
+        vehicle.setCurrentDriver(driver);
+        return mapToResponse(vehicleRepository.save(vehicle));
+    }
+
+    @Override
+    @Transactional
+    public VehicleResponse unassignDriver(Long vehicleId) {
+        Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(vehicleId, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+
+        vehicle.setCurrentDriver(null);
+        return mapToResponse(vehicleRepository.save(vehicle));
+    }
+
+    @Override
+    @Transactional
+    public VehicleResponse assignCleaner(Long vehicleId, Long userId) {
+        Long tenantId = getCurrentTenantId();
+        Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(vehicleId, tenantId)
+                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+
+        User cleaner = userRepository.findById(userId)
+                .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
+
+        boolean isCleaner = cleaner.getRoles().stream()
+                .anyMatch(r -> r.getName() == RoleName.CLEANER);
+        if (!isCleaner)
+            throw new FerosException("Selected user is not a cleaner", HttpStatus.BAD_REQUEST);
+
+        if (vehicleRepository.existsByCurrentCleaner_IdAndIdNot(userId, vehicleId))
+            throw new FerosException("This cleaner is already assigned to another vehicle", HttpStatus.CONFLICT);
+
+        vehicle.setCurrentCleaner(cleaner);
+        return mapToResponse(vehicleRepository.save(vehicle));
+    }
+
+    @Override
+    @Transactional
+    public VehicleResponse unassignCleaner(Long vehicleId) {
+        Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(vehicleId, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+
+        vehicle.setCurrentCleaner(null);
+        return mapToResponse(vehicleRepository.save(vehicle));
     }
 
     private Integer computeFinanceMonthsRemaining(Vehicle v) {

@@ -634,6 +634,17 @@ public class OrderServiceImpl implements OrderService {
 
         OrderStaffAllocation saved = staffAllocationRepository.save(staffAllocation);
 
+        // Sync vehicle-level staff assignment
+        Vehicle vehicle = vehicleAllocation.getVehicle();
+        RoleName roleName = role.getName();
+        if (roleName == RoleName.DRIVER) {
+            vehicle.setCurrentDriver(user);
+            vehicleRepository.save(vehicle);
+        } else if (roleName == RoleName.CLEANER) {
+            vehicle.setCurrentCleaner(user);
+            vehicleRepository.save(vehicle);
+        }
+
         String vehicleReg = vehicleAllocation.getVehicle().getRegistrationNumber();
         String destination = order.getDestinationCity().getName();
         notificationService.sendToUser(saved.getTenant(), user, NotificationType.TRIP_ASSIGNED,

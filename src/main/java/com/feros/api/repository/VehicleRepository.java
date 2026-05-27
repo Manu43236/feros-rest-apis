@@ -24,6 +24,9 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Long> {
     long countByTenantIdAndIsActiveTrue(Long tenantId);
     long countByTenantIdAndIsActiveFalse(Long tenantId);
 
+    boolean existsByCurrentDriver_IdAndIdNot(Long driverId, Long vehicleId);
+    boolean existsByCurrentCleaner_IdAndIdNot(Long cleanerId, Long vehicleId);
+
     @Query("SELECT COUNT(v) FROM Vehicle v WHERE v.tenant.id = :tenantId AND v.isActive = true " +
            "AND v.currentStatus IS NOT NULL AND v.currentStatus.statusType = :type")
     long countByTenantIdAndIsActiveTrueAndStatusType(@Param("tenantId") Long tenantId,

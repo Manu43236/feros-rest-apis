@@ -131,6 +131,14 @@ public class Vehicle extends BaseEntity {
     @Column(name = "tyre_rotation_interval_km")
     private Integer tyreRotationIntervalKm;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "current_driver_id")
+    private User currentDriver;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "current_cleaner_id")
+    private User currentCleaner;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 }

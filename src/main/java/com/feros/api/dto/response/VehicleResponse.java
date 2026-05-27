@@ -72,6 +72,12 @@ public class VehicleResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    // Vehicle-level staff assignment
+    private Long currentDriverId;
+    private String currentDriverName;
+    private Long currentCleanerId;
+    private String currentCleanerName;
+
     // Date-based assignment info (populated when ?date= param is provided)
     private Boolean isAssigned;
     private Long assignedOrderId;
