@@ -116,7 +116,7 @@ public class LrController {
     }
 
     @DeleteMapping("/{id}/checkposts/{checkpostId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<Void>> deleteCheckpost(
             @PathVariable Long id, @PathVariable Long checkpostId) {
         lrService.deleteCheckpost(checkpostId);
@@ -124,7 +124,7 @@ public class LrController {
     }
 
     @DeleteMapping("/{id}/charges/{chargeId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<Void>> deleteCharge(
             @PathVariable Long id, @PathVariable Long chargeId) {
         lrService.deleteCharge(chargeId);
