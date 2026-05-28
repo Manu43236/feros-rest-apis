@@ -86,6 +86,14 @@ public class Lr extends BaseEntity {
     private String remarks;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "driver_id")
+    private User driver;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cleaner_id")
+    private User cleaner;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "started_by_user_id")
     private User startedBy;
 

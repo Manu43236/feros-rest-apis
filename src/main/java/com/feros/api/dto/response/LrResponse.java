@@ -67,6 +67,10 @@ public class LrResponse {
     private String driverName;
     private String driverPhone;
 
+    private Long cleanerId;
+    private String cleanerName;
+    private String cleanerPhone;
+
     private String startedByName;
     private String startedByRole;
     private String completedByName;

@@ -25,6 +25,12 @@ public class VehicleAllocationResponse {
     private LocalDate actualDeliveryDate;
     private VehicleAllocationStatus allocationStatus;
     private String remarks;
+    private Long currentDriverId;
+    private String currentDriverName;
+    private String currentDriverPhone;
+    private Long currentCleanerId;
+    private String currentCleanerName;
+    private String currentCleanerPhone;
     private List<StaffAllocationResponse> staffAllocations;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

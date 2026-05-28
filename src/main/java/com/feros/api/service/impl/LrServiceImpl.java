@@ -114,6 +114,8 @@ public class LrServiceImpl implements LrService {
                 .ewayBillValidUpto(request.getEwayBillValidUpto())
                 .lrStatus(LrStatus.CREATED)
                 .remarks(request.getRemarks())
+                .driver(vehicle.getCurrentDriver())
+                .cleaner(vehicle.getCurrentCleaner())
                 .createdBy(getCurrentUser())
                 .isActive(true)
                 .build();
@@ -526,9 +528,12 @@ public class LrServiceImpl implements LrService {
                         .stream().map(this::mapToChargeResponse).toList())
                 .createdById(lr.getCreatedBy().getId())
                 .createdByName(lr.getCreatedBy().getName())
-                .driverId(driverOf(lr.getVehicleAllocation()).map(u -> u.getId()).orElse(null))
-                .driverName(driverOf(lr.getVehicleAllocation()).map(u -> u.getName()).orElse(null))
-                .driverPhone(driverOf(lr.getVehicleAllocation()).map(u -> u.getPhone()).orElse(null))
+                .driverId(lr.getDriver() != null ? lr.getDriver().getId() : null)
+                .driverName(lr.getDriver() != null ? lr.getDriver().getName() : null)
+                .driverPhone(lr.getDriver() != null ? lr.getDriver().getPhone() : null)
+                .cleanerId(lr.getCleaner() != null ? lr.getCleaner().getId() : null)
+                .cleanerName(lr.getCleaner() != null ? lr.getCleaner().getName() : null)
+                .cleanerPhone(lr.getCleaner() != null ? lr.getCleaner().getPhone() : null)
                 .startedByName(lr.getStartedBy() != null ? lr.getStartedBy().getName() : null)
                 .startedByRole(lr.getStartedBy() != null ? firstRole(lr.getStartedBy()) : null)
                 .completedByName(lr.getCompletedBy() != null ? lr.getCompletedBy().getName() : null)
@@ -539,15 +544,6 @@ public class LrServiceImpl implements LrService {
                 .build();
     }
 
-    private java.util.Optional<com.feros.api.entity.User> driverOf(OrderVehicleAllocation allocation) {
-        return staffAllocationRepository
-                .findByVehicleAllocationIdAndIsActiveTrue(allocation.getId())
-                .stream()
-                .filter(sa -> sa.getRole() != null &&
-                        sa.getRole().getName() == com.feros.api.enums.RoleName.DRIVER)
-                .findFirst()
-                .map(sa -> sa.getUser());
-    }
 
     private String firstRole(com.feros.api.entity.User user) {
         return user.getRoles().stream()
