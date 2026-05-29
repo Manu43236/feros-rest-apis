@@ -253,6 +253,46 @@ public class DashboardServiceImpl implements DashboardService {
                         .build())
                 .toList();
 
+        // ── Assigned order (staff allocated, no LR yet) ──────────────────────
+        DriverDashboardResponse.AssignedOrder assignedOrder = null;
+        if (activeTrip == null && upcoming.isEmpty()) {
+            List<com.feros.api.entity.OrderStaffAllocation> activeAllocations =
+                    staffAllocationRepository.findActiveAllocationsForUser(
+                            userId, List.of(StaffAllocationStatus.ALLOCATED));
+            for (com.feros.api.entity.OrderStaffAllocation sa : activeAllocations) {
+                boolean hasLr = lrRepository.existsByVehicleAllocationId(sa.getVehicleAllocation().getId());
+                if (!hasLr) {
+                    com.feros.api.entity.OrderVehicleAllocation va = sa.getVehicleAllocation();
+                    com.feros.api.entity.Order order = sa.getOrder();
+                    assignedOrder = DriverDashboardResponse.AssignedOrder.builder()
+                            .vehicleAllocationId(va.getId())
+                            .orderId(order.getId())
+                            .vehicleNumber(va.getVehicle().getRegistrationNumber())
+                            .clientName(order.getClient().getClientName())
+                            .fromCity(order.getSourceCity() != null ? order.getSourceCity().getName() : "—")
+                            .toCity(order.getDestinationCity() != null ? order.getDestinationCity().getName() : "—")
+                            .expectedLoadDate(va.getExpectedLoadDate())
+                            .expectedDeliveryDate(va.getExpectedDeliveryDate())
+                            .build();
+                    break;
+                }
+            }
+        }
+
+        // ── Vehicle-level assignment (no order) ───────────────────────────────
+        DriverDashboardResponse.AssignedVehicle assignedVehicle = null;
+        if (activeTrip == null && upcoming.isEmpty() && assignedOrder == null) {
+            var vehicleOpt = vehicleRepository.findAssignedVehicleByStaffUserId(userId);
+            if (vehicleOpt.isPresent()) {
+                com.feros.api.entity.Vehicle v = vehicleOpt.get();
+                assignedVehicle = DriverDashboardResponse.AssignedVehicle.builder()
+                        .vehicleId(v.getId())
+                        .vehicleNumber(v.getRegistrationNumber())
+                        .vehicleType(v.getVehicleType() != null ? v.getVehicleType().getName() : null)
+                        .build();
+            }
+        }
+
         return DriverDashboardResponse.builder()
                 .totalTrips(totalTrips)
                 .pendingTrips(pendingTrips)
@@ -261,6 +301,8 @@ public class DashboardServiceImpl implements DashboardService {
                 .unreadNotifications(unreadCount)
                 .activeTrip(activeTrip)
                 .upcomingTrips(upcoming)
+                .assignedVehicle(assignedVehicle)
+                .assignedOrder(assignedOrder)
                 .build();
     }
 

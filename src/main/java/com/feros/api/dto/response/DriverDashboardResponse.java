@@ -15,6 +15,29 @@ public class DriverDashboardResponse {
     private int unreadNotifications;
     private UpcomingTrip activeTrip;
     private List<UpcomingTrip> upcomingTrips;
+    private AssignedVehicle assignedVehicle;
+    private AssignedOrder assignedOrder;
+
+    @Data
+    @Builder
+    public static class AssignedVehicle {
+        private Long vehicleId;
+        private String vehicleNumber;
+        private String vehicleType;
+    }
+
+    @Data
+    @Builder
+    public static class AssignedOrder {
+        private Long vehicleAllocationId;
+        private Long orderId;
+        private String vehicleNumber;
+        private String clientName;
+        private String fromCity;
+        private String toCity;
+        private java.time.LocalDate expectedLoadDate;
+        private java.time.LocalDate expectedDeliveryDate;
+    }
 
     @Data
     @Builder
