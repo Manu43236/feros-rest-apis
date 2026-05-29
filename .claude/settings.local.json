@@ -805,7 +805,15 @@
       "Bash(git add src/pages/vehicles/VehiclesPage.tsx && git commit -m \"$\\(cat <<'EOF'\nredesign vehicle staff assign dialog — inline search + user list\n\n- Replace overflowing SearchableSelect with inline search input + scrollable user list\n- Show avatar initials, name, phone per user row\n- Highlight selected user with colored checkmark\n- Current assigned user shown as disabled row labeled \"Current\"\n- Remove button in banner instead of Unassign\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push origin main)",
       "Bash(git add src/pages/vehicles/VehiclesPage.tsx && git commit -m \"show driver list only on search input in staff assign dialog\" && git push origin main)",
       "Bash(git add src/pages/vehicles/VehiclesPage.tsx && git commit -m \"show all drivers by default in staff assign dialog with search filter\" && git push origin main)",
-      "Bash(grep -n \"tenant_id\\\\|@Table\\\\|@Column\" /Users/manu/Documents/FEROS/feros-rest-apis/src/main/java/com/feros/api/entity/master/VehicleStatus.java 2>/dev/null || grep -rn \"vehicle_statuses\" /Users/manu/Documents/FEROS/feros-rest-apis/src/main/resources/*.sql 2>/dev/null | head -10)"
+      "Bash(grep -n \"tenant_id\\\\|@Table\\\\|@Column\" /Users/manu/Documents/FEROS/feros-rest-apis/src/main/java/com/feros/api/entity/master/VehicleStatus.java 2>/dev/null || grep -rn \"vehicle_statuses\" /Users/manu/Documents/FEROS/feros-rest-apis/src/main/resources/*.sql 2>/dev/null | head -10)",
+      "Bash(git add privacy-policy.html && git commit -m \"Use logo image and remove effective date from privacy policy\" && git push)",
+      "Bash(cd /Users/manu/Documents/FEROS/mobile && dart run flutter_native_splash:create)",
+      "Bash(flutter pub get)",
+      "Bash(grep -n \"DesignationSection\\\\|PayRatesSection\\\\|function Designation\\\\|case 'designations'\\\\|case 'payRates'\" /Users/manu/Documents/FEROS/web/src/pages/masters/MastersPage.tsx)",
+      "Bash(grep -n \"case 'payRates'\" /Users/manu/Documents/FEROS/web/src/pages/masters/MastersPage.tsx)",
+      "Bash(npx tsc --noEmit --project /Users/manu/Documents/FEROS/web/tsconfig.app.json 2>&1 | head -40)",
+      "Bash(/Users/manu/Documents/FEROS/web/node_modules/.bin/tsc --noEmit --project /Users/manu/Documents/FEROS/web/tsconfig.app.json 2>&1 | head -40)",
+      "Bash(mvn compile 2>&1 | grep -E \"ERROR|error:|BUILD\" | tail -20)"
     ]
   }
 }

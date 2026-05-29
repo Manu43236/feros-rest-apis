@@ -20,6 +20,7 @@ public class PayrollResponse {
     private String userName;
     private String userPhone;
     private String roleName;
+    private String designationName;
 
     private LocalDate payCycleStartDate;
     private LocalDate payCycleEndDate;

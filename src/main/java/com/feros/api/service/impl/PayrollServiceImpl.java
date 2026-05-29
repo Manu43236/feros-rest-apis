@@ -391,6 +391,11 @@ public class PayrollServiceImpl implements PayrollService {
         String roleName = p.getUser().getRoles().stream()
                 .findFirst().map(r -> r.getName().name()).orElse(null);
 
+        String designationName = staffProfileRepository
+                .findByUserIdAndTenantIdAndIsActiveTrue(p.getUser().getId(), p.getTenant().getId())
+                .map(sp -> sp.getDesignation() != null ? sp.getDesignation().getName() : null)
+                .orElse(null);
+
         List<PayrollDeductionResponse> deductions = payrollDeductionRepository
                 .findByPayrollIdAndIsActiveTrue(p.getId())
                 .stream().map(d -> PayrollDeductionResponse.builder()
@@ -409,6 +414,7 @@ public class PayrollServiceImpl implements PayrollService {
                 .userName(p.getUser().getName())
                 .userPhone(p.getUser().getPhone())
                 .roleName(roleName)
+                .designationName(designationName)
                 .payCycleStartDate(p.getPayCycleStartDate())
                 .payCycleEndDate(p.getPayCycleEndDate())
                 .totalDays(p.getTotalDays())

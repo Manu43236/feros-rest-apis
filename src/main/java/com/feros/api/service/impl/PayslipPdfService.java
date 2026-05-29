@@ -1,13 +1,17 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.entity.Attendance;
 import com.feros.api.entity.Payroll;
 import com.feros.api.entity.PayrollDeduction;
 import com.feros.api.entity.StaffProfile;
+import com.feros.api.entity.VehicleStaffAssignment;
 import com.feros.api.enums.PayrollStatus;
 import com.feros.api.exception.FerosException;
+import com.feros.api.repository.AttendanceRepository;
 import com.feros.api.repository.PayrollDeductionRepository;
 import com.feros.api.repository.PayrollRepository;
 import com.feros.api.repository.StaffProfileRepository;
+import com.feros.api.repository.VehicleStaffAssignmentRepository;
 import com.feros.api.util.SecurityUtil;
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.*;
@@ -19,6 +23,7 @@ import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -29,6 +34,8 @@ public class PayslipPdfService {
     private final PayrollRepository payrollRepository;
     private final PayrollDeductionRepository payrollDeductionRepository;
     private final StaffProfileRepository staffProfileRepository;
+    private final AttendanceRepository attendanceRepository;
+    private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
 
     private static final Color NAVY    = new Color(15, 33, 55);
     private static final Color GRAY    = new Color(90, 105, 120);
@@ -128,11 +135,15 @@ public class PayslipPdfService {
             doc.add(Chunk.NEWLINE);
 
             // ── Earnings ────────────────────────────────────────────────────
+            String designationLabel = (profile != null && profile.getDesignation() != null)
+                    ? profile.getDesignation().getName() + "  (₹" + fmt(payroll.getDailyRate()) + "/day)"
+                    : "₹" + fmt(payroll.getDailyRate()) + "/day";
+
             doc.add(sectionTitle("EARNINGS"));
             PdfPTable earnings = new PdfPTable(new float[]{3, 1.5f});
             earnings.setWidthPercentage(100);
             addEarningsHeader(earnings);
-            addAmountRow(earnings, "Basic Pay  (Daily Rate: ₹" + fmt(payroll.getDailyRate()) + ")",
+            addAmountRow(earnings, "Basic Pay  — " + designationLabel,
                     payroll.getBasicPay(), false, false);
             if (payroll.getOvertimeHours().compareTo(BigDecimal.ZERO) > 0) {
                 addAmountRow(earnings, "Overtime Pay  (" + payroll.getOvertimeHours() + " hrs)",
@@ -141,9 +152,72 @@ public class PayslipPdfService {
             if (payroll.getTripBonus().compareTo(BigDecimal.ZERO) > 0) {
                 addAmountRow(earnings, "Trip Bonus", payroll.getTripBonus(), false, false);
             }
+            if (payroll.getVehicleExtraPay() != null
+                    && payroll.getVehicleExtraPay().compareTo(BigDecimal.ZERO) > 0) {
+                addAmountRow(earnings, "Vehicle Extra Pay", payroll.getVehicleExtraPay(), false, false);
+            }
             addAmountRow(earnings, "Gross Pay", payroll.getGrossPay(), true, false);
             doc.add(earnings);
             doc.add(Chunk.NEWLINE);
+
+            // ── Per-day annexure ────────────────────────────────────────────
+            try {
+                List<Attendance> attendanceList = attendanceRepository
+                        .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrueOrderByAttendanceDateDesc(
+                                user.getId(), tenantId,
+                                payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
+
+                List<Attendance> presentDaysList = attendanceList.stream()
+                        .filter(a -> a.getAttendanceType().getName().toLowerCase().contains("present"))
+                        .sorted(java.util.Comparator.comparing(Attendance::getAttendanceDate))
+                        .toList();
+
+                if (!presentDaysList.isEmpty()) {
+                    List<VehicleStaffAssignment> assignments = vehicleStaffAssignmentRepository
+                            .findOverlappingByUser(user.getId(), tenantId,
+                                    payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
+
+                    doc.add(sectionTitle("DAILY EARNINGS ANNEXURE"));
+                    PdfPTable annexure = new PdfPTable(new float[]{1.5f, 2f, 2f, 2f, 2f});
+                    annexure.setWidthPercentage(100);
+                    addAnnexureHeader(annexure, "Date", "Vehicle No.", "Designation Pay", "Vehicle Pay", "Day Total");
+
+                    BigDecimal designationPayPerDay = payroll.getDailyRate();
+
+                    for (Attendance att : presentDaysList) {
+                        LocalDate date = att.getAttendanceDate();
+                        boolean isHalfDay = att.getAttendanceType().getName().toLowerCase().contains("half");
+                        BigDecimal dayFactor = isHalfDay ? new BigDecimal("0.5") : BigDecimal.ONE;
+                        BigDecimal desPay = designationPayPerDay.multiply(dayFactor).setScale(2, RoundingMode.HALF_UP);
+
+                        // Find vehicle assignment for this day
+                        String vehicleNo = "—";
+                        BigDecimal vehPay = BigDecimal.ZERO;
+                        for (VehicleStaffAssignment a : assignments) {
+                            if (!date.isBefore(a.getAssignedFrom())
+                                    && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo()))
+                                    && Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
+                                    && a.getVehicle().getExtraPayPerDay() != null) {
+                                vehicleNo = a.getVehicle().getRegistrationNumber();
+                                vehPay = a.getVehicle().getExtraPayPerDay().multiply(dayFactor).setScale(2, RoundingMode.HALF_UP);
+                                break;
+                            }
+                        }
+
+                        BigDecimal dayTotal = desPay.add(vehPay);
+                        addAnnexureRow(annexure,
+                                date.format(DATE_FMT),
+                                vehicleNo,
+                                "₹" + fmt(desPay),
+                                vehPay.compareTo(BigDecimal.ZERO) > 0 ? "₹" + fmt(vehPay) : "—",
+                                "₹" + fmt(dayTotal));
+                    }
+                    doc.add(annexure);
+                    doc.add(Chunk.NEWLINE);
+                }
+            } catch (Exception ignored) {
+                // annexure is non-fatal
+            }
 
             // ── Deductions ───────────────────────────────────────────────────
             if (!deductions.isEmpty()) {
@@ -255,6 +329,28 @@ public class PayslipPdfService {
 
         table.addCell(lc);
         table.addCell(vc);
+    }
+
+    private void addAnnexureHeader(PdfPTable table, String... headers) {
+        for (String h : headers) {
+            PdfPCell cell = new PdfPCell(new Phrase(h, new Font(Font.HELVETICA, 8, Font.BOLD, Color.WHITE)));
+            cell.setBackgroundColor(GRAY);
+            cell.setPadding(5);
+            cell.setBorder(Rectangle.NO_BORDER);
+            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            table.addCell(cell);
+        }
+    }
+
+    private void addAnnexureRow(PdfPTable table, String date, String vehicle, String desPay, String vehPay, String total) {
+        String[] vals = {date, vehicle, desPay, vehPay, total};
+        for (int i = 0; i < vals.length; i++) {
+            PdfPCell cell = new PdfPCell(new Phrase(vals[i], FONT_BODY));
+            cell.setPadding(5);
+            cell.setHorizontalAlignment(i == 0 ? Element.ALIGN_LEFT : Element.ALIGN_CENTER);
+            cell.setBorderColor(new Color(220, 228, 240));
+            table.addCell(cell);
+        }
     }
 
     private Paragraph sectionTitle(String title) {
