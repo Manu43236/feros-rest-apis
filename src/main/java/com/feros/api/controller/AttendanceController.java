@@ -95,6 +95,20 @@ public class AttendanceController {
                 "Today attendance status fetched", attendanceService.getTodayAttendanceStatus()));
     }
 
+    @PostMapping("/attendance/my/mark-out")
+    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<AttendanceResponse>> markOut() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Marked out successfully", attendanceService.markOut()));
+    }
+
+    @PostMapping("/attendance/my/undo-out")
+    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<AttendanceResponse>> undoOut() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Out undone successfully", attendanceService.undoOut()));
+    }
+
     @GetMapping("/attendance/my")
     @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MEN', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getMyAttendance(

@@ -51,6 +51,9 @@ public class Attendance extends BaseEntity {
     @Column(name = "marked_at", nullable = false)
     private LocalDateTime markedAt;
 
+    @Column(name = "marked_out_at")
+    private LocalDateTime markedOutAt;
+
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 

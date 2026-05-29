@@ -185,6 +185,18 @@ public class DashboardServiceImpl implements DashboardService {
                 .existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrueAndApprovalStatusNot(
                         userId, tenantId, today, AttendanceApprovalStatus.REJECTED);
 
+        java.time.LocalDateTime markedOutAt = null;
+        boolean canUndoOut = false;
+        String dutyLabel = null;
+        var todayAtt = attendanceRepository.findByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(userId, tenantId, today);
+        if (todayAtt.isPresent() && todayAtt.get().getMarkedOutAt() != null) {
+            markedOutAt = todayAtt.get().getMarkedOutAt();
+            canUndoOut  = java.time.Duration.between(markedOutAt, com.feros.api.util.TimeUtil.nowIst()).toMinutes() <= 10;
+            long totalMinutes = java.time.Duration.between(todayAtt.get().getMarkedAt(), markedOutAt).toMinutes();
+            double hours = Math.round(totalMinutes / 6.0) / 10.0;
+            dutyLabel = hours + " hrs";
+        }
+
         int unreadCount = (int) notificationRepository.countUnread(tenantId, userId);
 
         boolean attendanceEnforced = tenantSettingsRepository.findByTenantId(tenantId)
@@ -298,6 +310,9 @@ public class DashboardServiceImpl implements DashboardService {
                 .pendingTrips(pendingTrips)
                 .attendanceMarked(attendanceMarked)
                 .attendanceEnforced(attendanceEnforced)
+                .markedOutAt(markedOutAt)
+                .canUndoOut(canUndoOut)
+                .dutyLabel(dutyLabel)
                 .unreadNotifications(unreadCount)
                 .activeTrip(activeTrip)
                 .upcomingTrips(upcoming)

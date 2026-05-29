@@ -26,6 +26,10 @@ public class AttendanceResponse {
     private Long markedById;
     private String markedByName;
     private LocalDateTime markedAt;
+    private LocalDateTime markedOutAt;
+    private String dutyLabel;
+    private Double dutyHours;
+    private boolean canUndoOut;
     private String remarks;
     private AttendanceApprovalStatus approvalStatus;
     private Long approvedById;

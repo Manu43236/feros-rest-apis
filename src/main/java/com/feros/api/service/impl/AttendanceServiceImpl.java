@@ -26,6 +26,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -397,6 +398,18 @@ public class AttendanceServiceImpl implements AttendanceService {
         String roleName = a.getUser().getRoles().stream()
                 .findFirst().map(r -> r.getName().name()).orElse(null);
 
+        // Duty hours & label
+        String dutyLabel = "Full Day";
+        Double dutyHours = null;
+        boolean canUndoOut = false;
+
+        if (a.getMarkedOutAt() != null) {
+            long totalMinutes = Duration.between(a.getMarkedAt(), a.getMarkedOutAt()).toMinutes();
+            dutyHours  = Math.round(totalMinutes / 6.0) / 10.0; // 1 decimal place
+            dutyLabel  = dutyHours + " hrs";
+            canUndoOut = Duration.between(a.getMarkedOutAt(), TimeUtil.nowIst()).toMinutes() <= 10;
+        }
+
         return AttendanceResponse.builder()
                 .id(a.getId())
                 .userId(a.getUser().getId())
@@ -412,6 +425,10 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .markedById(a.getMarkedBy().getId())
                 .markedByName(a.getMarkedBy().getName())
                 .markedAt(a.getMarkedAt())
+                .markedOutAt(a.getMarkedOutAt())
+                .dutyLabel(dutyLabel)
+                .dutyHours(dutyHours)
+                .canUndoOut(canUndoOut)
                 .remarks(a.getRemarks())
                 .approvalStatus(a.getApprovalStatus())
                 .approvedById(a.getApprovedBy() != null ? a.getApprovedBy().getId() : null)
@@ -476,6 +493,50 @@ public class AttendanceServiceImpl implements AttendanceService {
                         SecurityUtil.getCurrentUserId(), getCurrentTenantId(), TimeUtil.today())
                 .map(this::mapToResponse)
                 .orElse(null);
+    }
+
+    @Override
+    @Transactional
+    public AttendanceResponse markOut() {
+        Long userId   = SecurityUtil.getCurrentUserId();
+        Long tenantId = getCurrentTenantId();
+
+        Attendance attendance = attendanceRepository
+                .findByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(userId, tenantId, TimeUtil.today())
+                .orElseThrow(() -> new FerosException("No attendance record found for today", HttpStatus.NOT_FOUND));
+
+        if (attendance.getApprovalStatus() == AttendanceApprovalStatus.REJECTED) {
+            throw new FerosException("Cannot mark out — attendance is rejected", HttpStatus.BAD_REQUEST);
+        }
+        if (attendance.getMarkedOutAt() != null) {
+            throw new FerosException("Already marked out for today", HttpStatus.CONFLICT);
+        }
+
+        attendance.setMarkedOutAt(TimeUtil.nowIst());
+        return mapToResponse(attendanceRepository.save(attendance));
+    }
+
+    @Override
+    @Transactional
+    public AttendanceResponse undoOut() {
+        Long userId   = SecurityUtil.getCurrentUserId();
+        Long tenantId = getCurrentTenantId();
+
+        Attendance attendance = attendanceRepository
+                .findByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(userId, tenantId, TimeUtil.today())
+                .orElseThrow(() -> new FerosException("No attendance record found for today", HttpStatus.NOT_FOUND));
+
+        if (attendance.getMarkedOutAt() == null) {
+            throw new FerosException("No out record to undo", HttpStatus.BAD_REQUEST);
+        }
+
+        long minutesSinceOut = Duration.between(attendance.getMarkedOutAt(), TimeUtil.nowIst()).toMinutes();
+        if (minutesSinceOut > 10) {
+            throw new FerosException("Undo window expired — out was marked more than 10 minutes ago", HttpStatus.BAD_REQUEST);
+        }
+
+        attendance.setMarkedOutAt(null);
+        return mapToResponse(attendanceRepository.save(attendance));
     }
 
     private TripProofResponse mapToTripProofResponse(TripProof p) {

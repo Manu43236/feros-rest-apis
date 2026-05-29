@@ -12,6 +12,9 @@ public class DriverDashboardResponse {
     private int pendingTrips;
     private boolean attendanceMarked;
     private boolean attendanceEnforced;
+    private java.time.LocalDateTime markedOutAt;
+    private boolean canUndoOut;
+    private String dutyLabel;
     private int unreadNotifications;
     private UpcomingTrip activeTrip;
     private List<UpcomingTrip> upcomingTrips;

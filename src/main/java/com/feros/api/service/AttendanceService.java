@@ -42,6 +42,10 @@ public interface AttendanceService {
 
     AttendanceResponse getTodayAttendanceStatus();
 
+    AttendanceResponse markOut();
+
+    AttendanceResponse undoOut();
+
     TripProofResponse addTripProof(Long userId, TripProofRequest request);
 
     List<TripProofResponse> getTripProofsByLr(Long lrId);
