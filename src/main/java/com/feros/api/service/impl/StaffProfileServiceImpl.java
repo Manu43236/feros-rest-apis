@@ -306,6 +306,7 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .tenantId(p.getTenant().getId())
                 .designationId(p.getDesignation() != null ? p.getDesignation().getId() : null)
                 .designationName(p.getDesignation() != null ? p.getDesignation().getName() : null)
+                .designationPayPerDay(p.getDesignation() != null ? p.getDesignation().getPayPerDay() : null)
                 .employmentTypeId(p.getEmploymentType() != null ? p.getEmploymentType().getId() : null)
                 .employmentTypeName(p.getEmploymentType() != null ? p.getEmploymentType().getName() : null)
                 .dateOfBirth(p.getDateOfBirth())

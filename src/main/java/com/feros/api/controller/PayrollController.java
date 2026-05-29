@@ -7,9 +7,12 @@ import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.PayrollResponse;
 import com.feros.api.dto.response.SalaryAdvanceResponse;
 import com.feros.api.service.PayrollService;
+import com.feros.api.service.impl.PayslipPdfService;
 import com.feros.api.util.SecurityUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +25,7 @@ import java.util.List;
 public class PayrollController {
 
     private final PayrollService payrollService;
+    private final PayslipPdfService payslipPdfService;
 
     // ===================== SALARY ADVANCES =====================
     @PostMapping("/advances")
@@ -109,5 +113,15 @@ public class PayrollController {
     public ResponseEntity<ApiResponse<PayrollResponse>> cancelPayroll(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Payroll cancelled successfully", payrollService.cancelPayroll(id)));
+    }
+
+    @GetMapping("/{id}/payslip-pdf")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
+    public ResponseEntity<byte[]> getPayslipPdf(@PathVariable Long id) {
+        byte[] pdf = payslipPdfService.generate(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"payslip-" + id + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 }

@@ -5,6 +5,8 @@ import com.feros.api.enums.RoleName;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "designations")
 @Getter
@@ -28,6 +30,9 @@ public class Designation extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "role_type", nullable = false)
     private RoleName roleType;
+
+    @Column(name = "pay_per_day")
+    private BigDecimal payPerDay;
 
     @Column(name = "is_active")
     private Boolean isActive = true;

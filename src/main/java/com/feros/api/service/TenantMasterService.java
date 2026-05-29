@@ -28,13 +28,6 @@ public interface TenantMasterService {
     TenantMasterResponse updateDesignation(Long id, DesignationRequest request);
     void deleteDesignation(Long id);
 
-    // Pay Rates
-    TenantMasterResponse createPayRate(PayRateRequest request);
-    TenantMasterResponse getPayRateById(Long id);
-    List<TenantMasterResponse> getAllPayRates();
-    TenantMasterResponse updatePayRate(Long id, PayRateRequest request);
-    void deletePayRate(Long id);
-
     // Charge Types
     TenantMasterResponse createChargeType(ChargeTypeRequest request);
     TenantMasterResponse getChargeTypeById(Long id);

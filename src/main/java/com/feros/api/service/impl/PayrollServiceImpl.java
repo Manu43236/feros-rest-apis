@@ -11,6 +11,7 @@ import com.feros.api.entity.*;
 import com.feros.api.entity.master.DeductionType;
 import com.feros.api.enums.PayrollStatus;
 import com.feros.api.exception.FerosException;
+import com.feros.api.entity.StaffProfile;
 import com.feros.api.repository.*;
 import com.feros.api.service.NotificationService;
 import com.feros.api.service.PayrollService;
@@ -40,6 +41,7 @@ public class PayrollServiceImpl implements PayrollService {
     private final UserRepository userRepository;
     private final AttendanceRepository attendanceRepository;
     private final DeductionTypeRepository deductionTypeRepository;
+    private final StaffProfileRepository staffProfileRepository;
     private final NotificationService notificationService;
 
     private Long getCurrentTenantId() {
@@ -117,6 +119,24 @@ public class PayrollServiceImpl implements PayrollService {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
 
+        // Resolve daily rate — use override if provided, else fetch from designation
+        BigDecimal resolvedDailyRate = request.getDailyRate();
+        if (resolvedDailyRate == null) {
+            StaffProfile profile = staffProfileRepository
+                    .findByUserIdAndTenantIdAndIsActiveTrue(request.getUserId(), tenantId)
+                    .orElseThrow(() -> new FerosException(
+                            "Staff profile not found for user. Cannot determine pay rate.", HttpStatus.BAD_REQUEST));
+            if (profile.getDesignation() == null) {
+                throw new FerosException(
+                        "No designation assigned to this staff member. Cannot determine pay rate.", HttpStatus.BAD_REQUEST);
+            }
+            if (profile.getDesignation().getPayPerDay() == null) {
+                throw new FerosException(
+                        "Designation '" + profile.getDesignation().getName() + "' has no pay rate configured.", HttpStatus.BAD_REQUEST);
+            }
+            resolvedDailyRate = profile.getDesignation().getPayPerDay();
+        }
+
         // Calculate attendance stats from attendance records
         List<com.feros.api.entity.Attendance> attendanceList = attendanceRepository
                 .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrue(
@@ -144,7 +164,7 @@ public class PayrollServiceImpl implements PayrollService {
                 .add(BigDecimal.valueOf(halfDays).multiply(new BigDecimal("0.5")))
                 .add(BigDecimal.valueOf(leaveDays));
 
-        BigDecimal basicPay = request.getDailyRate()
+        BigDecimal basicPay = resolvedDailyRate
                 .multiply(effectiveDays)
                 .setScale(2, RoundingMode.HALF_UP);
 
@@ -152,7 +172,7 @@ public class PayrollServiceImpl implements PayrollService {
         BigDecimal overtimePay = BigDecimal.ZERO;
         if (request.getOvertimeHours() != null &&
                 request.getOvertimeHours().compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal hourlyRate = request.getDailyRate()
+            BigDecimal hourlyRate = resolvedDailyRate
                     .divide(BigDecimal.valueOf(8), 4, RoundingMode.HALF_UP);
             overtimePay = hourlyRate
                     .multiply(new BigDecimal("1.5"))
@@ -175,7 +195,7 @@ public class PayrollServiceImpl implements PayrollService {
                 .halfDays(halfDays)
                 .leaveDays(leaveDays)
                 .overtimeHours(request.getOvertimeHours() != null ? request.getOvertimeHours() : BigDecimal.ZERO)
-                .dailyRate(request.getDailyRate())
+                .dailyRate(resolvedDailyRate)
                 .basicPay(basicPay)
                 .overtimePay(overtimePay)
                 .tripBonus(tripBonus)

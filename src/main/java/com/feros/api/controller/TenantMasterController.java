@@ -137,43 +137,6 @@ public class TenantMasterController {
         return ResponseEntity.ok(ApiResponse.success("Designation deleted successfully", null));
     }
 
-    // ===================== PAY RATES =====================
-    @GetMapping("/pay-rates")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
-    public ResponseEntity<ApiResponse<List<TenantMasterResponse>>> getAllPayRates() {
-        return ResponseEntity
-                .ok(ApiResponse.success("Pay rates fetched successfully", tenantMasterService.getAllPayRates()));
-    }
-
-    @GetMapping("/pay-rates/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
-    public ResponseEntity<ApiResponse<TenantMasterResponse>> getPayRateById(@PathVariable Long id) {
-        return ResponseEntity
-                .ok(ApiResponse.success("Pay rate fetched successfully", tenantMasterService.getPayRateById(id)));
-    }
-
-    @PostMapping("/pay-rates")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
-    public ResponseEntity<ApiResponse<TenantMasterResponse>> createPayRate(@Valid @RequestBody PayRateRequest request) {
-        return ResponseEntity
-                .ok(ApiResponse.success("Pay rate created successfully", tenantMasterService.createPayRate(request)));
-    }
-
-    @PutMapping("/pay-rates/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
-    public ResponseEntity<ApiResponse<TenantMasterResponse>> updatePayRate(@PathVariable Long id,
-            @Valid @RequestBody PayRateRequest request) {
-        return ResponseEntity.ok(
-                ApiResponse.success("Pay rate updated successfully", tenantMasterService.updatePayRate(id, request)));
-    }
-
-    @DeleteMapping("/pay-rates/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deletePayRate(@PathVariable Long id) {
-        tenantMasterService.deletePayRate(id);
-        return ResponseEntity.ok(ApiResponse.success("Pay rate deleted successfully", null));
-    }
-
     // ===================== CHARGE TYPES =====================
     @GetMapping("/charge-types")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")

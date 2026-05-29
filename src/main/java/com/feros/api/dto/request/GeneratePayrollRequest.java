@@ -21,7 +21,7 @@ public class GeneratePayrollRequest {
     @NotNull(message = "Pay cycle end date is required")
     private LocalDate payCycleEndDate;
 
-    @NotNull(message = "Daily rate is required")
+    // Optional — if not provided, auto-fetched from staff designation's payPerDay
     private BigDecimal dailyRate;
 
     private BigDecimal tripBonus;

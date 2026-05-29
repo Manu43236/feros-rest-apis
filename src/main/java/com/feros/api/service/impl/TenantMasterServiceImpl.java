@@ -29,14 +29,12 @@ public class TenantMasterServiceImpl implements TenantMasterService {
     private final VehicleStatusRepository vehicleStatusRepository;
     private final RouteRepository routeRepository;
     private final DesignationRepository designationRepository;
-    private final PayRateRepository payRateRepository;
     private final ChargeTypeRepository chargeTypeRepository;
     private final PaymentTermsRepository paymentTermsRepository;
     private final ClientTypeRepository clientTypeRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
     private final RbacLoginAccessRepository rbacLoginAccessRepository;
     private final CityRepository cityRepository;
-    private final VehicleTypeRepository vehicleTypeRepository;
 
     private Tenant getCurrentTenant() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
@@ -153,7 +151,9 @@ public class TenantMasterServiceImpl implements TenantMasterService {
         Tenant tenant = getCurrentTenant();
         Designation designation = Designation.builder()
                 .tenant(tenant).name(request.getName())
-                .roleType(request.getRoleType()).isActive(true).build();
+                .roleType(request.getRoleType())
+                .payPerDay(request.getPayPerDay())
+                .isActive(true).build();
         return mapDesignation(designationRepository.save(designation));
     }
 
@@ -175,6 +175,7 @@ public class TenantMasterServiceImpl implements TenantMasterService {
                 .orElseThrow(() -> new FerosException("Designation not found", HttpStatus.NOT_FOUND));
         designation.setName(request.getName());
         designation.setRoleType(request.getRoleType());
+        designation.setPayPerDay(request.getPayPerDay());
         return mapDesignation(designationRepository.save(designation));
     }
 
@@ -184,66 +185,6 @@ public class TenantMasterServiceImpl implements TenantMasterService {
                 .orElseThrow(() -> new FerosException("Designation not found", HttpStatus.NOT_FOUND));
         designation.setIsActive(false);
         designationRepository.save(designation);
-    }
-
-    // ===================== PAY RATES =====================
-    @Override
-    public TenantMasterResponse createPayRate(PayRateRequest request) {
-        Tenant tenant = getCurrentTenant();
-        Designation designation = designationRepository.findByIdAndTenantId(
-                request.getDesignationId(), getCurrentTenantId())
-                .orElseThrow(() -> new FerosException("Designation not found", HttpStatus.NOT_FOUND));
-        PayRate payRate = PayRate.builder()
-                .tenant(tenant).designation(designation)
-                .payPerDay(request.getPayPerDay())
-                .effectiveFrom(request.getEffectiveFrom())
-                .effectiveTo(request.getEffectiveTo())
-                .isActive(true).build();
-        if (request.getVehicleTypeId() != null) {
-            VehicleType vehicleType = vehicleTypeRepository.findById(request.getVehicleTypeId())
-                    .orElseThrow(() -> new FerosException("Vehicle type not found", HttpStatus.NOT_FOUND));
-            payRate.setVehicleType(vehicleType);
-        }
-        return mapPayRate(payRateRepository.save(payRate));
-    }
-
-    @Override
-    public TenantMasterResponse getPayRateById(Long id) {
-        return mapPayRate(payRateRepository.findByIdAndTenantId(id, getCurrentTenantId())
-                .orElseThrow(() -> new FerosException("Pay rate not found", HttpStatus.NOT_FOUND)));
-    }
-
-    @Override
-    public List<TenantMasterResponse> getAllPayRates() {
-        return payRateRepository.findByTenantIdAndIsActiveTrue(getCurrentTenantId())
-                .stream().map(this::mapPayRate).toList();
-    }
-
-    @Override
-    public TenantMasterResponse updatePayRate(Long id, PayRateRequest request) {
-        PayRate payRate = payRateRepository.findByIdAndTenantId(id, getCurrentTenantId())
-                .orElseThrow(() -> new FerosException("Pay rate not found", HttpStatus.NOT_FOUND));
-        Designation designation = designationRepository.findByIdAndTenantId(
-                request.getDesignationId(), getCurrentTenantId())
-                .orElseThrow(() -> new FerosException("Designation not found", HttpStatus.NOT_FOUND));
-        payRate.setDesignation(designation);
-        payRate.setPayPerDay(request.getPayPerDay());
-        payRate.setEffectiveFrom(request.getEffectiveFrom());
-        payRate.setEffectiveTo(request.getEffectiveTo());
-        if (request.getVehicleTypeId() != null) {
-            VehicleType vehicleType = vehicleTypeRepository.findById(request.getVehicleTypeId())
-                    .orElseThrow(() -> new FerosException("Vehicle type not found", HttpStatus.NOT_FOUND));
-            payRate.setVehicleType(vehicleType);
-        }
-        return mapPayRate(payRateRepository.save(payRate));
-    }
-
-    @Override
-    public void deletePayRate(Long id) {
-        PayRate payRate = payRateRepository.findByIdAndTenantId(id, getCurrentTenantId())
-                .orElseThrow(() -> new FerosException("Pay rate not found", HttpStatus.NOT_FOUND));
-        payRate.setIsActive(false);
-        payRateRepository.save(payRate);
     }
 
     // ===================== CHARGE TYPES =====================
@@ -425,22 +366,9 @@ public class TenantMasterServiceImpl implements TenantMasterService {
     private TenantMasterResponse mapDesignation(Designation d) {
         return TenantMasterResponse.builder().id(d.getId())
                 .tenantId(d.getTenant().getId()).name(d.getName())
-                .roleType(d.getRoleType()).isActive(d.getIsActive())
+                .roleType(d.getRoleType()).payPerDay(d.getPayPerDay())
+                .isActive(d.getIsActive())
                 .createdAt(d.getCreatedAt()).updatedAt(d.getUpdatedAt()).build();
-    }
-
-    private TenantMasterResponse mapPayRate(PayRate p) {
-        return TenantMasterResponse.builder().id(p.getId())
-                .tenantId(p.getTenant().getId())
-                .designationId(p.getDesignation().getId())
-                .designationName(p.getDesignation().getName())
-                .vehicleTypeId(p.getVehicleType() != null ? p.getVehicleType().getId() : null)
-                .vehicleTypeName(p.getVehicleType() != null ? p.getVehicleType().getName() : null)
-                .payPerDay(p.getPayPerDay())
-                .effectiveFrom(p.getEffectiveFrom())
-                .effectiveTo(p.getEffectiveTo())
-                .isActive(p.getIsActive()).createdAt(p.getCreatedAt())
-                .updatedAt(p.getUpdatedAt()).build();
     }
 
     private TenantMasterResponse mapChargeType(ChargeType c) {

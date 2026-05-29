@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Getter
 @Setter
 public class DesignationRequest {
@@ -14,4 +16,6 @@ public class DesignationRequest {
 
     @NotNull(message = "Role type is required")
     private RoleName roleType;
+
+    private BigDecimal payPerDay;
 }

@@ -5,7 +5,6 @@ import com.feros.api.enums.RoleName;
 import com.feros.api.enums.VehicleStatusType;
 import lombok.*;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
@@ -34,14 +33,8 @@ public class TenantMasterResponse {
     // Designation fields
     private RoleName roleType;
 
-    // PayRate fields
-    private Long designationId;
-    private String designationName;
-    private Long vehicleTypeId;
-    private String vehicleTypeName;
+    // Designation — pay rate
     private BigDecimal payPerDay;
-    private LocalDate effectiveFrom;
-    private LocalDate effectiveTo;
 
     // PaymentTerms fields
     private Integer creditDays;

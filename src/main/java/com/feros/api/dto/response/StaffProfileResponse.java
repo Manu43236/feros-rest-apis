@@ -21,6 +21,7 @@ public class StaffProfileResponse {
 
     private Long designationId;
     private String designationName;
+    private java.math.BigDecimal designationPayPerDay;
     private Long employmentTypeId;
     private String employmentTypeName;
 
