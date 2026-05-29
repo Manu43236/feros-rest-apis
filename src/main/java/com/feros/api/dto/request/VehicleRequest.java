@@ -53,4 +53,8 @@ public class VehicleRequest {
 
     private String notes;
     private Integer tyreRotationIntervalKm;
+
+    // Extra pay for assigned driver
+    private Boolean extraPayEnabled;
+    private BigDecimal extraPayPerDay;
 }

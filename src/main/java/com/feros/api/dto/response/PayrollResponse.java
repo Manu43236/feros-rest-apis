@@ -35,6 +35,7 @@ public class PayrollResponse {
     private BigDecimal basicPay;
     private BigDecimal overtimePay;
     private BigDecimal tripBonus;
+    private BigDecimal vehicleExtraPay;
     private BigDecimal grossPay;
     private BigDecimal totalDeductions;
     private BigDecimal netPay;

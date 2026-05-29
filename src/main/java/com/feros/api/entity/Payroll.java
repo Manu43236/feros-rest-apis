@@ -66,6 +66,9 @@ public class Payroll extends BaseEntity {
     @Column(name = "trip_bonus")
     private BigDecimal tripBonus = BigDecimal.ZERO;
 
+    @Column(name = "vehicle_extra_pay")
+    private BigDecimal vehicleExtraPay = BigDecimal.ZERO;
+
     @Column(name = "gross_pay")
     private BigDecimal grossPay = BigDecimal.ZERO;
 

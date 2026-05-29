@@ -72,6 +72,10 @@ public class VehicleResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    // Extra pay for assigned driver
+    private Boolean extraPayEnabled;
+    private BigDecimal extraPayPerDay;
+
     // Vehicle-level staff assignment
     private Long currentDriverId;
     private String currentDriverName;

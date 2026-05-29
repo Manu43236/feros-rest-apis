@@ -131,6 +131,13 @@ public class Vehicle extends BaseEntity {
     @Column(name = "tyre_rotation_interval_km")
     private Integer tyreRotationIntervalKm;
 
+    // Extra pay for assigned driver
+    @Column(name = "extra_pay_enabled")
+    private Boolean extraPayEnabled = false;
+
+    @Column(name = "extra_pay_per_day")
+    private BigDecimal extraPayPerDay;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "current_driver_id")
     private User currentDriver;

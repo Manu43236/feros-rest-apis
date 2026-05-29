@@ -12,6 +12,7 @@ import com.feros.api.entity.master.DeductionType;
 import com.feros.api.enums.PayrollStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.entity.StaffProfile;
+import com.feros.api.entity.VehicleStaffAssignment;
 import com.feros.api.repository.*;
 import com.feros.api.service.NotificationService;
 import com.feros.api.service.PayrollService;
@@ -42,6 +43,7 @@ public class PayrollServiceImpl implements PayrollService {
     private final AttendanceRepository attendanceRepository;
     private final DeductionTypeRepository deductionTypeRepository;
     private final StaffProfileRepository staffProfileRepository;
+    private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final NotificationService notificationService;
 
     private Long getCurrentTenantId() {
@@ -181,7 +183,44 @@ public class PayrollServiceImpl implements PayrollService {
         }
 
         BigDecimal tripBonus = request.getTripBonus() != null ? request.getTripBonus() : BigDecimal.ZERO;
-        BigDecimal grossPay = basicPay.add(overtimePay).add(tripBonus);
+
+        // Vehicle extra pay — sum extraPayPerDay × present days in each vehicle assignment period
+        BigDecimal vehicleExtraPay = BigDecimal.ZERO;
+        try {
+            List<VehicleStaffAssignment> assignments = vehicleStaffAssignmentRepository
+                    .findOverlappingByUser(request.getUserId(), tenantId,
+                            request.getPayCycleStartDate(), request.getPayCycleEndDate());
+            for (VehicleStaffAssignment assignment : assignments) {
+                if (!Boolean.TRUE.equals(assignment.getVehicle().getExtraPayEnabled())
+                        || assignment.getVehicle().getExtraPayPerDay() == null) continue;
+
+                LocalDate from = assignment.getAssignedFrom()
+                        .isBefore(request.getPayCycleStartDate())
+                        ? request.getPayCycleStartDate() : assignment.getAssignedFrom();
+                LocalDate to = (assignment.getAssignedTo() == null
+                        || assignment.getAssignedTo().isAfter(request.getPayCycleEndDate()))
+                        ? request.getPayCycleEndDate() : assignment.getAssignedTo();
+
+                // Count present attendance days within this assignment window
+                long presentInWindow = attendanceList.stream()
+                        .filter(a -> {
+                            LocalDate d = a.getAttendanceDate();
+                            return !d.isBefore(from) && !d.isAfter(to)
+                                    && a.getAttendanceType().getName().toLowerCase().contains("present");
+                        })
+                        .count();
+
+                vehicleExtraPay = vehicleExtraPay.add(
+                        assignment.getVehicle().getExtraPayPerDay()
+                                .multiply(BigDecimal.valueOf(presentInWindow)));
+            }
+        } catch (Exception e) {
+            // Non-fatal — log and continue without extra pay
+            vehicleExtraPay = BigDecimal.ZERO;
+        }
+        vehicleExtraPay = vehicleExtraPay.setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal grossPay = basicPay.add(overtimePay).add(tripBonus).add(vehicleExtraPay);
 
         // Build payroll
         Payroll payroll = Payroll.builder()
@@ -199,6 +238,7 @@ public class PayrollServiceImpl implements PayrollService {
                 .basicPay(basicPay)
                 .overtimePay(overtimePay)
                 .tripBonus(tripBonus)
+                .vehicleExtraPay(vehicleExtraPay)
                 .grossPay(grossPay)
                 .totalDeductions(BigDecimal.ZERO)
                 .netPay(grossPay)
@@ -381,6 +421,7 @@ public class PayrollServiceImpl implements PayrollService {
                 .basicPay(p.getBasicPay())
                 .overtimePay(p.getOvertimePay())
                 .tripBonus(p.getTripBonus())
+                .vehicleExtraPay(p.getVehicleExtraPay())
                 .grossPay(p.getGrossPay())
                 .totalDeductions(p.getTotalDeductions())
                 .netPay(p.getNetPay())

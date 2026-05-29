@@ -10,6 +10,7 @@ import com.feros.api.entity.User;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.VehicleBreakdown;
 import com.feros.api.entity.VehicleDocument;
+import com.feros.api.entity.VehicleStaffAssignment;
 import com.feros.api.entity.VehicleTyrePosition;
 import com.feros.api.entity.master.*;
 import com.feros.api.enums.RoleName;
@@ -56,6 +57,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
     private final VehicleDocumentRepository vehicleDocumentRepository;
     private final DocumentTypeRepository documentTypeRepository;
+    private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -288,6 +290,8 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setFinanceEndDate(request.getFinanceEndDate());
         vehicle.setNotes(request.getNotes());
         vehicle.setTyreRotationIntervalKm(request.getTyreRotationIntervalKm());
+        vehicle.setExtraPayEnabled(Boolean.TRUE.equals(request.getExtraPayEnabled()));
+        vehicle.setExtraPayPerDay(request.getExtraPayPerDay());
 
         if (request.getBrandId() != null)
             vehicle.setBrand(vehicleBrandRepository.findById(request.getBrandId())
@@ -734,6 +738,8 @@ public class VehicleServiceImpl implements VehicleService {
                 .financeMonthsRemaining(computeFinanceMonthsRemaining(v))
                 .notes(v.getNotes())
                 .tyreRotationIntervalKm(v.getTyreRotationIntervalKm())
+                .extraPayEnabled(Boolean.TRUE.equals(v.getExtraPayEnabled()))
+                .extraPayPerDay(v.getExtraPayPerDay())
                 .currentDriverId(v.getCurrentDriver() != null ? v.getCurrentDriver().getId() : null)
                 .currentDriverName(v.getCurrentDriver() != null ? v.getCurrentDriver().getName() : null)
                 .currentCleanerId(v.getCurrentCleaner() != null ? v.getCurrentCleaner().getId() : null)
@@ -762,6 +768,25 @@ public class VehicleServiceImpl implements VehicleService {
         if (vehicleRepository.existsByCurrentDriver_IdAndIdNot(userId, vehicleId))
             throw new FerosException("This driver is already assigned to another vehicle", HttpStatus.CONFLICT);
 
+        // Close any existing open assignment for this driver
+        vehicleStaffAssignmentRepository
+                .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(userId, tenantId)
+                .ifPresent(a -> {
+                    a.setAssignedTo(TimeUtil.today());
+                    vehicleStaffAssignmentRepository.save(a);
+                });
+
+        // Record new assignment
+        User assignedBy = userRepository.findById(SecurityUtil.getCurrentUserId())
+                .orElseThrow(() -> new FerosException("Current user not found", HttpStatus.NOT_FOUND));
+        vehicleStaffAssignmentRepository.save(VehicleStaffAssignment.builder()
+                .tenant(vehicle.getTenant())
+                .vehicle(vehicle)
+                .user(driver)
+                .assignedFrom(TimeUtil.today())
+                .assignedBy(assignedBy)
+                .build());
+
         vehicle.setCurrentDriver(driver);
         return mapToResponse(vehicleRepository.save(vehicle));
     }
@@ -769,8 +794,20 @@ public class VehicleServiceImpl implements VehicleService {
     @Override
     @Transactional
     public VehicleResponse unassignDriver(Long vehicleId) {
-        Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(vehicleId, getCurrentTenantId())
+        Long tenantId = getCurrentTenantId();
+        Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(vehicleId, tenantId)
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+
+        // Close open assignment
+        if (vehicle.getCurrentDriver() != null) {
+            vehicleStaffAssignmentRepository
+                    .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(
+                            vehicle.getCurrentDriver().getId(), tenantId)
+                    .ifPresent(a -> {
+                        a.setAssignedTo(TimeUtil.today());
+                        vehicleStaffAssignmentRepository.save(a);
+                    });
+        }
 
         vehicle.setCurrentDriver(null);
         return mapToResponse(vehicleRepository.save(vehicle));
@@ -794,6 +831,25 @@ public class VehicleServiceImpl implements VehicleService {
         if (vehicleRepository.existsByCurrentCleaner_IdAndIdNot(userId, vehicleId))
             throw new FerosException("This cleaner is already assigned to another vehicle", HttpStatus.CONFLICT);
 
+        // Close any existing open assignment for this cleaner
+        vehicleStaffAssignmentRepository
+                .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(userId, tenantId)
+                .ifPresent(a -> {
+                    a.setAssignedTo(TimeUtil.today());
+                    vehicleStaffAssignmentRepository.save(a);
+                });
+
+        // Record new assignment
+        User assignedBy = userRepository.findById(SecurityUtil.getCurrentUserId())
+                .orElseThrow(() -> new FerosException("Current user not found", HttpStatus.NOT_FOUND));
+        vehicleStaffAssignmentRepository.save(VehicleStaffAssignment.builder()
+                .tenant(vehicle.getTenant())
+                .vehicle(vehicle)
+                .user(cleaner)
+                .assignedFrom(TimeUtil.today())
+                .assignedBy(assignedBy)
+                .build());
+
         vehicle.setCurrentCleaner(cleaner);
         return mapToResponse(vehicleRepository.save(vehicle));
     }
@@ -801,8 +857,20 @@ public class VehicleServiceImpl implements VehicleService {
     @Override
     @Transactional
     public VehicleResponse unassignCleaner(Long vehicleId) {
-        Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(vehicleId, getCurrentTenantId())
+        Long tenantId = getCurrentTenantId();
+        Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(vehicleId, tenantId)
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+
+        // Close open assignment
+        if (vehicle.getCurrentCleaner() != null) {
+            vehicleStaffAssignmentRepository
+                    .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(
+                            vehicle.getCurrentCleaner().getId(), tenantId)
+                    .ifPresent(a -> {
+                        a.setAssignedTo(TimeUtil.today());
+                        vehicleStaffAssignmentRepository.save(a);
+                    });
+        }
 
         vehicle.setCurrentCleaner(null);
         return mapToResponse(vehicleRepository.save(vehicle));
