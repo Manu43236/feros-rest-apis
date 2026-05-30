@@ -259,6 +259,10 @@ public class StaffProfileServiceImpl implements StaffProfileService {
         Vehicle vehicle = vehicleRepository
                 .findByIdAndTenantIdAndIsActiveTrue(vehicleId, tenantId)
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+        long existingCount = vehicleImageRepository.findByVehicleIdAndTenantIdAndIsActiveTrue(vehicleId, tenantId).size();
+        if (existingCount >= 3) {
+            throw new FerosException("Maximum 3 images allowed per vehicle", HttpStatus.BAD_REQUEST);
+        }
         VehicleImage image = VehicleImage.builder()
                 .tenant(getCurrentTenant())
                 .vehicle(vehicle)
