@@ -86,4 +86,6 @@ public class VehicleResponse {
     private Boolean isAssigned;
     private Long assignedOrderId;
     private String assignedOrderNumber;
+
+    private String coverImageUrl;
 }

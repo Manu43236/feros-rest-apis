@@ -10,6 +10,7 @@ import com.feros.api.entity.User;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.VehicleBreakdown;
 import com.feros.api.entity.VehicleDocument;
+import com.feros.api.entity.VehicleImage;
 import com.feros.api.entity.VehicleStaffAssignment;
 import com.feros.api.entity.VehicleTyrePosition;
 import com.feros.api.entity.master.*;
@@ -58,6 +59,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final VehicleDocumentRepository vehicleDocumentRepository;
     private final DocumentTypeRepository documentTypeRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    private final VehicleImageRepository vehicleImageRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -747,6 +749,10 @@ public class VehicleServiceImpl implements VehicleService {
                 .isActive(v.getIsActive())
                 .createdAt(v.getCreatedAt())
                 .updatedAt(v.getUpdatedAt())
+                .coverImageUrl(
+                    vehicleImageRepository.findByVehicleIdAndTenantIdAndIsActiveTrue(v.getId(), v.getTenant().getId())
+                        .stream().findFirst().map(VehicleImage::getImageUrl).orElse(null)
+                )
                 .build();
     }
 
