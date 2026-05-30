@@ -44,6 +44,8 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final LeaveTypeRepository leaveTypeRepository;
     private final S3Service s3Service;
     private final NotificationService notificationService;
+    private final VehicleRepository vehicleRepository;
+    private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -513,7 +515,25 @@ public class AttendanceServiceImpl implements AttendanceService {
         }
 
         attendance.setMarkedOutAt(TimeUtil.nowIst());
-        return mapToResponse(attendanceRepository.save(attendance));
+        AttendanceResponse response = mapToResponse(attendanceRepository.save(attendance));
+
+        // Auto-unassign from vehicle on mark-out
+        vehicleRepository.findAssignedVehicleByStaffUserId(userId).ifPresent(vehicle -> {
+            vehicleStaffAssignmentRepository
+                    .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(userId, tenantId)
+                    .ifPresent(a -> {
+                        a.setAssignedTo(TimeUtil.today());
+                        vehicleStaffAssignmentRepository.save(a);
+                    });
+            if (vehicle.getCurrentDriver() != null && vehicle.getCurrentDriver().getId().equals(userId)) {
+                vehicle.setCurrentDriver(null);
+            } else if (vehicle.getCurrentCleaner() != null && vehicle.getCurrentCleaner().getId().equals(userId)) {
+                vehicle.setCurrentCleaner(null);
+            }
+            vehicleRepository.save(vehicle);
+        });
+
+        return response;
     }
 
     @Override
