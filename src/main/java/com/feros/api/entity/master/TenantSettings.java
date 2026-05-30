@@ -69,6 +69,18 @@ public class TenantSettings extends BaseEntity {
     private java.math.BigDecimal serviceGstRate = java.math.BigDecimal.valueOf(18.00);
 
     @Builder.Default
+    @Column(name = "driver_batta_rate", precision = 10, scale = 2)
+    private BigDecimal driverBattaRate = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "cleaner_batta_rate", precision = 10, scale = 2)
+    private BigDecimal cleanerBattaRate = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "trip_mamulu_amount", precision = 10, scale = 2)
+    private BigDecimal tripMamuluAmount = BigDecimal.ZERO;
+
+    @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;
 }
