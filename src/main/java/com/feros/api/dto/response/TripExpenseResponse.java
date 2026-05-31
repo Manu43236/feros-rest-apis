@@ -41,6 +41,9 @@ public class TripExpenseResponse {
     private String settlementNote;
     private String settledByName;
     private LocalDateTime settledAt;
+    private String rejectedByName;
+    private LocalDateTime rejectedAt;
+    private String rejectionReason;
 
     private List<TripExpenseItemResponse> items;
     private LocalDateTime createdAt;

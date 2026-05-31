@@ -1,6 +1,7 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.request.TripExpenseApproveRequest;
+import com.feros.api.dto.request.TripExpenseRejectRequest;
 import com.feros.api.dto.request.TripExpenseRequest;
 import com.feros.api.dto.request.TripExpenseSettleRequest;
 import com.feros.api.dto.response.ApiResponse;
@@ -69,6 +70,15 @@ public class TripExpenseController {
                 "Trip expense sheet approved", tripExpenseService.approve(id, request)));
     }
 
+    // Admin: Reject submitted expense sheet
+    @PutMapping("/trip-expenses/{id}/reject")
+    public ResponseEntity<ApiResponse<TripExpenseResponse>> reject(
+            @PathVariable Long id,
+            @RequestBody(required = false) TripExpenseRejectRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Trip expense sheet rejected", tripExpenseService.reject(id, request)));
+    }
+
     // Both (Admin + Supervisor): Record settlement
     @PostMapping("/trip-expenses/{id}/settle")
     public ResponseEntity<ApiResponse<TripExpenseResponse>> settle(
@@ -76,5 +86,12 @@ public class TripExpenseController {
             @RequestBody TripExpenseSettleRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Trip expense settled", tripExpenseService.settle(id, request)));
+    }
+
+    // Supervisor: Delete DRAFT or REJECTED expense sheet
+    @DeleteMapping("/lr/{lrId}/trip-expense")
+    public ResponseEntity<ApiResponse<Void>> deleteDraft(@PathVariable Long lrId) {
+        tripExpenseService.deleteDraft(lrId);
+        return ResponseEntity.ok(ApiResponse.success("Trip expense sheet deleted", null));
     }
 }
