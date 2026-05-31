@@ -3,6 +3,7 @@ package com.feros.api.service.impl;
 import com.feros.api.dto.request.TripExpenseApproveRequest;
 import com.feros.api.dto.request.TripExpenseItemApproveRequest;
 import com.feros.api.dto.request.TripExpenseItemRequest;
+import com.feros.api.dto.request.TripExpenseRejectRequest;
 import com.feros.api.dto.request.TripExpenseRequest;
 import com.feros.api.dto.request.TripExpenseSettleRequest;
 import com.feros.api.dto.response.TripExpenseItemResponse;
@@ -152,6 +153,9 @@ public class TripExpenseServiceImpl implements TripExpenseService {
                 .settlementNote(expense.getSettlementNote())
                 .settledByName(expense.getSettledBy() != null ? expense.getSettledBy().getName() : null)
                 .settledAt(expense.getSettledAt())
+                .rejectedByName(expense.getRejectedBy() != null ? expense.getRejectedBy().getName() : null)
+                .rejectedAt(expense.getRejectedAt())
+                .rejectionReason(expense.getRejectionReason())
                 .items(itemResponses)
                 .createdAt(expense.getCreatedAt())
                 .build();
@@ -203,8 +207,8 @@ public class TripExpenseServiceImpl implements TripExpenseService {
         LrTripExpense expense = tripExpenseRepository.findByLrIdAndIsActiveTrue(lrId)
                 .orElseThrow(() -> new FerosException("Trip expense sheet not found", HttpStatus.NOT_FOUND));
 
-        if (expense.getStatus() != TripExpenseStatus.DRAFT) {
-            throw new FerosException("Only DRAFT expense sheets can be updated", HttpStatus.BAD_REQUEST);
+        if (expense.getStatus() != TripExpenseStatus.DRAFT && expense.getStatus() != TripExpenseStatus.REJECTED) {
+            throw new FerosException("Only DRAFT or REJECTED expense sheets can be updated", HttpStatus.BAD_REQUEST);
         }
 
         TenantSettings settings = tenantSettingsRepository.findByTenantId(tenant.getId())
@@ -242,13 +246,17 @@ public class TripExpenseServiceImpl implements TripExpenseService {
         LrTripExpense expense = tripExpenseRepository.findByLrIdAndIsActiveTrue(lrId)
                 .orElseThrow(() -> new FerosException("Trip expense sheet not found", HttpStatus.NOT_FOUND));
 
-        if (expense.getStatus() != TripExpenseStatus.DRAFT) {
-            throw new FerosException("Only DRAFT expense sheets can be submitted", HttpStatus.BAD_REQUEST);
+        if (expense.getStatus() != TripExpenseStatus.DRAFT && expense.getStatus() != TripExpenseStatus.REJECTED) {
+            throw new FerosException("Only DRAFT or REJECTED expense sheets can be submitted", HttpStatus.BAD_REQUEST);
         }
 
         expense.setStatus(TripExpenseStatus.SUBMITTED);
         expense.setSubmittedBy(currentUser);
         expense.setSubmittedAt(TimeUtil.nowIst());
+        // Clear rejection data on resubmit
+        expense.setRejectedBy(null);
+        expense.setRejectedAt(null);
+        expense.setRejectionReason(null);
         tripExpenseRepository.save(expense);
 
         // Notify admin
@@ -375,5 +383,59 @@ public class TripExpenseServiceImpl implements TripExpenseService {
         tripExpenseRepository.save(expense);
 
         return toResponse(expense);
+    }
+
+    @Override
+    @Transactional
+    public TripExpenseResponse reject(Long id, TripExpenseRejectRequest request) {
+        Tenant tenant = getCurrentTenant();
+        User currentUser = getCurrentUser();
+
+        LrTripExpense expense = tripExpenseRepository.findByIdAndTenantIdAndIsActiveTrue(id, tenant.getId())
+                .orElseThrow(() -> new FerosException("Trip expense sheet not found", HttpStatus.NOT_FOUND));
+
+        if (expense.getStatus() != TripExpenseStatus.SUBMITTED) {
+            throw new FerosException("Only SUBMITTED expense sheets can be rejected", HttpStatus.BAD_REQUEST);
+        }
+
+        expense.setStatus(TripExpenseStatus.REJECTED);
+        expense.setRejectedBy(currentUser);
+        expense.setRejectedAt(TimeUtil.nowIst());
+        expense.setRejectionReason(request != null ? request.getRejectionReason() : null);
+        tripExpenseRepository.save(expense);
+
+        // Notify supervisor
+        if (expense.getSubmittedBy() != null) {
+            notificationService.sendToUser(
+                    tenant,
+                    expense.getSubmittedBy(),
+                    NotificationType.TRIP_EXPENSE_REJECTED,
+                    "Trip Expense Rejected",
+                    "Expense sheet for LR " + expense.getLr().getLrNumber() + " was rejected. " +
+                    (expense.getRejectionReason() != null ? "Reason: " + expense.getRejectionReason() : "")
+            );
+        }
+
+        return toResponse(expense);
+    }
+
+    @Override
+    @Transactional
+    public void deleteDraft(Long lrId) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        LrTripExpense expense = tripExpenseRepository.findByLrIdAndIsActiveTrue(lrId)
+                .orElseThrow(() -> new FerosException("Trip expense sheet not found", HttpStatus.NOT_FOUND));
+
+        if (!expense.getTenant().getId().equals(tenantId)) {
+            throw new FerosException("Trip expense sheet not found", HttpStatus.NOT_FOUND);
+        }
+
+        if (expense.getStatus() != TripExpenseStatus.DRAFT && expense.getStatus() != TripExpenseStatus.REJECTED) {
+            throw new FerosException("Only DRAFT or REJECTED expense sheets can be deleted", HttpStatus.BAD_REQUEST);
+        }
+
+        expense.setIsActive(false);
+        tripExpenseRepository.save(expense);
     }
 }

@@ -4,5 +4,6 @@ public enum TripExpenseStatus {
     DRAFT,
     SUBMITTED,
     APPROVED,
-    SETTLED
+    SETTLED,
+    REJECTED
 }

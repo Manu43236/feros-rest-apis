@@ -84,6 +84,16 @@ public class LrTripExpense extends BaseEntity {
     @Column(name = "settled_at")
     private LocalDateTime settledAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rejected_by_id")
+    private User rejectedBy;
+
+    @Column(name = "rejected_at")
+    private LocalDateTime rejectedAt;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
+
     @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;
