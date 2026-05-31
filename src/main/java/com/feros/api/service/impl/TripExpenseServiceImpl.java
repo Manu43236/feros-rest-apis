@@ -53,9 +53,13 @@ public class TripExpenseServiceImpl implements TripExpenseService {
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
     }
 
-    private Lr getLrDelivered(Long lrId, Long tenantId) {
-        Lr lr = lrRepository.findByIdAndTenantIdAndIsActiveTrue(lrId, tenantId)
+    private Lr getLr(Long lrId, Long tenantId) {
+        return lrRepository.findByIdAndTenantIdAndIsActiveTrue(lrId, tenantId)
                 .orElseThrow(() -> new FerosException("LR not found", HttpStatus.NOT_FOUND));
+    }
+
+    private Lr getLrDelivered(Long lrId, Long tenantId) {
+        Lr lr = getLr(lrId, tenantId);
         if (lr.getLrStatus() != LrStatus.DELIVERED) {
             throw new FerosException("Trip expenses can only be submitted for delivered LRs", HttpStatus.BAD_REQUEST);
         }
@@ -171,7 +175,7 @@ public class TripExpenseServiceImpl implements TripExpenseService {
             throw new FerosException("Trip expense sheet already exists for this LR", HttpStatus.BAD_REQUEST);
         }
 
-        Lr lr = getLrDelivered(lrId, tenant.getId());
+        Lr lr = getLr(lrId, tenant.getId());
 
         TenantSettings settings = tenantSettingsRepository.findByTenantId(tenant.getId())
                 .orElseThrow(() -> new FerosException("Tenant settings not found", HttpStatus.NOT_FOUND));
