@@ -16,6 +16,10 @@ public interface OrderVehicleAllocationRepository extends JpaRepository<OrderVeh
     List<OrderVehicleAllocation> findByOrderIdAndIsActiveTrue(Long orderId);
     Optional<OrderVehicleAllocation> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     boolean existsByOrderIdAndVehicleIdAndIsActiveTrue(Long orderId, Long vehicleId);
+    @Query("SELECT CASE WHEN COUNT(ova) > 0 THEN true ELSE false END FROM OrderVehicleAllocation ova " +
+           "WHERE ova.order.id = :orderId AND ova.vehicle.id = :vehicleId AND ova.isActive = true " +
+           "AND ova.allocationStatus NOT IN ('DELIVERED', 'CANCELLED')")
+    boolean existsActiveInProgressAllocation(@Param("orderId") Long orderId, @Param("vehicleId") Long vehicleId);
     long countByTenantIdAndAllocationStatusAndIsActiveTrue(Long tenantId, VehicleAllocationStatus status);
     @Query("SELECT COUNT(DISTINCT ova.vehicle.id) FROM OrderVehicleAllocation ova WHERE ova.tenant.id = :tenantId AND ova.allocationStatus = :status AND ova.isActive = true")
     long countDistinctVehiclesByTenantIdAndStatus(@Param("tenantId") Long tenantId, @Param("status") VehicleAllocationStatus status);

@@ -421,7 +421,7 @@ public class OrderServiceImpl implements OrderService {
                     order.getOrderStatus() + " order", HttpStatus.BAD_REQUEST);
         }
 
-        if (vehicleAllocationRepository.existsByOrderIdAndVehicleIdAndIsActiveTrue(
+        if (vehicleAllocationRepository.existsActiveInProgressAllocation(
                 orderId, request.getVehicleId())) {
             throw new FerosException("Vehicle already assigned to this order", HttpStatus.CONFLICT);
         }
