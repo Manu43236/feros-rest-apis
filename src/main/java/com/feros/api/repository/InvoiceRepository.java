@@ -2,6 +2,8 @@ package com.feros.api.repository;
 
 import com.feros.api.entity.Invoice;
 import com.feros.api.enums.InvoiceStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,6 +16,15 @@ import java.util.Optional;
 @Repository
 public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     List<Invoice> findByTenantIdAndIsActiveTrue(Long tenantId);
+
+    @Query("SELECT i FROM Invoice i WHERE i.tenant.id = :tenantId AND i.isActive = true " +
+           "AND (:status IS NULL OR i.invoiceStatus = :status) " +
+           "AND (:search IS NULL OR LOWER(i.invoiceNumber) LIKE LOWER(CONCAT('%',:search,'%')) " +
+           "OR LOWER(i.client.clientName) LIKE LOWER(CONCAT('%',:search,'%')))")
+    Page<Invoice> findAllPaged(@Param("tenantId") Long tenantId,
+                               @Param("status") InvoiceStatus status,
+                               @Param("search") String search,
+                               Pageable pageable);
     List<Invoice> findByTenantIdOrderByCreatedAtDesc(Long tenantId);
     Optional<Invoice> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     List<Invoice> findByClientIdAndTenantIdAndIsActiveTrue(Long clientId, Long tenantId);

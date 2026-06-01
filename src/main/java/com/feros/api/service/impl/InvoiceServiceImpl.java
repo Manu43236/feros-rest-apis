@@ -19,6 +19,10 @@ import com.feros.api.service.S3Service;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -223,9 +227,12 @@ public class InvoiceServiceImpl implements InvoiceService {
     }
 
     @Override
-    public List<InvoiceResponse> getAllInvoices() {
-        return invoiceRepository.findByTenantIdOrderByCreatedAtDesc(getCurrentTenantId())
-                .stream().map(this::mapToInvoiceResponse).toList();
+    public Page<InvoiceResponse> getAllInvoices(int page, int size, String search, InvoiceStatus status) {
+        Long tenantId = getCurrentTenantId();
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+        String searchParam = (search != null && !search.isBlank()) ? search.trim() : null;
+        return invoiceRepository.findAllPaged(tenantId, status, searchParam, pageable)
+                .map(this::mapToInvoiceResponse);
     }
 
     @Override

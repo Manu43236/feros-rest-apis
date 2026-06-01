@@ -6,13 +6,15 @@ import com.feros.api.dto.request.UpdateInvoiceRequest;
 import com.feros.api.dto.request.UpdateInvoiceStatusRequest;
 import com.feros.api.dto.response.InvoicePaymentResponse;
 import com.feros.api.dto.response.InvoiceResponse;
+import com.feros.api.enums.InvoiceStatus;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 
 public interface InvoiceService {
     InvoiceResponse createInvoice(CreateInvoiceRequest request);
     InvoiceResponse getInvoiceById(Long id);
-    List<InvoiceResponse> getAllInvoices();
+    Page<InvoiceResponse> getAllInvoices(int page, int size, String search, InvoiceStatus status);
     List<InvoiceResponse> getInvoicesByClient(Long clientId);
     InvoiceResponse updateInvoiceStatus(Long id, UpdateInvoiceStatusRequest request);
     InvoiceResponse updateInvoice(Long id, UpdateInvoiceRequest request);

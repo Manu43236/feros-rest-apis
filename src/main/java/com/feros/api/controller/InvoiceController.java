@@ -7,9 +7,11 @@ import com.feros.api.dto.request.UpdateInvoiceStatusRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.InvoicePaymentResponse;
 import com.feros.api.dto.response.InvoiceResponse;
+import com.feros.api.enums.InvoiceStatus;
 import com.feros.api.service.InvoiceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -25,9 +27,13 @@ public class InvoiceController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
-    public ResponseEntity<ApiResponse<List<InvoiceResponse>>> getAllInvoices() {
+    public ResponseEntity<ApiResponse<Page<InvoiceResponse>>> getAllInvoices(
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false)    String search,
+            @RequestParam(required = false)    InvoiceStatus status) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Invoices fetched successfully", invoiceService.getAllInvoices()));
+                "Invoices fetched successfully", invoiceService.getAllInvoices(page, size, search, status)));
     }
 
     @GetMapping("/{id}")
