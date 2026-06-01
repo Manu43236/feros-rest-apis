@@ -8,10 +8,12 @@ import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.LrChargeResponse;
 import com.feros.api.dto.response.LrCheckpostResponse;
 import com.feros.api.dto.response.LrResponse;
+import com.feros.api.enums.LrStatus;
 import com.feros.api.service.LrService;
 import com.feros.api.service.impl.LrPdfService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -37,9 +39,13 @@ public class LrController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
-    public ResponseEntity<ApiResponse<List<LrResponse>>> getAllLrs() {
+    public ResponseEntity<ApiResponse<Page<LrResponse>>> getAllLrs(
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false)    String search,
+            @RequestParam(required = false)    LrStatus status) {
         return ResponseEntity.ok(ApiResponse.success(
-                "LRs fetched successfully", lrService.getAllLrs()));
+                "LRs fetched successfully", lrService.getAllLrs(page, size, search, status)));
     }
 
     @GetMapping("/{id}")

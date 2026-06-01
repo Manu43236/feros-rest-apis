@@ -7,13 +7,15 @@ import com.feros.api.dto.request.UpdateLrRequest;
 import com.feros.api.dto.response.LrChargeResponse;
 import com.feros.api.dto.response.LrCheckpostResponse;
 import com.feros.api.dto.response.LrResponse;
+import com.feros.api.enums.LrStatus;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 
 public interface LrService {
     LrResponse createLr(CreateLrRequest request);
     LrResponse getLrById(Long id);
-    List<LrResponse> getAllLrs();
+    Page<LrResponse> getAllLrs(int page, int size, String search, LrStatus status);
     List<LrResponse> getMyLrs();
     List<LrResponse> getLrsByOrder(Long orderId);
     LrResponse updateLr(Long id, UpdateLrRequest request);

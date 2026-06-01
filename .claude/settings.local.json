@@ -813,7 +813,23 @@
       "Bash(grep -n \"case 'payRates'\" /Users/manu/Documents/FEROS/web/src/pages/masters/MastersPage.tsx)",
       "Bash(npx tsc --noEmit --project /Users/manu/Documents/FEROS/web/tsconfig.app.json 2>&1 | head -40)",
       "Bash(/Users/manu/Documents/FEROS/web/node_modules/.bin/tsc --noEmit --project /Users/manu/Documents/FEROS/web/tsconfig.app.json 2>&1 | head -40)",
-      "Bash(mvn compile 2>&1 | grep -E \"ERROR|error:|BUILD\" | tail -20)"
+      "Bash(mvn compile 2>&1 | grep -E \"ERROR|error:|BUILD\" | tail -20)",
+      "WebFetch(domain:ecc.tools)",
+      "Bash(npm install -g ecc-universal 2>&1)",
+      "Bash(ecc catalog profiles 2>&1)",
+      "Bash(ecc catalog components 2>&1)",
+      "Bash(ecc install --profile developer --target claude 2>&1)",
+      "Bash(ecc list-installed 2>&1 | head -60)",
+      "Bash(find /Users/manu/Documents/FEROS/feros-rest-apis/src -iname \"*expense*\" -o -iname \"*trip*expense*\" 2>/dev/null | head -20)",
+      "Bash(find /Users/manu/Documents/FEROS/web/src -iname \"*expense*\" 2>/dev/null | head -20)",
+      "Bash(npm run build 2>&1)",
+      "Bash(cd /Users/manu/Documents/FEROS/feros-rest-apis && mvn compile -q 2>&1 | tail -20)",
+      "Bash(grep -rn \"presigned\\\\|presignedUrl\\\\|getPresigned\\\\|publicUrl\\\\|S3\\\\|s3Key\\\\|fileKey\" /Users/manu/Documents/FEROS/web/src/api/*.ts | head -30)",
+      "Bash(sleep 15 && curl -s http://localhost:8080/api/v1/auth/login -o /dev/null -w \"%{http_code}\" 2>/dev/null || echo \"not ready\")",
+      "Bash(git remote -v && gh auth status 2>&1)",
+      "Bash(find /Users/manu/Documents/FEROS/web/src/pages -name \"*assignment*\" -o -name \"*Assignment*\" -o -name \"*order*\" -o -name \"*Order*\" 2>/dev/null | sort)",
+      "Bash(./mvnw compile -q 2>&1)",
+      "Bash(grep -r \"Pageable\\\\|PageRequest\\\\|Page<\" /Users/manu/Documents/FEROS/feros-rest-apis/src/main/java/com/feros/api/ --include=\"*.java\" -l 2>/dev/null | head -10)"
     ]
   }
 }

@@ -26,6 +26,10 @@ import com.feros.api.enums.MeterReadingType;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -143,19 +147,12 @@ public class LrServiceImpl implements LrService {
     }
 
     @Override
-    public List<LrResponse> getAllLrs() {
+    public Page<LrResponse> getAllLrs(int page, int size, String search, LrStatus status) {
         Long tenantId = getCurrentTenantId();
-        String role = SecurityUtil.getCurrentRole();
-        if ("DRIVER".equals(role) || "CLEANER".equals(role)) {
-            return lrRepository.findByTenantIdAndDriverUserId(tenantId, SecurityUtil.getCurrentUserId())
-                    .stream().map(this::mapToLrResponse).toList();
-        }
-        if ("SUPERVISOR".equals(role)) {
-            return lrRepository.findByTenantIdAndIsActiveTrue(tenantId)
-                    .stream().map(this::mapToLrResponse).toList();
-        }
-        return lrRepository.findByTenantIdAndIsActiveTrue(tenantId)
-                .stream().map(this::mapToLrResponse).toList();
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+        String searchParam = (search != null && !search.isBlank()) ? search.trim() : null;
+        return lrRepository.findAllPaged(tenantId, status, searchParam, pageable)
+                .map(this::mapToLrResponse);
     }
 
     @Override
