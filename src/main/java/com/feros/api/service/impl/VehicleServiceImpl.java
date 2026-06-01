@@ -19,7 +19,9 @@ import com.feros.api.enums.BreakdownStatus;
 import com.feros.api.enums.TyrePositionType;
 import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
+import com.feros.api.entity.Lr;
 import com.feros.api.entity.OrderVehicleAllocation;
+import com.feros.api.enums.LrStatus;
 import com.feros.api.repository.*;
 import com.feros.api.service.VehicleService;
 import com.feros.api.util.SecurityUtil;
@@ -60,6 +62,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final DocumentTypeRepository documentTypeRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final VehicleImageRepository vehicleImageRepository;
+    private final LrRepository lrRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -794,7 +797,15 @@ public class VehicleServiceImpl implements VehicleService {
                 .build());
 
         vehicle.setCurrentDriver(driver);
-        return mapToResponse(vehicleRepository.save(vehicle));
+        vehicleRepository.save(vehicle);
+
+        // Sync driver on any active LRs for this vehicle
+        List<Lr> activeLrs = lrRepository.findActiveByVehicleIdExcludingStatuses(
+                vehicleId, List.of(LrStatus.DELIVERED, LrStatus.CANCELLED));
+        activeLrs.forEach(lr -> lr.setDriver(driver));
+        if (!activeLrs.isEmpty()) lrRepository.saveAll(activeLrs);
+
+        return mapToResponse(vehicle);
     }
 
     @Override
@@ -816,7 +827,15 @@ public class VehicleServiceImpl implements VehicleService {
         }
 
         vehicle.setCurrentDriver(null);
-        return mapToResponse(vehicleRepository.save(vehicle));
+        vehicleRepository.save(vehicle);
+
+        // Sync driver on any active LRs for this vehicle
+        List<Lr> activeLrs = lrRepository.findActiveByVehicleIdExcludingStatuses(
+                vehicleId, List.of(LrStatus.DELIVERED, LrStatus.CANCELLED));
+        activeLrs.forEach(lr -> lr.setDriver(null));
+        if (!activeLrs.isEmpty()) lrRepository.saveAll(activeLrs);
+
+        return mapToResponse(vehicle);
     }
 
     @Override
@@ -857,7 +876,15 @@ public class VehicleServiceImpl implements VehicleService {
                 .build());
 
         vehicle.setCurrentCleaner(cleaner);
-        return mapToResponse(vehicleRepository.save(vehicle));
+        vehicleRepository.save(vehicle);
+
+        // Sync cleaner on any active LRs for this vehicle
+        List<Lr> activeLrs = lrRepository.findActiveByVehicleIdExcludingStatuses(
+                vehicleId, List.of(LrStatus.DELIVERED, LrStatus.CANCELLED));
+        activeLrs.forEach(lr -> lr.setCleaner(cleaner));
+        if (!activeLrs.isEmpty()) lrRepository.saveAll(activeLrs);
+
+        return mapToResponse(vehicle);
     }
 
     @Override
@@ -879,7 +906,15 @@ public class VehicleServiceImpl implements VehicleService {
         }
 
         vehicle.setCurrentCleaner(null);
-        return mapToResponse(vehicleRepository.save(vehicle));
+        vehicleRepository.save(vehicle);
+
+        // Sync cleaner on any active LRs for this vehicle
+        List<Lr> activeLrs = lrRepository.findActiveByVehicleIdExcludingStatuses(
+                vehicleId, List.of(LrStatus.DELIVERED, LrStatus.CANCELLED));
+        activeLrs.forEach(lr -> lr.setCleaner(null));
+        if (!activeLrs.isEmpty()) lrRepository.saveAll(activeLrs);
+
+        return mapToResponse(vehicle);
     }
 
     private Integer computeFinanceMonthsRemaining(Vehicle v) {

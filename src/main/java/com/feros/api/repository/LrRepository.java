@@ -42,4 +42,7 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
 
     @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true AND (l.driver.id = :userId OR l.cleaner.id = :userId) ORDER BY l.id DESC")
     List<Lr> findByTenantIdAndDriverUserId(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
+
+    @Query("SELECT l FROM Lr l WHERE l.vehicleAllocation.vehicle.id = :vehicleId AND l.isActive = true AND l.lrStatus NOT IN :excludedStatuses")
+    List<Lr> findActiveByVehicleIdExcludingStatuses(@Param("vehicleId") Long vehicleId, @Param("excludedStatuses") List<com.feros.api.enums.LrStatus> excludedStatuses);
 }
