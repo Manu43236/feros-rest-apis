@@ -1,5 +1,6 @@
 package com.feros.api.dto.response;
 
+import com.feros.api.enums.TripScope;
 import com.feros.api.enums.VehicleStatusType;
 import lombok.*;
 
@@ -88,4 +89,6 @@ public class VehicleResponse {
     private String assignedOrderNumber;
 
     private String coverImageUrl;
+
+    private TripScope tripScope;
 }

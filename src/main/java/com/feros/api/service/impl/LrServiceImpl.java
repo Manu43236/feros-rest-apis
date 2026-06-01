@@ -189,7 +189,31 @@ public class LrServiceImpl implements LrService {
         if (request.getRemarks() != null) lr.setRemarks(request.getRemarks());
 
         if (request.getLrStatus() != null) {
-            lr.setLrStatus(request.getLrStatus());
+            LrStatus current = lr.getLrStatus();
+            LrStatus next = request.getLrStatus();
+
+            // Terminal states — no changes allowed once reached
+            if (current == LrStatus.DELIVERED) {
+                throw new FerosException("LR is already delivered and cannot be modified", HttpStatus.BAD_REQUEST);
+            }
+            if (current == LrStatus.CANCELLED) {
+                throw new FerosException("LR is already cancelled and cannot be modified", HttpStatus.BAD_REQUEST);
+            }
+
+            // Enforce forward-only transitions
+            boolean validTransition = switch (current) {
+                case CREATED       -> next == LrStatus.WEIGHT_LOADED || next == LrStatus.IN_TRANSIT || next == LrStatus.CANCELLED;
+                case WEIGHT_LOADED -> next == LrStatus.IN_TRANSIT    || next == LrStatus.CANCELLED;
+                case IN_TRANSIT    -> next == LrStatus.DELIVERED      || next == LrStatus.CANCELLED;
+                default            -> false;
+            };
+            if (!validTransition) {
+                throw new FerosException(
+                    "Invalid status transition: " + current + " → " + next,
+                    HttpStatus.BAD_REQUEST);
+            }
+
+            lr.setLrStatus(next);
 
             // Sync vehicle allocation status
             OrderVehicleAllocation allocation = lr.getVehicleAllocation();

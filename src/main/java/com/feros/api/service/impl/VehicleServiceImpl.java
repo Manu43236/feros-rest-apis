@@ -20,8 +20,11 @@ import com.feros.api.enums.TyrePositionType;
 import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.entity.Lr;
+import com.feros.api.entity.OrderStaffAllocation;
 import com.feros.api.entity.OrderVehicleAllocation;
+import com.feros.api.entity.Role;
 import com.feros.api.enums.LrStatus;
+import com.feros.api.enums.StaffAllocationStatus;
 import com.feros.api.repository.*;
 import com.feros.api.service.VehicleService;
 import com.feros.api.util.SecurityUtil;
@@ -63,6 +66,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final VehicleImageRepository vehicleImageRepository;
     private final LrRepository lrRepository;
+    private final OrderStaffAllocationRepository orderStaffAllocationRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -154,6 +158,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .financeEndDate(request.getFinanceEndDate())
                 .notes(request.getNotes())
                 .tyreRotationIntervalKm(request.getTyreRotationIntervalKm())
+                .tripScope(request.getTripScope())
                 .isActive(true)
                 .build();
 
@@ -295,6 +300,7 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setFinanceEndDate(request.getFinanceEndDate());
         vehicle.setNotes(request.getNotes());
         vehicle.setTyreRotationIntervalKm(request.getTyreRotationIntervalKm());
+        vehicle.setTripScope(request.getTripScope());
         vehicle.setExtraPayEnabled(Boolean.TRUE.equals(request.getExtraPayEnabled()));
         vehicle.setExtraPayPerDay(request.getExtraPayPerDay());
 
@@ -745,6 +751,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .tyreRotationIntervalKm(v.getTyreRotationIntervalKm())
                 .extraPayEnabled(Boolean.TRUE.equals(v.getExtraPayEnabled()))
                 .extraPayPerDay(v.getExtraPayPerDay())
+                .tripScope(v.getTripScope())
                 .currentDriverId(v.getCurrentDriver() != null ? v.getCurrentDriver().getId() : null)
                 .currentDriverName(v.getCurrentDriver() != null ? v.getCurrentDriver().getName() : null)
                 .currentCleanerId(v.getCurrentCleaner() != null ? v.getCurrentCleaner().getId() : null)
@@ -796,6 +803,8 @@ public class VehicleServiceImpl implements VehicleService {
                 .assignedBy(assignedBy)
                 .build());
 
+        User oldDriver = vehicle.getCurrentDriver();
+
         vehicle.setCurrentDriver(driver);
         vehicleRepository.save(vehicle);
 
@@ -804,6 +813,47 @@ public class VehicleServiceImpl implements VehicleService {
                 vehicleId, List.of(LrStatus.DELIVERED, LrStatus.CANCELLED));
         activeLrs.forEach(lr -> lr.setDriver(driver));
         if (!activeLrs.isEmpty()) lrRepository.saveAll(activeLrs);
+
+        // Sync OrderStaffAllocations: cancel old driver's, create new driver's
+        if (!activeLrs.isEmpty()) {
+            Role driverRole = driver.getRoles().stream()
+                    .filter(r -> r.getName() == RoleName.DRIVER)
+                    .findFirst()
+                    .orElseThrow(() -> new FerosException("Driver role not found", HttpStatus.INTERNAL_SERVER_ERROR));
+
+            for (Lr lr : activeLrs) {
+                OrderVehicleAllocation vAlloc = lr.getVehicleAllocation();
+                if (vAlloc == null) continue;
+
+                // Cancel old driver's allocation for this vehicle allocation
+                if (oldDriver != null) {
+                    orderStaffAllocationRepository
+                            .findByVehicleAllocationIdAndIsActiveTrue(vAlloc.getId())
+                            .stream()
+                            .filter(sa -> sa.getUser().getId().equals(oldDriver.getId()))
+                            .forEach(sa -> {
+                                sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
+                                sa.setActualEndDate(TimeUtil.today());
+                                sa.setIsActive(false);
+                                orderStaffAllocationRepository.save(sa);
+                            });
+                }
+
+                // Create new allocation for the replacement driver
+                StaffAllocationStatus newStatus = lr.getLrStatus() == LrStatus.IN_TRANSIT
+                        ? StaffAllocationStatus.IN_TRANSIT : StaffAllocationStatus.ALLOCATED;
+                orderStaffAllocationRepository.save(OrderStaffAllocation.builder()
+                        .tenant(vehicle.getTenant())
+                        .order(vAlloc.getOrder())
+                        .vehicleAllocation(vAlloc)
+                        .user(driver)
+                        .role(driverRole)
+                        .allocationStatus(newStatus)
+                        .actualStartDate(TimeUtil.today())
+                        .allocatedBy(assignedBy)
+                        .build());
+            }
+        }
 
         return mapToResponse(vehicle);
     }

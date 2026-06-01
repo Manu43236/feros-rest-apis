@@ -16,6 +16,7 @@ public class CreateLrRequest {
     private Long vehicleAllocationId;
 
     private LocalDate lrDate;
+    @NotNull(message = "Loaded weight is required")
     private BigDecimal loadedWeight;
     private LocalDateTime loadedAt;
     private String ewayBillNumber;

@@ -1,6 +1,7 @@
 package com.feros.api.entity;
 
 import com.feros.api.entity.master.*;
+import com.feros.api.enums.TripScope;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -145,6 +146,10 @@ public class Vehicle extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "current_cleaner_id")
     private User currentCleaner;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "trip_scope")
+    private TripScope tripScope;
 
     @Column(name = "is_active")
     private Boolean isActive = true;

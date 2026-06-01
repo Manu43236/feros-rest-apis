@@ -1,5 +1,6 @@
 package com.feros.api.dto.request;
 
+import com.feros.api.enums.TripScope;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -57,4 +58,6 @@ public class VehicleRequest {
     // Extra pay for assigned driver
     private Boolean extraPayEnabled;
     private BigDecimal extraPayPerDay;
+
+    private TripScope tripScope;
 }

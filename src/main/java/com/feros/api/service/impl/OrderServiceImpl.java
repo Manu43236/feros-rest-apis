@@ -367,6 +367,18 @@ public class OrderServiceImpl implements OrderService {
                 .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Order not found", HttpStatus.NOT_FOUND));
 
+        // Guard: block cancel if any LR is already in transit or delivered
+        List<com.feros.api.entity.Lr> activeLrs = lrRepository.findByOrderIdAndIsActiveTrue(order.getId());
+        boolean hasNonCancellableLr = activeLrs.stream().anyMatch(lr ->
+                lr.getLrStatus() == LrStatus.IN_TRANSIT
+                || lr.getLrStatus() == LrStatus.WEIGHT_LOADED
+                || lr.getLrStatus() == LrStatus.DELIVERED);
+        if (hasNonCancellableLr) {
+            throw new FerosException(
+                    "Cannot cancel order — one or more LRs are already in transit or delivered",
+                    HttpStatus.BAD_REQUEST);
+        }
+
         // Cancel and release all vehicle allocations
         List<OrderVehicleAllocation> vehicleAllocations =
                 vehicleAllocationRepository.findByOrderIdAndIsActiveTrue(order.getId());
@@ -424,6 +436,12 @@ public class OrderServiceImpl implements OrderService {
         if (vehicleAllocationRepository.existsActiveInProgressAllocation(
                 orderId, request.getVehicleId())) {
             throw new FerosException("Vehicle already assigned to this order", HttpStatus.CONFLICT);
+        }
+
+        if (lrRepository.existsInTransitLrForVehicle(request.getVehicleId())) {
+            throw new FerosException(
+                    "Vehicle is currently on a trip and cannot be assigned to another order",
+                    HttpStatus.CONFLICT);
         }
 
         if (request.getExpectedLoadDate() != null && request.getExpectedDeliveryDate() != null &&
