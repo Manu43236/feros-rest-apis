@@ -22,6 +22,8 @@ public class StaffAllocationResponse {
     private LocalDate actualEndDate;
     private StaffAllocationStatus allocationStatus;
     private String remarks;
+    private Long allocatedById;
+    private String allocatedByName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

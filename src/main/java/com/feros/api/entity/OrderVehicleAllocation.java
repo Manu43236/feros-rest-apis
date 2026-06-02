@@ -6,6 +6,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "order_vehicle_allocations")
@@ -60,4 +61,11 @@ public class OrderVehicleAllocation extends BaseEntity {
 
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "unassigned_by")
+    private User unassignedBy;
+
+    @Column(name = "unassigned_at")
+    private LocalDateTime unassignedAt;
 }

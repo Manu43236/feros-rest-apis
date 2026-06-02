@@ -4,10 +4,10 @@ import com.feros.api.dto.request.AssignStaffRequest;
 import com.feros.api.dto.request.AssignVehicleRequest;
 import com.feros.api.dto.request.OrderRequest;
 import com.feros.api.dto.response.ApiResponse;
-import com.feros.api.dto.response.AssignmentEventResponse;
 import com.feros.api.dto.response.OrderResponse;
 import com.feros.api.dto.response.StaffAllocationResponse;
 import com.feros.api.dto.response.VehicleAllocationResponse;
+import com.feros.api.dto.response.VehicleAssignmentHistoryResponse;
 import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.enums.OrderStatus;
 
@@ -124,11 +124,18 @@ public class OrderController {
                 "Order marked as delivered", orderService.forceDeliverOrder(id)));
     }
 
-    @GetMapping("/assignment-history/vehicle/{vehicleId}")
+    @GetMapping("/vehicle-allocation-history")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
-    public ResponseEntity<ApiResponse<List<AssignmentEventResponse>>> getVehicleAssignmentHistory(
+    public ResponseEntity<ApiResponse<List<VehicleAssignmentHistoryResponse>>> getAllVehicleAllocationHistory() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Vehicle allocation history fetched", orderService.getAllVehicleAllocationHistory()));
+    }
+
+    @GetMapping("/vehicle-allocation-history/vehicle/{vehicleId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<VehicleAssignmentHistoryResponse>>> getVehicleAllocationHistoryByVehicle(
             @PathVariable Long vehicleId) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Assignment history fetched", orderService.getAssignmentHistory(vehicleId)));
+                "Vehicle allocation history fetched", orderService.getVehicleAllocationHistory(vehicleId)));
     }
 }

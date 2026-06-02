@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "vehicle_staff_assignments")
@@ -44,4 +45,11 @@ public class VehicleStaffAssignment extends BaseEntity {
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "unassigned_by")
+    private User unassignedBy;
+
+    @Column(name = "unassigned_at")
+    private LocalDateTime unassignedAt;
 }

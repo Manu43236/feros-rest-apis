@@ -785,16 +785,19 @@ public class VehicleServiceImpl implements VehicleService {
             throw new FerosException("This driver is already assigned to another vehicle", HttpStatus.CONFLICT);
 
         // Close any existing open assignment for this driver
+        User actorForClose = userRepository.findById(SecurityUtil.getCurrentUserId())
+                .orElseThrow(() -> new FerosException("Current user not found", HttpStatus.NOT_FOUND));
         vehicleStaffAssignmentRepository
                 .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(userId, tenantId)
                 .ifPresent(a -> {
                     a.setAssignedTo(TimeUtil.today());
+                    a.setUnassignedBy(actorForClose);
+                    a.setUnassignedAt(LocalDateTime.now());
                     vehicleStaffAssignmentRepository.save(a);
                 });
 
         // Record new assignment
-        User assignedBy = userRepository.findById(SecurityUtil.getCurrentUserId())
-                .orElseThrow(() -> new FerosException("Current user not found", HttpStatus.NOT_FOUND));
+        User assignedBy = actorForClose;
         vehicleStaffAssignmentRepository.save(VehicleStaffAssignment.builder()
                 .tenant(vehicle.getTenant())
                 .vehicle(vehicle)
@@ -867,11 +870,15 @@ public class VehicleServiceImpl implements VehicleService {
 
         // Close open assignment
         if (vehicle.getCurrentDriver() != null) {
+            User actor = userRepository.findById(SecurityUtil.getCurrentUserId())
+                    .orElseThrow(() -> new FerosException("Current user not found", HttpStatus.NOT_FOUND));
             vehicleStaffAssignmentRepository
                     .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(
                             vehicle.getCurrentDriver().getId(), tenantId)
                     .ifPresent(a -> {
                         a.setAssignedTo(TimeUtil.today());
+                        a.setUnassignedBy(actor);
+                        a.setUnassignedAt(LocalDateTime.now());
                         vehicleStaffAssignmentRepository.save(a);
                     });
         }
@@ -907,16 +914,19 @@ public class VehicleServiceImpl implements VehicleService {
             throw new FerosException("This cleaner is already assigned to another vehicle", HttpStatus.CONFLICT);
 
         // Close any existing open assignment for this cleaner
+        User actorForClose = userRepository.findById(SecurityUtil.getCurrentUserId())
+                .orElseThrow(() -> new FerosException("Current user not found", HttpStatus.NOT_FOUND));
         vehicleStaffAssignmentRepository
                 .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(userId, tenantId)
                 .ifPresent(a -> {
                     a.setAssignedTo(TimeUtil.today());
+                    a.setUnassignedBy(actorForClose);
+                    a.setUnassignedAt(LocalDateTime.now());
                     vehicleStaffAssignmentRepository.save(a);
                 });
 
         // Record new assignment
-        User assignedBy = userRepository.findById(SecurityUtil.getCurrentUserId())
-                .orElseThrow(() -> new FerosException("Current user not found", HttpStatus.NOT_FOUND));
+        User assignedBy = actorForClose;
         vehicleStaffAssignmentRepository.save(VehicleStaffAssignment.builder()
                 .tenant(vehicle.getTenant())
                 .vehicle(vehicle)
@@ -946,11 +956,15 @@ public class VehicleServiceImpl implements VehicleService {
 
         // Close open assignment
         if (vehicle.getCurrentCleaner() != null) {
+            User actor = userRepository.findById(SecurityUtil.getCurrentUserId())
+                    .orElseThrow(() -> new FerosException("Current user not found", HttpStatus.NOT_FOUND));
             vehicleStaffAssignmentRepository
                     .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(
                             vehicle.getCurrentCleaner().getId(), tenantId)
                     .ifPresent(a -> {
                         a.setAssignedTo(TimeUtil.today());
+                        a.setUnassignedBy(actor);
+                        a.setUnassignedAt(LocalDateTime.now());
                         vehicleStaffAssignmentRepository.save(a);
                     });
         }
@@ -965,6 +979,29 @@ public class VehicleServiceImpl implements VehicleService {
         if (!activeLrs.isEmpty()) lrRepository.saveAll(activeLrs);
 
         return mapToResponse(vehicle);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public List<com.feros.api.dto.response.StaffAssignmentHistoryResponse> getAllStaffAssignmentHistory() {
+        Long tenantId = getCurrentTenantId();
+        return vehicleStaffAssignmentRepository
+                .findAllByTenantIdOrderByCreatedAtDesc(tenantId)
+                .stream()
+                .map(a -> com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
+                        .id(a.getId())
+                        .vehicleId(a.getVehicle() != null ? a.getVehicle().getId() : null)
+                        .vehicleRegistrationNumber(a.getVehicle() != null ? a.getVehicle().getRegistrationNumber() : null)
+                        .userId(a.getUser() != null ? a.getUser().getId() : null)
+                        .userName(a.getUser() != null ? a.getUser().getName() : null)
+                        .userRole(a.getUser() != null ? a.getUser().getRoles().stream().findFirst()
+                                .map(r -> r.getName().name()).orElse(null) : null)
+                        .assignedByName(a.getAssignedBy() != null ? a.getAssignedBy().getName() : null)
+                        .assignedAt(a.getAssignedFrom())
+                        .unassignedByName(a.getUnassignedBy() != null ? a.getUnassignedBy().getName() : null)
+                        .unassignedAt(a.getUnassignedAt())
+                        .build())
+                .toList();
     }
 
     private Integer computeFinanceMonthsRemaining(Vehicle v) {

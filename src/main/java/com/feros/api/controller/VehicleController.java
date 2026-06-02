@@ -3,6 +3,7 @@ package com.feros.api.controller;
 import com.feros.api.dto.request.VehicleRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
+import com.feros.api.dto.response.StaffAssignmentHistoryResponse;
 import com.feros.api.dto.response.VehicleResponse;
 import com.feros.api.enums.BreakdownDuration;
 import com.feros.api.enums.BreakdownType;
@@ -143,5 +144,12 @@ public class VehicleController {
         private String location;
         private LocalDateTime breakdownDate;
         private String notes;
+    }
+
+    @GetMapping("/staff-assignment-history")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<StaffAssignmentHistoryResponse>>> getAllStaffAssignmentHistory() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Staff assignment history fetched", vehicleService.getAllStaffAssignmentHistory()));
     }
 }

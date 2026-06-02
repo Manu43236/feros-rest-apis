@@ -49,4 +49,16 @@ public interface OrderVehicleAllocationRepository extends JpaRepository<OrderVeh
     boolean existsVehicleConflict(@Param("vehicleId") Long vehicleId,
                                    @Param("loadDate") LocalDate loadDate,
                                    @Param("deliveryDate") LocalDate deliveryDate);
+
+    @Query("SELECT ova FROM OrderVehicleAllocation ova " +
+           "LEFT JOIN FETCH ova.order LEFT JOIN FETCH ova.vehicle " +
+           "LEFT JOIN FETCH ova.allocatedBy LEFT JOIN FETCH ova.unassignedBy " +
+           "WHERE ova.tenant.id = :tenantId ORDER BY ova.createdAt DESC")
+    List<OrderVehicleAllocation> findAllByTenantIdOrderByCreatedAtDesc(@Param("tenantId") Long tenantId);
+
+    @Query("SELECT ova FROM OrderVehicleAllocation ova " +
+           "LEFT JOIN FETCH ova.order LEFT JOIN FETCH ova.vehicle " +
+           "LEFT JOIN FETCH ova.allocatedBy LEFT JOIN FETCH ova.unassignedBy " +
+           "WHERE ova.vehicle.id = :vehicleId AND ova.tenant.id = :tenantId ORDER BY ova.createdAt DESC")
+    List<OrderVehicleAllocation> findByVehicleIdAndTenantIdOrderByCreatedAtDesc(@Param("vehicleId") Long vehicleId, @Param("tenantId") Long tenantId);
 }

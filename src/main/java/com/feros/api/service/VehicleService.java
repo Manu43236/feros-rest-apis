@@ -3,6 +3,7 @@ package com.feros.api.service;
 import com.feros.api.controller.VehicleController.UpdateStatusRequest;
 import com.feros.api.dto.request.VehicleRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
+import com.feros.api.dto.response.StaffAssignmentHistoryResponse;
 import com.feros.api.dto.response.VehicleResponse;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,4 +25,5 @@ public interface VehicleService {
     VehicleResponse unassignDriver(Long vehicleId);
     VehicleResponse assignCleaner(Long vehicleId, Long userId);
     VehicleResponse unassignCleaner(Long vehicleId);
+    List<StaffAssignmentHistoryResponse> getAllStaffAssignmentHistory();
 }
