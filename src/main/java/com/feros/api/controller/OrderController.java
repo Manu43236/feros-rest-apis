@@ -4,11 +4,14 @@ import com.feros.api.dto.request.AssignStaffRequest;
 import com.feros.api.dto.request.AssignVehicleRequest;
 import com.feros.api.dto.request.OrderRequest;
 import com.feros.api.dto.response.ApiResponse;
+import com.feros.api.dto.response.AssignmentEventResponse;
 import com.feros.api.dto.response.OrderResponse;
 import com.feros.api.dto.response.StaffAllocationResponse;
 import com.feros.api.dto.response.VehicleAllocationResponse;
 import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.enums.OrderStatus;
+
+import java.util.List;
 import com.feros.api.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -119,5 +122,13 @@ public class OrderController {
     public ResponseEntity<ApiResponse<OrderResponse>> forceDeliverOrder(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Order marked as delivered", orderService.forceDeliverOrder(id)));
+    }
+
+    @GetMapping("/assignment-history/vehicle/{vehicleId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<AssignmentEventResponse>>> getVehicleAssignmentHistory(
+            @PathVariable Long vehicleId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Assignment history fetched", orderService.getAssignmentHistory(vehicleId)));
     }
 }

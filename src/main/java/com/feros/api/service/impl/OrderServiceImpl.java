@@ -4,9 +4,11 @@ import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.AssignStaffRequest;
 import com.feros.api.dto.request.AssignVehicleRequest;
 import com.feros.api.dto.request.OrderRequest;
+import com.feros.api.dto.response.AssignmentEventResponse;
 import com.feros.api.dto.response.OrderResponse;
 import com.feros.api.dto.response.StaffAllocationResponse;
 import com.feros.api.dto.response.VehicleAllocationResponse;
+import com.feros.api.enums.AssignmentEventType;
 import com.feros.api.entity.*;
 import com.feros.api.entity.master.City;
 import com.feros.api.entity.master.MaterialType;
@@ -61,6 +63,7 @@ public class OrderServiceImpl implements OrderService {
     private final LrRepository lrRepository;
     private final AttendanceRepository attendanceRepository;
     private final NotificationService notificationService;
+    private final AssignmentEventRepository assignmentEventRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -74,6 +77,28 @@ public class OrderServiceImpl implements OrderService {
     private User getCurrentUser() {
         return userRepository.findById(SecurityUtil.getCurrentUserId())
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
+    }
+
+    private void recordEvent(Long tenantId, Long vehicleId, String vehicleReg,
+                             Long orderId, String orderNumber, AssignmentEventType eventType,
+                             String personName, String personRole) {
+        try {
+            User actor = getCurrentUser();
+            assignmentEventRepository.save(AssignmentEvent.builder()
+                    .tenantId(tenantId)
+                    .vehicleId(vehicleId)
+                    .vehicleRegistrationNumber(vehicleReg)
+                    .orderId(orderId)
+                    .orderNumber(orderNumber)
+                    .eventType(eventType)
+                    .personName(personName)
+                    .personRole(personRole)
+                    .performedById(actor.getId())
+                    .performedByName(actor.getName())
+                    .build());
+        } catch (Exception ignored) {
+            // history failure must never block the actual operation
+        }
     }
 
     private void setVehicleStatus(Vehicle vehicle, VehicleStatusType type) {
@@ -499,6 +524,9 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         vehicleAllocationRepository.save(allocation);
+        recordEvent(tenantId, vehicle.getId(), vehicle.getRegistrationNumber(),
+                order.getId(), order.getOrderNumber(),
+                AssignmentEventType.VEHICLE_ASSIGNED, null, null);
 
         // Update vehicle status → ASSIGNED
         setVehicleStatus(vehicle, VehicleStatusType.ASSIGNED);
@@ -593,6 +621,9 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.save(order);
 
         // Cancel and soft-delete vehicle allocation
+        recordEvent(tenantId, allocation.getVehicle().getId(), allocation.getVehicle().getRegistrationNumber(),
+                order.getId(), order.getOrderNumber(),
+                AssignmentEventType.VEHICLE_UNASSIGNED, null, null);
         allocation.setAllocationStatus(VehicleAllocationStatus.CANCELLED);
         allocation.setIsActive(false);
         vehicleAllocationRepository.save(allocation);
@@ -687,6 +718,10 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         OrderStaffAllocation saved = staffAllocationRepository.save(staffAllocation);
+        recordEvent(tenantId, vehicleAllocation.getVehicle().getId(), vehicleAllocation.getVehicle().getRegistrationNumber(),
+                order.getId(), order.getOrderNumber(),
+                AssignmentEventType.STAFF_ASSIGNED,
+                user.getName(), role.getName().name());
 
         // Sync vehicle-level staff assignment
         Vehicle vehicle = vehicleAllocation.getVehicle();
@@ -739,6 +774,12 @@ public class OrderServiceImpl implements OrderService {
         allocation.setAllocationStatus(StaffAllocationStatus.CANCELLED);
         allocation.setIsActive(false);
         staffAllocationRepository.save(allocation);
+        recordEvent(allocation.getTenant().getId(),
+                allocation.getVehicleAllocation().getVehicle().getId(),
+                allocation.getVehicleAllocation().getVehicle().getRegistrationNumber(),
+                allocation.getOrder().getId(), allocation.getOrder().getOrderNumber(),
+                AssignmentEventType.STAFF_UNASSIGNED,
+                allocation.getUser().getName(), allocation.getRole().getName().name());
 
         String vehicleReg = allocation.getVehicleAllocation().getVehicle().getRegistrationNumber();
         notificationService.sendToUser(allocation.getTenant(), allocation.getUser(), NotificationType.TRIP_UNASSIGNED,
@@ -807,6 +848,29 @@ public class OrderServiceImpl implements OrderService {
         return mapToOrderResponse(orderRepository.save(order));
     }
 
+    // ===================== ASSIGNMENT HISTORY =====================
+    @Override
+    public List<AssignmentEventResponse> getAssignmentHistory(Long vehicleId) {
+        Long tenantId = getCurrentTenantId();
+        return assignmentEventRepository
+                .findByVehicleIdAndTenantIdOrderByPerformedAtDesc(vehicleId, tenantId)
+                .stream()
+                .map(e -> AssignmentEventResponse.builder()
+                        .id(e.getId())
+                        .vehicleId(e.getVehicleId())
+                        .vehicleRegistrationNumber(e.getVehicleRegistrationNumber())
+                        .orderId(e.getOrderId())
+                        .orderNumber(e.getOrderNumber())
+                        .eventType(e.getEventType())
+                        .personName(e.getPersonName())
+                        .personRole(e.getPersonRole())
+                        .performedById(e.getPerformedById())
+                        .performedByName(e.getPerformedByName())
+                        .performedAt(e.getPerformedAt())
+                        .build())
+                .toList();
+    }
+
     // ===================== MAPPERS =====================
     private OrderResponse mapToOrderResponse(Order o) {
         List<VehicleAllocationResponse> vehicleAllocations = vehicleAllocationRepository
@@ -873,6 +937,8 @@ public class OrderServiceImpl implements OrderService {
                 .actualDeliveryDate(a.getActualDeliveryDate())
                 .allocationStatus(a.getAllocationStatus())
                 .remarks(a.getRemarks())
+                .allocatedById(a.getAllocatedBy() != null ? a.getAllocatedBy().getId() : null)
+                .allocatedByName(a.getAllocatedBy() != null ? a.getAllocatedBy().getName() : null)
                 .currentDriverId(a.getVehicle().getCurrentDriver() != null ? a.getVehicle().getCurrentDriver().getId() : null)
                 .currentDriverName(a.getVehicle().getCurrentDriver() != null ? a.getVehicle().getCurrentDriver().getName() : null)
                 .currentDriverPhone(a.getVehicle().getCurrentDriver() != null ? a.getVehicle().getCurrentDriver().getPhone() : null)
