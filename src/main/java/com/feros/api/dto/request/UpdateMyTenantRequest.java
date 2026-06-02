@@ -47,4 +47,6 @@ public class UpdateMyTenantRequest {
 
     @Email(message = "Invalid owner email format")
     private String ownerEmail;
+
+    private String invoiceDescription;
 }

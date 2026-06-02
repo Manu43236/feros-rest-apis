@@ -56,6 +56,7 @@ public class InvoiceResponse {
     private String tenantBranchName;
     private String tenantAccountHolderName;
     private String transportHsnSac;
+    private String tenantInvoiceDescription;
 
     // Client details (for print)
     private String clientGstin;

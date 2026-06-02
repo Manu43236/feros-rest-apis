@@ -424,6 +424,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .tenantBranchName(t.getBranchName())
                 .tenantAccountHolderName(t.getAccountHolderName())
                 .transportHsnSac(t.getTransportHsnSac() != null ? t.getTransportHsnSac() : "996791")
+                .tenantInvoiceDescription(t.getInvoiceDescription())
                 // Client print details
                 .clientGstin(cl.getGstin())
                 .clientAddress(cl.getAddress())

@@ -470,6 +470,7 @@ public class TenantServiceImpl implements TenantService {
         tenant.setOwnerName(request.getOwnerName());
         tenant.setOwnerPhone(request.getOwnerPhone());
         tenant.setOwnerEmail(request.getOwnerEmail());
+        tenant.setInvoiceDescription(request.getInvoiceDescription());
 
         return mapToResponse(tenantRepository.save(tenant));
     }
@@ -585,6 +586,7 @@ public class TenantServiceImpl implements TenantService {
                 .ownerName(tenant.getOwnerName())
                 .ownerPhone(tenant.getOwnerPhone())
                 .ownerEmail(tenant.getOwnerEmail())
+                .invoiceDescription(tenant.getInvoiceDescription())
                 .prefix(tenant.getPrefix())
                 .logoUrl(tenant.getLogoUrl() != null ? s3Service.getPublicUrl(tenant.getLogoUrl()) : null)
                 .lorryCount(tenant.getLorryCount())
