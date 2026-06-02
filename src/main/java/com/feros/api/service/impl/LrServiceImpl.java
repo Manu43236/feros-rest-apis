@@ -173,13 +173,6 @@ public class LrServiceImpl implements LrService {
         if (request.getEwayBillDate() != null) lr.setEwayBillDate(request.getEwayBillDate());
         if (request.getEwayBillValidUpto() != null) lr.setEwayBillValidUpto(request.getEwayBillValidUpto());
         if (request.getDeliveredWeight() != null) {
-            java.math.BigDecimal effectiveLoaded = request.getLoadedWeight() != null
-                    ? request.getLoadedWeight() : lr.getLoadedWeight();
-            if (effectiveLoaded != null && request.getDeliveredWeight().compareTo(effectiveLoaded) > 0) {
-                throw new FerosException(
-                    "Delivered weight (" + request.getDeliveredWeight() + "T) cannot exceed loaded weight (" + effectiveLoaded + "T)",
-                    HttpStatus.BAD_REQUEST);
-            }
             lr.setDeliveredWeight(request.getDeliveredWeight());
         }
         if (request.getDeliveredAt() != null) lr.setDeliveredAt(request.getDeliveredAt());
