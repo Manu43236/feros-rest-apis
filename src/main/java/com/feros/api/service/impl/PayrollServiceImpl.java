@@ -23,6 +23,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -308,9 +312,12 @@ public class PayrollServiceImpl implements PayrollService {
     }
 
     @Override
-    public List<PayrollResponse> getAllPayrolls() {
-        return payrollRepository.findByTenantIdAndIsActiveTrue(getCurrentTenantId())
-                .stream().map(this::mapToPayrollResponse).toList();
+    public Page<PayrollResponse> getAllPayrolls(int page, int size, String search) {
+        Long tenantId = getCurrentTenantId();
+        Pageable pageable = PageRequest.of(page, size);
+        String searchParam = (search != null && !search.isBlank()) ? search.trim() : null;
+        return payrollRepository.findAllPaged(tenantId, searchParam, pageable)
+                .map(this::mapToPayrollResponse);
     }
 
     @Override

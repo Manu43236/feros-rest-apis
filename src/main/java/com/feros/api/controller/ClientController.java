@@ -8,12 +8,11 @@ import com.feros.api.dto.response.ClientResponse;
 import com.feros.api.service.ClientService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/clients")
@@ -24,9 +23,12 @@ public class ClientController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
-    public ResponseEntity<ApiResponse<List<ClientResponse>>> getAllClients() {
+    public ResponseEntity<ApiResponse<Page<ClientResponse>>> getAllClients(
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false)    String search) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Clients fetched successfully", clientService.getAllClients()));
+                "Clients fetched successfully", clientService.getAllClients(page, size, search)));
     }
 
     @GetMapping("/{id}")

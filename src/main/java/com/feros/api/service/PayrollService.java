@@ -6,6 +6,8 @@ import com.feros.api.dto.request.SalaryAdvanceRequest;
 import com.feros.api.dto.response.PayrollResponse;
 import com.feros.api.dto.response.SalaryAdvanceResponse;
 
+import org.springframework.data.domain.Page;
+
 import java.util.List;
 
 public interface PayrollService {
@@ -21,7 +23,7 @@ public interface PayrollService {
 
     PayrollResponse getPayrollById(Long id);
 
-    List<PayrollResponse> getAllPayrolls();
+    Page<PayrollResponse> getAllPayrolls(int page, int size, String search);
 
     List<PayrollResponse> getPayrollsByUser(Long userId);
 

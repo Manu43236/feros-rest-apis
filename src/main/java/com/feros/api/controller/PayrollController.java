@@ -17,6 +17,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.data.domain.Page;
+
 import java.util.List;
 
 @RestController
@@ -72,9 +74,12 @@ public class PayrollController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
-    public ResponseEntity<ApiResponse<List<PayrollResponse>>> getAllPayrolls() {
+    public ResponseEntity<ApiResponse<Page<PayrollResponse>>> getAllPayrolls(
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false)    String search) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Payrolls fetched successfully", payrollService.getAllPayrolls()));
+                "Payrolls fetched successfully", payrollService.getAllPayrolls(page, size, search)));
     }
 
     @GetMapping("/{id}")

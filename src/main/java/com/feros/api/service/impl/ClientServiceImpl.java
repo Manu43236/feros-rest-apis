@@ -13,6 +13,9 @@ import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -93,9 +96,12 @@ public class ClientServiceImpl implements ClientService {
     }
 
     @Override
-    public List<ClientResponse> getAllClients() {
-        return clientRepository.findByTenantId(getCurrentTenantId())
-                .stream().map(this::mapToResponse).toList();
+    public Page<ClientResponse> getAllClients(int page, int size, String search) {
+        Long tenantId = getCurrentTenantId();
+        Pageable pageable = PageRequest.of(page, size);
+        String searchParam = (search != null && !search.isBlank()) ? search.trim() : null;
+        return clientRepository.findAllPaged(tenantId, searchParam, pageable)
+                .map(this::mapToResponse);
     }
 
     @Override

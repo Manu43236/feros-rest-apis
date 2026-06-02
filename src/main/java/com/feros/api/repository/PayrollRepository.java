@@ -1,6 +1,8 @@
 package com.feros.api.repository;
 
 import com.feros.api.entity.Payroll;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +15,18 @@ import java.util.Optional;
 @Repository
 public interface PayrollRepository extends JpaRepository<Payroll, Long> {
     List<Payroll> findByTenantIdAndIsActiveTrue(Long tenantId);
+
+    @Query("""
+        SELECT p FROM Payroll p
+        WHERE p.tenant.id = :tenantId AND p.isActive = true
+        AND (:search IS NULL
+             OR LOWER(p.user.name) LIKE LOWER(CONCAT('%', :search, '%')))
+        ORDER BY p.payCycleStartDate DESC, p.id DESC
+    """)
+    Page<Payroll> findAllPaged(
+            @Param("tenantId") Long tenantId,
+            @Param("search") String search,
+            Pageable pageable);
 
     List<Payroll> findByUserIdAndTenantIdAndIsActiveTrue(Long userId, Long tenantId);
 
