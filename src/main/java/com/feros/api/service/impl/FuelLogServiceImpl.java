@@ -3,11 +3,16 @@ package com.feros.api.service.impl;
 import com.feros.api.dto.request.FuelLogRequest;
 import com.feros.api.dto.response.FuelLogResponse;
 import com.feros.api.entity.*;
+import com.feros.api.enums.FuelPaymentMode;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.FuelLogService;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -111,11 +116,17 @@ public class FuelLogServiceImpl implements FuelLogService {
     }
 
     @Override
-    public List<FuelLogResponse> getAll() {
+    public Page<FuelLogResponse> getAll(int page, int size, Long vehicleId, String paymentMode, Boolean fullTank, String search) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        return fuelLogRepository
-                .findByTenantIdAndIsActiveTrueOrderByFillDateDescIdDesc(tenantId)
-                .stream().map(this::toResponse).toList();
+        Pageable pageable = PageRequest.of(page, size,
+                Sort.by(Sort.Direction.DESC, "fillDate").and(Sort.by(Sort.Direction.DESC, "id")));
+        FuelPaymentMode pmEnum = null;
+        if (paymentMode != null && !paymentMode.isBlank()) {
+            try { pmEnum = FuelPaymentMode.valueOf(paymentMode); } catch (IllegalArgumentException ignored) {}
+        }
+        String searchParam = (search != null && !search.isBlank()) ? search.trim() : null;
+        return fuelLogRepository.findAllPaged(tenantId, vehicleId, pmEnum, fullTank, searchParam, pageable)
+                .map(this::toResponse);
     }
 
     @Override

@@ -5,10 +5,9 @@ import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.FuelLogResponse;
 import com.feros.api.service.FuelLogService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/fuel-logs")
@@ -23,12 +22,15 @@ public class FuelLogController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<FuelLogResponse>>> getAll(
-            @RequestParam(required = false) Long vehicleId) {
-        List<FuelLogResponse> result = vehicleId != null
-                ? fuelLogService.getByVehicle(vehicleId)
-                : fuelLogService.getAll();
-        return ResponseEntity.ok(ApiResponse.success("Fuel logs fetched", result));
+    public ResponseEntity<ApiResponse<Page<FuelLogResponse>>> getAll(
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false)    String search,
+            @RequestParam(required = false)    String paymentMode,
+            @RequestParam(required = false)    Boolean fullTank,
+            @RequestParam(required = false)    Long vehicleId) {
+        return ResponseEntity.ok(ApiResponse.success("Fuel logs fetched",
+                fuelLogService.getAll(page, size, vehicleId, paymentMode, fullTank, search)));
     }
 
     @GetMapping("/{id}")
