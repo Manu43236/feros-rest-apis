@@ -21,4 +21,15 @@ public interface VehicleMeterReadingRepository extends JpaRepository<VehicleMete
 
     java.util.Optional<VehicleMeterReading> findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
             Long lrId, com.feros.api.enums.MeterReadingType readingType);
+
+    @Query("""
+        SELECT m FROM VehicleMeterReading m
+        WHERE m.tenant.id = :tenantId AND m.isActive = true
+        AND m.recordedAt >= :startDate AND m.recordedAt < :endDate
+        ORDER BY m.vehicle.id, m.recordedAt
+    """)
+    List<VehicleMeterReading> findByTenantIdAndDateRange(
+            @Param("tenantId") Long tenantId,
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate);
 }

@@ -66,4 +66,15 @@ public interface VehicleFuelLogRepository extends JpaRepository<VehicleFuelLog, 
     Optional<VehicleFuelLog> findPreviousFullTankFill(
             @Param("vehicleId") Long vehicleId,
             @Param("currentId") Long currentId);
+
+    @Query("""
+        SELECT f FROM VehicleFuelLog f
+        WHERE f.tenant.id = :tenantId AND f.isActive = true
+        AND f.fillDate >= :startDate AND f.fillDate < :endDate
+        ORDER BY f.vehicle.id, f.fillDate
+    """)
+    List<VehicleFuelLog> findByTenantIdAndDateRange(
+            @Param("tenantId") Long tenantId,
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate);
 }
