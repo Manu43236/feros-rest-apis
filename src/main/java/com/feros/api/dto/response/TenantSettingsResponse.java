@@ -26,4 +26,5 @@ public class TenantSettingsResponse {
     private Boolean requireTyreApproval;
     private Boolean requireSparePartApproval;
     private java.math.BigDecimal serviceGstRate;
+    private String invoiceDescription;
 }

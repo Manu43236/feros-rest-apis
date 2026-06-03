@@ -19,4 +19,5 @@ public class TenantSettingsUpdateRequest {
     private Boolean requireTyreApproval;
     private Boolean requireSparePartApproval;
     private BigDecimal serviceGstRate;
+    private String invoiceDescription;
 }

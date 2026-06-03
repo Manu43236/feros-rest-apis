@@ -88,9 +88,6 @@ public class Tenant extends BaseEntity {
     @Column(name = "transport_hsn_sac", length = 20)
     private String transportHsnSac;
 
-    @Column(name = "invoice_description", columnDefinition = "TEXT")
-    private String invoiceDescription;
-
     @Column(name = "prefix", length = 20)
     private String prefix;
 

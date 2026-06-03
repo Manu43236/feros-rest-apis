@@ -33,7 +33,6 @@ public class TenantResponse {
     private String ownerName;
     private String ownerPhone;
     private String ownerEmail;
-    private String invoiceDescription;
     private String prefix;
     private String logoUrl;
     private Integer lorryCount;

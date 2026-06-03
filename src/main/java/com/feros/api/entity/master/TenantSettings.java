@@ -83,4 +83,7 @@ public class TenantSettings extends BaseEntity {
     @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+    @Column(name = "invoice_description", columnDefinition = "TEXT")
+    private String invoiceDescription;
 }

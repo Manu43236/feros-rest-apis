@@ -13,6 +13,7 @@ import com.feros.api.enums.BillingOn;
 import com.feros.api.enums.FreightRateType;
 import com.feros.api.enums.InvoiceStatus;
 import com.feros.api.exception.FerosException;
+import com.feros.api.entity.master.TenantSettings;
 import com.feros.api.repository.*;
 import com.feros.api.service.InvoiceService;
 import com.feros.api.service.S3Service;
@@ -45,6 +46,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final LrChargeRepository lrChargeRepository;
     private final LrCheckpostRepository lrCheckpostRepository;
     private final UserRepository userRepository;
+    private final TenantSettingsRepository tenantSettingsRepository;
     private final S3Service s3Service;
 
     private Long getCurrentTenantId() {
@@ -392,6 +394,7 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         com.feros.api.entity.Tenant t  = inv.getTenant();
         com.feros.api.entity.Client  cl = inv.getClient();
+        TenantSettings settings = tenantSettingsRepository.findByTenantId(t.getId()).orElse(null);
 
         return InvoiceResponse.builder()
                 .id(inv.getId())
@@ -424,7 +427,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .tenantBranchName(t.getBranchName())
                 .tenantAccountHolderName(t.getAccountHolderName())
                 .transportHsnSac(t.getTransportHsnSac() != null ? t.getTransportHsnSac() : "996791")
-                .tenantInvoiceDescription(t.getInvoiceDescription())
+                .tenantInvoiceDescription(settings != null ? settings.getInvoiceDescription() : null)
                 // Client print details
                 .clientGstin(cl.getGstin())
                 .clientAddress(cl.getAddress())

@@ -470,7 +470,6 @@ public class TenantServiceImpl implements TenantService {
         tenant.setOwnerName(request.getOwnerName());
         tenant.setOwnerPhone(request.getOwnerPhone());
         tenant.setOwnerEmail(request.getOwnerEmail());
-        tenant.setInvoiceDescription(request.getInvoiceDescription());
 
         return mapToResponse(tenantRepository.save(tenant));
     }
@@ -503,6 +502,7 @@ public class TenantServiceImpl implements TenantService {
         if (request.getRequireTyreApproval() != null)            settings.setRequireTyreApproval(request.getRequireTyreApproval());
         if (request.getRequireSparePartApproval() != null)       settings.setRequireSparePartApproval(request.getRequireSparePartApproval());
         if (request.getServiceGstRate() != null)                 settings.setServiceGstRate(request.getServiceGstRate());
+        if (request.getInvoiceDescription() != null)             settings.setInvoiceDescription(request.getInvoiceDescription());
 
         return mapSettingsToResponse(tenantSettingsRepository.save(settings));
     }
@@ -523,6 +523,7 @@ public class TenantServiceImpl implements TenantService {
                 .requireTyreApproval(s.getRequireTyreApproval())
                 .requireSparePartApproval(s.getRequireSparePartApproval())
                 .serviceGstRate(s.getServiceGstRate())
+                .invoiceDescription(s.getInvoiceDescription())
                 .build();
     }
 
@@ -586,7 +587,6 @@ public class TenantServiceImpl implements TenantService {
                 .ownerName(tenant.getOwnerName())
                 .ownerPhone(tenant.getOwnerPhone())
                 .ownerEmail(tenant.getOwnerEmail())
-                .invoiceDescription(tenant.getInvoiceDescription())
                 .prefix(tenant.getPrefix())
                 .logoUrl(tenant.getLogoUrl() != null ? s3Service.getPublicUrl(tenant.getLogoUrl()) : null)
                 .lorryCount(tenant.getLorryCount())
