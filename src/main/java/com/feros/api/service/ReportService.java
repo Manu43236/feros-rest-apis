@@ -20,4 +20,10 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
     List<AttendanceDailyRow> getAttendanceDaily(LocalDate startDate, LocalDate endDate);
 
     List<AttendanceSummaryRow> getAttendanceSummary(LocalDate startDate, LocalDate endDate);
+
+    List<LrRegisterRow> getLrRegister(LocalDate startDate, LocalDate endDate, Long clientId);
+
+    List<WeightDiscrepancyRow> getWeightDiscrepancy(LocalDate startDate, LocalDate endDate);
+
+    List<DelayedDeliveryRow> getDelayedDeliveries(LocalDate startDate, LocalDate endDate, int thresholdDays);
 }

@@ -218,6 +218,102 @@ public class ReportController {
                 "Attendance Summary — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── LR Register ──────────────────────────────────────────────────────────────
+
+    @GetMapping("/trips/lr-register")
+    public ResponseEntity<ApiResponse<List<LrRegisterRow>>> getLrRegister(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(required = false) Long clientId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "LR register fetched", reportService.getLrRegister(startDate, endDate, clientId)));
+    }
+
+    @GetMapping("/trips/lr-register/export")
+    public ResponseEntity<byte[]> exportLrRegister(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(required = false) Long clientId,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<LrRegisterRow> rows = reportService.getLrRegister(startDate, endDate, clientId);
+        String[] headers = {"LR No.", "LR Date", "Order No.", "Client", "Vehicle", "Driver", "Cleaner",
+                "From City", "From State", "To City", "To State", "Material",
+                "Alloc. Wt (kg)", "Loaded Wt (kg)", "Delivered Wt (kg)", "Variance (kg)", "Overloaded",
+                "Loaded At", "Delivered At", "E-Way Bill No.", "E-Way Date", "E-Way Valid Upto", "Status", "Remarks"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getLrNumber(), r.getLrDate().toString(), r.getOrderNumber(), r.getClientName(),
+                r.getVehicleRegistrationNumber(), r.getDriverName(), r.getCleanerName(),
+                r.getFromCity(), r.getFromState(), r.getToCity(), r.getToState(), r.getMaterialType(),
+                safe(r.getAllocatedWeight()), safe(r.getLoadedWeight()), safe(r.getDeliveredWeight()),
+                safe(r.getWeightVariance()), r.getIsOverloaded() != null && r.getIsOverloaded() ? "Yes" : "No",
+                r.getLoadedAt() != null ? r.getLoadedAt().toString() : "—",
+                r.getDeliveredAt() != null ? r.getDeliveredAt().toString() : "—",
+                safe(r.getEwayBillNumber()), r.getEwayBillDate() != null ? r.getEwayBillDate().toString() : "—",
+                r.getEwayBillValidUpto() != null ? r.getEwayBillValidUpto().toString() : "—",
+                r.getLrStatus(), safe(r.getRemarks())
+        }).toList();
+        return export("lr-register-" + startDate + "-" + endDate,
+                "LR Register — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Weight Discrepancy ────────────────────────────────────────────────────────
+
+    @GetMapping("/trips/weight-discrepancy")
+    public ResponseEntity<ApiResponse<List<WeightDiscrepancyRow>>> getWeightDiscrepancy(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Weight discrepancy fetched", reportService.getWeightDiscrepancy(startDate, endDate)));
+    }
+
+    @GetMapping("/trips/weight-discrepancy/export")
+    public ResponseEntity<byte[]> exportWeightDiscrepancy(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<WeightDiscrepancyRow> rows = reportService.getWeightDiscrepancy(startDate, endDate);
+        String[] headers = {"LR No.", "LR Date", "Client", "Vehicle", "From", "To", "Material",
+                "Alloc. Wt (kg)", "Loaded Wt (kg)", "Delivered Wt (kg)", "Variance (kg)", "Overloaded", "Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getLrNumber(), r.getLrDate().toString(), r.getClientName(),
+                r.getVehicleRegistrationNumber(), r.getFromCity(), r.getToCity(), r.getMaterialType(),
+                safe(r.getAllocatedWeight()), safe(r.getLoadedWeight()), safe(r.getDeliveredWeight()),
+                safe(r.getWeightVariance()), r.getIsOverloaded() != null && r.getIsOverloaded() ? "Yes" : "No",
+                r.getLrStatus()
+        }).toList();
+        return export("weight-discrepancy-" + startDate + "-" + endDate,
+                "Weight Discrepancy — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Delayed Deliveries ────────────────────────────────────────────────────────
+
+    @GetMapping("/trips/delayed-deliveries")
+    public ResponseEntity<ApiResponse<List<DelayedDeliveryRow>>> getDelayedDeliveries(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "3") int thresholdDays) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Delayed deliveries fetched", reportService.getDelayedDeliveries(startDate, endDate, thresholdDays)));
+    }
+
+    @GetMapping("/trips/delayed-deliveries/export")
+    public ResponseEntity<byte[]> exportDelayedDeliveries(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "3") int thresholdDays,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<DelayedDeliveryRow> rows = reportService.getDelayedDeliveries(startDate, endDate, thresholdDays);
+        String[] headers = {"LR No.", "LR Date", "Client", "Vehicle", "Driver", "From", "To", "Material", "Loaded At", "Days in Transit", "Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getLrNumber(), r.getLrDate().toString(), r.getClientName(),
+                r.getVehicleRegistrationNumber(), r.getDriverName(),
+                r.getFromCity(), r.getToCity(), r.getMaterialType(),
+                r.getLoadedAt().toString(), String.valueOf(r.getDaysInTransit()), r.getLrStatus()
+        }).toList();
+        return export("delayed-deliveries-" + startDate + "-" + endDate,
+                "Delayed Deliveries — " + startDate + " to " + endDate, headers, data, format);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private ResponseEntity<byte[]> export(String filename, String title,

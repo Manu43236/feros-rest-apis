@@ -2,6 +2,7 @@ package com.feros.api.service.impl;
 
 import com.feros.api.dto.response.report.*;
 import com.feros.api.entity.*;
+import com.feros.api.enums.LrStatus;
 import com.feros.api.repository.*;
 import com.feros.api.service.ReportService;
 import com.feros.api.util.SecurityUtil;
@@ -31,6 +32,7 @@ public class ReportServiceImpl implements ReportService {
     private final VehicleDocumentRepository documentRepository;
     private final VehicleServiceRepository vehicleServiceRepository;
     private final AttendanceRepository attendanceRepository;
+    private final LrRepository lrRepository;
 
     // ── 1. Fleet Status ────────────────────────────────────────────────────────
 
@@ -278,6 +280,114 @@ public class ReportServiceImpl implements ReportService {
                     .presentPercent(pct)
                     .build();
         }).sorted(Comparator.comparing(AttendanceSummaryRow::getEmployeeName)).toList();
+    }
+
+    // ── 9. LR Register ────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<LrRegisterRow> getLrRegister(LocalDate startDate, LocalDate endDate, Long clientId) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<Lr> lrs = clientId != null
+                ? lrRepository.findByTenantIdAndDateRangeAndClient(tenantId, startDate, endDate, clientId)
+                : lrRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+
+        return lrs.stream().map(l -> LrRegisterRow.builder()
+                .lrId(l.getId())
+                .lrNumber(l.getLrNumber())
+                .lrDate(l.getLrDate())
+                .orderNumber(l.getOrder().getOrderNumber())
+                .clientName(l.getOrder().getClient().getClientName())
+                .vehicleRegistrationNumber(l.getVehicleAllocation().getVehicle().getRegistrationNumber())
+                .driverName(l.getDriver() != null ? l.getDriver().getName() : "—")
+                .cleanerName(l.getCleaner() != null ? l.getCleaner().getName() : "—")
+                .fromCity(l.getOrder().getSourceCity() != null ? l.getOrder().getSourceCity().getName() : "—")
+                .fromState(l.getOrder().getSourceState() != null ? l.getOrder().getSourceState().getName() : "—")
+                .toCity(l.getOrder().getDestinationCity() != null ? l.getOrder().getDestinationCity().getName() : "—")
+                .toState(l.getOrder().getDestinationState() != null ? l.getOrder().getDestinationState().getName() : "—")
+                .materialType(l.getOrder().getMaterialType() != null ? l.getOrder().getMaterialType().getName() : "—")
+                .allocatedWeight(l.getAllocatedWeight())
+                .loadedWeight(l.getLoadedWeight())
+                .deliveredWeight(l.getDeliveredWeight())
+                .weightVariance(l.getWeightVariance())
+                .isOverloaded(l.getIsOverloaded())
+                .loadedAt(l.getLoadedAt())
+                .deliveredAt(l.getDeliveredAt())
+                .ewayBillNumber(l.getEwayBillNumber())
+                .ewayBillDate(l.getEwayBillDate())
+                .ewayBillValidUpto(l.getEwayBillValidUpto())
+                .lrStatus(l.getLrStatus().name())
+                .remarks(l.getRemarks())
+                .build()).toList();
+    }
+
+    // ── 10. Weight Discrepancy ────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WeightDiscrepancyRow> getWeightDiscrepancy(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return lrRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate).stream()
+                .filter(l -> (l.getWeightVariance() != null && l.getWeightVariance().compareTo(BigDecimal.ZERO) != 0)
+                        || Boolean.TRUE.equals(l.getIsOverloaded()))
+                .map(l -> WeightDiscrepancyRow.builder()
+                        .lrId(l.getId())
+                        .lrNumber(l.getLrNumber())
+                        .lrDate(l.getLrDate())
+                        .clientName(l.getOrder().getClient().getClientName())
+                        .vehicleRegistrationNumber(l.getVehicleAllocation().getVehicle().getRegistrationNumber())
+                        .fromCity(l.getOrder().getSourceCity() != null ? l.getOrder().getSourceCity().getName() : "—")
+                        .toCity(l.getOrder().getDestinationCity() != null ? l.getOrder().getDestinationCity().getName() : "—")
+                        .materialType(l.getOrder().getMaterialType() != null ? l.getOrder().getMaterialType().getName() : "—")
+                        .allocatedWeight(l.getAllocatedWeight())
+                        .loadedWeight(l.getLoadedWeight())
+                        .deliveredWeight(l.getDeliveredWeight())
+                        .weightVariance(l.getWeightVariance())
+                        .isOverloaded(l.getIsOverloaded())
+                        .lrStatus(l.getLrStatus().name())
+                        .build())
+                .toList();
+    }
+
+    // ── 11. Delayed Deliveries ────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DelayedDeliveryRow> getDelayedDeliveries(LocalDate startDate, LocalDate endDate, int thresholdDays) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDateTime now = LocalDateTime.now();
+
+        return lrRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate).stream()
+                .filter(l -> l.getLrStatus() == LrStatus.IN_TRANSIT || l.getLrStatus() == LrStatus.DELIVERED)
+                .filter(l -> l.getLoadedAt() != null)
+                .filter(l -> {
+                    LocalDateTime endTime = l.getDeliveredAt() != null ? l.getDeliveredAt() : now;
+                    return java.time.temporal.ChronoUnit.DAYS.between(l.getLoadedAt(), endTime) >= thresholdDays;
+                })
+                .map(l -> {
+                    LocalDateTime endTime = l.getDeliveredAt() != null ? l.getDeliveredAt() : now;
+                    long days = java.time.temporal.ChronoUnit.DAYS.between(l.getLoadedAt(), endTime);
+                    return buildDelayedRow(l, days);
+                })
+                .sorted(Comparator.comparingLong(DelayedDeliveryRow::getDaysInTransit).reversed())
+                .toList();
+    }
+
+    private DelayedDeliveryRow buildDelayedRow(Lr l, long days) {
+        return DelayedDeliveryRow.builder()
+                .lrId(l.getId())
+                .lrNumber(l.getLrNumber())
+                .lrDate(l.getLrDate())
+                .clientName(l.getOrder().getClient().getClientName())
+                .vehicleRegistrationNumber(l.getVehicleAllocation().getVehicle().getRegistrationNumber())
+                .driverName(l.getDriver() != null ? l.getDriver().getName() : "—")
+                .fromCity(l.getOrder().getSourceCity() != null ? l.getOrder().getSourceCity().getName() : "—")
+                .toCity(l.getOrder().getDestinationCity() != null ? l.getOrder().getDestinationCity().getName() : "—")
+                .materialType(l.getOrder().getMaterialType() != null ? l.getOrder().getMaterialType().getName() : "—")
+                .loadedAt(l.getLoadedAt())
+                .daysInTransit(days)
+                .lrStatus(l.getLrStatus().name())
+                .build();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────────
