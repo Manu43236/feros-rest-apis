@@ -321,7 +321,7 @@ public class ReportServiceImpl implements ReportService {
                 .ewayBillNumber(l.getEwayBillNumber())
                 .ewayBillDate(l.getEwayBillDate())
                 .ewayBillValidUpto(l.getEwayBillValidUpto())
-                .lrStatus(l.getLrStatus().name())
+                .lrStatus(l.getLrStatus() != null ? l.getLrStatus().name() : "—")
                 .remarks(l.getRemarks())
                 .build()).toList();
     }
@@ -349,7 +349,7 @@ public class ReportServiceImpl implements ReportService {
                         .deliveredWeight(l.getDeliveredWeight())
                         .weightVariance(l.getWeightVariance())
                         .isOverloaded(l.getIsOverloaded())
-                        .lrStatus(l.getLrStatus().name())
+                        .lrStatus(l.getLrStatus() != null ? l.getLrStatus().name() : "—")
                         .build())
                 .toList();
     }
@@ -404,8 +404,8 @@ public class ReportServiceImpl implements ReportService {
                 .freightRateType(o.getFreightRateType() != null ? o.getFreightRateType().name() : "—")
                 .freightRate(o.getFreightRate())
                 .totalFreightAmount(o.getTotalFreightAmount())
-                .orderStatus(o.getOrderStatus().name())
-                .orderPaymentStatus(o.getOrderPaymentStatus().name())
+                .orderStatus(o.getOrderStatus() != null ? o.getOrderStatus().name() : "—")
+                .orderPaymentStatus(o.getOrderPaymentStatus() != null ? o.getOrderPaymentStatus().name() : "—")
                 .build()).toList();
     }
 
@@ -436,7 +436,7 @@ public class ReportServiceImpl implements ReportService {
                             .totalWeight(o.getTotalWeight())
                             .totalWeightFulfilled(o.getTotalWeightFulfilled())
                             .pendingWeight(pending)
-                            .orderStatus(o.getOrderStatus().name())
+                            .orderStatus(o.getOrderStatus() != null ? o.getOrderStatus().name() : "—")
                             .build();
                 })
                 .sorted(Comparator.comparing(r -> r.getOrderDate() != null ? r.getOrderDate() : java.time.LocalDate.MIN))
@@ -499,7 +499,7 @@ public class ReportServiceImpl implements ReportService {
                             .toCity(o.getDestinationCity() != null ? o.getDestinationCity().getName() : "—")
                             .totalWeight(o.getTotalWeight())
                             .totalWeightFulfilled(o.getTotalWeightFulfilled())
-                            .orderStatus(o.getOrderStatus().name())
+                            .orderStatus(o.getOrderStatus() != null ? o.getOrderStatus().name() : "—")
                             .build();
                 })
                 .sorted(Comparator.comparingLong(OverdueOrderRow::getDaysOverdue).reversed())
@@ -532,7 +532,7 @@ public class ReportServiceImpl implements ReportService {
                             .totalWeightFulfilled(fulfilled)
                             .pendingWeight(pending)
                             .fulfillmentPercent(pct)
-                            .orderStatus(o.getOrderStatus().name())
+                            .orderStatus(o.getOrderStatus() != null ? o.getOrderStatus().name() : "—")
                             .build();
                 })
                 .sorted(Comparator.comparing(WeightFulfillmentRow::getFulfillmentPercent))
@@ -582,8 +582,8 @@ public class ReportServiceImpl implements ReportService {
                         .orderDate(o.getOrderDate())
                         .clientName(o.getClient().getClientName())
                         .totalFreightAmount(o.getTotalFreightAmount())
-                        .orderStatus(o.getOrderStatus().name())
-                        .orderPaymentStatus(o.getOrderPaymentStatus().name())
+                        .orderStatus(o.getOrderStatus() != null ? o.getOrderStatus().name() : "—")
+                        .orderPaymentStatus(o.getOrderPaymentStatus() != null ? o.getOrderPaymentStatus().name() : "—")
                         .build())
                 .sorted(Comparator.comparing(OrderPaymentStatusRow::getClientName))
                 .toList();
@@ -662,7 +662,7 @@ public class ReportServiceImpl implements ReportService {
                 .materialType(l.getOrder().getMaterialType() != null ? l.getOrder().getMaterialType().getName() : "—")
                 .loadedAt(l.getLoadedAt())
                 .daysInTransit(days)
-                .lrStatus(l.getLrStatus().name())
+                .lrStatus(l.getLrStatus() != null ? l.getLrStatus().name() : "—")
                 .build();
     }
 
