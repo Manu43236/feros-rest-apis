@@ -3,6 +3,8 @@ package com.feros.api.service.impl;
 import com.feros.api.dto.response.report.*;
 import com.feros.api.entity.*;
 import com.feros.api.enums.LrStatus;
+import com.feros.api.enums.OrderStatus;
+import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.entity.Client;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.repository.*;
@@ -35,6 +37,7 @@ public class ReportServiceImpl implements ReportService {
     private final VehicleServiceRepository vehicleServiceRepository;
     private final AttendanceRepository attendanceRepository;
     private final LrRepository lrRepository;
+    private final OrderRepository orderRepository;
 
     // ── 1. Fleet Status ────────────────────────────────────────────────────────
 
@@ -372,6 +375,217 @@ public class ReportServiceImpl implements ReportService {
                     return buildDelayedRow(l, days);
                 })
                 .sorted(Comparator.comparingLong(DelayedDeliveryRow::getDaysInTransit).reversed())
+                .toList();
+    }
+
+    // ── 14. Order Register ────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderRegisterRow> getOrderRegister(LocalDate startDate, LocalDate endDate, String status) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<com.feros.api.entity.Order> orders = status != null
+                ? orderRepository.findByTenantIdAndDateRangeAndStatus(tenantId, startDate, endDate, OrderStatus.valueOf(status))
+                : orderRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+
+        return orders.stream().map(o -> OrderRegisterRow.builder()
+                .orderId(o.getId())
+                .orderNumber(o.getOrderNumber())
+                .orderDate(o.getOrderDate())
+                .expectedDeliveryDate(o.getExpectedDeliveryDate())
+                .clientName(o.getClient().getClientName())
+                .materialType(o.getMaterialType() != null ? o.getMaterialType().getName() : "—")
+                .fromCity(o.getSourceCity() != null ? o.getSourceCity().getName() : "—")
+                .fromState(o.getSourceState() != null ? o.getSourceState().getName() : "—")
+                .toCity(o.getDestinationCity() != null ? o.getDestinationCity().getName() : "—")
+                .toState(o.getDestinationState() != null ? o.getDestinationState().getName() : "—")
+                .totalWeight(o.getTotalWeight())
+                .totalWeightFulfilled(o.getTotalWeightFulfilled())
+                .freightRateType(o.getFreightRateType() != null ? o.getFreightRateType().name() : "—")
+                .freightRate(o.getFreightRate())
+                .totalFreightAmount(o.getTotalFreightAmount())
+                .orderStatus(o.getOrderStatus().name())
+                .orderPaymentStatus(o.getOrderPaymentStatus().name())
+                .build()).toList();
+    }
+
+    // ── 15. Open Orders ───────────────────────────────────────────────────────────
+
+    private static final List<OrderStatus> OPEN_STATUSES = List.of(
+            OrderStatus.PENDING, OrderStatus.PARTIALLY_ASSIGNED, OrderStatus.FULLY_ASSIGNED,
+            OrderStatus.IN_TRANSIT, OrderStatus.PARTIALLY_DELIVERED);
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OpenOrderRow> getOpenOrders() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return orderRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+                .filter(o -> OPEN_STATUSES.contains(o.getOrderStatus()))
+                .map(o -> {
+                    BigDecimal pending = o.getTotalWeight().subtract(
+                            o.getTotalWeightFulfilled() != null ? o.getTotalWeightFulfilled() : BigDecimal.ZERO).max(BigDecimal.ZERO);
+                    return OpenOrderRow.builder()
+                            .orderId(o.getId())
+                            .orderNumber(o.getOrderNumber())
+                            .orderDate(o.getOrderDate())
+                            .expectedDeliveryDate(o.getExpectedDeliveryDate())
+                            .clientName(o.getClient().getClientName())
+                            .materialType(o.getMaterialType() != null ? o.getMaterialType().getName() : "—")
+                            .fromCity(o.getSourceCity() != null ? o.getSourceCity().getName() : "—")
+                            .toCity(o.getDestinationCity() != null ? o.getDestinationCity().getName() : "—")
+                            .totalWeight(o.getTotalWeight())
+                            .totalWeightFulfilled(o.getTotalWeightFulfilled())
+                            .pendingWeight(pending)
+                            .orderStatus(o.getOrderStatus().name())
+                            .build();
+                })
+                .sorted(Comparator.comparing(r -> r.getOrderDate() != null ? r.getOrderDate() : java.time.LocalDate.MIN))
+                .toList();
+    }
+
+    // ── 16. Order Client Summary ──────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderClientSummaryRow> getOrderClientSummary(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        Map<Long, List<com.feros.api.entity.Order>> byClient = orderRepository
+                .findByTenantIdAndDateRange(tenantId, startDate, endDate).stream()
+                .collect(Collectors.groupingBy(o -> o.getClient().getId()));
+
+        return byClient.entrySet().stream().map(entry -> {
+            List<com.feros.api.entity.Order> orders = entry.getValue();
+            com.feros.api.entity.Order first = orders.get(0);
+            return OrderClientSummaryRow.builder()
+                    .clientId(entry.getKey())
+                    .clientName(first.getClient().getClientName())
+                    .totalOrders(orders.size())
+                    .completedOrders((int) orders.stream().filter(o -> o.getOrderStatus() == OrderStatus.COMPLETED || o.getOrderStatus() == OrderStatus.DELIVERED).count())
+                    .inProgressOrders((int) orders.stream().filter(o -> OPEN_STATUSES.contains(o.getOrderStatus())).count())
+                    .cancelledOrders((int) orders.stream().filter(o -> o.getOrderStatus() == OrderStatus.CANCELLED).count())
+                    .totalWeight(orders.stream().map(com.feros.api.entity.Order::getTotalWeight).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
+                    .totalWeightFulfilled(orders.stream().map(com.feros.api.entity.Order::getTotalWeightFulfilled).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
+                    .totalFreightAmount(orders.stream().map(com.feros.api.entity.Order::getTotalFreightAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
+                    .build();
+        }).sorted(Comparator.comparing(OrderClientSummaryRow::getClientName)).toList();
+    }
+
+    // ── 17. Overdue Orders ────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OverdueOrderRow> getOverdueOrders(int thresholdDays) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDate today = TimeUtil.today();
+
+        return orderRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+                .filter(o -> OPEN_STATUSES.contains(o.getOrderStatus()))
+                .filter(o -> o.getExpectedDeliveryDate() != null)
+                .filter(o -> {
+                    long days = java.time.temporal.ChronoUnit.DAYS.between(o.getExpectedDeliveryDate(), today);
+                    return days >= thresholdDays;
+                })
+                .map(o -> {
+                    long daysOverdue = java.time.temporal.ChronoUnit.DAYS.between(o.getExpectedDeliveryDate(), today);
+                    return OverdueOrderRow.builder()
+                            .orderId(o.getId())
+                            .orderNumber(o.getOrderNumber())
+                            .orderDate(o.getOrderDate())
+                            .expectedDeliveryDate(o.getExpectedDeliveryDate())
+                            .daysOverdue(daysOverdue)
+                            .clientName(o.getClient().getClientName())
+                            .materialType(o.getMaterialType() != null ? o.getMaterialType().getName() : "—")
+                            .fromCity(o.getSourceCity() != null ? o.getSourceCity().getName() : "—")
+                            .toCity(o.getDestinationCity() != null ? o.getDestinationCity().getName() : "—")
+                            .totalWeight(o.getTotalWeight())
+                            .totalWeightFulfilled(o.getTotalWeightFulfilled())
+                            .orderStatus(o.getOrderStatus().name())
+                            .build();
+                })
+                .sorted(Comparator.comparingLong(OverdueOrderRow::getDaysOverdue).reversed())
+                .toList();
+    }
+
+    // ── 18. Weight Fulfillment ────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WeightFulfillmentRow> getWeightFulfillment(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return orderRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate).stream()
+                .filter(o -> o.getOrderStatus() != OrderStatus.CANCELLED)
+                .map(o -> {
+                    BigDecimal fulfilled = o.getTotalWeightFulfilled() != null ? o.getTotalWeightFulfilled() : BigDecimal.ZERO;
+                    BigDecimal pending = o.getTotalWeight().subtract(fulfilled).max(BigDecimal.ZERO);
+                    BigDecimal pct = o.getTotalWeight().compareTo(BigDecimal.ZERO) > 0
+                            ? fulfilled.multiply(BigDecimal.valueOf(100)).divide(o.getTotalWeight(), 1, java.math.RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO;
+                    return WeightFulfillmentRow.builder()
+                            .orderId(o.getId())
+                            .orderNumber(o.getOrderNumber())
+                            .orderDate(o.getOrderDate())
+                            .clientName(o.getClient().getClientName())
+                            .materialType(o.getMaterialType() != null ? o.getMaterialType().getName() : "—")
+                            .fromCity(o.getSourceCity() != null ? o.getSourceCity().getName() : "—")
+                            .toCity(o.getDestinationCity() != null ? o.getDestinationCity().getName() : "—")
+                            .totalWeight(o.getTotalWeight())
+                            .totalWeightFulfilled(fulfilled)
+                            .pendingWeight(pending)
+                            .fulfillmentPercent(pct)
+                            .orderStatus(o.getOrderStatus().name())
+                            .build();
+                })
+                .sorted(Comparator.comparing(WeightFulfillmentRow::getFulfillmentPercent))
+                .toList();
+    }
+
+    // ── 19. Route-wise Order Summary ──────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderRouteSummaryRow> getOrderRouteSummary(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<com.feros.api.entity.Order> orders = orderRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+        Map<String, List<com.feros.api.entity.Order>> byRoute = orders.stream()
+                .collect(Collectors.groupingBy(o ->
+                        (o.getSourceCity() != null ? o.getSourceCity().getName() : "—") + "|" +
+                        (o.getDestinationCity() != null ? o.getDestinationCity().getName() : "—")));
+
+        return byRoute.entrySet().stream().map(entry -> {
+            List<com.feros.api.entity.Order> routeOrders = entry.getValue();
+            com.feros.api.entity.Order first = routeOrders.get(0);
+            return OrderRouteSummaryRow.builder()
+                    .fromCity(first.getSourceCity() != null ? first.getSourceCity().getName() : "—")
+                    .fromState(first.getSourceState() != null ? first.getSourceState().getName() : "—")
+                    .toCity(first.getDestinationCity() != null ? first.getDestinationCity().getName() : "—")
+                    .toState(first.getDestinationState() != null ? first.getDestinationState().getName() : "—")
+                    .totalOrders(routeOrders.size())
+                    .completedOrders((int) routeOrders.stream().filter(o -> o.getOrderStatus() == OrderStatus.COMPLETED || o.getOrderStatus() == OrderStatus.DELIVERED).count())
+                    .totalWeight(routeOrders.stream().map(com.feros.api.entity.Order::getTotalWeight).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
+                    .totalWeightFulfilled(routeOrders.stream().map(com.feros.api.entity.Order::getTotalWeightFulfilled).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
+                    .totalFreightAmount(routeOrders.stream().map(com.feros.api.entity.Order::getTotalFreightAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
+                    .build();
+        }).sorted(Comparator.comparingInt(OrderRouteSummaryRow::getTotalOrders).reversed()).toList();
+    }
+
+    // ── 20. Order Payment Status ──────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderPaymentStatusRow> getOrderPaymentStatus(LocalDate startDate, LocalDate endDate, String paymentStatus) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return orderRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate).stream()
+                .filter(o -> paymentStatus == null || o.getOrderPaymentStatus() == OrderPaymentStatus.valueOf(paymentStatus))
+                .map(o -> OrderPaymentStatusRow.builder()
+                        .orderId(o.getId())
+                        .orderNumber(o.getOrderNumber())
+                        .orderDate(o.getOrderDate())
+                        .clientName(o.getClient().getClientName())
+                        .totalFreightAmount(o.getTotalFreightAmount())
+                        .orderStatus(o.getOrderStatus().name())
+                        .orderPaymentStatus(o.getOrderPaymentStatus().name())
+                        .build())
+                .sorted(Comparator.comparing(OrderPaymentStatusRow::getClientName))
                 .toList();
     }
 

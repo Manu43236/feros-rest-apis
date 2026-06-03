@@ -30,4 +30,18 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
     List<VehicleTripSummaryRow> getVehicleTripSummary(LocalDate startDate, LocalDate endDate);
 
     List<ClientTripSummaryRow> getClientTripSummary(LocalDate startDate, LocalDate endDate);
+
+    List<OrderRegisterRow> getOrderRegister(LocalDate startDate, LocalDate endDate, String status);
+
+    List<OpenOrderRow> getOpenOrders();
+
+    List<OrderClientSummaryRow> getOrderClientSummary(LocalDate startDate, LocalDate endDate);
+
+    List<OverdueOrderRow> getOverdueOrders(int thresholdDays);
+
+    List<WeightFulfillmentRow> getWeightFulfillment(LocalDate startDate, LocalDate endDate);
+
+    List<OrderRouteSummaryRow> getOrderRouteSummary(LocalDate startDate, LocalDate endDate);
+
+    List<OrderPaymentStatusRow> getOrderPaymentStatus(LocalDate startDate, LocalDate endDate, String paymentStatus);
 }

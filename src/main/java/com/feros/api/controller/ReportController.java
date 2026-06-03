@@ -314,6 +314,197 @@ public class ReportController {
                 "Delayed Deliveries — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── Order Register ────────────────────────────────────────────────────────────
+
+    @GetMapping("/orders/register")
+    public ResponseEntity<ApiResponse<List<OrderRegisterRow>>> getOrderRegister(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Order register fetched", reportService.getOrderRegister(startDate, endDate, status)));
+    }
+
+    @GetMapping("/orders/register/export")
+    public ResponseEntity<byte[]> exportOrderRegister(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<OrderRegisterRow> rows = reportService.getOrderRegister(startDate, endDate, status);
+        String[] headers = {"Order No.", "Order Date", "Exp. Delivery", "Client", "Material",
+                "From", "To", "Total Wt (kg)", "Fulfilled Wt (kg)", "Freight Rate Type",
+                "Freight Rate", "Total Freight", "Status", "Payment Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getOrderNumber(), r.getOrderDate().toString(),
+                r.getExpectedDeliveryDate() != null ? r.getExpectedDeliveryDate().toString() : "—",
+                r.getClientName(), r.getMaterialType(),
+                r.getFromCity() + ", " + r.getFromState(), r.getToCity() + ", " + r.getToState(),
+                safe(r.getTotalWeight()), safe(r.getTotalWeightFulfilled()),
+                r.getFreightRateType(), safe(r.getFreightRate()), safe(r.getTotalFreightAmount()),
+                r.getOrderStatus(), r.getOrderPaymentStatus()
+        }).toList();
+        return export("order-register-" + startDate + "-" + endDate,
+                "Order Register — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Open Orders ───────────────────────────────────────────────────────────────
+
+    @GetMapping("/orders/open")
+    public ResponseEntity<ApiResponse<List<OpenOrderRow>>> getOpenOrders() {
+        return ResponseEntity.ok(ApiResponse.success("Open orders fetched", reportService.getOpenOrders()));
+    }
+
+    @GetMapping("/orders/open/export")
+    public ResponseEntity<byte[]> exportOpenOrders(@RequestParam(defaultValue = "csv") String format) {
+        List<OpenOrderRow> rows = reportService.getOpenOrders();
+        String[] headers = {"Order No.", "Order Date", "Exp. Delivery", "Client", "Material",
+                "From", "To", "Total Wt (kg)", "Fulfilled Wt (kg)", "Pending Wt (kg)", "Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getOrderNumber(), r.getOrderDate().toString(),
+                r.getExpectedDeliveryDate() != null ? r.getExpectedDeliveryDate().toString() : "—",
+                r.getClientName(), r.getMaterialType(), r.getFromCity(), r.getToCity(),
+                safe(r.getTotalWeight()), safe(r.getTotalWeightFulfilled()), safe(r.getPendingWeight()),
+                r.getOrderStatus()
+        }).toList();
+        return export("open-orders", "Open Orders", headers, data, format);
+    }
+
+    // ── Order Client Summary ──────────────────────────────────────────────────────
+
+    @GetMapping("/orders/client-summary")
+    public ResponseEntity<ApiResponse<List<OrderClientSummaryRow>>> getOrderClientSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Order client summary fetched", reportService.getOrderClientSummary(startDate, endDate)));
+    }
+
+    @GetMapping("/orders/client-summary/export")
+    public ResponseEntity<byte[]> exportOrderClientSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<OrderClientSummaryRow> rows = reportService.getOrderClientSummary(startDate, endDate);
+        String[] headers = {"Client", "Total Orders", "Completed", "In Progress", "Cancelled",
+                "Total Wt (kg)", "Fulfilled Wt (kg)", "Total Freight"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getClientName(), String.valueOf(r.getTotalOrders()),
+                String.valueOf(r.getCompletedOrders()), String.valueOf(r.getInProgressOrders()),
+                String.valueOf(r.getCancelledOrders()),
+                safe(r.getTotalWeight()), safe(r.getTotalWeightFulfilled()), safe(r.getTotalFreightAmount())
+        }).toList();
+        return export("order-client-summary-" + startDate + "-" + endDate,
+                "Order Client Summary — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Overdue Orders ────────────────────────────────────────────────────────────
+
+    @GetMapping("/orders/overdue")
+    public ResponseEntity<ApiResponse<List<OverdueOrderRow>>> getOverdueOrders(
+            @RequestParam(defaultValue = "1") int thresholdDays) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Overdue orders fetched", reportService.getOverdueOrders(thresholdDays)));
+    }
+
+    @GetMapping("/orders/overdue/export")
+    public ResponseEntity<byte[]> exportOverdueOrders(
+            @RequestParam(defaultValue = "1") int thresholdDays,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<OverdueOrderRow> rows = reportService.getOverdueOrders(thresholdDays);
+        String[] headers = {"Order No.", "Order Date", "Exp. Delivery", "Days Overdue",
+                "Client", "Material", "From", "To", "Total Wt (kg)", "Fulfilled Wt (kg)", "Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getOrderNumber(), r.getOrderDate().toString(),
+                r.getExpectedDeliveryDate().toString(), String.valueOf(r.getDaysOverdue()),
+                r.getClientName(), r.getMaterialType(), r.getFromCity(), r.getToCity(),
+                safe(r.getTotalWeight()), safe(r.getTotalWeightFulfilled()), r.getOrderStatus()
+        }).toList();
+        return export("overdue-orders", "Overdue Orders", headers, data, format);
+    }
+
+    // ── Weight Fulfillment ────────────────────────────────────────────────────────
+
+    @GetMapping("/orders/weight-fulfillment")
+    public ResponseEntity<ApiResponse<List<WeightFulfillmentRow>>> getWeightFulfillment(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Weight fulfillment fetched", reportService.getWeightFulfillment(startDate, endDate)));
+    }
+
+    @GetMapping("/orders/weight-fulfillment/export")
+    public ResponseEntity<byte[]> exportWeightFulfillment(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<WeightFulfillmentRow> rows = reportService.getWeightFulfillment(startDate, endDate);
+        String[] headers = {"Order No.", "Order Date", "Client", "Material", "From", "To",
+                "Total Wt (kg)", "Fulfilled Wt (kg)", "Pending Wt (kg)", "Fulfillment %", "Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getOrderNumber(), r.getOrderDate().toString(), r.getClientName(),
+                r.getMaterialType(), r.getFromCity(), r.getToCity(),
+                safe(r.getTotalWeight()), safe(r.getTotalWeightFulfilled()),
+                safe(r.getPendingWeight()), r.getFulfillmentPercent() + "%", r.getOrderStatus()
+        }).toList();
+        return export("weight-fulfillment-" + startDate + "-" + endDate,
+                "Weight Fulfillment — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Route-wise Order Summary ──────────────────────────────────────────────────
+
+    @GetMapping("/orders/route-summary")
+    public ResponseEntity<ApiResponse<List<OrderRouteSummaryRow>>> getOrderRouteSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Order route summary fetched", reportService.getOrderRouteSummary(startDate, endDate)));
+    }
+
+    @GetMapping("/orders/route-summary/export")
+    public ResponseEntity<byte[]> exportOrderRouteSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<OrderRouteSummaryRow> rows = reportService.getOrderRouteSummary(startDate, endDate);
+        String[] headers = {"From City", "From State", "To City", "To State",
+                "Total Orders", "Completed", "Total Wt (kg)", "Fulfilled Wt (kg)", "Total Freight"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getFromCity(), r.getFromState(), r.getToCity(), r.getToState(),
+                String.valueOf(r.getTotalOrders()), String.valueOf(r.getCompletedOrders()),
+                safe(r.getTotalWeight()), safe(r.getTotalWeightFulfilled()), safe(r.getTotalFreightAmount())
+        }).toList();
+        return export("order-route-summary-" + startDate + "-" + endDate,
+                "Order Route Summary — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Order Payment Status ──────────────────────────────────────────────────────
+
+    @GetMapping("/orders/payment-status")
+    public ResponseEntity<ApiResponse<List<OrderPaymentStatusRow>>> getOrderPaymentStatus(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(required = false) String paymentStatus) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Order payment status fetched", reportService.getOrderPaymentStatus(startDate, endDate, paymentStatus)));
+    }
+
+    @GetMapping("/orders/payment-status/export")
+    public ResponseEntity<byte[]> exportOrderPaymentStatus(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(required = false) String paymentStatus,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<OrderPaymentStatusRow> rows = reportService.getOrderPaymentStatus(startDate, endDate, paymentStatus);
+        String[] headers = {"Order No.", "Order Date", "Client", "Total Freight", "Order Status", "Payment Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getOrderNumber(), r.getOrderDate().toString(), r.getClientName(),
+                safe(r.getTotalFreightAmount()), r.getOrderStatus(), r.getOrderPaymentStatus()
+        }).toList();
+        return export("order-payment-status-" + startDate + "-" + endDate,
+                "Order Payment Status — " + startDate + " to " + endDate, headers, data, format);
+    }
+
     // ── Vehicle Trip Summary ──────────────────────────────────────────────────────
 
     @GetMapping("/trips/vehicle-summary")
