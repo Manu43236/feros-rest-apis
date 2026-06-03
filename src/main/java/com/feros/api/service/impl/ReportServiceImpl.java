@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -29,6 +30,7 @@ public class ReportServiceImpl implements ReportService {
     private final VehicleBreakdownRepository breakdownRepository;
     private final VehicleDocumentRepository documentRepository;
     private final VehicleServiceRepository vehicleServiceRepository;
+    private final AttendanceRepository attendanceRepository;
 
     // ── 1. Fleet Status ────────────────────────────────────────────────────────
 
@@ -197,5 +199,109 @@ public class ReportServiceImpl implements ReportService {
                         .nextServiceDueOdometer(s.getDueAtOdometer())
                         .build())
                 .toList();
+    }
+
+    // ── 7. Attendance Daily Register ──────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AttendanceDailyRow> getAttendanceDaily(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<Attendance> records = attendanceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+        Map<Long, String> userVehicleMap = buildUserVehicleMap(tenantId);
+
+        return records.stream().map(a -> {
+            Double hoursWorked = null;
+            if (a.getMarkedAt() != null && a.getMarkedOutAt() != null) {
+                long minutes = Duration.between(a.getMarkedAt(), a.getMarkedOutAt()).toMinutes();
+                hoursWorked = Math.round(minutes / 60.0 * 100.0) / 100.0;
+            }
+            return AttendanceDailyRow.builder()
+                    .employeeId(a.getUser().getId())
+                    .employeeName(a.getUser().getName())
+                    .role(primaryRole(a.getUser()))
+                    .vehicleRegistrationNumber(userVehicleMap.getOrDefault(a.getUser().getId(), "—"))
+                    .attendanceDate(a.getAttendanceDate())
+                    .attendanceType(a.getAttendanceType().getName())
+                    .markedAt(a.getMarkedAt())
+                    .markedOutAt(a.getMarkedOutAt())
+                    .hoursWorked(hoursWorked)
+                    .approvalStatus(a.getApprovalStatus().name())
+                    .leaveType(a.getLeaveType() != null ? a.getLeaveType().getName() : null)
+                    .remarks(a.getRemarks())
+                    .build();
+        }).toList();
+    }
+
+    // ── 8. Attendance Monthly Summary ─────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AttendanceSummaryRow> getAttendanceSummary(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<Attendance> records = attendanceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+        Map<Long, String> userVehicleMap = buildUserVehicleMap(tenantId);
+
+        Map<Long, List<Attendance>> byUser = records.stream()
+                .collect(Collectors.groupingBy(a -> a.getUser().getId()));
+
+        return byUser.entrySet().stream().map(entry -> {
+            List<Attendance> userRecords = entry.getValue();
+            Attendance first = userRecords.get(0);
+
+            int present = 0, absent = 0, leave = 0, half = 0, other = 0;
+            for (Attendance a : userRecords) {
+                String t = a.getAttendanceType().getName().toUpperCase();
+                if      (t.contains("PRESENT")) present++;
+                else if (t.contains("ABSENT"))  absent++;
+                else if (t.contains("LEAVE"))   leave++;
+                else if (t.contains("HALF"))    half++;
+                else                            other++;
+            }
+
+            int total = userRecords.size();
+            BigDecimal pct = total > 0
+                    ? BigDecimal.valueOf(present * 100.0 / total).setScale(1, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+
+            return AttendanceSummaryRow.builder()
+                    .employeeId(entry.getKey())
+                    .employeeName(first.getUser().getName())
+                    .role(primaryRole(first.getUser()))
+                    .vehicleRegistrationNumber(userVehicleMap.getOrDefault(entry.getKey(), "—"))
+                    .presentDays(present)
+                    .absentDays(absent)
+                    .leaveDays(leave)
+                    .halfDays(half)
+                    .otherDays(other)
+                    .totalRecords(total)
+                    .presentPercent(pct)
+                    .build();
+        }).sorted(Comparator.comparing(AttendanceSummaryRow::getEmployeeName)).toList();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────────
+
+    private Map<Long, String> buildUserVehicleMap(Long tenantId) {
+        return vehicleRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+                .flatMap(v -> {
+                    List<Map.Entry<Long, String>> entries = new ArrayList<>();
+                    if (v.getCurrentDriver() != null)
+                        entries.add(Map.entry(v.getCurrentDriver().getId(), v.getRegistrationNumber()));
+                    if (v.getCurrentCleaner() != null)
+                        entries.add(Map.entry(v.getCurrentCleaner().getId(), v.getRegistrationNumber()));
+                    return entries.stream();
+                })
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a));
+    }
+
+    private String primaryRole(User user) {
+        Set<String> names = user.getRoles().stream()
+                .map(r -> r.getName().name())
+                .collect(Collectors.toSet());
+        for (String r : List.of("DRIVER", "CLEANER", "SUPERVISOR", "OFFICE_STAFF", "SERVICE_MEN", "STORE_KEEPER", "ADMIN")) {
+            if (names.contains(r)) return r;
+        }
+        return names.isEmpty() ? "—" : names.iterator().next();
     }
 }

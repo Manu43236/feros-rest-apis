@@ -16,4 +16,8 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
     List<DocumentExpiryRow> getDocumentExpiry(int days);
 
     List<MaintenanceServiceRow> getMaintenanceService(LocalDate startDate, LocalDate endDate);
+
+    List<AttendanceDailyRow> getAttendanceDaily(LocalDate startDate, LocalDate endDate);
+
+    List<AttendanceSummaryRow> getAttendanceSummary(LocalDate startDate, LocalDate endDate);
 }

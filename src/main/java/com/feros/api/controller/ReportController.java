@@ -161,6 +161,63 @@ public class ReportController {
                 "Maintenance & Service — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── Attendance Daily Register ─────────────────────────────────────────────────
+
+    @GetMapping("/attendance/daily")
+    public ResponseEntity<ApiResponse<List<AttendanceDailyRow>>> getAttendanceDaily(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Attendance daily fetched", reportService.getAttendanceDaily(startDate, endDate)));
+    }
+
+    @GetMapping("/attendance/daily/export")
+    public ResponseEntity<byte[]> exportAttendanceDaily(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<AttendanceDailyRow> rows = reportService.getAttendanceDaily(startDate, endDate);
+        String[] headers = {"Date", "Employee", "Role", "Vehicle", "Type", "Mark In", "Mark Out", "Hours", "Approval", "Leave Type", "Remarks"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getAttendanceDate().toString(), r.getEmployeeName(), r.getRole(),
+                safe(r.getVehicleRegistrationNumber()), r.getAttendanceType(),
+                r.getMarkedAt() != null ? r.getMarkedAt().toLocalTime().toString() : "—",
+                r.getMarkedOutAt() != null ? r.getMarkedOutAt().toLocalTime().toString() : "—",
+                r.getHoursWorked() != null ? r.getHoursWorked() + " h" : "—",
+                r.getApprovalStatus(), safe(r.getLeaveType()), safe(r.getRemarks())
+        }).toList();
+        return export("attendance-daily-" + startDate + "-" + endDate,
+                "Attendance Daily Register — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Attendance Summary ────────────────────────────────────────────────────────
+
+    @GetMapping("/attendance/summary")
+    public ResponseEntity<ApiResponse<List<AttendanceSummaryRow>>> getAttendanceSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Attendance summary fetched", reportService.getAttendanceSummary(startDate, endDate)));
+    }
+
+    @GetMapping("/attendance/summary/export")
+    public ResponseEntity<byte[]> exportAttendanceSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<AttendanceSummaryRow> rows = reportService.getAttendanceSummary(startDate, endDate);
+        String[] headers = {"Employee", "Role", "Vehicle", "Present", "Absent", "Leave", "Half Day", "Other", "Total", "Present %"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getEmployeeName(), r.getRole(), safe(r.getVehicleRegistrationNumber()),
+                String.valueOf(r.getPresentDays()), String.valueOf(r.getAbsentDays()),
+                String.valueOf(r.getLeaveDays()), String.valueOf(r.getHalfDays()),
+                String.valueOf(r.getOtherDays()), String.valueOf(r.getTotalRecords()),
+                r.getPresentPercent() + "%"
+        }).toList();
+        return export("attendance-summary-" + startDate + "-" + endDate,
+                "Attendance Summary — " + startDate + " to " + endDate, headers, data, format);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private ResponseEntity<byte[]> export(String filename, String title,
