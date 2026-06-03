@@ -48,34 +48,6 @@ public class ReportController {
         return export("fleet-status-" + reportDate, "Fleet Status Report — " + reportDate, headers, data, format);
     }
 
-    // ── Vehicle Utilization ───────────────────────────────────────────────────
-
-    @GetMapping("/vehicles/utilization")
-    public ResponseEntity<ApiResponse<List<VehicleUtilizationRow>>> getVehicleUtilization(
-            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
-            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Vehicle utilization fetched", reportService.getVehicleUtilization(startDate, endDate)));
-    }
-
-    @GetMapping("/vehicles/utilization/export")
-    public ResponseEntity<byte[]> exportVehicleUtilization(
-            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
-            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
-            @RequestParam(defaultValue = "csv") String format) {
-        List<VehicleUtilizationRow> rows = reportService.getVehicleUtilization(startDate, endDate);
-        String[] headers = {"Vehicle No.", "Type", "Total Trips", "Days On Trip", "Total Days", "Utilization %", "Last Trip Date"};
-        List<String[]> data = rows.stream().map(r -> new String[]{
-                r.getRegistrationNumber(), r.getVehicleType(),
-                String.valueOf(r.getTotalTrips()), String.valueOf(r.getDaysOnTrip()),
-                String.valueOf(r.getTotalDaysInPeriod()),
-                r.getUtilizationPercent() + "%",
-                r.getLastTripDate() != null ? r.getLastTripDate().toString() : "—"
-        }).toList();
-        return export("vehicle-utilization-" + startDate + "-" + endDate,
-                "Vehicle Utilization — " + startDate + " to " + endDate, headers, data, format);
-    }
-
     // ── Fuel & Mileage ────────────────────────────────────────────────────────
 
     @GetMapping("/vehicles/fuel-mileage")

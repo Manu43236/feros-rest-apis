@@ -9,9 +9,7 @@ public interface ReportService {
 
     List<FleetStatusRow> getFleetStatus(LocalDate date);
 
-    List<VehicleUtilizationRow> getVehicleUtilization(LocalDate startDate, LocalDate endDate);
-
-    List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
+List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
 
     List<BreakdownReportRow> getBreakdowns(LocalDate startDate, LocalDate endDate);
 

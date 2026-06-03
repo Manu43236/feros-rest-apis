@@ -2,7 +2,6 @@ package com.feros.api.service.impl;
 
 import com.feros.api.dto.response.report.*;
 import com.feros.api.entity.*;
-import com.feros.api.enums.LrStatus;
 import com.feros.api.repository.*;
 import com.feros.api.service.ReportService;
 import com.feros.api.util.SecurityUtil;
@@ -25,7 +24,6 @@ import java.util.stream.Collectors;
 public class ReportServiceImpl implements ReportService {
 
     private final VehicleRepository vehicleRepository;
-    private final LrRepository lrRepository;
     private final VehicleFuelLogRepository fuelLogRepository;
     private final VehicleMeterReadingRepository meterReadingRepository;
     private final VehicleBreakdownRepository breakdownRepository;
@@ -52,58 +50,7 @@ public class ReportServiceImpl implements ReportService {
                 .toList();
     }
 
-    // ── 2. Vehicle Utilization ─────────────────────────────────────────────────
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<VehicleUtilizationRow> getVehicleUtilization(LocalDate startDate, LocalDate endDate) {
-        Long tenantId = SecurityUtil.getCurrentTenantId();
-        LocalDate today = TimeUtil.today();
-        int totalDays = (int) ChronoUnit.DAYS.between(startDate, endDate) + 1;
-
-        List<Vehicle> vehicles = vehicleRepository.findByTenantIdAndIsActiveTrue(tenantId);
-        List<Lr> lrs = lrRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
-
-        Map<Long, List<Lr>> lrsByVehicle = lrs.stream()
-                .collect(Collectors.groupingBy(lr -> lr.getVehicleAllocation().getVehicle().getId()));
-
-        return vehicles.stream().map(v -> {
-            List<Lr> vehicleLrs = lrsByVehicle.getOrDefault(v.getId(), List.of());
-
-            long daysOnTrip = vehicleLrs.stream().mapToLong(lr -> {
-                if (lr.getLoadedAt() == null) return 0L;
-                LocalDateTime end = (lr.getLrStatus() == LrStatus.DELIVERED && lr.getDeliveredAt() != null)
-                        ? lr.getDeliveredAt()
-                        : today.atTime(LocalTime.MAX);
-                return Math.max(0L, ChronoUnit.DAYS.between(lr.getLoadedAt().toLocalDate(), end.toLocalDate()) + 1);
-            }).sum();
-            daysOnTrip = Math.min(daysOnTrip, totalDays);
-
-            LocalDate lastTripDate = vehicleLrs.stream()
-                    .map(Lr::getLrDate)
-                    .filter(Objects::nonNull)
-                    .max(Comparator.naturalOrder())
-                    .orElse(null);
-
-            double utilizationPercent = totalDays > 0
-                    ? Math.min(100.0, BigDecimal.valueOf((double) daysOnTrip / totalDays * 100)
-                            .setScale(1, RoundingMode.HALF_UP).doubleValue())
-                    : 0.0;
-
-            return VehicleUtilizationRow.builder()
-                    .vehicleId(v.getId())
-                    .registrationNumber(v.getRegistrationNumber())
-                    .vehicleType(v.getVehicleType() != null ? v.getVehicleType().getName() : "—")
-                    .totalTrips(vehicleLrs.size())
-                    .daysOnTrip(daysOnTrip)
-                    .totalDaysInPeriod(totalDays)
-                    .utilizationPercent(utilizationPercent)
-                    .lastTripDate(lastTripDate)
-                    .build();
-        }).toList();
-    }
-
-    // ── 3. Fuel & Mileage ─────────────────────────────────────────────────────
+    // ── 2. Fuel & Mileage ─────────────────────────────────────────────────────
 
     @Override
     @Transactional(readOnly = true)
