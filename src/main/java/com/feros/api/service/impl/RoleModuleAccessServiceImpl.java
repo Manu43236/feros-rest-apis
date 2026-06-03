@@ -30,7 +30,7 @@ public class RoleModuleAccessServiceImpl implements RoleModuleAccessService {
         RoleName.OFFICE_STAFF, List.of(
             ModuleKey.CLIENTS, ModuleKey.ORDERS, ModuleKey.ASSIGNMENTS, ModuleKey.LR_REGISTER,
             ModuleKey.INVOICES, ModuleKey.CREDIT_NOTES, ModuleKey.SERVICE_INVOICES,
-            ModuleKey.ATTENDANCE, ModuleKey.REPORTS
+            ModuleKey.ATTENDANCE
         ),
         RoleName.SUPERVISOR, List.of(
             ModuleKey.ORDERS, ModuleKey.ASSIGNMENTS, ModuleKey.LR_REGISTER, ModuleKey.ATTENDANCE

@@ -10,7 +10,6 @@ public enum ModuleKey {
     CREDIT_NOTES,
     SERVICE_INVOICES,
     ATTENDANCE,
-    REPORTS,
     SPARE_PARTS,
     TYRES,
     PART_REQUESTS,
