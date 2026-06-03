@@ -44,4 +44,14 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
     List<OrderRouteSummaryRow> getOrderRouteSummary(LocalDate startDate, LocalDate endDate);
 
     List<OrderPaymentStatusRow> getOrderPaymentStatus(LocalDate startDate, LocalDate endDate, String paymentStatus);
+
+    List<InvoiceRegisterRow> getInvoiceRegister(LocalDate startDate, LocalDate endDate, String status);
+
+    List<OutstandingInvoiceRow> getOutstandingInvoices();
+
+    List<InvoiceAgingRow> getInvoiceAging();
+
+    List<CollectionRow> getCollections(LocalDate startDate, LocalDate endDate);
+
+    List<CreditNoteRegisterRow> getCreditNoteRegister(LocalDate startDate, LocalDate endDate);
 }

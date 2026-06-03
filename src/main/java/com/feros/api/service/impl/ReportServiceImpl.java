@@ -5,6 +5,7 @@ import com.feros.api.entity.*;
 import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.OrderStatus;
 import com.feros.api.enums.OrderPaymentStatus;
+import com.feros.api.enums.InvoiceStatus;
 import com.feros.api.entity.Client;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.repository.*;
@@ -38,6 +39,9 @@ public class ReportServiceImpl implements ReportService {
     private final AttendanceRepository attendanceRepository;
     private final LrRepository lrRepository;
     private final OrderRepository orderRepository;
+    private final InvoiceRepository invoiceRepository;
+    private final InvoicePaymentRepository invoicePaymentRepository;
+    private final InvoiceCreditNoteRepository invoiceCreditNoteRepository;
 
     // ── 1. Fleet Status ────────────────────────────────────────────────────────
 
@@ -679,6 +683,131 @@ public class ReportServiceImpl implements ReportService {
                     return entries.stream();
                 })
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a));
+    }
+
+    // ── Invoice Register ──────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<InvoiceRegisterRow> getInvoiceRegister(LocalDate startDate, LocalDate endDate, String status) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        InvoiceStatus statusEnum = status != null ? InvoiceStatus.valueOf(status) : null;
+        return invoiceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate).stream()
+                .filter(i -> statusEnum == null || i.getInvoiceStatus() == statusEnum)
+                .map(i -> InvoiceRegisterRow.builder()
+                        .invoiceId(i.getId())
+                        .invoiceNumber(i.getInvoiceNumber())
+                        .invoiceDate(i.getInvoiceDate())
+                        .dueDate(i.getDueDate())
+                        .clientName(i.getClient().getClientName())
+                        .subtotal(i.getSubtotal())
+                        .taxAmount(i.getTaxAmount())
+                        .totalAmount(i.getTotalAmount())
+                        .amountPaid(i.getAmountPaid())
+                        .balanceDue(i.getBalanceDue())
+                        .invoiceStatus(i.getInvoiceStatus() != null ? i.getInvoiceStatus().name() : "—")
+                        .build())
+                .toList();
+    }
+
+    // ── Outstanding Invoices ──────────────────────────────────────────────────────
+
+    private static final List<InvoiceStatus> OUTSTANDING_STATUSES = List.of(
+            InvoiceStatus.SENT, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE);
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OutstandingInvoiceRow> getOutstandingInvoices() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDate today = LocalDate.now();
+        return invoiceRepository.findOutstandingInvoices(tenantId).stream()
+                .filter(i -> i.getInvoiceStatus() != null && OUTSTANDING_STATUSES.contains(i.getInvoiceStatus()))
+                .map(i -> {
+                    Long daysOverdue = (i.getDueDate() != null && today.isAfter(i.getDueDate()))
+                            ? ChronoUnit.DAYS.between(i.getDueDate(), today) : null;
+                    return OutstandingInvoiceRow.builder()
+                            .invoiceId(i.getId())
+                            .invoiceNumber(i.getInvoiceNumber())
+                            .invoiceDate(i.getInvoiceDate())
+                            .dueDate(i.getDueDate())
+                            .clientName(i.getClient().getClientName())
+                            .totalAmount(i.getTotalAmount())
+                            .amountPaid(i.getAmountPaid())
+                            .balanceDue(i.getBalanceDue())
+                            .invoiceStatus(i.getInvoiceStatus().name())
+                            .daysOverdue(daysOverdue)
+                            .build();
+                })
+                .sorted(Comparator.comparing(r -> r.getDueDate() != null ? r.getDueDate() : LocalDate.MAX))
+                .toList();
+    }
+
+    // ── Invoice Aging ─────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<InvoiceAgingRow> getInvoiceAging() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDate today = LocalDate.now();
+        return invoiceRepository.findOutstandingInvoices(tenantId).stream()
+                .filter(i -> i.getInvoiceStatus() != null && OUTSTANDING_STATUSES.contains(i.getInvoiceStatus()))
+                .filter(i -> i.getDueDate() != null && today.isAfter(i.getDueDate()))
+                .map(i -> {
+                    long days = ChronoUnit.DAYS.between(i.getDueDate(), today);
+                    String bucket = days <= 30 ? "1-30 days" : days <= 60 ? "31-60 days" : days <= 90 ? "61-90 days" : "90+ days";
+                    return InvoiceAgingRow.builder()
+                            .invoiceId(i.getId())
+                            .invoiceNumber(i.getInvoiceNumber())
+                            .invoiceDate(i.getInvoiceDate())
+                            .dueDate(i.getDueDate())
+                            .clientName(i.getClient().getClientName())
+                            .balanceDue(i.getBalanceDue())
+                            .daysOverdue(days)
+                            .agingBucket(bucket)
+                            .build();
+                })
+                .sorted(Comparator.comparingLong(InvoiceAgingRow::getDaysOverdue).reversed())
+                .toList();
+    }
+
+    // ── Collections ───────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CollectionRow> getCollections(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return invoicePaymentRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate).stream()
+                .map(p -> CollectionRow.builder()
+                        .paymentId(p.getId())
+                        .paymentDate(p.getPaymentDate())
+                        .invoiceNumber(p.getInvoice().getInvoiceNumber())
+                        .clientName(p.getInvoice().getClient().getClientName())
+                        .amount(p.getAmount())
+                        .paymentMode(p.getPaymentMode() != null ? p.getPaymentMode().name() : "—")
+                        .referenceNumber(p.getReferenceNumber())
+                        .remarks(p.getRemarks())
+                        .build())
+                .toList();
+    }
+
+    // ── Credit Note Register ──────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CreditNoteRegisterRow> getCreditNoteRegister(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return invoiceCreditNoteRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate).stream()
+                .map(cn -> CreditNoteRegisterRow.builder()
+                        .creditNoteId(cn.getId())
+                        .creditNoteNumber(cn.getCreditNoteNumber())
+                        .creditNoteDate(cn.getCreditNoteDate())
+                        .clientName(cn.getClient().getClientName())
+                        .linkedInvoiceNumber(cn.getInvoice() != null ? cn.getInvoice().getInvoiceNumber() : null)
+                        .amount(cn.getAmount())
+                        .reason(cn.getReason())
+                        .creditNoteStatus(cn.getCreditNoteStatus() != null ? cn.getCreditNoteStatus().name() : "—")
+                        .build())
+                .toList();
     }
 
     private String primaryRole(User user) {

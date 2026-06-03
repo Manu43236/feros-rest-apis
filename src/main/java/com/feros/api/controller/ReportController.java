@@ -561,6 +561,133 @@ public class ReportController {
                 "Client Trip Summary — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── Invoice Register ──────────────────────────────────────────────────────
+
+    @GetMapping("/invoices/register")
+    public ResponseEntity<ApiResponse<List<InvoiceRegisterRow>>> getInvoiceRegister(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Invoice register fetched", reportService.getInvoiceRegister(startDate, endDate, status)));
+    }
+
+    @GetMapping("/invoices/register/export")
+    public ResponseEntity<byte[]> exportInvoiceRegister(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<InvoiceRegisterRow> rows = reportService.getInvoiceRegister(startDate, endDate, status);
+        String[] headers = {"Invoice No.", "Invoice Date", "Due Date", "Client", "Subtotal",
+                "Tax", "Total", "Paid", "Balance Due", "Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getInvoiceNumber(), safe(r.getInvoiceDate()), safe(r.getDueDate()),
+                r.getClientName(), safe(r.getSubtotal()), safe(r.getTaxAmount()),
+                safe(r.getTotalAmount()), safe(r.getAmountPaid()), safe(r.getBalanceDue()),
+                r.getInvoiceStatus()
+        }).toList();
+        return export("invoice-register-" + startDate + "-" + endDate,
+                "Invoice Register — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Outstanding Invoices ──────────────────────────────────────────────────
+
+    @GetMapping("/invoices/outstanding")
+    public ResponseEntity<ApiResponse<List<OutstandingInvoiceRow>>> getOutstandingInvoices() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Outstanding invoices fetched", reportService.getOutstandingInvoices()));
+    }
+
+    @GetMapping("/invoices/outstanding/export")
+    public ResponseEntity<byte[]> exportOutstandingInvoices(
+            @RequestParam(defaultValue = "csv") String format) {
+        List<OutstandingInvoiceRow> rows = reportService.getOutstandingInvoices();
+        String[] headers = {"Invoice No.", "Invoice Date", "Due Date", "Client",
+                "Total", "Paid", "Balance Due", "Status", "Days Overdue"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getInvoiceNumber(), safe(r.getInvoiceDate()), safe(r.getDueDate()),
+                r.getClientName(), safe(r.getTotalAmount()), safe(r.getAmountPaid()),
+                safe(r.getBalanceDue()), r.getInvoiceStatus(),
+                r.getDaysOverdue() != null ? r.getDaysOverdue() + " days" : "—"
+        }).toList();
+        return export("outstanding-invoices", "Outstanding Invoices", headers, data, format);
+    }
+
+    // ── Invoice Aging ─────────────────────────────────────────────────────────
+
+    @GetMapping("/invoices/aging")
+    public ResponseEntity<ApiResponse<List<InvoiceAgingRow>>> getInvoiceAging() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Invoice aging fetched", reportService.getInvoiceAging()));
+    }
+
+    @GetMapping("/invoices/aging/export")
+    public ResponseEntity<byte[]> exportInvoiceAging(
+            @RequestParam(defaultValue = "csv") String format) {
+        List<InvoiceAgingRow> rows = reportService.getInvoiceAging();
+        String[] headers = {"Invoice No.", "Invoice Date", "Due Date", "Client",
+                "Balance Due", "Days Overdue", "Aging Bucket"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getInvoiceNumber(), safe(r.getInvoiceDate()), safe(r.getDueDate()),
+                r.getClientName(), safe(r.getBalanceDue()),
+                r.getDaysOverdue() + " days", r.getAgingBucket()
+        }).toList();
+        return export("invoice-aging", "Invoice Aging Report", headers, data, format);
+    }
+
+    // ── Collections ───────────────────────────────────────────────────────────
+
+    @GetMapping("/invoices/collections")
+    public ResponseEntity<ApiResponse<List<CollectionRow>>> getCollections(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Collections fetched", reportService.getCollections(startDate, endDate)));
+    }
+
+    @GetMapping("/invoices/collections/export")
+    public ResponseEntity<byte[]> exportCollections(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<CollectionRow> rows = reportService.getCollections(startDate, endDate);
+        String[] headers = {"Payment Date", "Invoice No.", "Client", "Amount", "Mode", "Reference", "Remarks"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getPaymentDate()), r.getInvoiceNumber(), r.getClientName(),
+                safe(r.getAmount()), r.getPaymentMode(),
+                safe(r.getReferenceNumber()), safe(r.getRemarks())
+        }).toList();
+        return export("collections-" + startDate + "-" + endDate,
+                "Collections — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Credit Note Register ──────────────────────────────────────────────────
+
+    @GetMapping("/invoices/credit-notes")
+    public ResponseEntity<ApiResponse<List<CreditNoteRegisterRow>>> getCreditNoteRegister(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Credit notes fetched", reportService.getCreditNoteRegister(startDate, endDate)));
+    }
+
+    @GetMapping("/invoices/credit-notes/export")
+    public ResponseEntity<byte[]> exportCreditNoteRegister(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<CreditNoteRegisterRow> rows = reportService.getCreditNoteRegister(startDate, endDate);
+        String[] headers = {"Credit Note No.", "Date", "Client", "Linked Invoice", "Amount", "Reason", "Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getCreditNoteNumber(), safe(r.getCreditNoteDate()), r.getClientName(),
+                safe(r.getLinkedInvoiceNumber()), safe(r.getAmount()),
+                r.getReason(), r.getCreditNoteStatus()
+        }).toList();
+        return export("credit-notes-" + startDate + "-" + endDate,
+                "Credit Note Register — " + startDate + " to " + endDate, headers, data, format);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private ResponseEntity<byte[]> export(String filename, String title,
