@@ -3,6 +3,8 @@ package com.feros.api.service.impl;
 import com.feros.api.dto.response.report.*;
 import com.feros.api.entity.*;
 import com.feros.api.enums.LrStatus;
+import com.feros.api.entity.Client;
+import com.feros.api.entity.Vehicle;
 import com.feros.api.repository.*;
 import com.feros.api.service.ReportService;
 import com.feros.api.util.SecurityUtil;
@@ -371,6 +373,66 @@ public class ReportServiceImpl implements ReportService {
                 })
                 .sorted(Comparator.comparingLong(DelayedDeliveryRow::getDaysInTransit).reversed())
                 .toList();
+    }
+
+    // ── 12. Vehicle Trip Summary ──────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VehicleTripSummaryRow> getVehicleTripSummary(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<Lr> lrs = lrRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+
+        Map<Long, List<Lr>> byVehicle = lrs.stream()
+                .collect(Collectors.groupingBy(l -> l.getVehicleAllocation().getVehicle().getId()));
+
+        return byVehicle.entrySet().stream().map(entry -> {
+            List<Lr> vLrs = entry.getValue();
+            Lr first = vLrs.get(0);
+            Vehicle vehicle = first.getVehicleAllocation().getVehicle();
+
+            return VehicleTripSummaryRow.builder()
+                    .vehicleId(vehicle.getId())
+                    .registrationNumber(vehicle.getRegistrationNumber())
+                    .vehicleType(vehicle.getVehicleType() != null ? vehicle.getVehicleType().getName() : "—")
+                    .totalTrips(vLrs.size())
+                    .completedTrips((int) vLrs.stream().filter(l -> l.getLrStatus() == LrStatus.DELIVERED).count())
+                    .inTransitTrips((int) vLrs.stream().filter(l -> l.getLrStatus() == LrStatus.IN_TRANSIT).count())
+                    .cancelledTrips((int) vLrs.stream().filter(l -> l.getLrStatus() == LrStatus.CANCELLED).count())
+                    .totalAllocatedWeight(vLrs.stream().map(Lr::getAllocatedWeight).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
+                    .totalLoadedWeight(vLrs.stream().map(Lr::getLoadedWeight).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
+                    .totalDeliveredWeight(vLrs.stream().map(Lr::getDeliveredWeight).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
+                    .build();
+        }).sorted(Comparator.comparing(VehicleTripSummaryRow::getRegistrationNumber)).toList();
+    }
+
+    // ── 13. Client Trip Summary ───────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ClientTripSummaryRow> getClientTripSummary(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<Lr> lrs = lrRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+
+        Map<Long, List<Lr>> byClient = lrs.stream()
+                .collect(Collectors.groupingBy(l -> l.getOrder().getClient().getId()));
+
+        return byClient.entrySet().stream().map(entry -> {
+            List<Lr> cLrs = entry.getValue();
+            Client client = cLrs.get(0).getOrder().getClient();
+
+            return ClientTripSummaryRow.builder()
+                    .clientId(client.getId())
+                    .clientName(client.getClientName())
+                    .totalTrips(cLrs.size())
+                    .completedTrips((int) cLrs.stream().filter(l -> l.getLrStatus() == LrStatus.DELIVERED).count())
+                    .inTransitTrips((int) cLrs.stream().filter(l -> l.getLrStatus() == LrStatus.IN_TRANSIT).count())
+                    .cancelledTrips((int) cLrs.stream().filter(l -> l.getLrStatus() == LrStatus.CANCELLED).count())
+                    .totalAllocatedWeight(cLrs.stream().map(Lr::getAllocatedWeight).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
+                    .totalLoadedWeight(cLrs.stream().map(Lr::getLoadedWeight).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
+                    .totalDeliveredWeight(cLrs.stream().map(Lr::getDeliveredWeight).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
+                    .build();
+        }).sorted(Comparator.comparing(ClientTripSummaryRow::getClientName)).toList();
     }
 
     private DelayedDeliveryRow buildDelayedRow(Lr l, long days) {

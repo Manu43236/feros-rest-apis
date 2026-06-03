@@ -314,6 +314,62 @@ public class ReportController {
                 "Delayed Deliveries — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── Vehicle Trip Summary ──────────────────────────────────────────────────────
+
+    @GetMapping("/trips/vehicle-summary")
+    public ResponseEntity<ApiResponse<List<VehicleTripSummaryRow>>> getVehicleTripSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Vehicle trip summary fetched", reportService.getVehicleTripSummary(startDate, endDate)));
+    }
+
+    @GetMapping("/trips/vehicle-summary/export")
+    public ResponseEntity<byte[]> exportVehicleTripSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<VehicleTripSummaryRow> rows = reportService.getVehicleTripSummary(startDate, endDate);
+        String[] headers = {"Vehicle No.", "Type", "Total Trips", "Completed", "In Transit", "Cancelled",
+                "Total Alloc. Wt (kg)", "Total Loaded Wt (kg)", "Total Delivered Wt (kg)"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getRegistrationNumber(), r.getVehicleType(),
+                String.valueOf(r.getTotalTrips()), String.valueOf(r.getCompletedTrips()),
+                String.valueOf(r.getInTransitTrips()), String.valueOf(r.getCancelledTrips()),
+                safe(r.getTotalAllocatedWeight()), safe(r.getTotalLoadedWeight()), safe(r.getTotalDeliveredWeight())
+        }).toList();
+        return export("vehicle-trip-summary-" + startDate + "-" + endDate,
+                "Vehicle Trip Summary — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Client Trip Summary ───────────────────────────────────────────────────────
+
+    @GetMapping("/trips/client-summary")
+    public ResponseEntity<ApiResponse<List<ClientTripSummaryRow>>> getClientTripSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Client trip summary fetched", reportService.getClientTripSummary(startDate, endDate)));
+    }
+
+    @GetMapping("/trips/client-summary/export")
+    public ResponseEntity<byte[]> exportClientTripSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<ClientTripSummaryRow> rows = reportService.getClientTripSummary(startDate, endDate);
+        String[] headers = {"Client", "Total Trips", "Completed", "In Transit", "Cancelled",
+                "Total Alloc. Wt (kg)", "Total Loaded Wt (kg)", "Total Delivered Wt (kg)"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getClientName(),
+                String.valueOf(r.getTotalTrips()), String.valueOf(r.getCompletedTrips()),
+                String.valueOf(r.getInTransitTrips()), String.valueOf(r.getCancelledTrips()),
+                safe(r.getTotalAllocatedWeight()), safe(r.getTotalLoadedWeight()), safe(r.getTotalDeliveredWeight())
+        }).toList();
+        return export("client-trip-summary-" + startDate + "-" + endDate,
+                "Client Trip Summary — " + startDate + " to " + endDate, headers, data, format);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private ResponseEntity<byte[]> export(String filename, String title,
