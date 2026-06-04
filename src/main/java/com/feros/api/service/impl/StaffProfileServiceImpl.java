@@ -200,6 +200,8 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .fileUrl(request.getFileUrl())
                 .isVerified(false)
                 .remarks(request.getRemarks())
+                .cost(request.getCost())
+                .paidOn(request.getPaidOn())
                 .isActive(true)
                 .build();
 
@@ -220,6 +222,8 @@ public class StaffProfileServiceImpl implements StaffProfileService {
         if (request.getIssuerName()      != null) doc.setIssuerName(request.getIssuerName());
         if (request.getPermitType()      != null) doc.setPermitType(PermitType.valueOf(request.getPermitType()));
         if (request.getRemarks()         != null) doc.setRemarks(request.getRemarks());
+        if (request.getCost()            != null) doc.setCost(request.getCost());
+        if (request.getPaidOn()          != null) doc.setPaidOn(request.getPaidOn());
 
         return mapToDocumentResponse(vehicleDocumentRepository.save(doc));
     }
@@ -372,6 +376,8 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .fileUrl(d.getFileUrl())
                 .isVerified(d.getIsVerified())
                 .remarks(d.getRemarks())
+                .cost(d.getCost())
+                .paidOn(d.getPaidOn())
                 .createdAt(d.getCreatedAt())
                 .updatedAt(d.getUpdatedAt())
                 .build();

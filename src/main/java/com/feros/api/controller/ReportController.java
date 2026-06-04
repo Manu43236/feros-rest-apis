@@ -688,6 +688,111 @@ public class ReportController {
                 "Credit Note Register — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── Trip Expenses ─────────────────────────────────────────────────────────
+
+    @GetMapping("/expenses/trips")
+    public ResponseEntity<ApiResponse<List<TripExpenseReportRow>>> getTripExpenses(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Trip expenses fetched", reportService.getTripExpenses(startDate, endDate)));
+    }
+
+    @GetMapping("/expenses/trips/export")
+    public ResponseEntity<byte[]> exportTripExpenses(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<TripExpenseReportRow> rows = reportService.getTripExpenses(startDate, endDate);
+        String[] headers = {"LR No.", "LR Date", "Vehicle", "Driver", "Cleaner", "From", "To",
+                "Advance", "Driver Batta", "Cleaner Batta", "Mamulu", "Other Expenses", "Total", "Settlement", "Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getLrNumber(), safe(r.getLrDate()), r.getVehicleNumber(),
+                r.getDriverName(), r.getCleanerName(), r.getFromCity(), r.getToCity(),
+                safe(r.getAdvanceAmount()), safe(r.getDriverBatta()), safe(r.getCleanerBatta()),
+                safe(r.getTripMamulu()), safe(r.getItemsTotal()), safe(r.getTotalExpense()),
+                safe(r.getSettlementAmount()), r.getStatus()
+        }).toList();
+        return export("trip-expenses-" + startDate + "-" + endDate,
+                "Trip Expenses — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Fuel Cost Summary ─────────────────────────────────────────────────────
+
+    @GetMapping("/expenses/fuel")
+    public ResponseEntity<ApiResponse<List<FuelCostRow>>> getFuelCostSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Fuel cost summary fetched", reportService.getFuelCostSummary(startDate, endDate)));
+    }
+
+    @GetMapping("/expenses/fuel/export")
+    public ResponseEntity<byte[]> exportFuelCostSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<FuelCostRow> rows = reportService.getFuelCostSummary(startDate, endDate);
+        String[] headers = {"Vehicle", "Type", "Total Fills", "Total Litres", "Total Cost"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getRegistrationNumber(), r.getVehicleType(),
+                String.valueOf(r.getTotalFills()), safe(r.getTotalLitres()), safe(r.getTotalCost())
+        }).toList();
+        return export("fuel-cost-" + startDate + "-" + endDate,
+                "Fuel Cost Summary — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Maintenance Cost Summary ──────────────────────────────────────────────
+
+    @GetMapping("/expenses/maintenance")
+    public ResponseEntity<ApiResponse<List<MaintenanceCostRow>>> getMaintenanceCostSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Maintenance cost summary fetched", reportService.getMaintenanceCostSummary(startDate, endDate)));
+    }
+
+    @GetMapping("/expenses/maintenance/export")
+    public ResponseEntity<byte[]> exportMaintenanceCostSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<MaintenanceCostRow> rows = reportService.getMaintenanceCostSummary(startDate, endDate);
+        String[] headers = {"Vehicle", "Type", "Total Services", "Total Cost"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getRegistrationNumber(), r.getVehicleType(),
+                String.valueOf(r.getTotalServices()), safe(r.getTotalCost())
+        }).toList();
+        return export("maintenance-cost-" + startDate + "-" + endDate,
+                "Maintenance Cost Summary — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Document Cost Summary ─────────────────────────────────────────────────
+
+    @GetMapping("/expenses/documents")
+    public ResponseEntity<ApiResponse<List<DocumentCostRow>>> getDocumentCostSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Document cost summary fetched", reportService.getDocumentCostSummary(startDate, endDate)));
+    }
+
+    @GetMapping("/expenses/documents/export")
+    public ResponseEntity<byte[]> exportDocumentCostSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<DocumentCostRow> rows = reportService.getDocumentCostSummary(startDate, endDate);
+        String[] headers = {"Vehicle", "Type", "Document Type", "Document No.", "Issuer", "Paid On", "Cost (₹)"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getRegistrationNumber(), r.getVehicleType(), r.getDocumentTypeName(),
+                safe(r.getDocumentNumber()), safe(r.getIssuerName()),
+                safe(r.getPaidOn()), safe(r.getCost())
+        }).toList();
+        return export("document-cost-" + startDate + "-" + endDate,
+                "Document Cost Summary — " + startDate + " to " + endDate, headers, data, format);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private ResponseEntity<byte[]> export(String filename, String title,

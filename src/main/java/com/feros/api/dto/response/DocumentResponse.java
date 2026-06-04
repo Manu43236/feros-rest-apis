@@ -2,6 +2,7 @@ package com.feros.api.dto.response;
 
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -23,6 +24,8 @@ public class DocumentResponse {
     private String permitType;
     private Boolean isVerified;
     private String remarks;
+    private BigDecimal cost;
+    private LocalDate paidOn;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -3,6 +3,7 @@ package com.feros.api.dto.request;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Getter
@@ -15,4 +16,6 @@ public class UpdateDocumentRequest {
     private String issuerName;
     private String permitType;
     private String remarks;
+    private BigDecimal cost;
+    private LocalDate paidOn;
 }

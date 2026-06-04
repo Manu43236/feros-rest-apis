@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Getter
@@ -20,4 +21,6 @@ public class DocumentRequest {
     private String issuerName;
     private String permitType;
     private String remarks;
+    private BigDecimal cost;
+    private LocalDate paidOn;
 }

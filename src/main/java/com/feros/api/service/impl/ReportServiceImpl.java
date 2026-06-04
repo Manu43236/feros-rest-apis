@@ -42,6 +42,8 @@ public class ReportServiceImpl implements ReportService {
     private final InvoiceRepository invoiceRepository;
     private final InvoicePaymentRepository invoicePaymentRepository;
     private final InvoiceCreditNoteRepository invoiceCreditNoteRepository;
+    private final LrTripExpenseRepository tripExpenseRepository;
+    private final LrTripExpenseItemRepository tripExpenseItemRepository;
 
     // ── 1. Fleet Status ────────────────────────────────────────────────────────
 
@@ -808,6 +810,119 @@ public class ReportServiceImpl implements ReportService {
                         .creditNoteStatus(cn.getCreditNoteStatus() != null ? cn.getCreditNoteStatus().name() : "—")
                         .build())
                 .toList();
+    }
+
+    // ── Trip Expenses ─────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TripExpenseReportRow> getTripExpenses(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return tripExpenseRepository.findByTenantIdAndLrDateRange(tenantId, startDate, endDate).stream()
+                .map(e -> {
+                    Lr lr = e.getLr();
+                    BigDecimal itemsTotal = tripExpenseItemRepository.findByTripExpenseIdAndIsActiveTrue(e.getId())
+                            .stream().map(i -> i.getAmount() != null ? i.getAmount() : BigDecimal.ZERO)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal batta = e.getDriverBatta().add(e.getCleanerBatta()).add(e.getTripMamulu());
+                    BigDecimal total = batta.add(itemsTotal);
+                    return TripExpenseReportRow.builder()
+                            .lrId(lr.getId())
+                            .lrNumber(lr.getLrNumber())
+                            .lrDate(lr.getLrDate())
+                            .vehicleNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
+                            .driverName(lr.getDriver() != null ? lr.getDriver().getName() : "—")
+                            .cleanerName(lr.getCleaner() != null ? lr.getCleaner().getName() : "—")
+                            .fromCity(lr.getOrder().getSourceCity() != null ? lr.getOrder().getSourceCity().getName() : "—")
+                            .toCity(lr.getOrder().getDestinationCity() != null ? lr.getOrder().getDestinationCity().getName() : "—")
+                            .advanceAmount(e.getAdvanceAmount())
+                            .driverBatta(e.getDriverBatta())
+                            .cleanerBatta(e.getCleanerBatta())
+                            .tripMamulu(e.getTripMamulu())
+                            .itemsTotal(itemsTotal)
+                            .totalExpense(total)
+                            .settlementAmount(e.getSettlementAmount())
+                            .status(e.getStatus() != null ? e.getStatus().name() : "—")
+                            .build();
+                })
+                .toList();
+    }
+
+    // ── Fuel Cost Summary ─────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FuelCostRow> getFuelCostSummary(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<VehicleFuelLog> logs = fuelLogRepository.findByTenantIdAndDateRange(
+                tenantId, startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX));
+
+        Map<Long, List<VehicleFuelLog>> byVehicle = logs.stream()
+                .collect(Collectors.groupingBy(l -> l.getVehicle().getId()));
+
+        return byVehicle.entrySet().stream().map(entry -> {
+            List<VehicleFuelLog> vLogs = entry.getValue();
+            Vehicle vehicle = vLogs.get(0).getVehicle();
+            BigDecimal totalLitres = vLogs.stream().map(VehicleFuelLog::getLitresFilled).filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal totalCost = vLogs.stream().map(VehicleFuelLog::getTotalCost).filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            return FuelCostRow.builder()
+                    .vehicleId(vehicle.getId())
+                    .registrationNumber(vehicle.getRegistrationNumber())
+                    .vehicleType(vehicle.getVehicleType() != null ? vehicle.getVehicleType().getName() : "—")
+                    .totalFills(vLogs.size())
+                    .totalLitres(totalLitres)
+                    .totalCost(totalCost)
+                    .build();
+        }).sorted(Comparator.comparing(FuelCostRow::getRegistrationNumber)).toList();
+    }
+
+    // ── Maintenance Cost Summary ──────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MaintenanceCostRow> getMaintenanceCostSummary(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<VehicleService> services = vehicleServiceRepository
+                .findByTenantIdAndServiceDateBetweenAndIsActiveTrue(tenantId, startDate, endDate);
+
+        Map<Long, List<VehicleService>> byVehicle = services.stream()
+                .collect(Collectors.groupingBy(s -> s.getVehicle().getId()));
+
+        return byVehicle.entrySet().stream().map(entry -> {
+            List<VehicleService> vServices = entry.getValue();
+            Vehicle vehicle = vServices.get(0).getVehicle();
+            BigDecimal totalCost = vServices.stream().map(VehicleService::getTotalCost).filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            return MaintenanceCostRow.builder()
+                    .vehicleId(vehicle.getId())
+                    .registrationNumber(vehicle.getRegistrationNumber())
+                    .vehicleType(vehicle.getVehicleType() != null ? vehicle.getVehicleType().getName() : "—")
+                    .totalServices(vServices.size())
+                    .totalCost(totalCost)
+                    .build();
+        }).sorted(Comparator.comparing(MaintenanceCostRow::getRegistrationNumber)).toList();
+    }
+
+    // ── Document Cost Summary ────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DocumentCostRow> getDocumentCostSummary(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<VehicleDocument> docs = documentRepository.findByTenantIdAndPaidOnBetween(tenantId, startDate, endDate);
+        return docs.stream().map(d -> DocumentCostRow.builder()
+                .vehicleId(d.getVehicle().getId())
+                .registrationNumber(d.getVehicle().getRegistrationNumber())
+                .vehicleType(d.getVehicle().getVehicleType() != null ? d.getVehicle().getVehicleType().getName() : "—")
+                .documentTypeName(d.getDocumentType().getName())
+                .documentNumber(d.getDocumentNumber())
+                .issuerName(d.getIssuerName())
+                .paidOn(d.getPaidOn())
+                .cost(d.getCost())
+                .build()
+        ).toList();
     }
 
     private String primaryRole(User user) {

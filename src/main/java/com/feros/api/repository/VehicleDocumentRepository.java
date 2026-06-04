@@ -18,4 +18,7 @@ public interface VehicleDocumentRepository extends JpaRepository<VehicleDocument
     List<VehicleDocument> findExpiringDocuments(@Param("tenantId") Long tenantId, @Param("alertDate") LocalDate alertDate);
 
     List<VehicleDocument> findByTenantIdAndIsActiveTrue(Long tenantId);
+
+    @Query("SELECT vd FROM VehicleDocument vd WHERE vd.tenant.id = :tenantId AND vd.isActive = true AND vd.paidOn IS NOT NULL AND vd.paidOn BETWEEN :from AND :to ORDER BY vd.paidOn DESC")
+    List<VehicleDocument> findByTenantIdAndPaidOnBetween(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }

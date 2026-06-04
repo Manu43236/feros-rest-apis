@@ -54,4 +54,12 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
     List<CollectionRow> getCollections(LocalDate startDate, LocalDate endDate);
 
     List<CreditNoteRegisterRow> getCreditNoteRegister(LocalDate startDate, LocalDate endDate);
+
+    List<TripExpenseReportRow> getTripExpenses(LocalDate startDate, LocalDate endDate);
+
+    List<FuelCostRow> getFuelCostSummary(LocalDate startDate, LocalDate endDate);
+
+    List<MaintenanceCostRow> getMaintenanceCostSummary(LocalDate startDate, LocalDate endDate);
+
+    List<DocumentCostRow> getDocumentCostSummary(LocalDate startDate, LocalDate endDate);
 }
