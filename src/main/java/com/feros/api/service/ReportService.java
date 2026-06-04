@@ -74,4 +74,8 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
     List<VehiclePnlRow> getVehiclePnl(LocalDate startDate, LocalDate endDate);
 
     List<RoutePnlRow> getRoutePnl(LocalDate startDate, LocalDate endDate);
+
+    List<ClientVehiclePnlRow> getClientVehiclePnl(LocalDate startDate, LocalDate endDate);
+
+    List<TripPnlRow> getTripPnl(LocalDate startDate, LocalDate endDate);
 }

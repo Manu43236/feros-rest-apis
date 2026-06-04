@@ -930,6 +930,58 @@ public class ReportController {
                 "P&L Per Vehicle — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── P&L Per Client × Vehicle ──────────────────────────────────────────────
+
+    @GetMapping("/pnl/client-vehicle")
+    public ResponseEntity<ApiResponse<List<ClientVehiclePnlRow>>> getClientVehiclePnl(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Client×Vehicle P&L fetched", reportService.getClientVehiclePnl(startDate, endDate)));
+    }
+
+    @GetMapping("/pnl/client-vehicle/export")
+    public ResponseEntity<byte[]> exportClientVehiclePnl(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<ClientVehiclePnlRow> rows = reportService.getClientVehiclePnl(startDate, endDate);
+        String[] headers = {"Client", "Vehicle", "Type", "Trips", "Revenue (₹)", "Trip Expenses (₹)", "Net P&L (₹)"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getClientName(), r.getRegistrationNumber(), r.getVehicleType(),
+                String.valueOf(r.getTotalTrips()), safe(r.getRevenue()),
+                safe(r.getTripExpenses()), safe(r.getNetPnl())
+        }).toList();
+        return export("client-vehicle-pnl-" + startDate + "-" + endDate,
+                "P&L Per Client × Vehicle — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── P&L Per Trip ──────────────────────────────────────────────────────────
+
+    @GetMapping("/pnl/trips")
+    public ResponseEntity<ApiResponse<List<TripPnlRow>>> getTripPnl(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Trip P&L fetched", reportService.getTripPnl(startDate, endDate)));
+    }
+
+    @GetMapping("/pnl/trips/export")
+    public ResponseEntity<byte[]> exportTripPnl(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<TripPnlRow> rows = reportService.getTripPnl(startDate, endDate);
+        String[] headers = {"LR No.", "LR Date", "Vehicle", "Client", "From", "To", "Revenue (₹)", "Trip Exp (₹)", "Net P&L (₹)"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getLrNumber(), safe(r.getLrDate()), r.getRegistrationNumber(),
+                r.getClientName(), r.getFromCity(), r.getToCity(),
+                safe(r.getRevenue()), safe(r.getTripExpenses()), safe(r.getNetPnl())
+        }).toList();
+        return export("trip-pnl-" + startDate + "-" + endDate,
+                "P&L Per Trip — " + startDate + " to " + endDate, headers, data, format);
+    }
+
     // ── P&L Per Route ─────────────────────────────────────────────────────────
 
     @GetMapping("/pnl/routes")

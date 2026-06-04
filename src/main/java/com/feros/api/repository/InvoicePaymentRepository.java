@@ -21,4 +21,7 @@ public interface InvoicePaymentRepository extends JpaRepository<InvoicePayment, 
 
     @Query("SELECT p FROM InvoicePayment p WHERE p.tenant.id = :tenantId AND p.isActive = true AND p.invoice.client.id = :clientId AND p.paymentDate BETWEEN :from AND :to ORDER BY p.paymentDate ASC")
     List<InvoicePayment> findByTenantIdAndClientIdAndDateRange(@Param("tenantId") Long tenantId, @Param("clientId") Long clientId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("SELECT p FROM InvoicePayment p WHERE p.tenant.id = :tenantId AND p.isActive = true AND p.invoice.id IN :invoiceIds")
+    List<InvoicePayment> findByTenantIdAndInvoiceIds(@Param("tenantId") Long tenantId, @Param("invoiceIds") java.util.Collection<Long> invoiceIds);
 }
