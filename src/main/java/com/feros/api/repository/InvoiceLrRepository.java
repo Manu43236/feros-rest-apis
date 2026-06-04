@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -20,4 +21,7 @@ public interface InvoiceLrRepository extends JpaRepository<InvoiceLr, Long> {
 
     @Query("SELECT DISTINCT il.invoice FROM InvoiceLr il WHERE il.order.id = :orderId AND il.isActive = true")
     List<com.feros.api.entity.Invoice> findDistinctInvoicesByOrderId(@Param("orderId") Long orderId);
+
+    @Query("SELECT il FROM InvoiceLr il WHERE il.tenant.id = :tenantId AND il.isActive = true AND il.invoice.invoiceDate BETWEEN :from AND :to")
+    List<InvoiceLr> findByTenantIdAndInvoiceDateRange(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }

@@ -66,4 +66,12 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
     List<DriverPerformanceRow> getDriverPerformance(LocalDate startDate, LocalDate endDate);
 
     List<CleanerPerformanceRow> getCleanerPerformance(LocalDate startDate, LocalDate endDate);
+
+    PnlSummaryRow getPnlSummary(LocalDate startDate, LocalDate endDate);
+
+    List<ClientPnlRow> getClientPnl(LocalDate startDate, LocalDate endDate);
+
+    List<VehiclePnlRow> getVehiclePnl(LocalDate startDate, LocalDate endDate);
+
+    List<RoutePnlRow> getRoutePnl(LocalDate startDate, LocalDate endDate);
 }

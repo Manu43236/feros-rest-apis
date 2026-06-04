@@ -44,6 +44,7 @@ public class ReportServiceImpl implements ReportService {
     private final InvoiceCreditNoteRepository invoiceCreditNoteRepository;
     private final LrTripExpenseRepository tripExpenseRepository;
     private final LrTripExpenseItemRepository tripExpenseItemRepository;
+    private final InvoiceLrRepository invoiceLrRepository;
 
     // ── 1. Fleet Status ────────────────────────────────────────────────────────
 
@@ -1025,6 +1026,230 @@ public class ReportServiceImpl implements ReportService {
                     .attendancePct(attPct)
                     .build();
         }).sorted(Comparator.comparing(CleanerPerformanceRow::getCleanerName)).toList();
+    }
+
+    // ── P&L Summary ───────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public PnlSummaryRow getPnlSummary(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        List<InvoiceLr> invoiceLrs = invoiceLrRepository.findByTenantIdAndInvoiceDateRange(tenantId, startDate, endDate);
+        BigDecimal totalInvoiced = invoiceLrs.stream()
+                .map(il -> il.getTotalAmount() != null ? il.getTotalAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalCollected = invoicePaymentRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate)
+                .stream().map(p -> p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal balanceDue = totalInvoiced.subtract(totalCollected);
+
+        List<LrTripExpense> expenses = tripExpenseRepository.findByTenantIdAndLrDateRange(tenantId, startDate, endDate);
+        Map<Long, BigDecimal> itemTotalById = buildItemTotalMap(expenses);
+        BigDecimal tripExpenses = expenses.stream()
+                .map(e -> tripTotal(e, itemTotalById))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(LocalTime.MAX);
+        BigDecimal fuelExpenses = fuelLogRepository.findByTenantIdAndDateRange(tenantId, start, end)
+                .stream().map(l -> l.getTotalCost() != null ? l.getTotalCost() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal maintenanceExpenses = vehicleServiceRepository
+                .findByTenantIdAndServiceDateBetweenAndIsActiveTrue(tenantId, startDate, endDate)
+                .stream().map(s -> s.getTotalCost() != null ? s.getTotalCost() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal documentExpenses = documentRepository.findByTenantIdAndPaidOnBetween(tenantId, startDate, endDate)
+                .stream().map(d -> d.getCost() != null ? d.getCost() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalExpenses = tripExpenses.add(fuelExpenses).add(maintenanceExpenses).add(documentExpenses);
+
+        return PnlSummaryRow.builder()
+                .totalInvoiced(totalInvoiced)
+                .totalCollected(totalCollected)
+                .balanceDue(balanceDue)
+                .tripExpenses(tripExpenses)
+                .fuelExpenses(fuelExpenses)
+                .maintenanceExpenses(maintenanceExpenses)
+                .documentExpenses(documentExpenses)
+                .totalExpenses(totalExpenses)
+                .grossPnl(totalInvoiced.subtract(tripExpenses))
+                .netPnl(totalInvoiced.subtract(totalExpenses))
+                .build();
+    }
+
+    // ── P&L Per Client ────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ClientPnlRow> getClientPnl(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        List<InvoiceLr> invoiceLrs = invoiceLrRepository.findByTenantIdAndInvoiceDateRange(tenantId, startDate, endDate);
+        Map<Long, List<InvoiceLr>> byClient = invoiceLrs.stream()
+                .collect(Collectors.groupingBy(il -> il.getOrder().getClient().getId()));
+
+        List<LrTripExpense> expenses = tripExpenseRepository.findByTenantIdAndLrDateRange(tenantId, startDate, endDate);
+        Map<Long, BigDecimal> itemTotalById = buildItemTotalMap(expenses);
+        Map<Long, BigDecimal> expByClient = expenses.stream()
+                .collect(Collectors.groupingBy(
+                        e -> e.getLr().getOrder().getClient().getId(),
+                        Collectors.reducing(BigDecimal.ZERO, e -> tripTotal(e, itemTotalById), BigDecimal::add)
+                ));
+
+        Map<Long, BigDecimal> collectedByClient = invoicePaymentRepository
+                .findByTenantIdAndDateRange(tenantId, startDate, endDate).stream()
+                .collect(Collectors.groupingBy(
+                        p -> p.getInvoice().getClient().getId(),
+                        Collectors.reducing(BigDecimal.ZERO, p -> p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO, BigDecimal::add)
+                ));
+
+        return byClient.entrySet().stream().map(entry -> {
+            Long clientId = entry.getKey();
+            List<InvoiceLr> cLrs = entry.getValue();
+            Client client = cLrs.get(0).getOrder().getClient();
+            BigDecimal revenue = cLrs.stream()
+                    .map(il -> il.getTotalAmount() != null ? il.getTotalAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal collected = collectedByClient.getOrDefault(clientId, BigDecimal.ZERO);
+            BigDecimal tripExp = expByClient.getOrDefault(clientId, BigDecimal.ZERO);
+            return ClientPnlRow.builder()
+                    .clientId(clientId)
+                    .clientName(client.getClientName())
+                    .totalInvoiced(revenue)
+                    .totalCollected(collected)
+                    .balanceDue(revenue.subtract(collected))
+                    .tripExpenses(tripExp)
+                    .netPnl(revenue.subtract(tripExp))
+                    .build();
+        }).sorted(Comparator.comparing(ClientPnlRow::getClientName)).toList();
+    }
+
+    // ── P&L Per Vehicle ───────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VehiclePnlRow> getVehiclePnl(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        List<InvoiceLr> invoiceLrs = invoiceLrRepository.findByTenantIdAndInvoiceDateRange(tenantId, startDate, endDate);
+        Map<Long, List<InvoiceLr>> byVehicle = invoiceLrs.stream()
+                .filter(il -> il.getLr().getVehicleAllocation() != null && il.getLr().getVehicleAllocation().getVehicle() != null)
+                .collect(Collectors.groupingBy(il -> il.getLr().getVehicleAllocation().getVehicle().getId()));
+
+        List<LrTripExpense> expenses = tripExpenseRepository.findByTenantIdAndLrDateRange(tenantId, startDate, endDate);
+        Map<Long, BigDecimal> itemTotalById = buildItemTotalMap(expenses);
+        Map<Long, BigDecimal> tripExpByVehicle = expenses.stream()
+                .filter(e -> e.getLr().getVehicleAllocation() != null && e.getLr().getVehicleAllocation().getVehicle() != null)
+                .collect(Collectors.groupingBy(
+                        e -> e.getLr().getVehicleAllocation().getVehicle().getId(),
+                        Collectors.reducing(BigDecimal.ZERO, e -> tripTotal(e, itemTotalById), BigDecimal::add)
+                ));
+
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(LocalTime.MAX);
+        Map<Long, BigDecimal> fuelByVehicle = fuelLogRepository.findByTenantIdAndDateRange(tenantId, start, end).stream()
+                .collect(Collectors.groupingBy(l -> l.getVehicle().getId(),
+                        Collectors.reducing(BigDecimal.ZERO, l -> l.getTotalCost() != null ? l.getTotalCost() : BigDecimal.ZERO, BigDecimal::add)));
+
+        Map<Long, BigDecimal> maintByVehicle = vehicleServiceRepository
+                .findByTenantIdAndServiceDateBetweenAndIsActiveTrue(tenantId, startDate, endDate).stream()
+                .collect(Collectors.groupingBy(s -> s.getVehicle().getId(),
+                        Collectors.reducing(BigDecimal.ZERO, s -> s.getTotalCost() != null ? s.getTotalCost() : BigDecimal.ZERO, BigDecimal::add)));
+
+        Map<Long, BigDecimal> docByVehicle = documentRepository.findByTenantIdAndPaidOnBetween(tenantId, startDate, endDate).stream()
+                .collect(Collectors.groupingBy(d -> d.getVehicle().getId(),
+                        Collectors.reducing(BigDecimal.ZERO, d -> d.getCost() != null ? d.getCost() : BigDecimal.ZERO, BigDecimal::add)));
+
+        return byVehicle.entrySet().stream().map(entry -> {
+            Long vehicleId = entry.getKey();
+            List<InvoiceLr> vLrs = entry.getValue();
+            Vehicle vehicle = vLrs.get(0).getLr().getVehicleAllocation().getVehicle();
+            BigDecimal revenue = vLrs.stream()
+                    .map(il -> il.getTotalAmount() != null ? il.getTotalAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal tripExp = tripExpByVehicle.getOrDefault(vehicleId, BigDecimal.ZERO);
+            BigDecimal fuel = fuelByVehicle.getOrDefault(vehicleId, BigDecimal.ZERO);
+            BigDecimal maint = maintByVehicle.getOrDefault(vehicleId, BigDecimal.ZERO);
+            BigDecimal doc = docByVehicle.getOrDefault(vehicleId, BigDecimal.ZERO);
+            BigDecimal totalExp = tripExp.add(fuel).add(maint).add(doc);
+            return VehiclePnlRow.builder()
+                    .vehicleId(vehicleId)
+                    .registrationNumber(vehicle.getRegistrationNumber())
+                    .vehicleType(vehicle.getVehicleType() != null ? vehicle.getVehicleType().getName() : "—")
+                    .revenue(revenue)
+                    .tripExpenses(tripExp)
+                    .fuelCost(fuel)
+                    .maintenanceCost(maint)
+                    .documentCost(doc)
+                    .totalExpenses(totalExp)
+                    .netPnl(revenue.subtract(totalExp))
+                    .build();
+        }).sorted(Comparator.comparing(VehiclePnlRow::getRegistrationNumber)).toList();
+    }
+
+    // ── P&L Per Route ─────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RoutePnlRow> getRoutePnl(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        List<InvoiceLr> invoiceLrs = invoiceLrRepository.findByTenantIdAndInvoiceDateRange(tenantId, startDate, endDate);
+        Map<String, List<InvoiceLr>> byRoute = invoiceLrs.stream()
+                .filter(il -> il.getOrder().getSourceCity() != null && il.getOrder().getDestinationCity() != null)
+                .collect(Collectors.groupingBy(il ->
+                        il.getOrder().getSourceCity().getName() + "||" + il.getOrder().getDestinationCity().getName()));
+
+        List<LrTripExpense> expenses = tripExpenseRepository.findByTenantIdAndLrDateRange(tenantId, startDate, endDate);
+        Map<Long, BigDecimal> itemTotalById = buildItemTotalMap(expenses);
+        Map<String, BigDecimal> expByRoute = expenses.stream()
+                .filter(e -> e.getLr().getOrder().getSourceCity() != null && e.getLr().getOrder().getDestinationCity() != null)
+                .collect(Collectors.groupingBy(
+                        e -> e.getLr().getOrder().getSourceCity().getName() + "||" + e.getLr().getOrder().getDestinationCity().getName(),
+                        Collectors.reducing(BigDecimal.ZERO, e -> tripTotal(e, itemTotalById), BigDecimal::add)
+                ));
+
+        return byRoute.entrySet().stream().map(entry -> {
+            String[] parts = entry.getKey().split("\\|\\|", 2);
+            String fromCity = parts[0];
+            String toCity = parts.length > 1 ? parts[1] : "—";
+            List<InvoiceLr> routeLrs = entry.getValue();
+            BigDecimal revenue = routeLrs.stream()
+                    .map(il -> il.getTotalAmount() != null ? il.getTotalAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal tripExp = expByRoute.getOrDefault(entry.getKey(), BigDecimal.ZERO);
+            return RoutePnlRow.builder()
+                    .fromCity(fromCity)
+                    .toCity(toCity)
+                    .totalTrips(routeLrs.size())
+                    .revenue(revenue)
+                    .tripExpenses(tripExp)
+                    .netPnl(revenue.subtract(tripExp))
+                    .build();
+        }).sorted(Comparator.comparing(RoutePnlRow::getFromCity).thenComparing(RoutePnlRow::getToCity)).toList();
+    }
+
+    // ── P&L Helpers ───────────────────────────────────────────────────────────────
+
+    private Map<Long, BigDecimal> buildItemTotalMap(List<LrTripExpense> expenses) {
+        if (expenses.isEmpty()) return Map.of();
+        List<Long> ids = expenses.stream().map(LrTripExpense::getId).toList();
+        return tripExpenseItemRepository.findByTripExpenseIdsAndIsActiveTrue(ids).stream()
+                .collect(Collectors.groupingBy(
+                        i -> i.getTripExpense().getId(),
+                        Collectors.reducing(BigDecimal.ZERO, i -> i.getAmount() != null ? i.getAmount() : BigDecimal.ZERO, BigDecimal::add)
+                ));
+    }
+
+    private BigDecimal tripTotal(LrTripExpense e, Map<Long, BigDecimal> itemTotalById) {
+        BigDecimal batta = e.getDriverBatta().add(e.getCleanerBatta()).add(e.getTripMamulu());
+        return batta.add(itemTotalById.getOrDefault(e.getId(), BigDecimal.ZERO));
     }
 
     private String primaryRole(User user) {
