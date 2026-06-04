@@ -16,4 +16,5 @@ public interface ServicePartRepository extends JpaRepository<ServicePart, Long> 
     List<ServicePart> findByService_TenantIdOrderByCreatedAtDesc(Long tenantId);
     Optional<ServicePart> findByIdAndService_TenantId(Long id, Long tenantId);
     List<ServicePart> findByService_TenantIdAndService_ServiceDateBetweenAndStatus(Long tenantId, LocalDate from, LocalDate to, ServicePartStatus status);
+    List<ServicePart> findByService_TenantIdAndService_ServiceDateBetween(Long tenantId, LocalDate from, LocalDate to);
 }

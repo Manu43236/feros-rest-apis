@@ -78,4 +78,19 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
     List<ClientVehiclePnlRow> getClientVehiclePnl(LocalDate startDate, LocalDate endDate);
 
     List<TripPnlRow> getTripPnl(LocalDate startDate, LocalDate endDate);
+
+    // ── Inventory Reports ──────────────────────────────────────────────────────
+    List<StockSummaryRow> getStockSummary();
+    List<StockInwardRow> getStockInward(LocalDate startDate, LocalDate endDate);
+    List<StockOutwardRow> getStockOutward(LocalDate startDate, LocalDate endDate);
+    List<PartRequestRow> getPartRequests(LocalDate startDate, LocalDate endDate);
+    List<ConsumptionByVehicleRow> getConsumptionByVehicle(LocalDate startDate, LocalDate endDate);
+
+    // ── Tyre Reports ───────────────────────────────────────────────────────────
+    List<TyreInventoryRow> getTyreInventory();
+    List<TyreFittingRow> getTyreFittingRegister(LocalDate startDate, LocalDate endDate);
+    List<TyreRemovalRow> getTyreRemovalRegister(LocalDate startDate, LocalDate endDate);
+    List<TyreLifeRow> getTyreLifeReport();
+    List<TyreRequestRow> getTyreRequests(LocalDate startDate, LocalDate endDate);
+    List<TyreRotationRow> getTyreRotationLog(LocalDate startDate, LocalDate endDate);
 }

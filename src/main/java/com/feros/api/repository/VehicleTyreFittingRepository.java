@@ -33,4 +33,12 @@ public interface VehicleTyreFittingRepository extends JpaRepository<VehicleTyreF
     // All fittings (active + historical) for a tenant — for km/cost analysis
     @Query("SELECT f FROM VehicleTyreFitting f WHERE f.tenant.id = :tenantId AND f.isActive = true ORDER BY f.fittedDate DESC")
     List<VehicleTyreFitting> findAllFittingsByTenantId(@Param("tenantId") Long tenantId);
+
+    // Fitting register: fittings whose fittedDate falls in range
+    @Query("SELECT f FROM VehicleTyreFitting f WHERE f.tenant.id = :tenantId AND f.isActive = true AND f.fittedDate BETWEEN :from AND :to ORDER BY f.fittedDate DESC")
+    List<VehicleTyreFitting> findByTenantIdAndFittedDateBetween(@Param("tenantId") Long tenantId, @Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to);
+
+    // Removal register: removals whose removedDate falls in range
+    @Query("SELECT f FROM VehicleTyreFitting f WHERE f.tenant.id = :tenantId AND f.isActive = true AND f.removedDate BETWEEN :from AND :to ORDER BY f.removedDate DESC")
+    List<VehicleTyreFitting> findByTenantIdAndRemovedDateBetween(@Param("tenantId") Long tenantId, @Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to);
 }

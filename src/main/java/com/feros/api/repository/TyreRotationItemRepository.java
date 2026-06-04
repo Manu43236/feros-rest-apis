@@ -8,4 +8,5 @@ import java.util.List;
 public interface TyreRotationItemRepository extends JpaRepository<TyreRotationItem, Long> {
 
     List<TyreRotationItem> findByRotationLogIdOrderById(Long rotationLogId);
+    List<TyreRotationItem> findByRotationLogIdInOrderById(List<Long> rotationLogIds);
 }

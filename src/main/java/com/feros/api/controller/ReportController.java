@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/reports")
@@ -1005,6 +1006,271 @@ public class ReportController {
         }).toList();
         return export("route-pnl-" + startDate + "-" + endDate,
                 "P&L Per Route — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Inventory: Stock Summary ──────────────────────────────────────────────
+
+    @GetMapping("/inventory/stock-summary")
+    public ResponseEntity<ApiResponse<List<StockSummaryRow>>> getStockSummary() {
+        return ResponseEntity.ok(ApiResponse.success("Stock summary fetched", reportService.getStockSummary()));
+    }
+
+    @GetMapping("/inventory/stock-summary/export")
+    public ResponseEntity<byte[]> exportStockSummary(@RequestParam(defaultValue = "csv") String format) {
+        List<StockSummaryRow> rows = reportService.getStockSummary();
+        String[] headers = {"Part", "Part No.", "Category", "Unit", "Qty On Hand", "Min Level", "Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getPartName(), safe(r.getPartNumber()), safe(r.getCategory()), r.getUnit(),
+                String.valueOf(r.getQuantityOnHand()), String.valueOf(r.getMinStockLevel()), r.getStockStatus()
+        }).toList();
+        return export("stock-summary", "Stock Summary", headers, data, format);
+    }
+
+    // ── Inventory: Stock Inward ───────────────────────────────────────────────
+
+    @GetMapping("/inventory/inward")
+    public ResponseEntity<ApiResponse<List<StockInwardRow>>> getStockInward(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Stock inward fetched", reportService.getStockInward(startDate, endDate)));
+    }
+
+    @GetMapping("/inventory/inward/export")
+    public ResponseEntity<byte[]> exportStockInward(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<StockInwardRow> rows = reportService.getStockInward(startDate, endDate);
+        String[] headers = {"Date & Time", "Part", "Part No.", "Category", "Unit", "Qty", "Unit Cost", "Total Cost", "Supplier", "Reference Type", "Received By", "Notes"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getTransactionDate()), r.getPartName(), safe(r.getPartNumber()), safe(r.getCategory()),
+                r.getUnit(), String.valueOf(r.getQuantity()), safe(r.getUnitCost()), safe(r.getTotalCost()),
+                safe(r.getSupplierName()), safe(r.getReferenceType()), safe(r.getReceivedBy()), safe(r.getNotes())
+        }).toList();
+        return export("stock-inward-" + startDate + "-" + endDate,
+                "Stock Inward — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Inventory: Stock Outward ──────────────────────────────────────────────
+
+    @GetMapping("/inventory/outward")
+    public ResponseEntity<ApiResponse<List<StockOutwardRow>>> getStockOutward(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Stock outward fetched", reportService.getStockOutward(startDate, endDate)));
+    }
+
+    @GetMapping("/inventory/outward/export")
+    public ResponseEntity<byte[]> exportStockOutward(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<StockOutwardRow> rows = reportService.getStockOutward(startDate, endDate);
+        String[] headers = {"Date & Time", "Part", "Part No.", "Category", "Unit", "Qty", "Total Cost", "Type", "Vehicle", "Requested By", "Approved By", "Notes"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getTransactionDate()), r.getPartName(), safe(r.getPartNumber()), safe(r.getCategory()),
+                r.getUnit(), String.valueOf(r.getQuantity()), safe(r.getTotalCost()), r.getTransactionType(),
+                safe(r.getVehicleRegistration()), safe(r.getRequestedBy()), safe(r.getApprovedBy()), safe(r.getNotes())
+        }).toList();
+        return export("stock-outward-" + startDate + "-" + endDate,
+                "Stock Outward — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Inventory: Part Requests ──────────────────────────────────────────────
+
+    @GetMapping("/inventory/part-requests")
+    public ResponseEntity<ApiResponse<List<PartRequestRow>>> getPartRequests(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Part requests fetched", reportService.getPartRequests(startDate, endDate)));
+    }
+
+    @GetMapping("/inventory/part-requests/export")
+    public ResponseEntity<byte[]> exportPartRequests(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<PartRequestRow> rows = reportService.getPartRequests(startDate, endDate);
+        String[] headers = {"Service Date", "Part", "Part No.", "Category", "Unit", "Qty Requested", "Qty Approved", "Vehicle", "Vehicle Type", "Requested By", "Approved By", "Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getServiceDate()), r.getPartName(), safe(r.getPartNumber()), safe(r.getCategory()),
+                r.getUnit(), String.valueOf(r.getQuantityRequested()), String.valueOf(r.getQuantityApproved()),
+                safe(r.getVehicleRegistration()), safe(r.getVehicleType()),
+                safe(r.getRequestedBy()), safe(r.getApprovedBy()), r.getStatus()
+        }).toList();
+        return export("part-requests-" + startDate + "-" + endDate,
+                "Part Request Register — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Inventory: Consumption by Vehicle ────────────────────────────────────
+
+    @GetMapping("/inventory/consumption")
+    public ResponseEntity<ApiResponse<List<ConsumptionByVehicleRow>>> getConsumptionByVehicle(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Consumption by vehicle fetched", reportService.getConsumptionByVehicle(startDate, endDate)));
+    }
+
+    @GetMapping("/inventory/consumption/export")
+    public ResponseEntity<byte[]> exportConsumptionByVehicle(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<ConsumptionByVehicleRow> rows = reportService.getConsumptionByVehicle(startDate, endDate);
+        String[] headers = {"Vehicle", "Type", "Total Parts Consumed", "Total Cost (₹)"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getRegistrationNumber(), r.getVehicleType(),
+                String.valueOf(r.getTotalPartsConsumed()), safe(r.getTotalCost())
+        }).toList();
+        return export("consumption-by-vehicle-" + startDate + "-" + endDate,
+                "Consumption by Vehicle — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Tyre: Inventory ───────────────────────────────────────────────────────
+
+    @GetMapping("/tyres/inventory")
+    public ResponseEntity<ApiResponse<List<TyreInventoryRow>>> getTyreInventory() {
+        return ResponseEntity.ok(ApiResponse.success("Tyre inventory fetched", reportService.getTyreInventory()));
+    }
+
+    @GetMapping("/tyres/inventory/export")
+    public ResponseEntity<byte[]> exportTyreInventory(@RequestParam(defaultValue = "csv") String format) {
+        List<TyreInventoryRow> rows = reportService.getTyreInventory();
+        String[] headers = {"Serial No.", "Brand", "Size", "Type", "Ply", "Purchase Date", "Cost", "Status", "Lifetime KM", "Max KM", "% Used", "Retrds", "Expiry", "Fitted On", "Position"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getSerialNumber(), r.getBrand(), r.getSize(), r.getTyreType(), safe(r.getPlyRating()),
+                safe(r.getPurchaseDate()), safe(r.getPurchaseCost()), r.getStatus(),
+                String.valueOf(r.getTotalLifetimeKm()), String.valueOf(r.getMaxLifetimeKm()),
+                r.getPercentLifeUsed() + "%", String.valueOf(r.getRetreadCount()),
+                safe(r.getExpiryDate()), safe(r.getFittedOnVehicle()), safe(r.getFittedPosition())
+        }).toList();
+        return export("tyre-inventory", "Tyre Inventory", headers, data, format);
+    }
+
+    // ── Tyre: Fitting Register ────────────────────────────────────────────────
+
+    @GetMapping("/tyres/fittings")
+    public ResponseEntity<ApiResponse<List<TyreFittingRow>>> getTyreFittingRegister(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Tyre fitting register fetched", reportService.getTyreFittingRegister(startDate, endDate)));
+    }
+
+    @GetMapping("/tyres/fittings/export")
+    public ResponseEntity<byte[]> exportTyreFittingRegister(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<TyreFittingRow> rows = reportService.getTyreFittingRegister(startDate, endDate);
+        String[] headers = {"Fitted Date", "Vehicle", "Type", "Tyre Serial", "Brand", "Size", "Tyre Type", "Position", "Fitted At KM", "Fitted By"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getFittedDate()), r.getVehicleRegistration(), r.getVehicleType(),
+                r.getTyreSerial(), r.getTyreBrand(), r.getTyreSize(), r.getTyreType(),
+                r.getPosition(), String.valueOf(r.getFittedAtKm()), r.getFittedBy()
+        }).toList();
+        return export("tyre-fittings-" + startDate + "-" + endDate,
+                "Tyre Fitting Register — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Tyre: Removal Register ────────────────────────────────────────────────
+
+    @GetMapping("/tyres/removals")
+    public ResponseEntity<ApiResponse<List<TyreRemovalRow>>> getTyreRemovalRegister(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Tyre removal register fetched", reportService.getTyreRemovalRegister(startDate, endDate)));
+    }
+
+    @GetMapping("/tyres/removals/export")
+    public ResponseEntity<byte[]> exportTyreRemovalRegister(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<TyreRemovalRow> rows = reportService.getTyreRemovalRegister(startDate, endDate);
+        String[] headers = {"Removed Date", "Vehicle", "Type", "Tyre Serial", "Brand", "Size", "Position", "Fitted At KM", "Removed At KM", "KM Driven", "Reason", "Removed By"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getRemovedDate()), r.getVehicleRegistration(), r.getVehicleType(),
+                r.getTyreSerial(), r.getTyreBrand(), r.getTyreSize(), r.getPosition(),
+                String.valueOf(r.getFittedAtKm()), String.valueOf(r.getRemovedAtKm()),
+                String.valueOf(r.getKmDriven()), r.getRemovalReason(), r.getRemovedBy()
+        }).toList();
+        return export("tyre-removals-" + startDate + "-" + endDate,
+                "Tyre Removal Register — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Tyre: Life Report ─────────────────────────────────────────────────────
+
+    @GetMapping("/tyres/life")
+    public ResponseEntity<ApiResponse<List<TyreLifeRow>>> getTyreLifeReport() {
+        return ResponseEntity.ok(ApiResponse.success("Tyre life report fetched", reportService.getTyreLifeReport()));
+    }
+
+    @GetMapping("/tyres/life/export")
+    public ResponseEntity<byte[]> exportTyreLifeReport(@RequestParam(defaultValue = "csv") String format) {
+        List<TyreLifeRow> rows = reportService.getTyreLifeReport();
+        String[] headers = {"Serial No.", "Brand", "Size", "Type", "Lifetime KM", "Max KM", "% Used", "Retreads", "Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getSerialNumber(), r.getBrand(), r.getSize(), r.getTyreType(),
+                String.valueOf(r.getTotalLifetimeKm()), String.valueOf(r.getMaxLifetimeKm()),
+                r.getPercentLifeUsed() + "%", String.valueOf(r.getRetreadCount()), r.getStatus()
+        }).toList();
+        return export("tyre-life", "Tyre Life Report", headers, data, format);
+    }
+
+    // ── Tyre: Request Register ────────────────────────────────────────────────
+
+    @GetMapping("/tyres/requests")
+    public ResponseEntity<ApiResponse<List<TyreRequestRow>>> getTyreRequests(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Tyre requests fetched", reportService.getTyreRequests(startDate, endDate)));
+    }
+
+    @GetMapping("/tyres/requests/export")
+    public ResponseEntity<byte[]> exportTyreRequests(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<TyreRequestRow> rows = reportService.getTyreRequests(startDate, endDate);
+        String[] headers = {"Date", "Vehicle", "Type", "Position", "Requested By", "Approved By", "Issued Tyre", "Fitted At KM", "Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getCreatedAt()), r.getVehicleRegistration(), r.getVehicleType(), r.getPosition(),
+                r.getRequestedBy(), safe(r.getApprovedBy()),
+                r.getIssuedTyreSerial() != null ? r.getIssuedTyreSerial() + " / " + r.getIssuedTyreBrand() : "—",
+                String.valueOf(r.getFittedAtKm()), r.getStatus()
+        }).toList();
+        return export("tyre-requests-" + startDate + "-" + endDate,
+                "Tyre Request Register — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Tyre: Rotation Log ────────────────────────────────────────────────────
+
+    @GetMapping("/tyres/rotations")
+    public ResponseEntity<ApiResponse<List<TyreRotationRow>>> getTyreRotationLog(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Tyre rotation log fetched", reportService.getTyreRotationLog(startDate, endDate)));
+    }
+
+    @GetMapping("/tyres/rotations/export")
+    public ResponseEntity<byte[]> exportTyreRotationLog(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<TyreRotationRow> rows = reportService.getTyreRotationLog(startDate, endDate);
+        String[] headers = {"Date", "Vehicle", "Type", "Odometer KM", "Performed By", "Tyres Rotated", "Movements"};
+        List<String[]> data = rows.stream().map(r -> {
+            String movements = r.getMovements().stream()
+                    .map(m -> m.getTyreSerial() + " " + m.getFromPosition() + "→" + m.getToPosition())
+                    .collect(Collectors.joining("; "));
+            return new String[]{
+                    safe(r.getRotationDate()), r.getVehicleRegistration(), r.getVehicleType(),
+                    String.valueOf(r.getOdometerKm()), r.getPerformedBy(),
+                    String.valueOf(r.getTyresRotated()), movements
+            };
+        }).toList();
+        return export("tyre-rotations-" + startDate + "-" + endDate,
+                "Tyre Rotation Log — " + startDate + " to " + endDate, headers, data, format);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

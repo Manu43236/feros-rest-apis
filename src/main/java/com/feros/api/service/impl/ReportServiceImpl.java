@@ -6,6 +6,7 @@ import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.OrderStatus;
 import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.enums.InvoiceStatus;
+import com.feros.api.enums.StockTransactionType;
 import com.feros.api.entity.Client;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.repository.*;
@@ -45,6 +46,14 @@ public class ReportServiceImpl implements ReportService {
     private final LrTripExpenseRepository tripExpenseRepository;
     private final LrTripExpenseItemRepository tripExpenseItemRepository;
     private final InvoiceLrRepository invoiceLrRepository;
+    private final SparePartsInventoryRepository sparePartsInventoryRepository;
+    private final SparePartsTransactionRepository sparePartsTransactionRepository;
+    private final ServicePartRepository servicePartRepository;
+    private final TyreRepository tyreRepository;
+    private final VehicleTyreFittingRepository vehicleTyreFittingRepository;
+    private final TyreRequestRepository tyreRequestRepository;
+    private final TyreRotationLogRepository tyreRotationLogRepository;
+    private final TyreRotationItemRepository tyreRotationItemRepository;
 
     // ── 1. Fleet Status ────────────────────────────────────────────────────────
 
@@ -1365,5 +1374,328 @@ public class ReportServiceImpl implements ReportService {
             if (names.contains(r)) return r;
         }
         return names.isEmpty() ? "—" : names.iterator().next();
+    }
+
+    // ── Inventory Reports ─────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StockSummaryRow> getStockSummary() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return sparePartsInventoryRepository.findByTenantIdOrderBySparePartNameAsc(tenantId).stream()
+                .map(inv -> {
+                    var part = inv.getSparePart();
+                    int qty = inv.getQuantity() != null ? inv.getQuantity() : 0;
+                    int minLevel = part.getMinStockLevel() != null ? part.getMinStockLevel() : 0;
+                    String status = qty == 0 ? "OUT" : (qty <= minLevel ? "LOW" : "OK");
+                    return StockSummaryRow.builder()
+                            .partId(part.getId())
+                            .partName(part.getName())
+                            .partNumber(part.getPartNumber())
+                            .category(part.getCategory())
+                            .unit(part.getUnit())
+                            .quantityOnHand(qty)
+                            .minStockLevel(minLevel)
+                            .stockStatus(status)
+                            .build();
+                }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StockInwardRow> getStockInward(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDateTime from = startDate.atStartOfDay();
+        LocalDateTime to = endDate.atTime(LocalTime.MAX);
+        return sparePartsTransactionRepository
+                .findByTenantIdAndCreatedAtBetweenOrderByCreatedAtDesc(tenantId, from, to).stream()
+                .filter(t -> t.getTransactionType() == StockTransactionType.IN)
+                .map(t -> {
+                    var part = t.getSparePart();
+                    return StockInwardRow.builder()
+                            .transactionId(t.getId())
+                            .transactionDate(t.getCreatedAt())
+                            .partName(part.getName())
+                            .partNumber(part.getPartNumber())
+                            .category(part.getCategory())
+                            .unit(part.getUnit())
+                            .quantity(t.getQuantity() != null ? t.getQuantity() : 0)
+                            .unitCost(t.getUnitCost())
+                            .totalCost(t.getTotalCost())
+                            .supplierName(t.getSupplierName())
+                            .referenceType(t.getReferenceType() != null ? t.getReferenceType().name() : "—")
+                            .receivedBy(t.getCreatedBy() != null ? t.getCreatedBy().getName() : "—")
+                            .notes(t.getNotes())
+                            .build();
+                }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StockOutwardRow> getStockOutward(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDateTime from = startDate.atStartOfDay();
+        LocalDateTime to = endDate.atTime(LocalTime.MAX);
+        return sparePartsTransactionRepository
+                .findByTenantIdAndCreatedAtBetweenOrderByCreatedAtDesc(tenantId, from, to).stream()
+                .filter(t -> t.getTransactionType() == StockTransactionType.OUT
+                        || t.getTransactionType() == StockTransactionType.DAMAGE)
+                .map(t -> {
+                    var part = t.getSparePart();
+                    String vehicleReg = null;
+                    String requestedBy = null;
+                    String approvedBy = null;
+                    if (t.getServicePart() != null) {
+                        ServicePart sp = t.getServicePart();
+                        if (sp.getService() != null && sp.getService().getVehicle() != null) {
+                            vehicleReg = sp.getService().getVehicle().getRegistrationNumber();
+                        }
+                        requestedBy = sp.getRequestedBy() != null ? sp.getRequestedBy().getName() : null;
+                        approvedBy = sp.getApprovedBy() != null ? sp.getApprovedBy().getName() : null;
+                    }
+                    return StockOutwardRow.builder()
+                            .transactionId(t.getId())
+                            .transactionDate(t.getCreatedAt())
+                            .partName(part.getName())
+                            .partNumber(part.getPartNumber())
+                            .category(part.getCategory())
+                            .unit(part.getUnit())
+                            .quantity(t.getQuantity() != null ? t.getQuantity() : 0)
+                            .totalCost(t.getTotalCost())
+                            .transactionType(t.getTransactionType().name())
+                            .vehicleRegistration(vehicleReg)
+                            .requestedBy(requestedBy)
+                            .approvedBy(approvedBy)
+                            .notes(t.getNotes())
+                            .build();
+                }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PartRequestRow> getPartRequests(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return servicePartRepository.findByService_TenantIdAndService_ServiceDateBetween(tenantId, startDate, endDate)
+                .stream().map(sp -> {
+                    var part = sp.getSparePart();
+                    var vehicle = sp.getService() != null ? sp.getService().getVehicle() : null;
+                    return PartRequestRow.builder()
+                            .servicePartId(sp.getId())
+                            .serviceDate(sp.getService() != null ? sp.getService().getServiceDate() : null)
+                            .partName(part.getName())
+                            .partNumber(part.getPartNumber())
+                            .category(part.getCategory())
+                            .unit(part.getUnit())
+                            .quantityRequested(sp.getQuantityRequested() != null ? sp.getQuantityRequested() : 0)
+                            .quantityApproved(sp.getQuantityApproved() != null ? sp.getQuantityApproved() : 0)
+                            .vehicleRegistration(vehicle != null ? vehicle.getRegistrationNumber() : null)
+                            .vehicleType(vehicle != null && vehicle.getVehicleType() != null ? vehicle.getVehicleType().getName() : null)
+                            .requestedBy(sp.getRequestedBy() != null ? sp.getRequestedBy().getName() : null)
+                            .approvedBy(sp.getApprovedBy() != null ? sp.getApprovedBy().getName() : null)
+                            .approvedAt(sp.getApprovedAt())
+                            .status(sp.getStatus() != null ? sp.getStatus().name() : "—")
+                            .build();
+                }).sorted(Comparator.comparing(PartRequestRow::getServiceDate, Comparator.nullsLast(Comparator.reverseOrder()))).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ConsumptionByVehicleRow> getConsumptionByVehicle(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDateTime from = startDate.atStartOfDay();
+        LocalDateTime to = endDate.atTime(LocalTime.MAX);
+        List<SparePartsTransaction> outward = sparePartsTransactionRepository
+                .findByTenantIdAndCreatedAtBetweenOrderByCreatedAtDesc(tenantId, from, to).stream()
+                .filter(t -> t.getTransactionType() == StockTransactionType.OUT && t.getServicePart() != null
+                        && t.getServicePart().getService() != null && t.getServicePart().getService().getVehicle() != null)
+                .toList();
+
+        Map<Long, List<SparePartsTransaction>> byVehicle = outward.stream()
+                .collect(Collectors.groupingBy(t -> t.getServicePart().getService().getVehicle().getId()));
+
+        return byVehicle.entrySet().stream().map(entry -> {
+            List<SparePartsTransaction> vTxns = entry.getValue();
+            Vehicle vehicle = vTxns.get(0).getServicePart().getService().getVehicle();
+            int totalParts = vTxns.stream().mapToInt(t -> t.getQuantity() != null ? t.getQuantity() : 0).sum();
+            BigDecimal totalCost = vTxns.stream()
+                    .map(t -> t.getTotalCost() != null ? t.getTotalCost() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            return ConsumptionByVehicleRow.builder()
+                    .vehicleId(vehicle.getId())
+                    .registrationNumber(vehicle.getRegistrationNumber())
+                    .vehicleType(vehicle.getVehicleType() != null ? vehicle.getVehicleType().getName() : "—")
+                    .totalPartsConsumed(totalParts)
+                    .totalCost(totalCost)
+                    .build();
+        }).sorted(Comparator.comparing(ConsumptionByVehicleRow::getRegistrationNumber)).toList();
+    }
+
+    // ── Tyre Reports ──────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TyreInventoryRow> getTyreInventory() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<Tyre> tyres = tyreRepository.findByTenantIdAndIsActiveTrueOrderByIdDesc(tenantId);
+
+        // Build map of tyre → active fitting (for vehicle + position info)
+        Map<Long, VehicleTyreFitting> activeFittings = vehicleTyreFittingRepository
+                .findAllActiveFittingsByTenantId(tenantId).stream()
+                .collect(Collectors.toMap(f -> f.getTyre().getId(), f -> f, (a, b) -> a));
+
+        return tyres.stream().map(t -> {
+            double lifetimeKm = t.getTotalLifetimeKm() != null ? t.getTotalLifetimeKm().doubleValue() : 0;
+            double maxKm = t.getMaxLifetimeKm() != null ? t.getMaxLifetimeKm().doubleValue() : 0;
+            double pctUsed = maxKm > 0 ? Math.min(100.0, lifetimeKm / maxKm * 100) : 0;
+
+            VehicleTyreFitting fitting = activeFittings.get(t.getId());
+            return TyreInventoryRow.builder()
+                    .tyreId(t.getId())
+                    .serialNumber(t.getSerialNumber())
+                    .brand(t.getBrand())
+                    .size(t.getSize())
+                    .tyreType(t.getTyreType() != null ? t.getTyreType().name() : "—")
+                    .plyRating(t.getPlyRating())
+                    .purchaseDate(t.getPurchaseDate())
+                    .purchaseCost(t.getPurchaseCost())
+                    .status(t.getStatus() != null ? t.getStatus().name() : "—")
+                    .totalLifetimeKm(lifetimeKm)
+                    .maxLifetimeKm(maxKm)
+                    .percentLifeUsed(Math.round(pctUsed * 10.0) / 10.0)
+                    .retreadCount(t.getRetreadCount() != null ? t.getRetreadCount() : 0)
+                    .expiryDate(t.getExpiryDate())
+                    .fittedOnVehicle(fitting != null && fitting.getVehicle() != null ? fitting.getVehicle().getRegistrationNumber() : null)
+                    .fittedPosition(fitting != null && fitting.getPosition() != null ? fitting.getPosition().getPositionCode() : null)
+                    .build();
+        }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TyreFittingRow> getTyreFittingRegister(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return vehicleTyreFittingRepository.findByTenantIdAndFittedDateBetween(tenantId, startDate, endDate)
+                .stream().map(f -> TyreFittingRow.builder()
+                        .fittingId(f.getId())
+                        .fittedDate(f.getFittedDate())
+                        .vehicleRegistration(f.getVehicle().getRegistrationNumber())
+                        .vehicleType(f.getVehicle().getVehicleType() != null ? f.getVehicle().getVehicleType().getName() : "—")
+                        .tyreSerial(f.getTyre().getSerialNumber())
+                        .tyreBrand(f.getTyre().getBrand())
+                        .tyreSize(f.getTyre().getSize())
+                        .tyreType(f.getTyre().getTyreType() != null ? f.getTyre().getTyreType().name() : "—")
+                        .position(f.getPosition() != null ? f.getPosition().getPositionCode() : "—")
+                        .fittedAtKm(f.getFittedAtKm() != null ? f.getFittedAtKm().doubleValue() : 0)
+                        .fittedBy(f.getFittedBy() != null ? f.getFittedBy().getName() : "—")
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TyreRemovalRow> getTyreRemovalRegister(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return vehicleTyreFittingRepository.findByTenantIdAndRemovedDateBetween(tenantId, startDate, endDate)
+                .stream().map(f -> TyreRemovalRow.builder()
+                        .fittingId(f.getId())
+                        .removedDate(f.getRemovedDate())
+                        .vehicleRegistration(f.getVehicle().getRegistrationNumber())
+                        .vehicleType(f.getVehicle().getVehicleType() != null ? f.getVehicle().getVehicleType().getName() : "—")
+                        .tyreSerial(f.getTyre().getSerialNumber())
+                        .tyreBrand(f.getTyre().getBrand())
+                        .tyreSize(f.getTyre().getSize())
+                        .position(f.getPosition() != null ? f.getPosition().getPositionCode() : "—")
+                        .fittedAtKm(f.getFittedAtKm() != null ? f.getFittedAtKm().doubleValue() : 0)
+                        .removedAtKm(f.getRemovedAtKm() != null ? f.getRemovedAtKm().doubleValue() : 0)
+                        .kmDriven(f.getKmDriven() != null ? f.getKmDriven().doubleValue() : 0)
+                        .removalReason(f.getRemovalReason() != null ? f.getRemovalReason().name() : "—")
+                        .removedBy(f.getRemovedBy() != null ? f.getRemovedBy().getName() : "—")
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TyreLifeRow> getTyreLifeReport() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return tyreRepository.findByTenantIdAndIsActiveTrueOrderByIdDesc(tenantId).stream()
+                .map(t -> {
+                    double lifetimeKm = t.getTotalLifetimeKm() != null ? t.getTotalLifetimeKm().doubleValue() : 0;
+                    double maxKm = t.getMaxLifetimeKm() != null ? t.getMaxLifetimeKm().doubleValue() : 0;
+                    double pctUsed = maxKm > 0 ? Math.min(100.0, lifetimeKm / maxKm * 100) : 0;
+                    return TyreLifeRow.builder()
+                            .tyreId(t.getId())
+                            .serialNumber(t.getSerialNumber())
+                            .brand(t.getBrand())
+                            .size(t.getSize())
+                            .tyreType(t.getTyreType() != null ? t.getTyreType().name() : "—")
+                            .totalLifetimeKm(lifetimeKm)
+                            .maxLifetimeKm(maxKm)
+                            .percentLifeUsed(Math.round(pctUsed * 10.0) / 10.0)
+                            .retreadCount(t.getRetreadCount() != null ? t.getRetreadCount() : 0)
+                            .status(t.getStatus() != null ? t.getStatus().name() : "—")
+                            .build();
+                })
+                .sorted(Comparator.comparingDouble(TyreLifeRow::getPercentLifeUsed).reversed())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TyreRequestRow> getTyreRequests(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDateTime from = startDate.atStartOfDay();
+        LocalDateTime to = endDate.atTime(LocalTime.MAX);
+        return tyreRequestRepository.findByTenantIdAndCreatedAtBetweenAndIsActiveTrueOrderByCreatedAtDesc(tenantId, from, to)
+                .stream().map(r -> TyreRequestRow.builder()
+                        .requestId(r.getId())
+                        .createdAt(r.getCreatedAt())
+                        .vehicleRegistration(r.getVehicle().getRegistrationNumber())
+                        .vehicleType(r.getVehicle().getVehicleType() != null ? r.getVehicle().getVehicleType().getName() : "—")
+                        .position(r.getPosition() != null ? r.getPosition().getPositionCode() : "—")
+                        .requestedBy(r.getRequestedBy() != null ? r.getRequestedBy().getName() : "—")
+                        .approvedBy(r.getApprovedBy() != null ? r.getApprovedBy().getName() : null)
+                        .approvedAt(r.getApprovedAt())
+                        .issuedTyreSerial(r.getIssuedTyre() != null ? r.getIssuedTyre().getSerialNumber() : null)
+                        .issuedTyreBrand(r.getIssuedTyre() != null ? r.getIssuedTyre().getBrand() : null)
+                        .fittedAtKm(r.getFittedAtKm() != null ? r.getFittedAtKm().doubleValue() : 0)
+                        .status(r.getStatus() != null ? r.getStatus().name() : "—")
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TyreRotationRow> getTyreRotationLog(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<TyreRotationLog> logs = tyreRotationLogRepository.findByTenantIdAndRotationDateBetween(tenantId, startDate, endDate);
+        if (logs.isEmpty()) return List.of();
+
+        List<Long> logIds = logs.stream().map(TyreRotationLog::getId).toList();
+        Map<Long, List<TyreRotationItem>> itemsByLog = tyreRotationItemRepository
+                .findByRotationLogIdInOrderById(logIds).stream()
+                .collect(Collectors.groupingBy(i -> i.getRotationLog().getId()));
+
+        return logs.stream().map(log -> {
+            List<TyreRotationItem> items = itemsByLog.getOrDefault(log.getId(), List.of());
+            List<TyreRotationRow.TyreMovement> movements = items.stream()
+                    .map(i -> TyreRotationRow.TyreMovement.builder()
+                            .tyreSerial(i.getTyre().getSerialNumber())
+                            .tyreBrand(i.getTyre().getBrand())
+                            .fromPosition(i.getFromPosition() != null ? i.getFromPosition().getPositionCode() : "—")
+                            .toPosition(i.getToPosition() != null ? i.getToPosition().getPositionCode() : "—")
+                            .build())
+                    .toList();
+            return TyreRotationRow.builder()
+                    .rotationLogId(log.getId())
+                    .rotationDate(log.getRotationDate())
+                    .vehicleRegistration(log.getVehicle().getRegistrationNumber())
+                    .vehicleType(log.getVehicle().getVehicleType() != null ? log.getVehicle().getVehicleType().getName() : "—")
+                    .odometerKm(log.getOdometerKm() != null ? log.getOdometerKm().doubleValue() : 0)
+                    .performedBy(log.getPerformedBy() != null ? log.getPerformedBy().getName() : "—")
+                    .tyresRotated(items.size())
+                    .movements(movements)
+                    .build();
+        }).toList();
     }
 }
