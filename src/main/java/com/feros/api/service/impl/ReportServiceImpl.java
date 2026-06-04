@@ -925,6 +925,108 @@ public class ReportServiceImpl implements ReportService {
         ).toList();
     }
 
+    // ── Driver Performance ────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DriverPerformanceRow> getDriverPerformance(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<Lr> lrs = lrRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate)
+                .stream().filter(l -> l.getDriver() != null).toList();
+
+        List<Attendance> attendance = attendanceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+        Map<Long, List<Attendance>> attendanceByUser = attendance.stream()
+                .collect(Collectors.groupingBy(a -> a.getUser().getId()));
+
+        Map<Long, List<Lr>> byDriver = lrs.stream()
+                .collect(Collectors.groupingBy(l -> l.getDriver().getId()));
+
+        return byDriver.entrySet().stream().map(entry -> {
+            List<Lr> driverLrs = entry.getValue();
+            User driver = driverLrs.get(0).getDriver();
+
+            BigDecimal totalWeight = driverLrs.stream()
+                    .map(Lr::getLoadedWeight).filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            List<Lr> delivered = driverLrs.stream()
+                    .filter(l -> l.getDeliveredAt() != null).toList();
+            long onTime = delivered.stream().filter(l -> {
+                LocalDate expected = l.getOrder().getExpectedDeliveryDate();
+                return expected != null && !l.getDeliveredAt().toLocalDate().isAfter(expected);
+            }).count();
+
+            List<Attendance> driverAtt = attendanceByUser.getOrDefault(driver.getId(), List.of());
+            int present = (int) driverAtt.stream()
+                    .filter(a -> a.getAttendanceType().getName().toUpperCase().contains("PRESENT")).count();
+            int total = driverAtt.size();
+            BigDecimal attPct = total > 0
+                    ? BigDecimal.valueOf(present * 100.0 / total).setScale(1, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+
+            BigDecimal onTimePct = !delivered.isEmpty()
+                    ? BigDecimal.valueOf(onTime * 100.0 / delivered.size()).setScale(1, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+
+            return DriverPerformanceRow.builder()
+                    .driverId(driver.getId())
+                    .driverName(driver.getName())
+                    .totalTrips(driverLrs.size())
+                    .totalWeight(totalWeight)
+                    .deliveredTrips(delivered.size())
+                    .onTimeDeliveries((int) onTime)
+                    .onTimePct(onTimePct)
+                    .presentDays(present)
+                    .totalAttendanceDays(total)
+                    .attendancePct(attPct)
+                    .build();
+        }).sorted(Comparator.comparing(DriverPerformanceRow::getDriverName)).toList();
+    }
+
+    // ── Cleaner Performance ───────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CleanerPerformanceRow> getCleanerPerformance(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<Lr> lrs = lrRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate)
+                .stream().filter(l -> l.getCleaner() != null).toList();
+
+        List<Attendance> attendance = attendanceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+        Map<Long, List<Attendance>> attendanceByUser = attendance.stream()
+                .collect(Collectors.groupingBy(a -> a.getUser().getId()));
+
+        Map<Long, List<Lr>> byCleaner = lrs.stream()
+                .collect(Collectors.groupingBy(l -> l.getCleaner().getId()));
+
+        return byCleaner.entrySet().stream().map(entry -> {
+            List<Lr> cleanerLrs = entry.getValue();
+            User cleaner = cleanerLrs.get(0).getCleaner();
+
+            BigDecimal totalWeight = cleanerLrs.stream()
+                    .map(Lr::getLoadedWeight).filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            List<Attendance> cleanerAtt = attendanceByUser.getOrDefault(cleaner.getId(), List.of());
+            int present = (int) cleanerAtt.stream()
+                    .filter(a -> a.getAttendanceType().getName().toUpperCase().contains("PRESENT")).count();
+            int total = cleanerAtt.size();
+            BigDecimal attPct = total > 0
+                    ? BigDecimal.valueOf(present * 100.0 / total).setScale(1, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+
+            return CleanerPerformanceRow.builder()
+                    .cleanerId(cleaner.getId())
+                    .cleanerName(cleaner.getName())
+                    .totalTrips(cleanerLrs.size())
+                    .totalWeight(totalWeight)
+                    .presentDays(present)
+                    .totalAttendanceDays(total)
+                    .attendancePct(attPct)
+                    .build();
+        }).sorted(Comparator.comparing(CleanerPerformanceRow::getCleanerName)).toList();
+    }
+
     private String primaryRole(User user) {
         Set<String> names = user.getRoles().stream()
                 .map(r -> r.getName().name())

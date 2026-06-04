@@ -767,6 +767,59 @@ public class ReportController {
                 "Maintenance Cost Summary — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── Driver Performance ────────────────────────────────────────────────────
+
+    @GetMapping("/staff/drivers")
+    public ResponseEntity<ApiResponse<List<DriverPerformanceRow>>> getDriverPerformance(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Driver performance fetched", reportService.getDriverPerformance(startDate, endDate)));
+    }
+
+    @GetMapping("/staff/drivers/export")
+    public ResponseEntity<byte[]> exportDriverPerformance(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<DriverPerformanceRow> rows = reportService.getDriverPerformance(startDate, endDate);
+        String[] headers = {"Driver", "Total Trips", "Total Weight (T)", "Delivered", "On Time", "On-Time %", "Present Days", "Attendance Days", "Attendance %"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getDriverName(), String.valueOf(r.getTotalTrips()), safe(r.getTotalWeight()),
+                String.valueOf(r.getDeliveredTrips()), String.valueOf(r.getOnTimeDeliveries()),
+                safe(r.getOnTimePct()), String.valueOf(r.getPresentDays()),
+                String.valueOf(r.getTotalAttendanceDays()), safe(r.getAttendancePct())
+        }).toList();
+        return export("driver-performance-" + startDate + "-" + endDate,
+                "Driver Performance — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    // ── Cleaner Performance ───────────────────────────────────────────────────
+
+    @GetMapping("/staff/cleaners")
+    public ResponseEntity<ApiResponse<List<CleanerPerformanceRow>>> getCleanerPerformance(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Cleaner performance fetched", reportService.getCleanerPerformance(startDate, endDate)));
+    }
+
+    @GetMapping("/staff/cleaners/export")
+    public ResponseEntity<byte[]> exportCleanerPerformance(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<CleanerPerformanceRow> rows = reportService.getCleanerPerformance(startDate, endDate);
+        String[] headers = {"Cleaner", "Total Trips", "Total Weight (T)", "Present Days", "Attendance Days", "Attendance %"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getCleanerName(), String.valueOf(r.getTotalTrips()), safe(r.getTotalWeight()),
+                String.valueOf(r.getPresentDays()), String.valueOf(r.getTotalAttendanceDays()),
+                safe(r.getAttendancePct())
+        }).toList();
+        return export("cleaner-performance-" + startDate + "-" + endDate,
+                "Cleaner Performance — " + startDate + " to " + endDate, headers, data, format);
+    }
+
     // ── Document Cost Summary ─────────────────────────────────────────────────
 
     @GetMapping("/expenses/documents")
