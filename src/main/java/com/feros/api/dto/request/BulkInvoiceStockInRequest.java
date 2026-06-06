@@ -20,6 +20,7 @@ public class BulkInvoiceStockInRequest {
     private String supplierName;
     private String invoiceNo;
     private LocalDate invoiceDate;
+    private LocalDate receivedDate; // stock entry date — allows backdating
     private String notes;
 
     @NotEmpty(message = "At least one item is required")

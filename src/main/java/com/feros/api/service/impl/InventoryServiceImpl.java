@@ -470,6 +470,10 @@ public class InventoryServiceImpl implements InventoryService {
                         .filter(s -> s != null && !s.isBlank())
                         .collect(Collectors.joining(" | "));
 
+                LocalDateTime txDateTime = request.getReceivedDate() != null
+                        ? request.getReceivedDate().atStartOfDay()
+                        : null; // null → @PrePersist sets to now
+
                 SparePartsTransaction tx = SparePartsTransaction.builder()
                         .tenant(tenant).sparePart(part)
                         .transactionType(StockTransactionType.IN).quantity(item.getQuantity())
@@ -479,6 +483,7 @@ public class InventoryServiceImpl implements InventoryService {
                         .invoiceNo(request.getInvoiceNo())
                         .invoiceDate(request.getInvoiceDate())
                         .notes(combinedNotes.isBlank() ? null : combinedNotes)
+                        .createdAt(txDateTime)
                         .createdBy(user)
                         .build();
                 transactionRepository.save(tx);

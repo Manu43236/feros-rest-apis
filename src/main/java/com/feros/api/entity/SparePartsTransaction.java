@@ -74,6 +74,8 @@ public class SparePartsTransaction {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = TimeUtil.nowIst();
+        if (createdAt == null) {
+            createdAt = TimeUtil.nowIst();
+        }
     }
 }
