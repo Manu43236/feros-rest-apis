@@ -24,8 +24,8 @@ public class EncryptionUtil {
     private static final int GCM_IV_LENGTH = 12;
     private static final int GCM_TAG_LENGTH = 128;
 
-    // Default dev key — 32 bytes, base64 encoded. MUST be overridden in production.
-    private static final String DEFAULT_DEV_KEY = "ZmVyb3NncHNkZXZrZXkxMjM0NTY3ODkwMTIzNDU=";
+    // Default dev key — exactly 32 bytes (AES-256), base64 encoded. MUST be overridden in production.
+    private static final String DEFAULT_DEV_KEY = "ZmVyb3MtZ3BzLWRldi1rZXktMDAwMDAwMDAwMDAwMDA=";
 
     private final SecretKey secretKey;
 
