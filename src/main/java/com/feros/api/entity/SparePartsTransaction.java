@@ -8,6 +8,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -54,6 +55,12 @@ public class SparePartsTransaction {
 
     @Column(name = "supplier_name")
     private String supplierName;
+
+    @Column(name = "invoice_no")
+    private String invoiceNo;
+
+    @Column(name = "invoice_date")
+    private LocalDate invoiceDate;
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;

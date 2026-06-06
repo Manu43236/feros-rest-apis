@@ -1427,6 +1427,8 @@ public class ReportServiceImpl implements ReportService {
                             .unitCost(t.getUnitCost())
                             .totalCost(t.getTotalCost())
                             .supplierName(t.getSupplierName())
+                            .invoiceNo(t.getInvoiceNo())
+                            .invoiceDate(t.getInvoiceDate())
                             .referenceType(t.getReferenceType() != null ? t.getReferenceType().name() : "—")
                             .receivedBy(t.getCreatedBy() != null ? t.getCreatedBy().getName() : "—")
                             .notes(t.getNotes())

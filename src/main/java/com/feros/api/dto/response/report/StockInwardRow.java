@@ -3,6 +3,7 @@ package com.feros.api.dto.response.report;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
@@ -17,6 +18,8 @@ public class StockInwardRow {
     private BigDecimal unitCost;
     private BigDecimal totalCost;
     private String supplierName;
+    private String invoiceNo;
+    private LocalDate invoiceDate;
     private String referenceType; // PURCHASE / ADJUSTMENT
     private String receivedBy;
     private String notes;

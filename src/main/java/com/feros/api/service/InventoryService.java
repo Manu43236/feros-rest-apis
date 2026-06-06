@@ -19,6 +19,7 @@ public interface InventoryService {
     List<StockItemResponse> getStock();
     void stockIn(StockInRequest request);
     void stockOut(StockOutRequest request);
+    BulkInvoiceStockInResponse bulkInvoiceStockIn(BulkInvoiceStockInRequest request);
 
     // Service Parts (request + approval)
     ServicePartResponse requestPart(Long serviceId, ServicePartRequest request);

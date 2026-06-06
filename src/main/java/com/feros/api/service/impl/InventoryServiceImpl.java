@@ -29,6 +29,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -436,6 +438,68 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     // ─── Bulk Uploads ─────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public BulkInvoiceStockInResponse bulkInvoiceStockIn(BulkInvoiceStockInRequest request) {
+        Long tenantId = getTenantId();
+        Tenant tenant = getTenant();
+        User user = getCurrentUser();
+
+        List<BulkInvoiceStockInResponse.SavedItem> saved = new ArrayList<>();
+        List<BulkInvoiceStockInResponse.FailedItem> failed = new ArrayList<>();
+
+        List<BulkInvoiceStockInRequest.LineItem> items = request.getItems();
+        for (int i = 0; i < items.size(); i++) {
+            BulkInvoiceStockInRequest.LineItem item = items.get(i);
+            int lineIndex = i + 1;
+            try {
+                SparePart part = sparePartRepository.findByIdAndTenantIdAndIsActiveTrue(item.getSparePartId(), tenantId)
+                        .orElseThrow(() -> new FerosException("Spare part not found", HttpStatus.NOT_FOUND));
+
+                SparePartsInventory inv = inventoryRepository.findByTenantIdAndSparePartId(tenantId, part.getId())
+                        .orElseGet(() -> SparePartsInventory.builder().tenant(tenant).sparePart(part).quantity(0).build());
+                inv.setQuantity(inv.getQuantity() + item.getQuantity());
+                inv.setLastUpdated(TimeUtil.nowIst());
+                inventoryRepository.save(inv);
+
+                BigDecimal unitCost = item.getUnitCost() != null ? item.getUnitCost() : BigDecimal.ZERO;
+                BigDecimal totalCost = unitCost.multiply(BigDecimal.valueOf(item.getQuantity()));
+
+                String combinedNotes = Stream.of(request.getNotes(), item.getItemNotes())
+                        .filter(s -> s != null && !s.isBlank())
+                        .collect(Collectors.joining(" | "));
+
+                SparePartsTransaction tx = SparePartsTransaction.builder()
+                        .tenant(tenant).sparePart(part)
+                        .transactionType(StockTransactionType.IN).quantity(item.getQuantity())
+                        .unitCost(unitCost).totalCost(totalCost)
+                        .referenceType(StockReferenceType.PURCHASE)
+                        .supplierName(request.getSupplierName())
+                        .invoiceNo(request.getInvoiceNo())
+                        .invoiceDate(request.getInvoiceDate())
+                        .notes(combinedNotes.isBlank() ? null : combinedNotes)
+                        .createdBy(user)
+                        .build();
+                transactionRepository.save(tx);
+
+                saved.add(BulkInvoiceStockInResponse.SavedItem.builder()
+                        .sparePartId(part.getId()).partName(part.getName()).quantity(item.getQuantity())
+                        .build());
+            } catch (Exception e) {
+                failed.add(BulkInvoiceStockInResponse.FailedItem.builder()
+                        .lineIndex(lineIndex).sparePartId(item.getSparePartId())
+                        .reason(e.getMessage()).build());
+            }
+        }
+
+        return BulkInvoiceStockInResponse.builder()
+                .totalItems(items.size())
+                .savedCount(saved.size())
+                .failedCount(failed.size())
+                .saved(saved).failed(failed)
+                .build();
+    }
 
     @Override
     @Transactional

@@ -80,6 +80,12 @@ public class InventoryController {
         return ResponseEntity.ok(ApiResponse.success("Stock recorded successfully", null));
     }
 
+    @PostMapping("/stock-in/bulk-invoice")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<BulkInvoiceStockInResponse>> bulkInvoiceStockIn(@Valid @RequestBody BulkInvoiceStockInRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Invoice stock-in processed", inventoryService.bulkInvoiceStockIn(request)));
+    }
+
     @PostMapping("/stock-in/bulk-upload")
     @PreAuthorize("hasAnyRole('ADMIN', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<BulkTenantUploadResponse>> bulkUploadStockIn(@RequestParam("file") MultipartFile file) {
