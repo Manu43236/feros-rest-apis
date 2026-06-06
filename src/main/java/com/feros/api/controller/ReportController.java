@@ -1273,6 +1273,162 @@ public class ReportController {
                 "Tyre Rotation Log — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── Payroll Reports ────────────────────────────────────────────────────────
+
+    @GetMapping("/payroll/summary")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<PayrollSummaryReportRow>>> getPayrollSummary(
+            @RequestParam String startDate, @RequestParam String endDate) {
+        return ResponseEntity.ok(ApiResponse.success("OK",
+                reportService.getPayrollSummary(LocalDate.parse(startDate), LocalDate.parse(endDate))));
+    }
+
+    @GetMapping("/payroll/summary/export")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<byte[]> exportPayrollSummary(
+            @RequestParam String startDate, @RequestParam String endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<PayrollSummaryReportRow> rows = reportService.getPayrollSummary(
+                LocalDate.parse(startDate), LocalDate.parse(endDate));
+        String[] headers = {"Employee", "Role", "Designation", "Pay Cycle Start", "Pay Cycle End",
+                "Present", "Absent", "Half Day", "Leave", "Total Days",
+                "Basic Pay", "OT Pay", "Trip Bonus", "Extra Pay", "Gross Pay",
+                "Deductions", "Net Pay", "Status", "Payment Date", "Mode",
+                "Bank Name", "Account No", "IFSC", "A/C Holder"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getEmployeeName()), safe(r.getRole()), safe(r.getDesignation()),
+                safe(r.getPayCycleStart()), safe(r.getPayCycleEnd()),
+                String.valueOf(r.getPresentDays()), String.valueOf(r.getAbsentDays()),
+                String.valueOf(r.getHalfDays()), String.valueOf(r.getLeaveDays()),
+                String.valueOf(r.getTotalDays()),
+                safe(r.getBasicPay()), safe(r.getOvertimePay()), safe(r.getTripBonus()),
+                safe(r.getVehicleExtraPay()), safe(r.getGrossPay()),
+                safe(r.getTotalDeductions()), safe(r.getNetPay()),
+                safe(r.getPayrollStatus()), safe(r.getPaymentDate()), safe(r.getPaymentMode()),
+                safe(r.getBankName()), safe(r.getAccountNumber()),
+                safe(r.getIfscCode()), safe(r.getAccountHolderName())
+        }).toList();
+        return export("payroll-summary-" + startDate + "-" + endDate,
+                "Payroll Summary — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    @GetMapping("/payroll/salary-register")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<SalaryRegisterRow>>> getSalaryRegister(
+            @RequestParam String startDate, @RequestParam String endDate) {
+        return ResponseEntity.ok(ApiResponse.success("OK",
+                reportService.getSalaryRegister(LocalDate.parse(startDate), LocalDate.parse(endDate))));
+    }
+
+    @GetMapping("/payroll/salary-register/export")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<byte[]> exportSalaryRegister(
+            @RequestParam String startDate, @RequestParam String endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<SalaryRegisterRow> rows = reportService.getSalaryRegister(
+                LocalDate.parse(startDate), LocalDate.parse(endDate));
+        String[] headers = {"Employee", "Role", "Designation", "Pay Cycle Start", "Pay Cycle End",
+                "Present", "Absent", "Half Day", "Leave", "Total Days", "Daily Rate",
+                "Basic Pay", "OT Pay", "Trip Bonus", "Extra Pay", "Gross Pay",
+                "Deductions Detail", "Total Deductions", "Net Pay",
+                "Status", "Payment Date", "Mode", "Reference No",
+                "Bank Name", "Account No", "IFSC", "A/C Holder"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getEmployeeName()), safe(r.getRole()), safe(r.getDesignation()),
+                safe(r.getPayCycleStart()), safe(r.getPayCycleEnd()),
+                String.valueOf(r.getPresentDays()), String.valueOf(r.getAbsentDays()),
+                String.valueOf(r.getHalfDays()), String.valueOf(r.getLeaveDays()),
+                String.valueOf(r.getTotalDays()), safe(r.getDailyRate()),
+                safe(r.getBasicPay()), safe(r.getOvertimePay()), safe(r.getTripBonus()),
+                safe(r.getVehicleExtraPay()), safe(r.getGrossPay()),
+                safe(r.getDeductionsDetail()), safe(r.getTotalDeductions()), safe(r.getNetPay()),
+                safe(r.getPayrollStatus()), safe(r.getPaymentDate()), safe(r.getPaymentMode()),
+                safe(r.getReferenceNumber()),
+                safe(r.getBankName()), safe(r.getAccountNumber()),
+                safe(r.getIfscCode()), safe(r.getAccountHolderName())
+        }).toList();
+        return export("salary-register-" + startDate + "-" + endDate,
+                "Salary Register — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    @GetMapping("/payroll/advances")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<AdvanceRegisterRow>>> getAdvanceRegister(
+            @RequestParam String startDate, @RequestParam String endDate) {
+        return ResponseEntity.ok(ApiResponse.success("OK",
+                reportService.getAdvanceRegister(LocalDate.parse(startDate), LocalDate.parse(endDate))));
+    }
+
+    @GetMapping("/payroll/advances/export")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<byte[]> exportAdvanceRegister(
+            @RequestParam String startDate, @RequestParam String endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<AdvanceRegisterRow> rows = reportService.getAdvanceRegister(
+                LocalDate.parse(startDate), LocalDate.parse(endDate));
+        String[] headers = {"Employee", "Role", "Advance Date", "Amount",
+                "Total Repaid", "Balance", "Fully Repaid", "Reason", "Approved By"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getEmployeeName()), safe(r.getRole()), safe(r.getAdvanceDate()),
+                safe(r.getAmount()), safe(r.getTotalRepaid()), safe(r.getBalanceAmount()),
+                r.isFullyRepaid() ? "Yes" : "No", safe(r.getReason()), safe(r.getApprovedBy())
+        }).toList();
+        return export("advance-register-" + startDate + "-" + endDate,
+                "Advance Register — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    @GetMapping("/payroll/by-role")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<PayrollByRoleRow>>> getPayrollByRole(
+            @RequestParam String startDate, @RequestParam String endDate) {
+        return ResponseEntity.ok(ApiResponse.success("OK",
+                reportService.getPayrollByRole(LocalDate.parse(startDate), LocalDate.parse(endDate))));
+    }
+
+    @GetMapping("/payroll/by-role/export")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<byte[]> exportPayrollByRole(
+            @RequestParam String startDate, @RequestParam String endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<PayrollByRoleRow> rows = reportService.getPayrollByRole(
+                LocalDate.parse(startDate), LocalDate.parse(endDate));
+        String[] headers = {"Role", "Employee Count", "Total Gross Pay", "Total Deductions", "Total Net Pay"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getRole()), String.valueOf(r.getEmployeeCount()),
+                safe(r.getTotalGrossPay()), safe(r.getTotalDeductions()), safe(r.getTotalNetPay())
+        }).toList();
+        return export("payroll-by-role-" + startDate + "-" + endDate,
+                "Payroll by Role — " + startDate + " to " + endDate, headers, data, format);
+    }
+
+    @GetMapping("/payroll/ytd")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<PayrollYtdRow>>> getPayrollYtd(
+            @RequestParam(defaultValue = "0") int year) {
+        int y = year > 0 ? year : java.time.LocalDate.now().getYear();
+        return ResponseEntity.ok(ApiResponse.success("OK", reportService.getPayrollYtd(y)));
+    }
+
+    @GetMapping("/payroll/ytd/export")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<byte[]> exportPayrollYtd(
+            @RequestParam(defaultValue = "0") int year,
+            @RequestParam(defaultValue = "csv") String format) {
+        int y = year > 0 ? year : java.time.LocalDate.now().getYear();
+        List<PayrollYtdRow> rows = reportService.getPayrollYtd(y);
+        String[] headers = {"Employee", "Role", "Designation", "Total Present Days",
+                "Total Gross Pay", "Total Deductions", "Total Net Pay",
+                "Bank Name", "Account No", "IFSC", "A/C Holder"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getEmployeeName()), safe(r.getRole()), safe(r.getDesignation()),
+                String.valueOf(r.getTotalPresentDays()),
+                safe(r.getTotalGrossPay()), safe(r.getTotalDeductions()), safe(r.getTotalNetPay()),
+                safe(r.getBankName()), safe(r.getAccountNumber()),
+                safe(r.getIfscCode()), safe(r.getAccountHolderName())
+        }).toList();
+        return export("payroll-ytd-" + y, "Payroll YTD — " + y, headers, data, format);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private ResponseEntity<byte[]> export(String filename, String title,

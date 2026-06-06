@@ -4,6 +4,7 @@ import com.feros.api.entity.SalaryAdvance;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,4 +15,7 @@ public interface SalaryAdvanceRepository extends JpaRepository<SalaryAdvance, Lo
     Optional<SalaryAdvance> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     List<SalaryAdvance> findByUserIdAndTenantIdAndIsFullyRepaidFalseAndIsActiveTrue(
             Long userId, Long tenantId);
+
+    List<SalaryAdvance> findByTenantIdAndAdvanceDateBetweenAndIsActiveTrueOrderByAdvanceDateDesc(
+            Long tenantId, LocalDate from, LocalDate to);
 }

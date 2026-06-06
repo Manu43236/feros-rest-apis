@@ -9,4 +9,6 @@ import java.util.List;
 @Repository
 public interface PayrollDeductionRepository extends JpaRepository<PayrollDeduction, Long> {
     List<PayrollDeduction> findByPayrollIdAndIsActiveTrue(Long payrollId);
+
+    List<PayrollDeduction> findByPayrollIdInAndIsActiveTrue(List<Long> payrollIds);
 }

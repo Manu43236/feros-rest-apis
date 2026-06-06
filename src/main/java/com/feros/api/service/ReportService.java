@@ -93,4 +93,11 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
     List<TyreLifeRow> getTyreLifeReport();
     List<TyreRequestRow> getTyreRequests(LocalDate startDate, LocalDate endDate);
     List<TyreRotationRow> getTyreRotationLog(LocalDate startDate, LocalDate endDate);
+
+    // ── Payroll Reports ────────────────────────────────────────────────────────
+    List<PayrollSummaryReportRow> getPayrollSummary(LocalDate startDate, LocalDate endDate);
+    List<SalaryRegisterRow> getSalaryRegister(LocalDate startDate, LocalDate endDate);
+    List<AdvanceRegisterRow> getAdvanceRegister(LocalDate startDate, LocalDate endDate);
+    List<PayrollByRoleRow> getPayrollByRole(LocalDate startDate, LocalDate endDate);
+    List<PayrollYtdRow> getPayrollYtd(int year);
 }

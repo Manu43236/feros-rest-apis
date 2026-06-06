@@ -54,6 +54,10 @@ public class ReportServiceImpl implements ReportService {
     private final TyreRequestRepository tyreRequestRepository;
     private final TyreRotationLogRepository tyreRotationLogRepository;
     private final TyreRotationItemRepository tyreRotationItemRepository;
+    private final PayrollRepository payrollRepository;
+    private final PayrollDeductionRepository payrollDeductionRepository;
+    private final SalaryAdvanceRepository salaryAdvanceRepository;
+    private final StaffProfileRepository staffProfileRepository;
 
     // ── 1. Fleet Status ────────────────────────────────────────────────────────
 
@@ -1697,5 +1701,182 @@ public class ReportServiceImpl implements ReportService {
                     .movements(movements)
                     .build();
         }).toList();
+    }
+
+    // ── Payroll Reports ────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PayrollSummaryReportRow> getPayrollSummary(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<Payroll> payrolls = payrollRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+        Map<Long, StaffProfile> profileMap = buildProfileMap(tenantId);
+        return payrolls.stream().map(p -> {
+            StaffProfile profile = profileMap.get(p.getUser().getId());
+            return PayrollSummaryReportRow.builder()
+                    .payrollId(p.getId())
+                    .employeeName(p.getUser().getName())
+                    .role(p.getUser().getRoles().stream().map(r -> r.getName().name()).findFirst().orElse("—"))
+                    .designation(profile != null && profile.getDesignation() != null ? profile.getDesignation().getName() : "—")
+                    .payCycleStart(p.getPayCycleStartDate())
+                    .payCycleEnd(p.getPayCycleEndDate())
+                    .presentDays(p.getPresentDays() != null ? p.getPresentDays() : 0)
+                    .absentDays(p.getAbsentDays() != null ? p.getAbsentDays() : 0)
+                    .halfDays(p.getHalfDays() != null ? p.getHalfDays() : 0)
+                    .leaveDays(p.getLeaveDays() != null ? p.getLeaveDays() : 0)
+                    .totalDays(p.getTotalDays() != null ? p.getTotalDays() : 0)
+                    .basicPay(p.getBasicPay())
+                    .overtimePay(p.getOvertimePay())
+                    .tripBonus(p.getTripBonus())
+                    .vehicleExtraPay(p.getVehicleExtraPay())
+                    .grossPay(p.getGrossPay())
+                    .totalDeductions(p.getTotalDeductions())
+                    .netPay(p.getNetPay())
+                    .payrollStatus(p.getPayrollStatus() != null ? p.getPayrollStatus().name() : "—")
+                    .paymentDate(p.getPaymentDate())
+                    .paymentMode(p.getPaymentMode() != null ? p.getPaymentMode().name() : "—")
+                    .bankName(profile != null ? profile.getBankName() : null)
+                    .accountNumber(profile != null ? profile.getAccountNumber() : null)
+                    .ifscCode(profile != null ? profile.getIfscCode() : null)
+                    .accountHolderName(profile != null ? profile.getAccountHolderName() : null)
+                    .build();
+        }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SalaryRegisterRow> getSalaryRegister(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<Payroll> payrolls = payrollRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+        Map<Long, StaffProfile> profileMap = buildProfileMap(tenantId);
+
+        List<Long> payrollIds = payrolls.stream().map(Payroll::getId).toList();
+        Map<Long, List<PayrollDeduction>> deductionsByPayroll = payrollDeductionRepository
+                .findByPayrollIdInAndIsActiveTrue(payrollIds).stream()
+                .collect(Collectors.groupingBy(d -> d.getPayroll().getId()));
+
+        return payrolls.stream().map(p -> {
+            StaffProfile profile = profileMap.get(p.getUser().getId());
+            List<PayrollDeduction> deductions = deductionsByPayroll.getOrDefault(p.getId(), List.of());
+            String deductionsDetail = deductions.stream()
+                    .map(d -> d.getDeductionType().getName() + ": " + d.getAmount().toPlainString())
+                    .collect(Collectors.joining(", "));
+
+            return SalaryRegisterRow.builder()
+                    .payrollId(p.getId())
+                    .employeeName(p.getUser().getName())
+                    .role(p.getUser().getRoles().stream().map(r -> r.getName().name()).findFirst().orElse("—"))
+                    .designation(profile != null && profile.getDesignation() != null ? profile.getDesignation().getName() : "—")
+                    .payCycleStart(p.getPayCycleStartDate())
+                    .payCycleEnd(p.getPayCycleEndDate())
+                    .presentDays(p.getPresentDays() != null ? p.getPresentDays() : 0)
+                    .absentDays(p.getAbsentDays() != null ? p.getAbsentDays() : 0)
+                    .halfDays(p.getHalfDays() != null ? p.getHalfDays() : 0)
+                    .leaveDays(p.getLeaveDays() != null ? p.getLeaveDays() : 0)
+                    .totalDays(p.getTotalDays() != null ? p.getTotalDays() : 0)
+                    .dailyRate(p.getDailyRate())
+                    .basicPay(p.getBasicPay())
+                    .overtimePay(p.getOvertimePay())
+                    .tripBonus(p.getTripBonus())
+                    .vehicleExtraPay(p.getVehicleExtraPay())
+                    .grossPay(p.getGrossPay())
+                    .deductionsDetail(deductionsDetail.isEmpty() ? "—" : deductionsDetail)
+                    .totalDeductions(p.getTotalDeductions())
+                    .netPay(p.getNetPay())
+                    .payrollStatus(p.getPayrollStatus() != null ? p.getPayrollStatus().name() : "—")
+                    .paymentDate(p.getPaymentDate())
+                    .paymentMode(p.getPaymentMode() != null ? p.getPaymentMode().name() : "—")
+                    .referenceNumber(p.getReferenceNumber())
+                    .bankName(profile != null ? profile.getBankName() : null)
+                    .accountNumber(profile != null ? profile.getAccountNumber() : null)
+                    .ifscCode(profile != null ? profile.getIfscCode() : null)
+                    .accountHolderName(profile != null ? profile.getAccountHolderName() : null)
+                    .build();
+        }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AdvanceRegisterRow> getAdvanceRegister(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return salaryAdvanceRepository
+                .findByTenantIdAndAdvanceDateBetweenAndIsActiveTrueOrderByAdvanceDateDesc(tenantId, startDate, endDate)
+                .stream().map(a -> AdvanceRegisterRow.builder()
+                        .advanceId(a.getId())
+                        .employeeName(a.getUser().getName())
+                        .role(a.getUser().getRoles().stream().map(r -> r.getName().name()).findFirst().orElse("—"))
+                        .advanceDate(a.getAdvanceDate())
+                        .amount(a.getAmount())
+                        .totalRepaid(a.getTotalRepaid())
+                        .balanceAmount(a.getBalanceAmount())
+                        .fullyRepaid(Boolean.TRUE.equals(a.getIsFullyRepaid()))
+                        .reason(a.getReason())
+                        .approvedBy(a.getApprovedBy() != null ? a.getApprovedBy().getName() : "—")
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PayrollByRoleRow> getPayrollByRole(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<Payroll> payrolls = payrollRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+        Map<String, List<Payroll>> byRole = payrolls.stream().collect(Collectors.groupingBy(p ->
+                p.getUser().getRoles().stream().map(r -> r.getName().name()).findFirst().orElse("UNKNOWN")));
+
+        return byRole.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> {
+                    List<Payroll> group = e.getValue();
+                    long distinctEmployees = group.stream().map(p -> p.getUser().getId()).distinct().count();
+                    BigDecimal totalGross = group.stream().map(p -> p.getGrossPay() != null ? p.getGrossPay() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal totalDed = group.stream().map(p -> p.getTotalDeductions() != null ? p.getTotalDeductions() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal totalNet = group.stream().map(p -> p.getNetPay() != null ? p.getNetPay() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
+                    return PayrollByRoleRow.builder()
+                            .role(e.getKey())
+                            .employeeCount((int) distinctEmployees)
+                            .totalGrossPay(totalGross)
+                            .totalDeductions(totalDed)
+                            .totalNetPay(totalNet)
+                            .build();
+                }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PayrollYtdRow> getPayrollYtd(int year) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDate from = LocalDate.of(year, 1, 1);
+        LocalDate to = LocalDate.of(year, 12, 31);
+        List<Payroll> payrolls = payrollRepository.findByTenantIdAndDateRange(tenantId, from, to);
+        Map<Long, StaffProfile> profileMap = buildProfileMap(tenantId);
+
+        Map<Long, List<Payroll>> byUser = payrolls.stream().collect(Collectors.groupingBy(p -> p.getUser().getId()));
+        return byUser.values().stream().map(group -> {
+            Payroll first = group.get(0);
+            StaffProfile profile = profileMap.get(first.getUser().getId());
+            int totalPresent = group.stream().mapToInt(p -> p.getPresentDays() != null ? p.getPresentDays() : 0).sum();
+            BigDecimal totalGross = group.stream().map(p -> p.getGrossPay() != null ? p.getGrossPay() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal totalDed = group.stream().map(p -> p.getTotalDeductions() != null ? p.getTotalDeductions() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal totalNet = group.stream().map(p -> p.getNetPay() != null ? p.getNetPay() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
+            return PayrollYtdRow.builder()
+                    .employeeName(first.getUser().getName())
+                    .role(first.getUser().getRoles().stream().map(r -> r.getName().name()).findFirst().orElse("—"))
+                    .designation(profile != null && profile.getDesignation() != null ? profile.getDesignation().getName() : "—")
+                    .totalPresentDays(totalPresent)
+                    .totalGrossPay(totalGross)
+                    .totalDeductions(totalDed)
+                    .totalNetPay(totalNet)
+                    .bankName(profile != null ? profile.getBankName() : null)
+                    .accountNumber(profile != null ? profile.getAccountNumber() : null)
+                    .ifscCode(profile != null ? profile.getIfscCode() : null)
+                    .accountHolderName(profile != null ? profile.getAccountHolderName() : null)
+                    .build();
+        }).sorted(Comparator.comparing(PayrollYtdRow::getEmployeeName)).toList();
+    }
+
+    private Map<Long, StaffProfile> buildProfileMap(Long tenantId) {
+        return staffProfileRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+                .collect(Collectors.toMap(p -> p.getUser().getId(), p -> p, (a, b) -> a));
     }
 }
