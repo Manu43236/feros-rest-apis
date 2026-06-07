@@ -222,7 +222,13 @@ public class TataFleetEdgeAdapter implements GpsProviderAdapter {
 
     /**
      * Fetches all vehicle snapshots, handling pagination automatically.
-     * TATA Fleet Edge returns paginated results — we load all pages.
+     *
+     * TATA response structure (per docs):
+     * {
+     *   "vehicles":  [ VehicleTelemetry... ],
+     *   "failures":  [ ... ],
+     *   "pageable":  { "pageNumber": 0, "pageSize": 100, "totalPages": 1, "totalElements": 5 }
+     * }
      */
     @SuppressWarnings("unchecked")
     private List<TataVehicleSnapshot> fetchAllSnapshots(String token, String baseUrl) {
@@ -245,36 +251,50 @@ public class TataFleetEdgeAdapter implements GpsProviderAdapter {
             Map<String, Object> body = response.getBody();
             if (body == null) break;
 
-            // TATA response may wrap data in a "content", "data", or "vehicleSnapshots" key
-            // Fall back to treating the body itself as a list if no known wrapper key found
-            List<Map<String, Object>> page = extractSnapshotList(body);
-            if (page.isEmpty()) break;
-
-            for (Map<String, Object> item : page) {
-                TataVehicleSnapshot snap = mapToSnapshot(item);
-                allSnapshots.add(snap);
+            List<Map<String, Object>> page = extractVehiclesList(body);
+            if (page.isEmpty()) {
+                log.debug("TATA Fleet Edge: empty vehicles list on page {}. Response keys: {}", pageNumber, body.keySet());
+                break;
             }
 
-            // Stop if we got fewer records than a full page — no more pages
-            if (page.size() < PAGE_SIZE) break;
+            for (Map<String, Object> item : page) {
+                allSnapshots.add(mapToSnapshot(item));
+            }
+
+            // Use totalPages from pageable to decide if there are more pages
+            int totalPages = extractTotalPages(body);
+            if (totalPages > 0 && pageNumber + 1 >= totalPages) break;
+            if (page.size() < PAGE_SIZE) break; // fallback if pageable not present
             pageNumber++;
         }
 
         return allSnapshots;
     }
 
+    /**
+     * Extracts the vehicle list from TATA's AllVehicleTelemetryResponse.
+     * Per docs, vehicles are under the "vehicles" key.
+     */
     @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> extractSnapshotList(Map<String, Object> body) {
-        for (String key : List.of("content", "data", "vehicleSnapshots", "vehicles")) {
-            Object val = body.get(key);
-            if (val instanceof List) {
-                return (List<Map<String, Object>>) val;
-            }
+    private List<Map<String, Object>> extractVehiclesList(Map<String, Object> body) {
+        Object val = body.get("vehicles");
+        if (val instanceof List) return (List<Map<String, Object>>) val;
+        // Fallback: some older versions may use different keys
+        for (String key : List.of("data", "content", "vehicleSnapshots")) {
+            Object v = body.get(key);
+            if (v instanceof List) return (List<Map<String, Object>>) v;
         }
-        // TATA might return a top-level array wrapped as a response with a known list key
-        // If none found, log and return empty
-        log.debug("TATA Fleet Edge: could not find snapshot list in response keys: {}", body.keySet());
         return Collections.emptyList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private int extractTotalPages(Map<String, Object> body) {
+        Object pageable = body.get("pageable");
+        if (pageable instanceof Map) {
+            Object tp = ((Map<String, Object>) pageable).get("totalPages");
+            if (tp instanceof Number) return ((Number) tp).intValue();
+        }
+        return 0;
     }
 
     private TataVehicleSnapshot mapToSnapshot(Map<String, Object> item) {
@@ -313,17 +333,22 @@ public class TataFleetEdgeAdapter implements GpsProviderAdapter {
     }
 
     /**
-     * Parses TATA eventDateTime format: "2024-01-15T10:30:00.000+0530"
-     * Falls back to now() on parse failure.
+     * Parses TATA eventDateTime.
+     *
+     * Per docs format: yyyy-MM-dd'T'HH:mm:ss.SSSXXX
+     * Real example from API: "2023-09-14T12:11:38.0000009" (7 fractional digits, no timezone)
+     *
+     * Uses ISO_OFFSET_DATE_TIME which handles variable-length fractional seconds and
+     * both +05:30 (with colon) and +0530 (without colon) timezone formats.
+     * Falls back to ISO_LOCAL_DATE_TIME for timestamps without timezone.
      */
     private LocalDateTime parseEventDateTime(String ts) {
         if (ts == null || ts.isBlank()) return null;
         try {
-            // Try OffsetDateTime first (handles timezone offset like +0530)
-            return OffsetDateTime.parse(ts, DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ"))
-                    .toLocalDateTime();
+            return OffsetDateTime.parse(ts, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toLocalDateTime();
         } catch (Exception e1) {
             try {
+                // No timezone offset — parse directly as LocalDateTime
                 return LocalDateTime.parse(ts, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
             } catch (Exception e2) {
                 log.debug("Could not parse TATA eventDateTime '{}': {}", ts, e2.getMessage());

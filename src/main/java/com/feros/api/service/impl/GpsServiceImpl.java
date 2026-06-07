@@ -179,6 +179,7 @@ public class GpsServiceImpl implements GpsService {
     // ─── Fleet map ───────────────────────────────────────────────────────────────
 
     @Override
+    @Transactional(readOnly = true)
     public List<GpsFleetVehicleResponse> getFleet() {
         List<GpsProviderConfig> configs = configRepository.findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(tenantId());
         List<GpsFleetVehicleResponse> fleet = new ArrayList<>();
