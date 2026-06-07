@@ -91,4 +91,6 @@ public class VehicleResponse {
     private String coverImageUrl;
 
     private TripScope tripScope;
+
+    private Boolean isIot;
 }

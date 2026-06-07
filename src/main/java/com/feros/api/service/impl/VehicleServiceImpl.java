@@ -159,6 +159,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .notes(request.getNotes())
                 .tyreRotationIntervalKm(request.getTyreRotationIntervalKm())
                 .tripScope(request.getTripScope())
+                .isIot(Boolean.TRUE.equals(request.getIsIot()))
                 .isActive(true)
                 .build();
 
@@ -303,6 +304,7 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setTripScope(request.getTripScope());
         vehicle.setExtraPayEnabled(Boolean.TRUE.equals(request.getExtraPayEnabled()));
         vehicle.setExtraPayPerDay(request.getExtraPayPerDay());
+        vehicle.setIsIot(Boolean.TRUE.equals(request.getIsIot()));
 
         if (request.getBrandId() != null)
             vehicle.setBrand(vehicleBrandRepository.findById(request.getBrandId())
@@ -752,6 +754,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .extraPayEnabled(Boolean.TRUE.equals(v.getExtraPayEnabled()))
                 .extraPayPerDay(v.getExtraPayPerDay())
                 .tripScope(v.getTripScope())
+                .isIot(Boolean.TRUE.equals(v.getIsIot()))
                 .currentDriverId(v.getCurrentDriver() != null ? v.getCurrentDriver().getId() : null)
                 .currentDriverName(v.getCurrentDriver() != null ? v.getCurrentDriver().getName() : null)
                 .currentCleanerId(v.getCurrentCleaner() != null ? v.getCurrentCleaner().getId() : null)

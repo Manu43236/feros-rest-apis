@@ -60,4 +60,6 @@ public class VehicleRequest {
     private BigDecimal extraPayPerDay;
 
     private TripScope tripScope;
+
+    private Boolean isIot;
 }

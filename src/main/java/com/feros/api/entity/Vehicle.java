@@ -151,6 +151,9 @@ public class Vehicle extends BaseEntity {
     @Column(name = "trip_scope")
     private TripScope tripScope;
 
+    @Column(name = "is_iot")
+    private Boolean isIot = false;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 }
