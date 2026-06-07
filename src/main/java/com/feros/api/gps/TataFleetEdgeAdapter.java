@@ -111,60 +111,61 @@ public class TataFleetEdgeAdapter implements GpsProviderAdapter {
     public List<GpsFleetVehicleResponse> fetchLiveLocations(GpsProviderConfig config, List<VehicleGpsMapping> mappings) {
         if (mappings.isEmpty()) return Collections.emptyList();
 
+        // Fetch snapshots — if TATA is unreachable or returns bad data, fall back to OFFLINE
+        List<TataVehicleSnapshot> snapshots;
         try {
             String token   = authenticate(config);
             String baseUrl = resolveBaseUrl(config);
-            List<TataVehicleSnapshot> snapshots = fetchAllSnapshots(token, baseUrl);
+            snapshots = fetchAllSnapshots(token, baseUrl);
+        } catch (Exception e) {
+            log.error("TATA Fleet Edge snapshot fetch failed for config {}: {} — returning mapped vehicles as OFFLINE",
+                    config.getId(), e.getMessage());
+            return mappings.stream().map(this::buildOfflineResponse).collect(Collectors.toList());
+        }
 
-            // Index snapshots by registrationNumber for O(1) lookup
-            // Our providerVehicleId = registrationNumber (set when mapping was created)
-            Map<String, TataVehicleSnapshot> snapshotByRegNumber = snapshots.stream()
-                    .filter(s -> s.getRegistrationNumber() != null)
-                    .collect(Collectors.toMap(
-                            TataVehicleSnapshot::getRegistrationNumber,
-                            s -> s,
-                            (a, b) -> a // keep first if duplicate
-                    ));
+        // Index snapshots by registrationNumber for O(1) lookup
+        Map<String, TataVehicleSnapshot> snapshotByRegNumber = snapshots.stream()
+                .filter(s -> s.getRegistrationNumber() != null)
+                .collect(Collectors.toMap(
+                        TataVehicleSnapshot::getRegistrationNumber,
+                        s -> s,
+                        (a, b) -> a
+                ));
 
-            List<GpsFleetVehicleResponse> results = new ArrayList<>();
+        List<GpsFleetVehicleResponse> results = new ArrayList<>();
 
-            for (VehicleGpsMapping mapping : mappings) {
-                TataVehicleSnapshot snap = snapshotByRegNumber.get(mapping.getProviderVehicleId());
-                if (snap == null) {
-                    // Vehicle in our mapping not found in TATA response — treat as offline
-                    results.add(buildOfflineResponse(mapping));
-                    continue;
-                }
-
-                LocalDateTime updatedAt  = parseEventDateTime(snap.getEventDateTime());
-                GpsVehicleStatus status  = resolveStatus(snap.getSpeed(), snap.getIgnitionOn(), updatedAt);
-
-                String driverName = null;
-                if (mapping.getVehicle() != null && mapping.getVehicle().getCurrentDriver() != null) {
-                    driverName = mapping.getVehicle().getCurrentDriver().getName();
-                }
-
-                results.add(GpsFleetVehicleResponse.builder()
-                        .vehicleId(mapping.getVehicle().getId())
-                        .registrationNumber(mapping.getVehicle().getRegistrationNumber())
-                        .driverName(driverName)
-                        .latitude(snap.getGpsLatitude())
-                        .longitude(snap.getGpsLongitude())
-                        .speedKmh(snap.getSpeed())
-                        .ignitionOn(snap.getIgnitionOn())
-                        .gpsStatus(status)
-                        .lastUpdatedAt(updatedAt)
-                        .providerType(GpsProviderType.TATA_FLEET_EDGE)
-                        .providerVehicleId(mapping.getProviderVehicleId())
-                        .build());
+        for (VehicleGpsMapping mapping : mappings) {
+            TataVehicleSnapshot snap = snapshotByRegNumber.get(mapping.getProviderVehicleId());
+            if (snap == null) {
+                // Vehicle in our mapping not found in this TATA response — show as OFFLINE
+                results.add(buildOfflineResponse(mapping));
+                continue;
             }
 
-            return results;
+            LocalDateTime updatedAt = parseEventDateTime(snap.getEventDateTime());
+            GpsVehicleStatus status = resolveStatus(snap.getSpeed(), snap.getIgnitionOn(), updatedAt);
 
-        } catch (Exception e) {
-            log.error("Failed to fetch live locations from TATA Fleet Edge for config {}: {}", config.getId(), e.getMessage());
-            return Collections.emptyList();
+            String driverName = null;
+            if (mapping.getVehicle() != null && mapping.getVehicle().getCurrentDriver() != null) {
+                driverName = mapping.getVehicle().getCurrentDriver().getName();
+            }
+
+            results.add(GpsFleetVehicleResponse.builder()
+                    .vehicleId(mapping.getVehicle().getId())
+                    .registrationNumber(mapping.getVehicle().getRegistrationNumber())
+                    .driverName(driverName)
+                    .latitude(snap.getGpsLatitude())
+                    .longitude(snap.getGpsLongitude())
+                    .speedKmh(snap.getSpeed())
+                    .ignitionOn(snap.getIgnitionOn())
+                    .gpsStatus(status)
+                    .lastUpdatedAt(updatedAt)
+                    .providerType(GpsProviderType.TATA_FLEET_EDGE)
+                    .providerVehicleId(mapping.getProviderVehicleId())
+                    .build());
         }
+
+        return results;
     }
 
     // ─── Private helpers ─────────────────────────────────────────────────────────
