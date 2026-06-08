@@ -69,6 +69,10 @@ public class TenantSettings extends BaseEntity {
     private java.math.BigDecimal serviceGstRate = java.math.BigDecimal.valueOf(18.00);
 
     @Builder.Default
+    @Column(name = "service_invoice_gst_enabled")
+    private Boolean serviceInvoiceGstEnabled = true;
+
+    @Builder.Default
     @Column(name = "driver_batta_rate", precision = 10, scale = 2)
     private BigDecimal driverBattaRate = BigDecimal.ZERO;
 

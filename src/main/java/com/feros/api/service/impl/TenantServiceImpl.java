@@ -502,6 +502,7 @@ public class TenantServiceImpl implements TenantService {
         if (request.getRequireTyreApproval() != null)            settings.setRequireTyreApproval(request.getRequireTyreApproval());
         if (request.getRequireSparePartApproval() != null)       settings.setRequireSparePartApproval(request.getRequireSparePartApproval());
         if (request.getServiceGstRate() != null)                 settings.setServiceGstRate(request.getServiceGstRate());
+        if (request.getServiceInvoiceGstEnabled() != null)       settings.setServiceInvoiceGstEnabled(request.getServiceInvoiceGstEnabled());
         if (request.getInvoiceDescription() != null)             settings.setInvoiceDescription(request.getInvoiceDescription());
 
         return mapSettingsToResponse(tenantSettingsRepository.save(settings));
@@ -523,6 +524,7 @@ public class TenantServiceImpl implements TenantService {
                 .requireTyreApproval(s.getRequireTyreApproval())
                 .requireSparePartApproval(s.getRequireSparePartApproval())
                 .serviceGstRate(s.getServiceGstRate())
+                .serviceInvoiceGstEnabled(s.getServiceInvoiceGstEnabled())
                 .invoiceDescription(s.getInvoiceDescription())
                 .build();
     }

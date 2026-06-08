@@ -366,12 +366,18 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                     ? request.getLabourCharges() : BigDecimal.ZERO;
             BigDecimal subTotal = tasksTotal.add(partsTotal).add(labour);
 
-            // Get GST rate from tenant settings
-            BigDecimal gstRate = tenantSettingsRepository.findByTenantId(vs.getTenant().getId())
-                    .map(TenantSettings::getServiceGstRate)
-                    .orElse(BigDecimal.valueOf(18.00));
-            BigDecimal gstAmount = subTotal.multiply(gstRate)
-                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            // Get GST settings — apply only if serviceInvoiceGstEnabled is true
+            TenantSettings tenantSettings = tenantSettingsRepository.findByTenantId(vs.getTenant().getId()).orElse(null);
+            boolean gstEnabled = tenantSettings == null || !Boolean.FALSE.equals(tenantSettings.getServiceInvoiceGstEnabled());
+            BigDecimal gstRate = BigDecimal.ZERO;
+            BigDecimal gstAmount = BigDecimal.ZERO;
+            if (gstEnabled) {
+                gstRate = tenantSettings != null && tenantSettings.getServiceGstRate() != null
+                        ? tenantSettings.getServiceGstRate()
+                        : BigDecimal.valueOf(18.00);
+                gstAmount = subTotal.multiply(gstRate)
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            }
             BigDecimal total = subTotal.add(gstAmount);
 
             builder.tasksTotal(tasksTotal)

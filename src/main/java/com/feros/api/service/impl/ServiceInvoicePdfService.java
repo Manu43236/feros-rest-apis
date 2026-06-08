@@ -2,10 +2,13 @@ package com.feros.api.service.impl;
 
 import com.feros.api.entity.ServiceInvoice;
 import com.feros.api.entity.ServicePart;
+import com.feros.api.entity.SparePartsTransaction;
 import com.feros.api.entity.VehicleServiceTask;
 import com.feros.api.enums.ServiceInvoiceType;
+import com.feros.api.repository.SparePartsTransactionRepository;
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.*;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.awt.Color;
@@ -14,9 +17,14 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class ServiceInvoicePdfService {
+
+    private final SparePartsTransactionRepository transactionRepository;
 
     private static final Color NAVY      = new Color(15, 33, 55);
     private static final Color GRAY      = new Color(90, 105, 120);
@@ -89,16 +97,27 @@ public class ServiceInvoicePdfService {
                 List<ServicePart> parts = approvedParts.stream()
                         .filter(p -> p.getStatus().name().equals("APPROVED")).toList();
                 if (!parts.isEmpty()) {
+                    // Load transaction costs for each part
+                    List<Long> partIds = parts.stream().map(ServicePart::getId).toList();
+                    Map<Long, SparePartsTransaction> txByPartId = transactionRepository
+                            .findByServicePart_IdIn(partIds).stream()
+                            .collect(Collectors.toMap(tx -> tx.getServicePart().getId(), tx -> tx, (a, b) -> a));
+
                     doc.add(sectionTitle("PARTS USED"));
-                    PdfPTable ptable = new PdfPTable(new float[]{3, 1, 1});
+                    PdfPTable ptable = new PdfPTable(new float[]{3f, 1.5f, 0.8f, 1.2f, 1.2f});
                     ptable.setWidthPercentage(100);
-                    addTableHeader(ptable, "Part Name", "Part No", "Qty");
+                    addTableHeader(ptable, "Part Name", "Part No", "Qty", "Unit Cost (₹)", "Total (₹)");
                     for (ServicePart p : parts) {
                         int qty = p.getQuantityApproved() != null ? p.getQuantityApproved() : p.getQuantityRequested();
-                        addTableRow3(ptable,
+                        SparePartsTransaction tx = txByPartId.get(p.getId());
+                        BigDecimal unitCost  = tx != null && tx.getUnitCost()  != null ? tx.getUnitCost()  : BigDecimal.ZERO;
+                        BigDecimal totalCost = tx != null && tx.getTotalCost() != null ? tx.getTotalCost() : BigDecimal.ZERO;
+                        addPartsRow(ptable,
                                 p.getSparePart().getName(),
                                 p.getSparePart().getPartNumber() != null ? p.getSparePart().getPartNumber() : "—",
-                                qty + " " + p.getSparePart().getUnit());
+                                qty + " " + p.getSparePart().getUnit(),
+                                "₹" + unitCost.setScale(2, RoundingMode.HALF_UP),
+                                "₹" + totalCost.setScale(2, RoundingMode.HALF_UP));
                     }
                     doc.add(ptable);
                     doc.add(Chunk.NEWLINE);
@@ -110,6 +129,10 @@ public class ServiceInvoicePdfService {
                 totals.setWidthPercentage(60);
                 totals.setHorizontalAlignment(Element.ALIGN_RIGHT);
                 addTotalRow(totals, "Tasks Total", inv.getTasksTotal(), false);
+                BigDecimal partsTotal = inv.getPartsTotal() != null ? inv.getPartsTotal() : BigDecimal.ZERO;
+                if (partsTotal.compareTo(BigDecimal.ZERO) > 0) {
+                    addTotalRow(totals, "Parts Total", partsTotal, false);
+                }
                 addTotalRow(totals, "Labour Charges", inv.getLabourCharges(), false);
                 addTotalRow(totals, "Sub Total", inv.getSubTotal(), false);
                 addTotalRow(totals, "GST (" + inv.getGstRate().setScale(0, RoundingMode.HALF_UP) + "%)",
@@ -195,6 +218,21 @@ public class ServiceInvoicePdfService {
             cell.setPadding(5); cell.setBorderColor(new Color(220, 228, 240));
             table.addCell(cell);
         }
+    }
+
+    private void addPartsRow(PdfPTable table, String name, String partNo, String qty, String unitCost, String total) {
+        Color border = new Color(220, 228, 240);
+        PdfPCell c1 = new PdfPCell(new Phrase(name, FONT_BODY));
+        c1.setPadding(5); c1.setBorderColor(border);
+        PdfPCell c2 = new PdfPCell(new Phrase(partNo, FONT_BODY));
+        c2.setPadding(5); c2.setBorderColor(border);
+        PdfPCell c3 = new PdfPCell(new Phrase(qty, FONT_BODY));
+        c3.setPadding(5); c3.setBorderColor(border); c3.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        PdfPCell c4 = new PdfPCell(new Phrase(unitCost, FONT_BODY));
+        c4.setPadding(5); c4.setBorderColor(border); c4.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        PdfPCell c5 = new PdfPCell(new Phrase(total, FONT_BOLD));
+        c5.setPadding(5); c5.setBorderColor(border); c5.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        table.addCell(c1); table.addCell(c2); table.addCell(c3); table.addCell(c4); table.addCell(c5);
     }
 
     private void addTotalRow(PdfPTable table, String label, BigDecimal amount, boolean highlight) {
