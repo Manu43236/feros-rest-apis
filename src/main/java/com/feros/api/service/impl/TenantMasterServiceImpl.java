@@ -331,6 +331,8 @@ public class TenantMasterServiceImpl implements TenantMasterService {
             settings.setRequireTyreApproval(request.getRequireTyreApproval());
         if (request.getRequireSparePartApproval() != null)
             settings.setRequireSparePartApproval(request.getRequireSparePartApproval());
+        if (request.getServiceInvoiceGstEnabled() != null)
+            settings.setServiceInvoiceGstEnabled(request.getServiceInvoiceGstEnabled());
 
         return mapSettings(tenantSettingsRepository.save(settings));
     }
@@ -406,6 +408,7 @@ public class TenantMasterServiceImpl implements TenantMasterService {
                 .attendanceDeadlineTime(s.getAttendanceDeadlineTime())
                 .requireTyreApproval(s.getRequireTyreApproval())
                 .requireSparePartApproval(s.getRequireSparePartApproval())
+                .serviceInvoiceGstEnabled(s.getServiceInvoiceGstEnabled())
                 .isActive(s.getIsActive()).createdAt(s.getCreatedAt())
                 .updatedAt(s.getUpdatedAt()).build();
     }

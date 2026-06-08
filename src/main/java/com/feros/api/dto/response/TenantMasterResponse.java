@@ -51,6 +51,7 @@ public class TenantMasterResponse {
     private LocalTime attendanceDeadlineTime;
     private Boolean requireTyreApproval;
     private Boolean requireSparePartApproval;
+    private Boolean serviceInvoiceGstEnabled;
 
     private Boolean isActive;
     private LocalDateTime createdAt;

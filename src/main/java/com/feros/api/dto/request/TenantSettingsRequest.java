@@ -20,4 +20,5 @@ public class TenantSettingsRequest {
     private LocalTime attendanceDeadlineTime;
     private Boolean requireTyreApproval;
     private Boolean requireSparePartApproval;
+    private Boolean serviceInvoiceGstEnabled;
 }
