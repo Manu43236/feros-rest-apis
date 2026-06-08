@@ -109,7 +109,7 @@ public class TenantController {
     // ─── Settings ──────────────────────────────────────────────────────────────
 
     @GetMapping("/settings")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER', 'DRIVER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'SERVICE_MANAGER', 'STORE_KEEPER', 'DRIVER')")
     public ResponseEntity<ApiResponse<TenantSettingsResponse>> getSettings() {
         return ResponseEntity.ok(ApiResponse.success("Settings fetched", tenantService.getSettings()));
     }

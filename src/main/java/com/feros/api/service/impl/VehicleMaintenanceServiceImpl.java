@@ -22,6 +22,7 @@ import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.entity.ServicePart;
 import com.feros.api.entity.SparePartsTransaction;
+import com.feros.api.entity.User;
 import com.feros.api.repository.*;
 import com.feros.api.service.VehicleMaintenanceService;
 import com.feros.api.util.NumberUtil;
@@ -54,6 +55,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     private final TenantSettingsRepository tenantSettingsRepository;
     private final ServicePartRepository servicePartRepository;
     private final SparePartsTransactionRepository sparePartsTransactionRepository;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
@@ -288,6 +290,45 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
 
     @Override
     @Transactional
+    public VehicleServiceResponse assignTask(Long serviceId, Long taskId, Long mechanicId) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        VehicleService vs = vehicleServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+
+        VehicleServiceTask task = vs.getTasks().stream()
+                .filter(t -> t.getId().equals(taskId))
+                .findFirst()
+                .orElseThrow(() -> new FerosException("Task not found", HttpStatus.NOT_FOUND));
+
+        if (task.getStatus() == ServiceTaskStatus.COMPLETED) {
+            throw new FerosException("Cannot reassign a completed task", HttpStatus.BAD_REQUEST);
+        }
+
+        User mechanic = userRepository.findByIdAndIsActiveTrue(mechanicId)
+                .orElseThrow(() -> new FerosException("Mechanic not found", HttpStatus.NOT_FOUND));
+
+        if (!mechanic.getTenant().getId().equals(tenantId)) {
+            throw new FerosException("Mechanic not found", HttpStatus.NOT_FOUND);
+        }
+
+        task.setAssignedMechanic(mechanic);
+        task.setStatus(ServiceTaskStatus.ASSIGNED);
+        vehicleServiceTaskRepository.save(task);
+
+        // Auto-start the service when first task is assigned
+        if (vs.getStatus() == ServiceStatus.OPEN) {
+            vs.setStatus(ServiceStatus.IN_PROGRESS);
+            vs.setStartedAt(TimeUtil.nowIst());
+            vehicleServiceRepository.save(vs);
+        }
+
+        return mapToResponse(vehicleServiceRepository.findById(vs.getId()).orElse(vs));
+    }
+
+    @Override
+    @Transactional
     public VehicleServiceResponse addTask(Long serviceId, VehicleServiceTaskRequest request) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
 
@@ -477,6 +518,9 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                         .frequencyKm(t.getFrequencyKm())
                         .cost(t.getCost())
                         .status(t.getStatus())
+                        .assignedMechanicId(t.getAssignedMechanic() != null ? t.getAssignedMechanic().getId() : null)
+                        .assignedMechanicName(t.getAssignedMechanic() != null ? t.getAssignedMechanic().getName() : null)
+                        .mechanicClosedAt(t.getMechanicClosedAt())
                         .build())
                 .toList();
 

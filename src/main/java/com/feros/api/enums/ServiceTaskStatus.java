@@ -1,5 +1,5 @@
 package com.feros.api.enums;
 
 public enum ServiceTaskStatus {
-    PENDING, COMPLETED
+    PENDING, ASSIGNED, IN_PROGRESS, MECHANIC_CLOSED, COMPLETED
 }

@@ -1,5 +1,6 @@
 package com.feros.api.controller;
 
+import com.feros.api.dto.request.AssignMechanicRequest;
 import com.feros.api.dto.request.CompleteServiceRequest;
 import com.feros.api.dto.request.VehicleServiceRequest;
 import com.feros.api.dto.request.VehicleServiceTaskRequest;
@@ -23,31 +24,31 @@ public class VehicleMaintenanceController {
     private final VehicleMaintenanceService vehicleMaintenanceService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<VehicleServiceResponse>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success("Vehicle services fetched successfully", vehicleMaintenanceService.getAll()));
     }
 
     @GetMapping("/vehicle/{vehicleId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MEN', 'SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<VehicleServiceResponse>>> getByVehicle(@PathVariable Long vehicleId) {
         return ResponseEntity.ok(ApiResponse.success("Vehicle services fetched successfully", vehicleMaintenanceService.getByVehicle(vehicleId)));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Vehicle service fetched successfully", vehicleMaintenanceService.getById(id)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> create(@Valid @RequestBody VehicleServiceRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Service created successfully", vehicleMaintenanceService.create(request)));
     }
 
     @PutMapping("/{id}/start")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> start(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Service started successfully", vehicleMaintenanceService.start(id)));
     }
@@ -66,7 +67,7 @@ public class VehicleMaintenanceController {
     }
 
     @PutMapping("/{id}/complete")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> complete(
             @PathVariable Long id,
             @Valid @RequestBody CompleteServiceRequest request) {
@@ -74,14 +75,24 @@ public class VehicleMaintenanceController {
     }
 
     @PatchMapping("/{serviceId}/tasks/{taskId}/complete")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> completeTask(
             @PathVariable Long serviceId, @PathVariable Long taskId) {
         return ResponseEntity.ok(ApiResponse.success("Task marked complete", vehicleMaintenanceService.completeTask(serviceId, taskId)));
     }
 
+    @PutMapping("/{serviceId}/tasks/{taskId}/assign")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<VehicleServiceResponse>> assignTask(
+            @PathVariable Long serviceId,
+            @PathVariable Long taskId,
+            @Valid @RequestBody AssignMechanicRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Mechanic assigned successfully",
+                vehicleMaintenanceService.assignTask(serviceId, taskId, request.getMechanicId())));
+    }
+
     @PostMapping("/{id}/tasks")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> addTask(
             @PathVariable Long id,
             @RequestBody VehicleServiceTaskRequest request) {

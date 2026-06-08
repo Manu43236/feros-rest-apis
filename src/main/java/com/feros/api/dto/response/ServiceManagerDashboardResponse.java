@@ -1,0 +1,79 @@
+package com.feros.api.dto.response;
+
+import com.feros.api.enums.BreakdownStatus;
+import com.feros.api.enums.BreakdownType;
+import com.feros.api.enums.ServiceStatus;
+import com.feros.api.enums.ServiceTaskStatus;
+import com.feros.api.enums.ServiceTriggeredBy;
+import lombok.*;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ServiceManagerDashboardResponse {
+
+    private List<BreakdownItem> breakdowns;
+    private List<ServiceItem> generalServices;
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class BreakdownItem {
+        private Long breakdownId;
+        private Long vehicleId;
+        private String vehicleRegistrationNumber;
+        private BreakdownType breakdownType;
+        private String location;
+        private BreakdownStatus breakdownStatus;
+        private LocalDateTime breakdownDate;
+        // linked service (null if not yet logged)
+        private Long serviceId;
+        private String serviceNumber;
+        private ServiceStatus serviceStatus;
+        private int tasksTotal;
+        private int tasksAssigned;
+        private int tasksMechanicClosed;
+        private List<TaskItem> tasks;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class ServiceItem {
+        private Long serviceId;
+        private String serviceNumber;
+        private Long vehicleId;
+        private String vehicleRegistrationNumber;
+        private ServiceStatus serviceStatus;
+        private String displayStatus;
+        private LocalDate serviceDate;
+        private ServiceTriggeredBy triggeredBy;
+        private int tasksTotal;
+        private int tasksAssigned;
+        private int tasksMechanicClosed;
+        private List<TaskItem> tasks;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class TaskItem {
+        private Long taskId;
+        private String displayName;
+        private ServiceTaskStatus status;
+        private Long assignedMechanicId;
+        private String assignedMechanicName;
+    }
+}

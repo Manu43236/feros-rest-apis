@@ -22,7 +22,7 @@ public class VehicleBreakdownController {
 
     // Admin / Supervisor / OfficeStaff — report breakdown by order + allocation
     @PostMapping("/orders/{orderId}/vehicle-allocations/{allocationId}/breakdown")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<BreakdownResponse>> reportBreakdown(
             @PathVariable Long orderId,
             @PathVariable Long allocationId,
@@ -83,7 +83,7 @@ public class VehicleBreakdownController {
 
     // Vehicle breakdown history — for maintenance tracking
     @GetMapping("/vehicle-breakdowns")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<BreakdownResponse>>> getVehicleBreakdownHistory(
             @RequestParam(required = false) Long vehicleId) {
         List<BreakdownResponse> data = (vehicleId != null)
@@ -94,7 +94,7 @@ public class VehicleBreakdownController {
 
     // Standalone — mark available vehicle as BREAKDOWN (not on any order)
     @PostMapping("/vehicles/{vehicleId}/breakdown")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<BreakdownResponse>> reportStandaloneBreakdown(
             @PathVariable Long vehicleId,
             @Valid @RequestBody BreakdownRequest request) {
@@ -104,7 +104,7 @@ public class VehicleBreakdownController {
 
     // Standalone — resolve breakdown and mark vehicle back to AVAILABLE
     @PostMapping("/vehicles/{vehicleId}/breakdown/{breakdownId}/resolve")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<BreakdownResponse>> resolveStandaloneBreakdown(
             @PathVariable Long vehicleId,
             @PathVariable Long breakdownId) {

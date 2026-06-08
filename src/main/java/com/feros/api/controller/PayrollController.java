@@ -90,7 +90,7 @@ public class PayrollController {
     }
 
     @GetMapping("/my")
-    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
+    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MANAGER', 'MECHANIC', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<List<PayrollResponse>>> getMyPayrolls() {
         return ResponseEntity.ok(ApiResponse.success(
                 "Payrolls fetched successfully",
@@ -121,7 +121,7 @@ public class PayrollController {
     }
 
     @GetMapping("/{id}/payslip-pdf")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MANAGER', 'MECHANIC', 'STORE_KEEPER')")
     public ResponseEntity<byte[]> getPayslipPdf(@PathVariable Long id) {
         byte[] pdf = payslipPdfService.generate(id);
         return ResponseEntity.ok()

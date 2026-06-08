@@ -5,6 +5,7 @@ import com.feros.api.dto.request.*;
 import com.feros.api.dto.response.*;
 import com.feros.api.entity.*;
 import com.feros.api.entity.master.SparePart;
+import com.feros.api.entity.VehicleServiceTask;
 import com.feros.api.enums.ServicePartStatus;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.StockReferenceType;
@@ -41,6 +42,7 @@ public class InventoryServiceImpl implements InventoryService {
     private final ServicePartRepository servicePartRepository;
     private final SparePartsTransactionRepository transactionRepository;
     private final VehicleServiceRepository vehicleServiceRepository;
+    private final VehicleServiceTaskRepository vehicleServiceTaskRepository;
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
@@ -230,6 +232,15 @@ public class InventoryServiceImpl implements InventoryService {
         SparePart part = sparePartRepository.findByIdAndTenantIdAndIsActiveTrue(request.getSparePartId(), tenantId)
                 .orElseThrow(() -> new FerosException("Spare part not found", HttpStatus.NOT_FOUND));
 
+        // Resolve optional task linkage
+        VehicleServiceTask serviceTask = null;
+        if (request.getTaskId() != null) {
+            serviceTask = vehicleServiceTaskRepository.findById(request.getTaskId())
+                    .filter(t -> t.getService().getId().equals(serviceId))
+                    .orElseThrow(() -> new FerosException("Task not found on this service", HttpStatus.BAD_REQUEST));
+        }
+        final VehicleServiceTask resolvedTask = serviceTask;
+
         // If requireSparePartApproval = true → await STORE_KEEPER; false/null → auto-approve
         com.feros.api.entity.master.TenantSettings settings =
                 tenantSettingsRepository.findByTenantId(tenantId).orElse(null);
@@ -242,6 +253,7 @@ public class InventoryServiceImpl implements InventoryService {
 
             ServicePart sp = ServicePart.builder()
                     .service(service)
+                    .serviceTask(resolvedTask)
                     .sparePart(part)
                     .quantityRequested(request.getQuantityRequested())
                     .quantityApproved(request.getQuantityRequested())
@@ -284,6 +296,7 @@ public class InventoryServiceImpl implements InventoryService {
         // Standard flow — create as REQUESTED, await STORE_KEEPER approval
         ServicePart sp = ServicePart.builder()
                 .service(service)
+                .serviceTask(resolvedTask)
                 .sparePart(part)
                 .quantityRequested(request.getQuantityRequested())
                 .status(ServicePartStatus.REQUESTED)
@@ -421,6 +434,12 @@ public class InventoryServiceImpl implements InventoryService {
     @Override
     public List<ServicePartResponse> getPartsForService(Long serviceId) {
         return servicePartRepository.findByServiceIdOrderByCreatedAtDesc(serviceId)
+                .stream().map(this::toServicePartResponse).toList();
+    }
+
+    @Override
+    public List<ServicePartResponse> getPartsForTask(Long taskId) {
+        return servicePartRepository.findByServiceTaskIdOrderByCreatedAtDesc(taskId)
                 .stream().map(this::toServicePartResponse).toList();
     }
 
@@ -664,6 +683,11 @@ public class InventoryServiceImpl implements InventoryService {
 
     private ServicePartResponse toServicePartResponse(ServicePart sp) {
         VehicleService svc = sp.getService();
+        VehicleServiceTask task = sp.getServiceTask();
+        String taskDisplayName = null;
+        if (task != null) {
+            taskDisplayName = task.getTaskType() != null ? task.getTaskType().getName() : task.getCustomName();
+        }
         return ServicePartResponse.builder()
                 .id(sp.getId())
                 .serviceId(svc.getId())
@@ -677,6 +701,8 @@ public class InventoryServiceImpl implements InventoryService {
                 .quantityApproved(sp.getQuantityApproved())
                 .status(sp.getStatus())
                 .rejectionReason(sp.getRejectionReason())
+                .taskId(task != null ? task.getId() : null)
+                .taskDisplayName(taskDisplayName)
                 .requestedById(sp.getRequestedBy().getId())
                 .requestedByName(sp.getRequestedBy().getName())
                 .approvedById(sp.getApprovedBy() != null ? sp.getApprovedBy().getId() : null)

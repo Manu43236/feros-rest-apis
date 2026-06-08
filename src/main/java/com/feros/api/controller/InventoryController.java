@@ -22,13 +22,13 @@ public class InventoryController {
     // ─── Spare Parts Master ───────────────────────────────────────────────────
 
     @GetMapping("/spare-parts")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'STORE_KEEPER', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'STORE_KEEPER', 'SERVICE_MANAGER', 'MECHANIC')")
     public ResponseEntity<ApiResponse<List<SparePartResponse>>> getAllSpareParts() {
         return ResponseEntity.ok(ApiResponse.success("Spare parts fetched", inventoryService.getAllSpareParts()));
     }
 
     @GetMapping("/spare-parts/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'STORE_KEEPER', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'STORE_KEEPER', 'SERVICE_MANAGER', 'MECHANIC')")
     public ResponseEntity<ApiResponse<SparePartResponse>> getSparePart(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Spare part fetched", inventoryService.getSparePart(id)));
     }
@@ -121,13 +121,19 @@ public class InventoryController {
     }
 
     @GetMapping("/service-parts/service/{serviceId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'STORE_KEEPER', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'STORE_KEEPER', 'SERVICE_MANAGER', 'MECHANIC')")
     public ResponseEntity<ApiResponse<List<ServicePartResponse>>> getPartsForService(@PathVariable Long serviceId) {
         return ResponseEntity.ok(ApiResponse.success("Service parts fetched", inventoryService.getPartsForService(serviceId)));
     }
 
+    @GetMapping("/service-parts/task/{taskId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'STORE_KEEPER', 'SERVICE_MANAGER', 'MECHANIC')")
+    public ResponseEntity<ApiResponse<List<ServicePartResponse>>> getPartsForTask(@PathVariable Long taskId) {
+        return ResponseEntity.ok(ApiResponse.success("Task parts fetched", inventoryService.getPartsForTask(taskId)));
+    }
+
     @PostMapping("/service-parts/service/{serviceId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SERVICE_MANAGER', 'MECHANIC')")
     public ResponseEntity<ApiResponse<ServicePartResponse>> requestPart(@PathVariable Long serviceId, @Valid @RequestBody ServicePartRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Part request submitted", inventoryService.requestPart(serviceId, request)));
     }
@@ -139,7 +145,7 @@ public class InventoryController {
     }
 
     @DeleteMapping("/service-parts/{servicePartId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> removeServicePart(@PathVariable Long servicePartId) {
         inventoryService.removeServicePart(servicePartId);
         return ResponseEntity.ok(ApiResponse.success("Part request removed", null));

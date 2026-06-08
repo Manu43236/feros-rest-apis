@@ -4,6 +4,7 @@ import com.feros.api.enums.ServiceTaskStatus;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -20,4 +21,7 @@ public class VehicleServiceTaskResponse {
     private Integer frequencyKm;
     private BigDecimal cost;
     private ServiceTaskStatus status;
+    private Long assignedMechanicId;
+    private String assignedMechanicName;
+    private LocalDateTime mechanicClosedAt;
 }

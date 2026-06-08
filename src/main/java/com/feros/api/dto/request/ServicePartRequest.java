@@ -17,4 +17,7 @@ public class ServicePartRequest {
     @NotNull(message = "Quantity is required")
     @Min(value = 1, message = "Quantity must be at least 1")
     private Integer quantityRequested;
+
+    /** Optional: the specific task this part is being requested for. */
+    private Long taskId;
 }

@@ -25,6 +25,11 @@ public class ServicePart {
     @JoinColumn(name = "service_id", nullable = false)
     private VehicleService service;
 
+    /** Optional: the specific task within the service this part was requested for. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "task_id")
+    private VehicleServiceTask serviceTask;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "spare_part_id", nullable = false)
     private SparePart sparePart;

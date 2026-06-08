@@ -7,6 +7,7 @@ public enum RoleName {
     SUPERVISOR,
     DRIVER,
     CLEANER,
-    SERVICE_MEN,
+    SERVICE_MANAGER,
+    MECHANIC,
     STORE_KEEPER
 }

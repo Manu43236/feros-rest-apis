@@ -207,9 +207,9 @@ public class TyreServiceImpl implements TyreService {
         VehicleTyrePosition position = findPosition(request.getPositionId(), tenantId);
         User fittedBy = getUser(userId);
 
-        // Check tenant setting — SERVICE_MEN must go through STORE_KEEPER if approval required
+        // Check tenant setting — SERVICE_MANAGER must go through STORE_KEEPER if approval required
         String currentRole = SecurityUtil.getCurrentRole();
-        if ("SERVICE_MEN".equals(currentRole)) {
+        if ("SERVICE_MANAGER".equals(currentRole)) {
             TenantSettings settings = tenantSettingsRepository.findByTenantId(tenantId).orElse(null);
             if (settings != null && Boolean.TRUE.equals(settings.getRequireTyreApproval())) {
                 throw new FerosException(

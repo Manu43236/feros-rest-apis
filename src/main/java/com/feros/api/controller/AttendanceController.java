@@ -73,7 +73,7 @@ public class AttendanceController {
 
     // All roles can self-mark attendance
     @PostMapping("/attendance/my")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MEN', 'STORE_KEEPER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MANAGER', 'MECHANIC', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> markOwnAttendance(
             @Valid @RequestBody MarkOwnAttendanceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -81,7 +81,7 @@ public class AttendanceController {
     }
 
     @PostMapping("/attendance/my/mark-present")
-    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
+    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MANAGER', 'MECHANIC', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> markMobilePresent(
             @RequestBody MarkMobilePresentRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -89,28 +89,28 @@ public class AttendanceController {
     }
 
     @GetMapping("/attendance/my/today-status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MANAGER', 'MECHANIC', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> getTodayAttendanceStatus() {
         return ResponseEntity.ok(ApiResponse.success(
                 "Today attendance status fetched", attendanceService.getTodayAttendanceStatus()));
     }
 
     @PostMapping("/attendance/my/mark-out")
-    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
+    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MANAGER', 'MECHANIC', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> markOut() {
         return ResponseEntity.ok(ApiResponse.success(
                 "Marked out successfully", attendanceService.markOut()));
     }
 
     @PostMapping("/attendance/my/undo-out")
-    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MEN', 'STORE_KEEPER')")
+    @PreAuthorize("hasAnyRole('DRIVER', 'CLEANER', 'SUPERVISOR', 'SERVICE_MANAGER', 'MECHANIC', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> undoOut() {
         return ResponseEntity.ok(ApiResponse.success(
                 "Out undone successfully", attendanceService.undoOut()));
     }
 
     @GetMapping("/attendance/my")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MEN', 'STORE_KEEPER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MANAGER', 'MECHANIC', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getMyAttendance(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {

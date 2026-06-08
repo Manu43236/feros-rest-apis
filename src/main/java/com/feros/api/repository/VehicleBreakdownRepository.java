@@ -22,6 +22,7 @@ public interface VehicleBreakdownRepository extends JpaRepository<VehicleBreakdo
     List<VehicleBreakdown> findByVehicleIdAndIsActiveTrueOrderByCreatedAtDesc(Long vehicleId);
 
     List<VehicleBreakdown> findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(Long tenantId);
+    List<VehicleBreakdown> findByTenantIdAndStatusInAndIsActiveTrueOrderByBreakdownDateDesc(Long tenantId, List<BreakdownStatus> statuses);
 
     Optional<VehicleBreakdown> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
 

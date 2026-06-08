@@ -1374,7 +1374,7 @@ public class ReportServiceImpl implements ReportService {
         Set<String> names = user.getRoles().stream()
                 .map(r -> r.getName().name())
                 .collect(Collectors.toSet());
-        for (String r : List.of("DRIVER", "CLEANER", "SUPERVISOR", "OFFICE_STAFF", "SERVICE_MEN", "STORE_KEEPER", "ADMIN")) {
+        for (String r : List.of("DRIVER", "CLEANER", "SUPERVISOR", "OFFICE_STAFF", "SERVICE_MANAGER", "MECHANIC", "STORE_KEEPER", "ADMIN")) {
             if (names.contains(r)) return r;
         }
         return names.isEmpty() ? "—" : names.iterator().next();

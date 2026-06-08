@@ -26,13 +26,13 @@ public class TyreController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<TyreResponse>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success("Tyres fetched", tyreService.getAllTyres()));
     }
 
     @GetMapping("/available")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<TyreResponse>>> getAvailable() {
         return ResponseEntity.ok(ApiResponse.success("Available tyres fetched", tyreService.getAvailableTyres()));
     }
@@ -44,13 +44,13 @@ public class TyreController {
     }
 
     @GetMapping("/{id}/history")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<TyreFittingResponse>>> getTyreHistory(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Tyre history fetched", tyreService.getTyreHistory(id)));
     }
 
     @PatchMapping("/{id}/back-to-stock")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<TyreResponse>> markBackToStock(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Tyre marked back to stock", tyreService.markBackToStock(id)));
     }

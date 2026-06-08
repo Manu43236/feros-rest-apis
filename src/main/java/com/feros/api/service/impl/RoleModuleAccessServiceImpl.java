@@ -38,7 +38,7 @@ public class RoleModuleAccessServiceImpl implements RoleModuleAccessService {
         RoleName.STORE_KEEPER, List.of(
             ModuleKey.SPARE_PARTS, ModuleKey.TYRES, ModuleKey.PART_REQUESTS, ModuleKey.TYRE_REQUESTS
         ),
-        RoleName.SERVICE_MEN, List.of(
+        RoleName.SERVICE_MANAGER, List.of(
             ModuleKey.VEHICLE_SERVICES
         ),
         RoleName.DRIVER, List.of(),

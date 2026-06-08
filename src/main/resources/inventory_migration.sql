@@ -5,7 +5,7 @@
 
 -- New roles
 INSERT IGNORE INTO roles (name, description, is_active) VALUES
-('SERVICE_MEN', 'Vehicle Service Technician', 1),
+('SERVICE_MANAGER', 'Vehicle Service Manager', 1),
 ('STORE_KEEPER', 'Spare Parts Store Keeper', 1);
 
 -- Tenant master: spare parts list

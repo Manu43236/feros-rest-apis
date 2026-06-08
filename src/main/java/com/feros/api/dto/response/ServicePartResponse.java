@@ -23,6 +23,8 @@ public class ServicePartResponse {
     private Integer quantityApproved;
     private ServicePartStatus status;
     private String rejectionReason;
+    private Long taskId;
+    private String taskDisplayName;
     private Long requestedById;
     private String requestedByName;
     private Long approvedById;

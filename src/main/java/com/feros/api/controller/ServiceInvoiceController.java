@@ -28,13 +28,13 @@ public class ServiceInvoiceController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<ServiceInvoiceResponse>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Invoice fetched", serviceInvoiceService.getById(id)));
     }
 
     @GetMapping("/service/{serviceId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<ServiceInvoiceResponse>> getByServiceId(@PathVariable Long serviceId) {
         return ResponseEntity.ok(ApiResponse.success("Invoice fetched", serviceInvoiceService.getByServiceId(serviceId)));
     }
@@ -59,7 +59,7 @@ public class ServiceInvoiceController {
     }
 
     @GetMapping("/{id}/pdf")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
     public ResponseEntity<byte[]> getPdf(@PathVariable Long id) {
         byte[] pdf = serviceInvoiceService.generatePdf(id);
         return ResponseEntity.ok()

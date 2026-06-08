@@ -21,7 +21,7 @@ public class TyreRequestController {
     private final TyreRequestService tyreRequestService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<TyreRequestResponse>> createRequest(
             @RequestBody TyreRequestCreateRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Tyre request submitted", tyreRequestService.createRequest(request)));
@@ -40,7 +40,7 @@ public class TyreRequestController {
     }
 
     @GetMapping("/my")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<TyreRequestResponse>>> getMyRequests() {
         return ResponseEntity.ok(ApiResponse.success("My tyre requests fetched", tyreRequestService.getMyRequests()));
     }

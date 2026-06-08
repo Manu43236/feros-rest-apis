@@ -26,6 +26,7 @@ public interface InventoryService {
     ServicePartResponse approvePart(Long servicePartId, ServicePartApprovalRequest request);
     void removeServicePart(Long servicePartId);
     List<ServicePartResponse> getPartsForService(Long serviceId);
+    List<ServicePartResponse> getPartsForTask(Long taskId);
     List<ServicePartResponse> getPendingRequests();
     List<ServicePartResponse> getAllRequests();
 

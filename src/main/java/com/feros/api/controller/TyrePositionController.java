@@ -25,14 +25,14 @@ public class TyrePositionController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MEN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<TyrePositionResponse>>> getAll(
             @RequestParam Long vehicleId) {
         return ResponseEntity.ok(ApiResponse.success("Positions fetched", tyreService.getPositionsForVehicle(vehicleId)));
     }
 
     @GetMapping("/current")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MEN', 'SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<TyrePositionResponse>>> getCurrent(
             @RequestParam Long vehicleId) {
         return ResponseEntity.ok(ApiResponse.success("Current positions fetched", tyreService.getCurrentPositionsForVehicle(vehicleId)));

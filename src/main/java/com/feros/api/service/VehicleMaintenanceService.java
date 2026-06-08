@@ -17,6 +17,7 @@ public interface VehicleMaintenanceService {
     VehicleServiceResponse updateNotes(Long id, String notes);
     VehicleServiceResponse complete(Long id, CompleteServiceRequest request);
     VehicleServiceResponse completeTask(Long serviceId, Long taskId);
+    VehicleServiceResponse assignTask(Long serviceId, Long taskId, Long mechanicId);
     VehicleServiceResponse addTask(Long serviceId, VehicleServiceTaskRequest request);
     void delete(Long id);
 }

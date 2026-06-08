@@ -4,6 +4,7 @@ import com.feros.api.entity.master.ServiceTaskType;
 import com.feros.api.enums.ServiceTaskStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.LocalDateTime;
 
 import java.math.BigDecimal;
 
@@ -40,6 +41,13 @@ public class VehicleServiceTask extends BaseEntity {
 
     @Column(name = "cost")
     private BigDecimal cost;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_mechanic_id")
+    private User assignedMechanic;
+
+    @Column(name = "mechanic_closed_at")
+    private LocalDateTime mechanicClosedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
