@@ -41,6 +41,10 @@ public class ServiceInvoice extends BaseEntity {
     @Builder.Default
     private BigDecimal tasksTotal = BigDecimal.ZERO;
 
+    @Column(name = "parts_total", precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal partsTotal = BigDecimal.ZERO;
+
     @Column(name = "labour_charges", precision = 10, scale = 2)
     @Builder.Default
     private BigDecimal labourCharges = BigDecimal.ZERO;

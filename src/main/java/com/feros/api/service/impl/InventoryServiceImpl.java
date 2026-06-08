@@ -257,15 +257,22 @@ public class InventoryServiceImpl implements InventoryService {
             inv.setLastUpdated(com.feros.api.util.TimeUtil.nowIst());
             inventoryRepository.save(inv);
 
-            // Record OUT transaction
+            // Record OUT transaction — use last purchase price as unit cost
+            BigDecimal unitCostAuto = transactionRepository
+                    .findTopByTenantIdAndSparePartIdAndReferenceTypeOrderByCreatedAtDesc(
+                            tenantId, part.getId(), StockReferenceType.PURCHASE)
+                    .map(SparePartsTransaction::getUnitCost)
+                    .orElse(BigDecimal.ZERO);
+            BigDecimal totalCostAuto = unitCostAuto.multiply(BigDecimal.valueOf(request.getQuantityRequested()));
             SparePartsTransaction tx = SparePartsTransaction.builder()
                     .tenant(service.getTenant())
                     .sparePart(part)
                     .transactionType(StockTransactionType.OUT)
                     .quantity(request.getQuantityRequested())
-                    .unitCost(BigDecimal.ZERO)
-                    .totalCost(BigDecimal.ZERO)
+                    .unitCost(unitCostAuto)
+                    .totalCost(totalCostAuto)
                     .referenceType(StockReferenceType.SERVICE)
+                    .servicePart(sp)
                     .notes("Auto-approved for service " + service.getServiceNumber())
                     .createdBy(user)
                     .build();
@@ -333,12 +340,20 @@ public class InventoryServiceImpl implements InventoryService {
             inv.setLastUpdated(TimeUtil.nowIst());
             inventoryRepository.save(inv);
 
-            // Record OUT transaction
+            // Record OUT transaction — use last purchase price as unit cost
+            BigDecimal unitCostApproved = transactionRepository
+                    .findTopByTenantIdAndSparePartIdAndReferenceTypeOrderByCreatedAtDesc(
+                            tenantId, sp.getSparePart().getId(), StockReferenceType.PURCHASE)
+                    .map(SparePartsTransaction::getUnitCost)
+                    .orElse(BigDecimal.ZERO);
+            BigDecimal totalCostApproved = unitCostApproved.multiply(BigDecimal.valueOf(qtyApproved));
             SparePartsTransaction tx = SparePartsTransaction.builder()
                     .tenant(sp.getService().getTenant())
                     .sparePart(sp.getSparePart())
                     .transactionType(StockTransactionType.OUT)
                     .quantity(qtyApproved)
+                    .unitCost(unitCostApproved)
+                    .totalCost(totalCostApproved)
                     .referenceType(StockReferenceType.SERVICE)
                     .servicePart(sp)
                     .notes("Used in service: " + sp.getService().getServiceNumber())

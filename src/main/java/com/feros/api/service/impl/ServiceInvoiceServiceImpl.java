@@ -3,11 +3,13 @@ package com.feros.api.service.impl;
 import com.feros.api.dto.response.ServiceInvoiceResponse;
 import com.feros.api.entity.ServiceInvoice;
 import com.feros.api.entity.ServicePart;
+import com.feros.api.entity.SparePartsTransaction;
 import com.feros.api.enums.ServiceInvoiceStatus;
 import com.feros.api.enums.ServicePartStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.ServiceInvoiceRepository;
 import com.feros.api.repository.ServicePartRepository;
+import com.feros.api.repository.SparePartsTransactionRepository;
 import com.feros.api.service.ServiceInvoiceService;
 import com.feros.api.util.SecurityUtil;
 import com.feros.api.util.TimeUtil;
@@ -18,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +29,7 @@ public class ServiceInvoiceServiceImpl implements ServiceInvoiceService {
 
     private final ServiceInvoiceRepository invoiceRepository;
     private final ServicePartRepository servicePartRepository;
+    private final SparePartsTransactionRepository transactionRepository;
     private final ServiceInvoicePdfService pdfService;
 
     @Override
@@ -97,6 +102,12 @@ public class ServiceInvoiceServiceImpl implements ServiceInvoiceService {
         List<ServicePart> parts = servicePartRepository.findByServiceIdOrderByCreatedAtDesc(svc.getId())
                 .stream().filter(p -> p.getStatus() == ServicePartStatus.APPROVED).toList();
 
+        // Build a map of servicePart.id → transaction for cost lookup (avoids N+1)
+        List<Long> partIds = parts.stream().map(ServicePart::getId).toList();
+        Map<Long, SparePartsTransaction> txByPartId = partIds.isEmpty() ? Map.of() :
+                transactionRepository.findByServicePart_IdIn(partIds).stream()
+                        .collect(Collectors.toMap(tx -> tx.getServicePart().getId(), tx -> tx, (a, b) -> a));
+
         List<ServiceInvoiceResponse.TaskLineItem> taskItems = svc.getTasks().stream()
                 .map(t -> ServiceInvoiceResponse.TaskLineItem.builder()
                         .name(t.getTaskType() != null ? t.getTaskType().getName() : t.getCustomName())
@@ -105,12 +116,19 @@ public class ServiceInvoiceServiceImpl implements ServiceInvoiceService {
                 .toList();
 
         List<ServiceInvoiceResponse.PartLineItem> partItems = parts.stream()
-                .map(p -> ServiceInvoiceResponse.PartLineItem.builder()
-                        .partName(p.getSparePart().getName())
-                        .partNumber(p.getSparePart().getPartNumber())
-                        .unit(p.getSparePart().getUnit())
-                        .quantity(p.getQuantityApproved() != null ? p.getQuantityApproved() : p.getQuantityRequested())
-                        .build())
+                .map(p -> {
+                    SparePartsTransaction tx = txByPartId.get(p.getId());
+                    BigDecimal unitCost = tx != null && tx.getUnitCost() != null ? tx.getUnitCost() : BigDecimal.ZERO;
+                    BigDecimal totalCost = tx != null && tx.getTotalCost() != null ? tx.getTotalCost() : BigDecimal.ZERO;
+                    return ServiceInvoiceResponse.PartLineItem.builder()
+                            .partName(p.getSparePart().getName())
+                            .partNumber(p.getSparePart().getPartNumber())
+                            .unit(p.getSparePart().getUnit())
+                            .quantity(p.getQuantityApproved() != null ? p.getQuantityApproved() : p.getQuantityRequested())
+                            .unitCost(unitCost)
+                            .totalCost(totalCost)
+                            .build();
+                })
                 .toList();
 
         return ServiceInvoiceResponse.builder()
@@ -128,6 +146,7 @@ public class ServiceInvoiceServiceImpl implements ServiceInvoiceService {
                 .tasks(taskItems)
                 .parts(partItems)
                 .tasksTotal(inv.getTasksTotal())
+                .partsTotal(inv.getPartsTotal())
                 .labourCharges(inv.getLabourCharges())
                 .subTotal(inv.getSubTotal())
                 .gstRate(inv.getGstRate())

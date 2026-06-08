@@ -12,12 +12,16 @@ import com.feros.api.entity.master.TenantSettings;
 import com.feros.api.enums.BreakdownStatus;
 import com.feros.api.enums.ServiceInvoiceStatus;
 import com.feros.api.enums.ServiceInvoiceType;
+import com.feros.api.enums.ServicePartStatus;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTaskStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
+import com.feros.api.enums.StockReferenceType;
 import com.feros.api.enums.VehicleServiceType;
 import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
+import com.feros.api.entity.ServicePart;
+import com.feros.api.entity.SparePartsTransaction;
 import com.feros.api.repository.*;
 import com.feros.api.service.VehicleMaintenanceService;
 import com.feros.api.util.NumberUtil;
@@ -48,6 +52,8 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     private final ServiceTaskTypeRepository serviceTaskTypeRepository;
     private final ServiceInvoiceRepository serviceInvoiceRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
+    private final ServicePartRepository servicePartRepository;
+    private final SparePartsTransactionRepository sparePartsTransactionRepository;
 
     @Override
     @Transactional
@@ -345,9 +351,20 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                     .map(t -> t.getCost() != null ? t.getCost() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+            // Sum approved parts costs from inventory transactions
+            List<Long> servicePartIds = servicePartRepository.findByServiceIdOrderByCreatedAtDesc(vs.getId())
+                    .stream()
+                    .filter(p -> p.getStatus() == ServicePartStatus.APPROVED)
+                    .map(ServicePart::getId)
+                    .toList();
+            BigDecimal partsTotal = servicePartIds.isEmpty() ? BigDecimal.ZERO :
+                    sparePartsTransactionRepository.findByServicePart_IdIn(servicePartIds).stream()
+                            .map(tx -> tx.getTotalCost() != null ? tx.getTotalCost() : BigDecimal.ZERO)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
             BigDecimal labour = request.getLabourCharges() != null
                     ? request.getLabourCharges() : BigDecimal.ZERO;
-            BigDecimal subTotal = tasksTotal.add(labour);
+            BigDecimal subTotal = tasksTotal.add(partsTotal).add(labour);
 
             // Get GST rate from tenant settings
             BigDecimal gstRate = tenantSettingsRepository.findByTenantId(vs.getTenant().getId())
@@ -358,6 +375,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
             BigDecimal total = subTotal.add(gstAmount);
 
             builder.tasksTotal(tasksTotal)
+                    .partsTotal(partsTotal)
                     .labourCharges(labour)
                     .subTotal(subTotal)
                     .gstRate(gstRate)

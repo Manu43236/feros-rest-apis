@@ -35,6 +35,7 @@ public class ServiceInvoiceResponse {
     private List<TaskLineItem> tasks;
     private List<PartLineItem> parts;
     private BigDecimal tasksTotal;
+    private BigDecimal partsTotal;
     private BigDecimal labourCharges;
     private BigDecimal subTotal;
     private BigDecimal gstRate;
@@ -66,5 +67,7 @@ public class ServiceInvoiceResponse {
         private String partNumber;
         private String unit;
         private Integer quantity;
+        private BigDecimal unitCost;
+        private BigDecimal totalCost;
     }
 }
