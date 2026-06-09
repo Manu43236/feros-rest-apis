@@ -3,6 +3,7 @@ package com.feros.api.entity;
 import com.feros.api.entity.master.City;
 import com.feros.api.entity.master.EmploymentType;
 import com.feros.api.entity.master.State;
+import com.feros.api.enums.SalaryType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -83,6 +84,13 @@ public class StaffProfile extends BaseEntity {
 
     @Column(name = "profile_photo_url")
     private String profilePhotoUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "salary_type", nullable = false)
+    private SalaryType salaryType = SalaryType.DAILY;
+
+    @Column(name = "monthly_salary", precision = 12, scale = 2)
+    private java.math.BigDecimal monthlySalary;
 
     @Column(name = "is_active")
     private Boolean isActive = true;

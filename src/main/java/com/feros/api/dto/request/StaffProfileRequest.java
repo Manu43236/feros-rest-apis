@@ -1,8 +1,10 @@
 package com.feros.api.dto.request;
 
+import com.feros.api.enums.SalaryType;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Getter
@@ -27,4 +29,7 @@ public class StaffProfileRequest {
     private String licenseNumber;
     private LocalDate licenseExpiryDate;
     private String profilePhotoUrl;
+
+    private SalaryType salaryType;
+    private BigDecimal monthlySalary;
 }

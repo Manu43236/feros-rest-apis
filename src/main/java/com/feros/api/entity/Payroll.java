@@ -2,6 +2,7 @@ package com.feros.api.entity;
 
 import com.feros.api.enums.PaymentMode;
 import com.feros.api.enums.PayrollStatus;
+import com.feros.api.enums.SalaryType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -54,8 +55,15 @@ public class Payroll extends BaseEntity {
     @Column(name = "overtime_hours")
     private BigDecimal overtimeHours = BigDecimal.ZERO;
 
-    @Column(name = "daily_rate", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "salary_type")
+    private SalaryType salaryType = SalaryType.DAILY;
+
+    @Column(name = "daily_rate")
     private BigDecimal dailyRate;
+
+    @Column(name = "monthly_salary", precision = 12, scale = 2)
+    private BigDecimal monthlySalary;
 
     @Column(name = "basic_pay")
     private BigDecimal basicPay = BigDecimal.ZERO;

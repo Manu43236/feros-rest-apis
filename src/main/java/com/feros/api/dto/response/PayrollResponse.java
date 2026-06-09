@@ -2,6 +2,7 @@ package com.feros.api.dto.response;
 
 import com.feros.api.enums.PaymentMode;
 import com.feros.api.enums.PayrollStatus;
+import com.feros.api.enums.SalaryType;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -32,7 +33,9 @@ public class PayrollResponse {
     private Integer leaveDays;
     private BigDecimal overtimeHours;
 
+    private SalaryType salaryType;
     private BigDecimal dailyRate;
+    private BigDecimal monthlySalary;
     private BigDecimal basicPay;
     private BigDecimal overtimePay;
     private BigDecimal tripBonus;

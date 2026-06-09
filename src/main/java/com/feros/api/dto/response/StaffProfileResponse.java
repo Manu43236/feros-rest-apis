@@ -1,7 +1,9 @@
 package com.feros.api.dto.response;
 
+import com.feros.api.enums.SalaryType;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -49,6 +51,9 @@ public class StaffProfileResponse {
 
     private String profilePhotoUrl;
     private List<DocumentResponse> documents;
+
+    private SalaryType salaryType;
+    private BigDecimal monthlySalary;
 
     private Boolean isActive;
     private LocalDateTime createdAt;

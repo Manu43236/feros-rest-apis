@@ -84,6 +84,10 @@ public class StaffProfileServiceImpl implements StaffProfileService {
         profile.setLicenseExpiryDate(request.getLicenseExpiryDate());
         profile.setProfilePhotoUrl(request.getProfilePhotoUrl());
 
+        if (request.getSalaryType() != null)
+            profile.setSalaryType(request.getSalaryType());
+        profile.setMonthlySalary(request.getMonthlySalary());
+
         if (request.getDesignationId() != null)
             profile.setDesignation(designationRepository
                     .findByIdAndTenantId(request.getDesignationId(), tenantId)
@@ -337,6 +341,8 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                         p.getLicenseExpiryDate().isBefore(TimeUtil.today()))
                 .profilePhotoUrl(p.getProfilePhotoUrl())
                 .documents(documents)
+                .salaryType(p.getSalaryType())
+                .monthlySalary(p.getMonthlySalary())
                 .isActive(p.getIsActive())
                 .createdAt(p.getCreatedAt())
                 .updatedAt(p.getUpdatedAt())

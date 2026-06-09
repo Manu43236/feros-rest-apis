@@ -27,8 +27,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import com.feros.api.enums.SalaryType;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -111,6 +114,22 @@ public class PayrollServiceImpl implements PayrollService {
                 .stream().map(this::mapToAdvanceResponse).toList();
     }
 
+    /**
+     * Count working days (calendar days minus Sundays) in a given month.
+     * Used as the denominator for monthly LOP deduction.
+     */
+    private int countWorkingDaysInMonth(LocalDate start, LocalDate end) {
+        int workingDays = 0;
+        LocalDate date = start;
+        while (!date.isAfter(end)) {
+            if (date.getDayOfWeek() != DayOfWeek.SUNDAY) {
+                workingDays++;
+            }
+            date = date.plusDays(1);
+        }
+        return workingDays;
+    }
+
     @Override
     @Transactional
     public PayrollResponse generatePayroll(GeneratePayrollRequest request) {
@@ -125,23 +144,12 @@ public class PayrollServiceImpl implements PayrollService {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
 
-        // Resolve daily rate — use override if provided, else fetch from designation
-        BigDecimal resolvedDailyRate = request.getDailyRate();
-        if (resolvedDailyRate == null) {
-            StaffProfile profile = staffProfileRepository
-                    .findByUserIdAndTenantIdAndIsActiveTrue(request.getUserId(), tenantId)
-                    .orElseThrow(() -> new FerosException(
-                            "Staff profile not found for user. Cannot determine pay rate.", HttpStatus.BAD_REQUEST));
-            if (profile.getDesignation() == null) {
-                throw new FerosException(
-                        "No designation assigned to this staff member. Cannot determine pay rate.", HttpStatus.BAD_REQUEST);
-            }
-            if (profile.getDesignation().getPayPerDay() == null) {
-                throw new FerosException(
-                        "Designation '" + profile.getDesignation().getName() + "' has no pay rate configured.", HttpStatus.BAD_REQUEST);
-            }
-            resolvedDailyRate = profile.getDesignation().getPayPerDay();
-        }
+        StaffProfile profile = staffProfileRepository
+                .findByUserIdAndTenantIdAndIsActiveTrue(request.getUserId(), tenantId)
+                .orElseThrow(() -> new FerosException(
+                        "Staff profile not found for user. Cannot determine pay rate.", HttpStatus.BAD_REQUEST));
+
+        SalaryType salaryType = profile.getSalaryType() != null ? profile.getSalaryType() : SalaryType.DAILY;
 
         // Calculate attendance stats from attendance records
         List<com.feros.api.entity.Attendance> attendanceList = attendanceRepository
@@ -165,25 +173,74 @@ public class PayrollServiceImpl implements PayrollService {
                 leaveDays++;
         }
 
-        // Calculate pay
-        BigDecimal effectiveDays = BigDecimal.valueOf(presentDays)
-                .add(BigDecimal.valueOf(halfDays).multiply(new BigDecimal("0.5")))
-                .add(BigDecimal.valueOf(leaveDays));
+        BigDecimal basicPay;
+        BigDecimal resolvedDailyRate = null;
+        BigDecimal resolvedMonthlySalary = null;
 
-        BigDecimal basicPay = resolvedDailyRate
-                .multiply(effectiveDays)
-                .setScale(2, RoundingMode.HALF_UP);
+        if (salaryType == SalaryType.MONTHLY) {
+            // Resolve monthly salary — use override if provided, else fetch from profile
+            resolvedMonthlySalary = request.getMonthlySalary();
+            if (resolvedMonthlySalary == null) {
+                if (profile.getMonthlySalary() == null) {
+                    throw new FerosException(
+                            "No monthly salary configured for this staff member.", HttpStatus.BAD_REQUEST);
+                }
+                resolvedMonthlySalary = profile.getMonthlySalary();
+            }
 
-        // Overtime pay (per hour = dailyRate / 8 * 1.5)
+            // LOP deduction: (monthlySalary / workingDays) × lopDays
+            // lopDays = absent days only (leave days are paid, half days deduct 0.5)
+            int workingDays = countWorkingDaysInMonth(request.getPayCycleStartDate(), request.getPayCycleEndDate());
+            if (workingDays == 0) workingDays = 1; // safety guard
+
+            BigDecimal lopDays = BigDecimal.valueOf(absentDays)
+                    .add(BigDecimal.valueOf(halfDays).multiply(new BigDecimal("0.5")));
+
+            BigDecimal perDayRate = resolvedMonthlySalary
+                    .divide(BigDecimal.valueOf(workingDays), 4, RoundingMode.HALF_UP);
+            BigDecimal lopDeduction = perDayRate.multiply(lopDays).setScale(2, RoundingMode.HALF_UP);
+
+            basicPay = resolvedMonthlySalary.subtract(lopDeduction).setScale(2, RoundingMode.HALF_UP);
+        } else {
+            // DAILY — existing logic
+            resolvedDailyRate = request.getDailyRate();
+            if (resolvedDailyRate == null) {
+                if (profile.getDesignation() == null) {
+                    throw new FerosException(
+                            "No designation assigned to this staff member. Cannot determine pay rate.", HttpStatus.BAD_REQUEST);
+                }
+                if (profile.getDesignation().getPayPerDay() == null) {
+                    throw new FerosException(
+                            "Designation '" + profile.getDesignation().getName() + "' has no pay rate configured.", HttpStatus.BAD_REQUEST);
+                }
+                resolvedDailyRate = profile.getDesignation().getPayPerDay();
+            }
+
+            BigDecimal effectiveDays = BigDecimal.valueOf(presentDays)
+                    .add(BigDecimal.valueOf(halfDays).multiply(new BigDecimal("0.5")))
+                    .add(BigDecimal.valueOf(leaveDays));
+
+            basicPay = resolvedDailyRate
+                    .multiply(effectiveDays)
+                    .setScale(2, RoundingMode.HALF_UP);
+        }
+
+        // Overtime pay — based on daily rate equivalent (monthly / workingDays if monthly)
         BigDecimal overtimePay = BigDecimal.ZERO;
         if (request.getOvertimeHours() != null &&
                 request.getOvertimeHours().compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal hourlyRate = resolvedDailyRate
-                    .divide(BigDecimal.valueOf(8), 4, RoundingMode.HALF_UP);
-            overtimePay = hourlyRate
-                    .multiply(new BigDecimal("1.5"))
-                    .multiply(request.getOvertimeHours())
-                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal dailyRateForOt = resolvedDailyRate;
+            if (dailyRateForOt == null && resolvedMonthlySalary != null) {
+                int wd = countWorkingDaysInMonth(request.getPayCycleStartDate(), request.getPayCycleEndDate());
+                dailyRateForOt = resolvedMonthlySalary.divide(BigDecimal.valueOf(wd == 0 ? 1 : wd), 4, RoundingMode.HALF_UP);
+            }
+            if (dailyRateForOt != null) {
+                BigDecimal hourlyRate = dailyRateForOt.divide(BigDecimal.valueOf(8), 4, RoundingMode.HALF_UP);
+                overtimePay = hourlyRate
+                        .multiply(new BigDecimal("1.5"))
+                        .multiply(request.getOvertimeHours())
+                        .setScale(2, RoundingMode.HALF_UP);
+            }
         }
 
         BigDecimal tripBonus = request.getTripBonus() != null ? request.getTripBonus() : BigDecimal.ZERO;
@@ -205,7 +262,6 @@ public class PayrollServiceImpl implements PayrollService {
                         || assignment.getAssignedTo().isAfter(request.getPayCycleEndDate()))
                         ? request.getPayCycleEndDate() : assignment.getAssignedTo();
 
-                // Count present attendance days within this assignment window
                 long presentInWindow = attendanceList.stream()
                         .filter(a -> {
                             LocalDate d = a.getAttendanceDate();
@@ -219,7 +275,6 @@ public class PayrollServiceImpl implements PayrollService {
                                 .multiply(BigDecimal.valueOf(presentInWindow)));
             }
         } catch (Exception e) {
-            // Non-fatal — log and continue without extra pay
             vehicleExtraPay = BigDecimal.ZERO;
         }
         vehicleExtraPay = vehicleExtraPay.setScale(2, RoundingMode.HALF_UP);
@@ -238,7 +293,9 @@ public class PayrollServiceImpl implements PayrollService {
                 .halfDays(halfDays)
                 .leaveDays(leaveDays)
                 .overtimeHours(request.getOvertimeHours() != null ? request.getOvertimeHours() : BigDecimal.ZERO)
+                .salaryType(salaryType)
                 .dailyRate(resolvedDailyRate)
+                .monthlySalary(resolvedMonthlySalary)
                 .basicPay(basicPay)
                 .overtimePay(overtimePay)
                 .tripBonus(tripBonus)
@@ -430,7 +487,9 @@ public class PayrollServiceImpl implements PayrollService {
                 .halfDays(p.getHalfDays())
                 .leaveDays(p.getLeaveDays())
                 .overtimeHours(p.getOvertimeHours())
+                .salaryType(p.getSalaryType())
                 .dailyRate(p.getDailyRate())
+                .monthlySalary(p.getMonthlySalary())
                 .basicPay(p.getBasicPay())
                 .overtimePay(p.getOvertimePay())
                 .tripBonus(p.getTripBonus())
