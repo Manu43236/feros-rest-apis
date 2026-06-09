@@ -75,5 +75,7 @@ public class ServiceManagerDashboardResponse {
         private ServiceTaskStatus status;
         private Long assignedMechanicId;
         private String assignedMechanicName;
+        private java.time.LocalDateTime mechanicStartedAt;
+        private java.time.LocalDateTime mechanicClosedAt;
     }
 }

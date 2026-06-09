@@ -123,6 +123,8 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
                         .status(t.getStatus())
                         .assignedMechanicId(t.getAssignedMechanic() != null ? t.getAssignedMechanic().getId() : null)
                         .assignedMechanicName(t.getAssignedMechanic() != null ? t.getAssignedMechanic().getName() : null)
+                        .mechanicStartedAt(t.getMechanicStartedAt())
+                        .mechanicClosedAt(t.getMechanicClosedAt())
                         .build())
                 .toList();
     }
