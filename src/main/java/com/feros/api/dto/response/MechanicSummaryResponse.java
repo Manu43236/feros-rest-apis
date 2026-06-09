@@ -10,6 +10,5 @@ import lombok.*;
 public class MechanicSummaryResponse {
     private Long id;
     private String name;
-    private String phone;
-    private String userNumber;
+    private String designation;
 }

@@ -10,6 +10,7 @@ import com.feros.api.enums.RoleName;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTaskStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
+import com.feros.api.repository.StaffProfileRepository;
 import com.feros.api.repository.UserRepository;
 import com.feros.api.repository.VehicleBreakdownRepository;
 import com.feros.api.repository.VehicleServiceRepository;
@@ -28,6 +29,7 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
     private final VehicleBreakdownRepository breakdownRepository;
     private final VehicleServiceRepository serviceRepository;
     private final UserRepository userRepository;
+    private final StaffProfileRepository staffProfileRepository;
 
     @Override
     public ServiceManagerDashboardResponse getDashboard() {
@@ -100,12 +102,16 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         return userRepository.findByTenantIdAndRoleNames(tenantId, List.of(RoleName.MECHANIC))
                 .stream()
-                .map(u -> MechanicSummaryResponse.builder()
-                        .id(u.getId())
-                        .name(u.getName())
-                        .phone(u.getPhone())
-                        .userNumber(u.getUserNumber())
-                        .build())
+                .map(u -> {
+                    String desig = staffProfileRepository.findByUserIdAndIsActiveTrue(u.getId())
+                            .map(p -> p.getDesignation() != null ? p.getDesignation().getName() : null)
+                            .orElse(null);
+                    return MechanicSummaryResponse.builder()
+                            .id(u.getId())
+                            .name(u.getName())
+                            .designation(desig)
+                            .build();
+                })
                 .toList();
     }
 
