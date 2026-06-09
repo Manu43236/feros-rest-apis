@@ -87,7 +87,7 @@ public class VehicleMaintenanceController {
             @PathVariable Long serviceId,
             @PathVariable Long taskId,
             @Valid @RequestBody AssignMechanicRequest request) {
-        return ResponseEntity.ok(ApiResponse.success("Mechanic assigned successfully",
+        return ResponseEntity.ok(ApiResponse.success("Technician assigned successfully",
                 vehicleMaintenanceService.assignTask(serviceId, taskId, request.getMechanicId())));
     }
 

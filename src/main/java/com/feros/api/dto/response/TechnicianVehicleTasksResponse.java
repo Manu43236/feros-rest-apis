@@ -14,7 +14,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MechanicVehicleTasksResponse {
+public class TechnicianVehicleTasksResponse {
 
     private Long vehicleId;
     private String vehicleRegistrationNumber;
@@ -26,14 +26,14 @@ public class MechanicVehicleTasksResponse {
     // breakdown info (populated when triggered by breakdown)
     private Long breakdownId;
     private String breakdownType;
-    private List<MechanicTaskItem> tasks;
+    private List<TechnicianTaskItem> tasks;
 
     @Getter
     @Setter
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
-    public static class MechanicTaskItem {
+    public static class TechnicianTaskItem {
         private Long taskId;
         private String displayName;
         private ServiceTaskStatus status;

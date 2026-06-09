@@ -1,6 +1,6 @@
 package com.feros.api.service.impl;
 
-import com.feros.api.dto.response.MechanicSummaryResponse;
+import com.feros.api.dto.response.TechnicianSummaryResponse;
 import com.feros.api.dto.response.ServiceManagerDashboardResponse;
 import com.feros.api.entity.ServicePart;
 import com.feros.api.entity.VehicleBreakdown;
@@ -125,15 +125,15 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
     }
 
     @Override
-    public List<MechanicSummaryResponse> getMechanics() {
+    public List<TechnicianSummaryResponse> getTechnicians() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        return userRepository.findByTenantIdAndRoleNames(tenantId, List.of(RoleName.MECHANIC))
+        return userRepository.findByTenantIdAndRoleNames(tenantId, List.of(RoleName.TECHNICIAN))
                 .stream()
                 .map(u -> {
                     String desig = staffProfileRepository.findByUserIdAndIsActiveTrue(u.getId())
                             .map(p -> p.getDesignation() != null ? p.getDesignation().getName() : null)
                             .orElse(null);
-                    return MechanicSummaryResponse.builder()
+                    return TechnicianSummaryResponse.builder()
                             .id(u.getId())
                             .name(u.getName())
                             .designation(desig)

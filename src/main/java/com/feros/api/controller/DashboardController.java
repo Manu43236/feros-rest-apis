@@ -20,13 +20,13 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MANAGER', 'MECHANIC', 'STORE_KEEPER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MANAGER', 'TECHNICIAN', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<Object>> getDashboard() {
         String role = SecurityUtil.getCurrentRole();
         Object data = switch (role) {
             case "SUPERVISOR"                    -> dashboardService.getSupervisorDashboard();
             case "DRIVER", "CLEANER",
-                 "MECHANIC", "SERVICE_MANAGER",
+                 "TECHNICIAN", "SERVICE_MANAGER",
                  "STORE_KEEPER"                  -> dashboardService.getDriverDashboard();
             default                              -> dashboardService.getDashboard(); // ADMIN, OFFICE_STAFF
         };

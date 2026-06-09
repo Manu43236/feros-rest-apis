@@ -9,13 +9,13 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MechanicPerformanceRow {
-    private Long mechanicId;
-    private String mechanicName;
+public class TechnicianPerformanceRow {
+    private Long technicianId;
+    private String technicianName;
     private String designation;
     private int tasksAssigned;
     private int tasksCompleted;
-    private int tasksMechanicClosed;
+    private int tasksTechnicianClosed;
     private int tasksInProgress;
     private int servicesWorkedOn;
     private BigDecimal avgDurationMinutes;

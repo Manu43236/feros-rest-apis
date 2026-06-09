@@ -7,7 +7,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MechanicSummaryResponse {
+public class TechnicianSummaryResponse {
     private Long id;
     private String name;
     private String designation;

@@ -102,5 +102,5 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
     List<PayrollYtdRow> getPayrollYtd(int year);
 
     // ── Mechanic Performance ───────────────────────────────────────────────────
-    List<MechanicPerformanceRow> getMechanicPerformance(LocalDate startDate, LocalDate endDate);
+    List<TechnicianPerformanceRow> getTechnicianPerformance(LocalDate startDate, LocalDate endDate);
 }

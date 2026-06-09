@@ -1,7 +1,7 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.response.ApiResponse;
-import com.feros.api.dto.response.MechanicSummaryResponse;
+import com.feros.api.dto.response.TechnicianSummaryResponse;
 import com.feros.api.dto.response.ServiceManagerDashboardResponse;
 import com.feros.api.service.ServiceManagerService;
 import lombok.RequiredArgsConstructor;
@@ -28,11 +28,11 @@ public class ServiceManagerController {
                 serviceManagerService.getDashboard()));
     }
 
-    @GetMapping("/mechanics")
+    @GetMapping("/technicians")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
-    public ResponseEntity<ApiResponse<List<MechanicSummaryResponse>>> getMechanics() {
+    public ResponseEntity<ApiResponse<List<TechnicianSummaryResponse>>> getTechnicians() {
         return ResponseEntity.ok(ApiResponse.success(
-                "Mechanics fetched successfully",
-                serviceManagerService.getMechanics()));
+                "Technicians fetched successfully",
+                serviceManagerService.getTechnicians()));
     }
 }

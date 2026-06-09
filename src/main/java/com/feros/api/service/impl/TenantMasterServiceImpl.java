@@ -423,7 +423,7 @@ public class TenantMasterServiceImpl implements TenantMasterService {
         // Build full matrix with defaults (true) for any missing entries
         List<RbacLoginAccessResponse.Entry> entries = new java.util.ArrayList<>();
         for (RoleName role : new RoleName[]{RoleName.OFFICE_STAFF, RoleName.SUPERVISOR,
-                RoleName.DRIVER, RoleName.CLEANER, RoleName.STORE_KEEPER, RoleName.SERVICE_MANAGER, RoleName.MECHANIC}) {
+                RoleName.DRIVER, RoleName.CLEANER, RoleName.STORE_KEEPER, RoleName.SERVICE_MANAGER, RoleName.TECHNICIAN}) {
             for (DeviceType platform : DeviceType.values()) {
                 boolean allowed = records.stream()
                         .filter(r -> r.getRole() == role && r.getPlatform() == platform)

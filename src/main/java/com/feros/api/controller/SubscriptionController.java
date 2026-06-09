@@ -101,7 +101,7 @@ public class SubscriptionController {
     // ─── Tenant self-service (ADMIN can view own subscription) ───────────────
 
     @GetMapping("/my")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MANAGER', 'MECHANIC', 'STORE_KEEPER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MANAGER', 'TECHNICIAN', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<SubscriptionHistoryResponse>> getMyCurrent() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         return ResponseEntity.ok(ApiResponse.success("Subscription fetched",
