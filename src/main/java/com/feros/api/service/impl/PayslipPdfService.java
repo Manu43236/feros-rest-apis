@@ -135,9 +135,17 @@ public class PayslipPdfService {
             doc.add(Chunk.NEWLINE);
 
             // ── Earnings ────────────────────────────────────────────────────
-            String designationLabel = (profile != null && profile.getDesignation() != null)
-                    ? profile.getDesignation().getName() + "  (₹" + fmt(payroll.getDailyRate()) + "/day)"
-                    : "₹" + fmt(payroll.getDailyRate()) + "/day";
+            boolean isMonthly = payroll.getSalaryType() != null
+                    && payroll.getSalaryType().name().equals("MONTHLY");
+
+            String designationLabel;
+            if (isMonthly) {
+                designationLabel = "Monthly Salary  (₹" + fmt(payroll.getMonthlySalary()) + "/month)";
+            } else {
+                designationLabel = (profile != null && profile.getDesignation() != null)
+                        ? profile.getDesignation().getName() + "  (₹" + fmt(payroll.getDailyRate()) + "/day)"
+                        : "₹" + fmt(payroll.getDailyRate()) + "/day";
+            }
 
             doc.add(sectionTitle("EARNINGS"));
             PdfPTable earnings = new PdfPTable(new float[]{3, 1.5f});
@@ -160,8 +168,8 @@ public class PayslipPdfService {
             doc.add(earnings);
             doc.add(Chunk.NEWLINE);
 
-            // ── Per-day annexure ────────────────────────────────────────────
-            try {
+            // ── Per-day annexure (daily-rate employees only) ─────────────────
+            if (!isMonthly) try {
                 List<Attendance> attendanceList = attendanceRepository
                         .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrueOrderByAttendanceDateDesc(
                                 user.getId(), tenantId,
