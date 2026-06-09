@@ -113,6 +113,12 @@ public class LrPdfService {
             String toCity    = order.getDestinationCity() != null ? order.getDestinationCity().getName() : "";
             String fromState = order.getSourceState()     != null ? order.getSourceState().getName()     : "";
             String toState   = order.getDestinationState()!= null ? order.getDestinationState().getName(): "";
+            String fromLabel = (order.getSourceAddress() != null && !order.getSourceAddress().isBlank())
+                    ? order.getSourceAddress()
+                    : (fromCity.isEmpty() ? "—" : fromCity);
+            String toLabel   = (order.getDestinationAddress() != null && !order.getDestinationAddress().isBlank())
+                    ? order.getDestinationAddress()
+                    : (toCity.isEmpty() ? "—" : toCity);
 
             PdfPTable info = new PdfPTable(new float[]{2.3f, 1f});
             info.setWidthPercentage(100);
@@ -146,9 +152,9 @@ public class LrPdfService {
             Paragraph fromTo = new Paragraph();
             fromTo.setSpacingBefore(7);
             fromTo.add(new Chunk("From  ", bold8));
-            fromTo.add(new Chunk(fromCity.isEmpty() ? "—" : fromCity, bold8Navy));
+            fromTo.add(new Chunk(fromLabel, bold8Navy));
             fromTo.add(new Chunk("    To  ", bold8));
-            fromTo.add(new Chunk(toCity.isEmpty() ? "—" : toCity, bold8Navy));
+            fromTo.add(new Chunk(toLabel, bold8Navy));
             left.addElement(fromTo);
             info.addCell(left);
 
