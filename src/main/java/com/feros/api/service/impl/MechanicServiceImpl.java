@@ -78,6 +78,7 @@ public class MechanicServiceImpl implements MechanicService {
         }
 
         task.setStatus(ServiceTaskStatus.IN_PROGRESS);
+        task.setMechanicStartedAt(TimeUtil.nowIst());
         taskRepository.save(task);
 
         return buildServiceResponse(task.getService(), task.getService().getTasks());
@@ -157,6 +158,7 @@ public class MechanicServiceImpl implements MechanicService {
                 .taskId(t.getId())
                 .displayName(t.getTaskType() != null ? t.getTaskType().getName() : t.getCustomName())
                 .status(t.getStatus())
+                .mechanicStartedAt(t.getMechanicStartedAt())
                 .mechanicClosedAt(t.getMechanicClosedAt())
                 .build();
     }

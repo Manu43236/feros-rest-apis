@@ -36,6 +36,7 @@ public class MechanicVehicleTasksResponse {
         private Long taskId;
         private String displayName;
         private ServiceTaskStatus status;
+        private LocalDateTime mechanicStartedAt;
         private LocalDateTime mechanicClosedAt;
     }
 }

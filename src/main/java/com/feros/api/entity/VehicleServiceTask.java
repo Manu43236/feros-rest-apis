@@ -46,6 +46,9 @@ public class VehicleServiceTask extends BaseEntity {
     @JoinColumn(name = "assigned_mechanic_id")
     private User assignedMechanic;
 
+    @Column(name = "mechanic_started_at")
+    private LocalDateTime mechanicStartedAt;
+
     @Column(name = "mechanic_closed_at")
     private LocalDateTime mechanicClosedAt;
 
