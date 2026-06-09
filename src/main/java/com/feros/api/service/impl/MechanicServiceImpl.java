@@ -3,10 +3,12 @@ package com.feros.api.service.impl;
 import com.feros.api.dto.request.ServicePartRequest;
 import com.feros.api.dto.response.MechanicVehicleTasksResponse;
 import com.feros.api.dto.response.ServicePartResponse;
+import com.feros.api.entity.ServicePart;
 import com.feros.api.entity.VehicleService;
 import com.feros.api.entity.VehicleServiceTask;
 import com.feros.api.enums.ServiceTaskStatus;
 import com.feros.api.exception.FerosException;
+import com.feros.api.repository.ServicePartRepository;
 import com.feros.api.repository.VehicleServiceTaskRepository;
 import com.feros.api.service.InventoryService;
 import com.feros.api.service.MechanicService;
@@ -26,6 +28,7 @@ import java.util.stream.Collectors;
 public class MechanicServiceImpl implements MechanicService {
 
     private final VehicleServiceTaskRepository taskRepository;
+    private final ServicePartRepository servicePartRepository;
     private final InventoryService inventoryService;
 
     @Override
@@ -42,11 +45,17 @@ public class MechanicServiceImpl implements MechanicService {
         Map<Long, List<VehicleServiceTask>> byService = tasks.stream()
                 .collect(Collectors.groupingBy(t -> t.getService().getId()));
 
+        // Bulk-load parts for all task IDs
+        List<Long> allTaskIds = tasks.stream().map(VehicleServiceTask::getId).toList();
+        Map<Long, List<ServicePart>> partsByTask = allTaskIds.isEmpty() ? Map.of()
+                : servicePartRepository.findByServiceTaskIdIn(allTaskIds).stream()
+                        .collect(Collectors.groupingBy(p -> p.getServiceTask().getId()));
+
         return byService.values().stream()
                 .map(serviceTasks -> {
                     VehicleService vs = serviceTasks.get(0).getService();
                     List<MechanicVehicleTasksResponse.MechanicTaskItem> taskItems = serviceTasks.stream()
-                            .map(this::toTaskItem)
+                            .map(t -> toTaskItem(t, partsByTask.getOrDefault(t.getId(), List.of())))
                             .toList();
 
                     return MechanicVehicleTasksResponse.builder()
@@ -132,10 +141,16 @@ public class MechanicServiceImpl implements MechanicService {
 
     private MechanicVehicleTasksResponse buildServiceResponse(VehicleService vs, List<VehicleServiceTask> allTasks) {
         Long mechanicId = SecurityUtil.getCurrentUserId();
-        List<MechanicVehicleTasksResponse.MechanicTaskItem> myTasks = allTasks.stream()
+        List<VehicleServiceTask> myTasksList = allTasks.stream()
                 .filter(t -> t.getAssignedMechanic() != null
                           && t.getAssignedMechanic().getId().equals(mechanicId))
-                .map(this::toTaskItem)
+                .toList();
+        List<Long> taskIds = myTasksList.stream().map(VehicleServiceTask::getId).toList();
+        Map<Long, List<ServicePart>> partsByTask = taskIds.isEmpty() ? Map.of()
+                : servicePartRepository.findByServiceTaskIdIn(taskIds).stream()
+                        .collect(Collectors.groupingBy(p -> p.getServiceTask().getId()));
+        List<MechanicVehicleTasksResponse.MechanicTaskItem> myTasks = myTasksList.stream()
+                .map(t -> toTaskItem(t, partsByTask.getOrDefault(t.getId(), List.of())))
                 .toList();
 
         return MechanicVehicleTasksResponse.builder()
@@ -153,13 +168,25 @@ public class MechanicServiceImpl implements MechanicService {
                 .build();
     }
 
-    private MechanicVehicleTasksResponse.MechanicTaskItem toTaskItem(VehicleServiceTask t) {
+    private MechanicVehicleTasksResponse.MechanicTaskItem toTaskItem(VehicleServiceTask t, List<ServicePart> parts) {
+        List<MechanicVehicleTasksResponse.PartItem> partItems = parts.stream()
+                .map(p -> MechanicVehicleTasksResponse.PartItem.builder()
+                        .partId(p.getSparePart().getId())
+                        .partName(p.getSparePart().getName())
+                        .partNumber(p.getSparePart().getPartNumber())
+                        .quantityRequested(p.getQuantityRequested())
+                        .quantityApproved(p.getQuantityApproved())
+                        .status(p.getStatus())
+                        .build())
+                .toList();
+
         return MechanicVehicleTasksResponse.MechanicTaskItem.builder()
                 .taskId(t.getId())
                 .displayName(t.getTaskType() != null ? t.getTaskType().getName() : t.getCustomName())
                 .status(t.getStatus())
                 .mechanicStartedAt(t.getMechanicStartedAt())
                 .mechanicClosedAt(t.getMechanicClosedAt())
+                .parts(partItems)
                 .build();
     }
 }

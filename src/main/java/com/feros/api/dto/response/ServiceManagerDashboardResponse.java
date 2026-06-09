@@ -2,6 +2,7 @@ package com.feros.api.dto.response;
 
 import com.feros.api.enums.BreakdownStatus;
 import com.feros.api.enums.BreakdownType;
+import com.feros.api.enums.ServicePartStatus;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTaskStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
@@ -35,13 +36,7 @@ public class ServiceManagerDashboardResponse {
         private BreakdownStatus breakdownStatus;
         private LocalDateTime breakdownDate;
         // linked service (null if not yet logged)
-        private Long serviceId;
-        private String serviceNumber;
-        private ServiceStatus serviceStatus;
-        private int tasksTotal;
-        private int tasksAssigned;
-        private int tasksMechanicClosed;
-        private List<TaskItem> tasks;
+        private ServiceItem service;
     }
 
     @Getter
@@ -77,5 +72,20 @@ public class ServiceManagerDashboardResponse {
         private String assignedMechanicName;
         private java.time.LocalDateTime mechanicStartedAt;
         private java.time.LocalDateTime mechanicClosedAt;
+        private List<PartItem> parts;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class PartItem {
+        private Long partId;
+        private String partName;
+        private String partNumber;
+        private Integer quantityRequested;
+        private Integer quantityApproved;
+        private ServicePartStatus status;
     }
 }

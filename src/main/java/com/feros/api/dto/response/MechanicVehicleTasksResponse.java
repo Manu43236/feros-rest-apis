@@ -1,5 +1,6 @@
 package com.feros.api.dto.response;
 
+import com.feros.api.enums.ServicePartStatus;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTaskStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
@@ -38,5 +39,20 @@ public class MechanicVehicleTasksResponse {
         private ServiceTaskStatus status;
         private LocalDateTime mechanicStartedAt;
         private LocalDateTime mechanicClosedAt;
+        private List<PartItem> parts;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class PartItem {
+        private Long partId;
+        private String partName;
+        private String partNumber;
+        private Integer quantityRequested;
+        private Integer quantityApproved;
+        private ServicePartStatus status;
     }
 }

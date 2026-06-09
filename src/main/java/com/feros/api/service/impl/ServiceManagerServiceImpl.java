@@ -2,6 +2,7 @@ package com.feros.api.service.impl;
 
 import com.feros.api.dto.response.MechanicSummaryResponse;
 import com.feros.api.dto.response.ServiceManagerDashboardResponse;
+import com.feros.api.entity.ServicePart;
 import com.feros.api.entity.VehicleBreakdown;
 import com.feros.api.entity.VehicleService;
 import com.feros.api.entity.VehicleServiceTask;
@@ -10,6 +11,7 @@ import com.feros.api.enums.RoleName;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTaskStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
+import com.feros.api.repository.ServicePartRepository;
 import com.feros.api.repository.StaffProfileRepository;
 import com.feros.api.repository.UserRepository;
 import com.feros.api.repository.VehicleBreakdownRepository;
@@ -21,6 +23,8 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +34,7 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
     private final VehicleServiceRepository serviceRepository;
     private final UserRepository userRepository;
     private final StaffProfileRepository staffProfileRepository;
+    private final ServicePartRepository servicePartRepository;
 
     @Override
     public ServiceManagerDashboardResponse getDashboard() {
@@ -50,8 +55,31 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
                     VehicleService linked = serviceRepository
                             .findFirstByBreakdownIdAndIsActiveTrue(bd.getId())
                             .orElse(null);
-                    List<ServiceManagerDashboardResponse.TaskItem> tasks = mapTaskItems(
-                            linked != null && linked.getTasks() != null ? linked.getTasks() : List.of());
+
+                    ServiceManagerDashboardResponse.ServiceItem serviceItem = null;
+                    if (linked != null) {
+                        List<VehicleServiceTask> linkedTasks = linked.getTasks() != null ? linked.getTasks() : List.of();
+                        List<Long> taskIds = linkedTasks.stream().map(VehicleServiceTask::getId).toList();
+                        Map<Long, List<ServicePart>> partsByTask = taskIds.isEmpty() ? Map.of()
+                                : servicePartRepository.findByServiceTaskIdIn(taskIds).stream()
+                                        .collect(Collectors.groupingBy(p -> p.getServiceTask().getId()));
+                        List<ServiceManagerDashboardResponse.TaskItem> tasks = mapTaskItems(linkedTasks, partsByTask);
+
+                        serviceItem = ServiceManagerDashboardResponse.ServiceItem.builder()
+                                .serviceId(linked.getId())
+                                .serviceNumber(linked.getServiceNumber())
+                                .vehicleId(linked.getVehicle().getId())
+                                .vehicleRegistrationNumber(linked.getVehicle().getRegistrationNumber())
+                                .serviceStatus(linked.getStatus())
+                                .displayStatus(computeDisplayStatus(linked))
+                                .serviceDate(linked.getServiceDate())
+                                .triggeredBy(linked.getTriggeredBy())
+                                .tasksTotal(tasks.size())
+                                .tasksAssigned(countAssigned(tasks))
+                                .tasksMechanicClosed(countMechanicClosed(tasks))
+                                .tasks(tasks)
+                                .build();
+                    }
 
                     return ServiceManagerDashboardResponse.BreakdownItem.builder()
                             .breakdownId(bd.getId())
@@ -61,20 +89,19 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
                             .location(bd.getLocation())
                             .breakdownStatus(bd.getStatus())
                             .breakdownDate(bd.getBreakdownDate())
-                            .serviceId(linked != null ? linked.getId() : null)
-                            .serviceNumber(linked != null ? linked.getServiceNumber() : null)
-                            .serviceStatus(linked != null ? linked.getStatus() : null)
-                            .tasksTotal(tasks.size())
-                            .tasksAssigned(countAssigned(tasks))
-                            .tasksMechanicClosed(countMechanicClosed(tasks))
-                            .tasks(tasks)
+                            .service(serviceItem)
                             .build();
                 }).toList();
 
         List<ServiceManagerDashboardResponse.ServiceItem> serviceItems = generalServices.stream()
                 .map(vs -> {
-                    List<ServiceManagerDashboardResponse.TaskItem> tasks = mapTaskItems(
-                            vs.getTasks() != null ? vs.getTasks() : List.of());
+                    List<VehicleServiceTask> vsTasks = vs.getTasks() != null ? vs.getTasks() : List.of();
+                    List<Long> taskIds = vsTasks.stream().map(VehicleServiceTask::getId).toList();
+                    Map<Long, List<ServicePart>> partsByTask = taskIds.isEmpty() ? Map.of()
+                            : servicePartRepository.findByServiceTaskIdIn(taskIds).stream()
+                                    .collect(Collectors.groupingBy(p -> p.getServiceTask().getId()));
+                    List<ServiceManagerDashboardResponse.TaskItem> tasks = mapTaskItems(vsTasks, partsByTask);
+
                     return ServiceManagerDashboardResponse.ServiceItem.builder()
                             .serviceId(vs.getId())
                             .serviceNumber(vs.getServiceNumber())
@@ -115,17 +142,35 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
                 .toList();
     }
 
-    private List<ServiceManagerDashboardResponse.TaskItem> mapTaskItems(List<VehicleServiceTask> tasks) {
+    private List<ServiceManagerDashboardResponse.TaskItem> mapTaskItems(
+            List<VehicleServiceTask> tasks,
+            Map<Long, List<ServicePart>> partsByTask) {
         return tasks.stream()
-                .map(t -> ServiceManagerDashboardResponse.TaskItem.builder()
-                        .taskId(t.getId())
-                        .displayName(t.getTaskType() != null ? t.getTaskType().getName() : t.getCustomName())
-                        .status(t.getStatus())
-                        .assignedMechanicId(t.getAssignedMechanic() != null ? t.getAssignedMechanic().getId() : null)
-                        .assignedMechanicName(t.getAssignedMechanic() != null ? t.getAssignedMechanic().getName() : null)
-                        .mechanicStartedAt(t.getMechanicStartedAt())
-                        .mechanicClosedAt(t.getMechanicClosedAt())
-                        .build())
+                .map(t -> {
+                    List<ServiceManagerDashboardResponse.PartItem> parts = partsByTask
+                            .getOrDefault(t.getId(), List.of())
+                            .stream()
+                            .map(p -> ServiceManagerDashboardResponse.PartItem.builder()
+                                    .partId(p.getSparePart().getId())
+                                    .partName(p.getSparePart().getName())
+                                    .partNumber(p.getSparePart().getPartNumber())
+                                    .quantityRequested(p.getQuantityRequested())
+                                    .quantityApproved(p.getQuantityApproved())
+                                    .status(p.getStatus())
+                                    .build())
+                            .toList();
+
+                    return ServiceManagerDashboardResponse.TaskItem.builder()
+                            .taskId(t.getId())
+                            .displayName(t.getTaskType() != null ? t.getTaskType().getName() : t.getCustomName())
+                            .status(t.getStatus())
+                            .assignedMechanicId(t.getAssignedMechanic() != null ? t.getAssignedMechanic().getId() : null)
+                            .assignedMechanicName(t.getAssignedMechanic() != null ? t.getAssignedMechanic().getName() : null)
+                            .mechanicStartedAt(t.getMechanicStartedAt())
+                            .mechanicClosedAt(t.getMechanicClosedAt())
+                            .parts(parts)
+                            .build();
+                })
                 .toList();
     }
 
