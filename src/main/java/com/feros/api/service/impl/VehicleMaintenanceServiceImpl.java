@@ -520,6 +520,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                         .status(t.getStatus())
                         .assignedMechanicId(t.getAssignedMechanic() != null ? t.getAssignedMechanic().getId() : null)
                         .assignedMechanicName(t.getAssignedMechanic() != null ? t.getAssignedMechanic().getName() : null)
+                        .mechanicStartedAt(t.getMechanicStartedAt())
                         .mechanicClosedAt(t.getMechanicClosedAt())
                         .build())
                 .toList();

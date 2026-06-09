@@ -23,5 +23,6 @@ public class VehicleServiceTaskResponse {
     private ServiceTaskStatus status;
     private Long assignedMechanicId;
     private String assignedMechanicName;
+    private LocalDateTime mechanicStartedAt;
     private LocalDateTime mechanicClosedAt;
 }
