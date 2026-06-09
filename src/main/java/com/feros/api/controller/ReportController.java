@@ -821,6 +821,34 @@ public class ReportController {
                 "Cleaner Performance — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── Mechanic Performance ──────────────────────────────────────────────────
+
+    @GetMapping("/staff/mechanics")
+    public ResponseEntity<ApiResponse<List<MechanicPerformanceRow>>> getMechanicPerformance(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Mechanic performance fetched", reportService.getMechanicPerformance(startDate, endDate)));
+    }
+
+    @GetMapping("/staff/mechanics/export")
+    public ResponseEntity<byte[]> exportMechanicPerformance(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<MechanicPerformanceRow> rows = reportService.getMechanicPerformance(startDate, endDate);
+        String[] headers = {"Mechanic", "Designation", "Tasks Assigned", "Completed", "Mechanic Closed", "In Progress", "Services", "Avg Duration (min)"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getMechanicName(), r.getDesignation(),
+                String.valueOf(r.getTasksAssigned()), String.valueOf(r.getTasksCompleted()),
+                String.valueOf(r.getTasksMechanicClosed()), String.valueOf(r.getTasksInProgress()),
+                String.valueOf(r.getServicesWorkedOn()),
+                r.getAvgDurationMinutes() != null ? r.getAvgDurationMinutes().toPlainString() : "—"
+        }).toList();
+        return export("mechanic-performance-" + startDate + "-" + endDate,
+                "Mechanic Performance — " + startDate + " to " + endDate, headers, data, format);
+    }
+
     // ── Document Cost Summary ─────────────────────────────────────────────────
 
     @GetMapping("/expenses/documents")

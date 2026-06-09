@@ -58,6 +58,7 @@ public class ReportServiceImpl implements ReportService {
     private final PayrollDeductionRepository payrollDeductionRepository;
     private final SalaryAdvanceRepository salaryAdvanceRepository;
     private final StaffProfileRepository staffProfileRepository;
+    private final VehicleServiceTaskRepository vehicleServiceTaskRepository;
 
     // ── 1. Fleet Status ────────────────────────────────────────────────────────
 
@@ -1875,6 +1876,57 @@ public class ReportServiceImpl implements ReportService {
                     .accountHolderName(profile != null ? profile.getAccountHolderName() : null)
                     .build();
         }).sorted(Comparator.comparing(PayrollYtdRow::getEmployeeName)).toList();
+    }
+
+    // ── Mechanic Performance ───────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MechanicPerformanceRow> getMechanicPerformance(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<VehicleServiceTask> tasks = vehicleServiceTaskRepository
+                .findByTenantIdAndServiceDateRange(tenantId, startDate, endDate);
+
+        Map<Long, List<VehicleServiceTask>> byMechanic = tasks.stream()
+                .collect(Collectors.groupingBy(t -> t.getAssignedMechanic().getId()));
+
+        Map<Long, StaffProfile> profileMap = buildProfileMap(tenantId);
+
+        return byMechanic.entrySet().stream().map(entry -> {
+            List<VehicleServiceTask> mechanicTasks = entry.getValue();
+            User mechanic = mechanicTasks.get(0).getAssignedMechanic();
+
+            int tasksAssigned       = mechanicTasks.size();
+            int tasksCompleted      = (int) mechanicTasks.stream().filter(t -> t.getStatus().name().equals("COMPLETED")).count();
+            int tasksMechanicClosed = (int) mechanicTasks.stream().filter(t -> t.getStatus().name().equals("MECHANIC_CLOSED")).count();
+            int tasksInProgress     = (int) mechanicTasks.stream().filter(t -> t.getStatus().name().equals("IN_PROGRESS")).count();
+            long servicesWorkedOn   = mechanicTasks.stream().map(t -> t.getService().getId()).distinct().count();
+
+            List<Long> durations = mechanicTasks.stream()
+                    .filter(t -> t.getMechanicStartedAt() != null && t.getMechanicClosedAt() != null)
+                    .map(t -> Duration.between(t.getMechanicStartedAt(), t.getMechanicClosedAt()).toMinutes())
+                    .filter(m -> m > 0)
+                    .toList();
+            BigDecimal avgDuration = durations.isEmpty() ? null
+                    : BigDecimal.valueOf(durations.stream().mapToLong(Long::longValue).average().orElse(0))
+                            .setScale(1, RoundingMode.HALF_UP);
+
+            StaffProfile profile = profileMap.get(mechanic.getId());
+            String designation = profile != null && profile.getDesignation() != null
+                    ? profile.getDesignation().getName() : "—";
+
+            return MechanicPerformanceRow.builder()
+                    .mechanicId(mechanic.getId())
+                    .mechanicName(mechanic.getName())
+                    .designation(designation)
+                    .tasksAssigned(tasksAssigned)
+                    .tasksCompleted(tasksCompleted)
+                    .tasksMechanicClosed(tasksMechanicClosed)
+                    .tasksInProgress(tasksInProgress)
+                    .servicesWorkedOn((int) servicesWorkedOn)
+                    .avgDurationMinutes(avgDuration)
+                    .build();
+        }).sorted(Comparator.comparing(MechanicPerformanceRow::getMechanicName)).toList();
     }
 
     private Map<Long, StaffProfile> buildProfileMap(Long tenantId) {
