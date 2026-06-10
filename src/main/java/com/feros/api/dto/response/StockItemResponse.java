@@ -2,6 +2,8 @@ package com.feros.api.dto.response;
 
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -17,4 +19,5 @@ public class StockItemResponse {
     private Integer quantity;
     private Integer minStockLevel;
     private Boolean isLowStock; // quantity <= minStockLevel
+    private BigDecimal lastUnitCost; // last purchase price
 }

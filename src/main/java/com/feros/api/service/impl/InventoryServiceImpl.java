@@ -668,6 +668,11 @@ public class InventoryServiceImpl implements InventoryService {
 
     private StockItemResponse toStockItemResponse(SparePartsInventory inv) {
         SparePart p = inv.getSparePart();
+        BigDecimal lastUnitCost = transactionRepository
+                .findTopByTenantIdAndSparePartIdAndReferenceTypeOrderByCreatedAtDesc(
+                        inv.getTenant().getId(), p.getId(), StockReferenceType.PURCHASE)
+                .map(SparePartsTransaction::getUnitCost)
+                .orElse(null);
         return StockItemResponse.builder()
                 .inventoryId(inv.getId())
                 .sparePartId(p.getId())
@@ -678,6 +683,7 @@ public class InventoryServiceImpl implements InventoryService {
                 .quantity(inv.getQuantity())
                 .minStockLevel(p.getMinStockLevel())
                 .isLowStock(inv.getQuantity() <= p.getMinStockLevel())
+                .lastUnitCost(lastUnitCost)
                 .build();
     }
 
