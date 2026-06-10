@@ -44,6 +44,9 @@ public class TyreResponse {
     // Scrap info (populated when directly scrapped)
     private String scrapReason;
     private LocalDate scrapDate;
+    // Purchase reference
+    private String supplierName;
+    private String invoiceNumber;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

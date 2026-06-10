@@ -91,6 +91,66 @@ public class TyreServiceImpl implements TyreService {
     }
 
     @Override
+    @Transactional
+    public List<TyreResponse> bulkCreateTyres(TyreBulkRequest request) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        Tenant tenant = getTenant(tenantId);
+
+        if (request.getSerialNumbers() == null || request.getSerialNumbers().isEmpty()) {
+            throw new FerosException("At least one serial number is required", HttpStatus.BAD_REQUEST);
+        }
+
+        // Deduplicate within the batch
+        List<String> serials = request.getSerialNumbers().stream()
+                .map(String::trim).filter(s -> !s.isEmpty()).distinct().toList();
+
+        // Check for duplicates against existing DB records in one query
+        serials.forEach(serial ->
+            tyreRepository.findByTenantIdAndSerialNumberAndIsActiveTrue(tenantId, serial)
+                .ifPresent(t -> { throw new FerosException("Serial number already exists: " + serial, HttpStatus.CONFLICT); })
+        );
+
+        TyrePurchaseCondition condition = request.getPurchaseCondition() != null
+                ? request.getPurchaseCondition() : TyrePurchaseCondition.NEW;
+
+        BigDecimal startingKm = (request.getKmAtPurchase() != null && request.getKmAtPurchase().compareTo(BigDecimal.ZERO) > 0)
+                ? request.getKmAtPurchase() : BigDecimal.ZERO;
+
+        int startingRetreadCount = (request.getRetreadCountAtPurchase() != null && request.getRetreadCountAtPurchase() > 0)
+                ? request.getRetreadCountAtPurchase() : 0;
+
+        LocalDate baseDate = request.getPurchaseDate() != null ? request.getPurchaseDate() : TimeUtil.today();
+        LocalDate expiryDate = request.getTyreLifeYears() != null ? baseDate.plusYears(request.getTyreLifeYears()) : null;
+
+        List<Tyre> tyres = serials.stream().map(serial -> Tyre.builder()
+                .tenant(tenant)
+                .serialNumber(serial)
+                .brand(request.getBrand())
+                .size(request.getSize())
+                .tyreType(request.getTyreType())
+                .plyRating(request.getPlyRating())
+                .purchaseDate(request.getPurchaseDate())
+                .purchaseCost(request.getPurchaseCost())
+                .status(TyreStatus.IN_STOCK)
+                .purchaseCondition(condition)
+                .kmAtPurchase(startingKm)
+                .retreadCount(startingRetreadCount)
+                .totalLifetimeKm(startingKm)
+                .tyreLifeYears(request.getTyreLifeYears())
+                .expiryDate(expiryDate)
+                .maxLifetimeKm(request.getMaxLifetimeKm())
+                .supplierName(request.getSupplierName())
+                .invoiceNumber(request.getInvoiceNumber())
+                .notes(request.getNotes())
+                .isActive(true)
+                .build()
+        ).toList();
+
+        return tyreRepository.saveAll(tyres).stream()
+                .map(t -> toTyreResponse(t, null)).toList();
+    }
+
+    @Override
     public List<TyreResponse> getAllTyres() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         List<Tyre> tyres = tyreRepository.findByTenantIdAndIsActiveTrueOrderByIdDesc(tenantId);
@@ -594,6 +654,8 @@ public class TyreServiceImpl implements TyreService {
                 .totalRetreadingCost(tyre.getTotalRetreadingCost())
                 .scrapReason(tyre.getScrapReason())
                 .scrapDate(tyre.getScrapDate())
+                .supplierName(tyre.getSupplierName())
+                .invoiceNumber(tyre.getInvoiceNumber())
                 .createdAt(tyre.getCreatedAt())
                 .updatedAt(tyre.getUpdatedAt())
                 .build();

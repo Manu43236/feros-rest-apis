@@ -9,6 +9,7 @@ public interface TyreService {
 
     // Tyre CRUD
     TyreResponse createTyre(TyreRequest request);
+    List<TyreResponse> bulkCreateTyres(TyreBulkRequest request);
     List<TyreResponse> getAllTyres();
     List<TyreResponse> getAvailableTyres();
     TyreResponse updateTyre(Long id, TyreRequest request);

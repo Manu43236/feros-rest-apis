@@ -1,6 +1,7 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.request.TyreBackToStockRequest;
+import com.feros.api.dto.request.TyreBulkRequest;
 import com.feros.api.dto.request.TyreRequest;
 import com.feros.api.dto.request.TyreScrapRequest;
 import com.feros.api.dto.response.ApiResponse;
@@ -26,6 +27,12 @@ public class TyreController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<TyreResponse>> create(@RequestBody TyreRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Tyre created", tyreService.createTyre(request)));
+    }
+
+    @PostMapping("/bulk")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<TyreResponse>>> bulkCreate(@RequestBody TyreBulkRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Tyres created", tyreService.bulkCreateTyres(request)));
     }
 
     @GetMapping

@@ -6,23 +6,28 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
-public class TyreRequest {
-    private String serialNumber;
+public class TyreBulkRequest {
+    // Serial numbers — one tyre created per entry
+    private List<String> serialNumbers;
+
+    // Common specs shared across all tyres in the batch
     private String brand;
     private String size;
     private TyreType tyreType;
     private String plyRating;
     private LocalDate purchaseDate;
     private BigDecimal purchaseCost;
-    private String notes;
     private Integer tyreLifeYears;
     private BigDecimal maxLifetimeKm;
-    // New fields — all optional, zero impact on existing creates
     private TyrePurchaseCondition purchaseCondition;
     private BigDecimal kmAtPurchase;
     private Integer retreadCountAtPurchase;
+    private String notes;
+
+    // Purchase reference — common to the batch
     private String supplierName;
     private String invoiceNumber;
 }

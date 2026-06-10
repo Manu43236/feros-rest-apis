@@ -106,6 +106,13 @@ public class Tyre extends BaseEntity {
     @Column(name = "scrap_date")
     private LocalDate scrapDate;
 
+    // Purchase reference
+    @Column(name = "supplier_name")
+    private String supplierName;
+
+    @Column(name = "invoice_number")
+    private String invoiceNumber;
+
     @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;
