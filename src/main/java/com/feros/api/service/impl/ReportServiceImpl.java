@@ -1517,24 +1517,33 @@ public class ReportServiceImpl implements ReportService {
                         && t.getServicePart().getService() != null && t.getServicePart().getService().getVehicle() != null)
                 .toList();
 
-        Map<Long, List<SparePartsTransaction>> byVehicle = outward.stream()
-                .collect(Collectors.groupingBy(t -> t.getServicePart().getService().getVehicle().getId()));
+        record VehiclePartKey(Long vehicleId, Long partId) {}
 
-        return byVehicle.entrySet().stream().map(entry -> {
-            List<SparePartsTransaction> vTxns = entry.getValue();
-            Vehicle vehicle = vTxns.get(0).getServicePart().getService().getVehicle();
-            int totalParts = vTxns.stream().mapToInt(t -> t.getQuantity() != null ? t.getQuantity() : 0).sum();
-            BigDecimal totalCost = vTxns.stream()
+        Map<VehiclePartKey, List<SparePartsTransaction>> byVehiclePart = outward.stream()
+                .collect(Collectors.groupingBy(t -> new VehiclePartKey(
+                        t.getServicePart().getService().getVehicle().getId(),
+                        t.getServicePart().getSparePart().getId())));
+
+        return byVehiclePart.entrySet().stream().map(entry -> {
+            List<SparePartsTransaction> txns = entry.getValue();
+            Vehicle vehicle = txns.get(0).getServicePart().getService().getVehicle();
+            var part = txns.get(0).getServicePart().getSparePart();
+            BigDecimal totalCost = txns.stream()
                     .map(t -> t.getTotalCost() != null ? t.getTotalCost() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             return ConsumptionByVehicleRow.builder()
                     .vehicleId(vehicle.getId())
                     .registrationNumber(vehicle.getRegistrationNumber())
                     .vehicleType(vehicle.getVehicleType() != null ? vehicle.getVehicleType().getName() : "—")
-                    .totalPartsConsumed(totalParts)
+                    .partId(part.getId())
+                    .partName(part.getName())
+                    .partCategory(part.getCategory())
+                    .timesConsumed(txns.stream().mapToInt(t -> t.getQuantity() != null ? t.getQuantity() : 0).sum())
                     .totalCost(totalCost)
                     .build();
-        }).sorted(Comparator.comparing(ConsumptionByVehicleRow::getRegistrationNumber)).toList();
+        }).sorted(Comparator.comparing(ConsumptionByVehicleRow::getRegistrationNumber)
+                .thenComparing(ConsumptionByVehicleRow::getPartName,
+                        Comparator.nullsLast(Comparator.naturalOrder()))).toList();
     }
 
     // ── Tyre Reports ──────────────────────────────────────────────────────────────

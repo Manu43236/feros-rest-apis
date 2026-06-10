@@ -9,6 +9,9 @@ public class ConsumptionByVehicleRow {
     private Long vehicleId;
     private String registrationNumber;
     private String vehicleType;
-    private int totalPartsConsumed;
+    private Long partId;
+    private String partName;
+    private String partCategory;
+    private int timesConsumed;
     private BigDecimal totalCost;
 }

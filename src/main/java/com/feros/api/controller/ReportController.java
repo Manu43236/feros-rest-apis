@@ -1145,10 +1145,11 @@ public class ReportController {
             @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
             @RequestParam(defaultValue = "csv") String format) {
         List<ConsumptionByVehicleRow> rows = reportService.getConsumptionByVehicle(startDate, endDate);
-        String[] headers = {"Vehicle", "Type", "Total Parts Consumed", "Total Cost (₹)"};
+        String[] headers = {"Vehicle", "Vehicle Type", "Part Name", "Category", "Qty Consumed", "Total Cost (₹)"};
         List<String[]> data = rows.stream().map(r -> new String[]{
                 r.getRegistrationNumber(), r.getVehicleType(),
-                String.valueOf(r.getTotalPartsConsumed()), safe(r.getTotalCost())
+                safe(r.getPartName()), safe(r.getPartCategory()),
+                String.valueOf(r.getTimesConsumed()), safe(r.getTotalCost())
         }).toList();
         return export("consumption-by-vehicle-" + startDate + "-" + endDate,
                 "Consumption by Vehicle — " + startDate + " to " + endDate, headers, data, format);
