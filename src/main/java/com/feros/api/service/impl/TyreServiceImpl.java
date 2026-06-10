@@ -119,6 +119,11 @@ public class TyreServiceImpl implements TyreService {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         Tyre tyre = findTyre(id, tenantId);
 
+        if (request.getSerialNumber() != null && !request.getSerialNumber().equals(tyre.getSerialNumber())) {
+            tyreRepository.findByTenantIdAndSerialNumberAndIsActiveTrue(tenantId, request.getSerialNumber())
+                    .ifPresent(t -> { throw new FerosException("Tyre with this serial number already exists", HttpStatus.CONFLICT); });
+            tyre.setSerialNumber(request.getSerialNumber());
+        }
         if (request.getBrand() != null)        tyre.setBrand(request.getBrand());
         if (request.getSize() != null)         tyre.setSize(request.getSize());
         if (request.getTyreType() != null)     tyre.setTyreType(request.getTyreType());
