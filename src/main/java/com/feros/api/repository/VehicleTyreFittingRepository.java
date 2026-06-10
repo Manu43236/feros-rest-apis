@@ -1,6 +1,7 @@
 package com.feros.api.repository;
 
 import com.feros.api.entity.VehicleTyreFitting;
+import com.feros.api.enums.TyreRemovalReason;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -41,4 +42,7 @@ public interface VehicleTyreFittingRepository extends JpaRepository<VehicleTyreF
     // Removal register: removals whose removedDate falls in range
     @Query("SELECT f FROM VehicleTyreFitting f WHERE f.tenant.id = :tenantId AND f.isActive = true AND f.removedDate BETWEEN :from AND :to ORDER BY f.removedDate DESC")
     List<VehicleTyreFitting> findByTenantIdAndRemovedDateBetween(@Param("tenantId") Long tenantId, @Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to);
+
+    // Most recent RETREAD removal for a tyre — used when building the retread log on return
+    Optional<VehicleTyreFitting> findFirstByTyreIdAndRemovalReasonAndIsActiveTrueOrderByRemovedDateDescIdDesc(Long tyreId, TyreRemovalReason removalReason);
 }

@@ -4,6 +4,7 @@ import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.*;
 import com.feros.api.dto.response.*;
 import com.feros.api.entity.*;
+import com.feros.api.enums.TyrePurchaseCondition;
 import com.feros.api.enums.TyreRemovalReason;
 import com.feros.api.enums.TyreStatus;
 import com.feros.api.exception.FerosException;
@@ -33,6 +34,7 @@ public class TyreServiceImpl implements TyreService {
     private final VehicleTyreFittingRepository fittingRepository;
     private final TyreRotationLogRepository rotationLogRepository;
     private final TyreRotationItemRepository rotationItemRepository;
+    private final TyreRetreadLogRepository retreadLogRepository;
     private final VehicleRepository vehicleRepository;
     private final NotificationService notificationService;
     private final TenantRepository tenantRepository;
@@ -53,6 +55,17 @@ public class TyreServiceImpl implements TyreService {
         LocalDate baseDate = request.getPurchaseDate() != null ? request.getPurchaseDate() : TimeUtil.today();
         LocalDate expiryDate = request.getTyreLifeYears() != null ? baseDate.plusYears(request.getTyreLifeYears()) : null;
 
+        TyrePurchaseCondition condition = request.getPurchaseCondition() != null
+                ? request.getPurchaseCondition() : TyrePurchaseCondition.NEW;
+
+        // For second-hand/retreaded tyres, start totalLifetimeKm from existing KM
+        BigDecimal startingKm = (request.getKmAtPurchase() != null && request.getKmAtPurchase().compareTo(BigDecimal.ZERO) > 0)
+                ? request.getKmAtPurchase() : BigDecimal.ZERO;
+
+        // For pre-retreaded tyres, start retreadCount from the value at purchase
+        int startingRetreadCount = (request.getRetreadCountAtPurchase() != null && request.getRetreadCountAtPurchase() > 0)
+                ? request.getRetreadCountAtPurchase() : 0;
+
         Tyre tyre = Tyre.builder()
                 .tenant(tenant)
                 .serialNumber(request.getSerialNumber())
@@ -63,8 +76,10 @@ public class TyreServiceImpl implements TyreService {
                 .purchaseDate(request.getPurchaseDate())
                 .purchaseCost(request.getPurchaseCost())
                 .status(TyreStatus.IN_STOCK)
-                .retreadCount(0)
-                .totalLifetimeKm(BigDecimal.ZERO)
+                .purchaseCondition(condition)
+                .kmAtPurchase(startingKm)
+                .retreadCount(startingRetreadCount)
+                .totalLifetimeKm(startingKm)
                 .tyreLifeYears(request.getTyreLifeYears())
                 .expiryDate(expiryDate)
                 .maxLifetimeKm(request.getMaxLifetimeKm())
@@ -425,16 +440,84 @@ public class TyreServiceImpl implements TyreService {
 
     @Override
     @Transactional
-    public TyreResponse markBackToStock(Long id) {
+    public TyreResponse markBackToStock(Long id, TyreBackToStockRequest request) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
+        Tenant tenant = getTenant(tenantId);
         Tyre tyre = findTyre(id, tenantId);
+
         if (tyre.getStatus() != TyreStatus.RETREADING) {
             throw new FerosException("Only tyres in RETREADING status can be marked back to stock", HttpStatus.CONFLICT);
         }
+
+        LocalDate returnDate = (request != null && request.getActualReturnDate() != null)
+                ? request.getActualReturnDate() : TimeUtil.today();
+
+        // Build retread log entry using last RETREAD fitting for sent-date and km-at-send
+        VehicleTyreFitting lastRetreadFitting = fittingRepository
+                .findFirstByTyreIdAndRemovalReasonAndIsActiveTrueOrderByRemovedDateDescIdDesc(
+                        id, TyreRemovalReason.RETREAD)
+                .orElse(null);
+
+        BigDecimal retreadingCost = (request != null && request.getRetreadingCost() != null)
+                ? request.getRetreadingCost() : null;
+
+        TyreRetreadLog retreadLog = TyreRetreadLog.builder()
+                .tenant(tenant)
+                .tyre(tyre)
+                .retreadNumber(tyre.getRetreadCount())
+                .sentDate(lastRetreadFitting != null ? lastRetreadFitting.getRemovedDate() : null)
+                .returnDate(returnDate)
+                .retreaderName(tyre.getRetreaderName())
+                .kmAtSend(lastRetreadFitting != null ? lastRetreadFitting.getRemovedAtKm() : null)
+                .retreadingCost(retreadingCost)
+                .newMaxLifetimeKm(request != null ? request.getNewMaxLifetimeKm() : null)
+                .notes(request != null ? request.getNotes() : null)
+                .build();
+        retreadLogRepository.save(retreadLog);
+
+        // Accumulate retreading cost on tyre
+        if (retreadingCost != null) {
+            tyre.setTotalRetreadingCost(tyre.getTotalRetreadingCost().add(retreadingCost));
+        }
+
+        // Update max lifetime km if a new value is provided for this retread cycle
+        if (request != null && request.getNewMaxLifetimeKm() != null) {
+            tyre.setMaxLifetimeKm(request.getNewMaxLifetimeKm());
+        }
+
         tyre.setStatus(TyreStatus.IN_STOCK);
         tyre.setRetreaderName(null);
         tyre.setExpectedReturnDate(null);
         return toTyreResponse(tyreRepository.save(tyre), null);
+    }
+
+    @Override
+    @Transactional
+    public TyreResponse scrapTyre(Long id, TyreScrapRequest request) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        Tyre tyre = findTyre(id, tenantId);
+
+        if (tyre.getStatus() == TyreStatus.FITTED) {
+            throw new FerosException("Cannot scrap a fitted tyre. Remove it from the vehicle first.", HttpStatus.CONFLICT);
+        }
+        if (tyre.getStatus() == TyreStatus.SCRAPPED) {
+            throw new FerosException("Tyre is already scrapped", HttpStatus.CONFLICT);
+        }
+
+        tyre.setStatus(TyreStatus.SCRAPPED);
+        tyre.setScrapReason(request.getScrapReason());
+        tyre.setScrapDate(request.getScrapDate() != null ? request.getScrapDate() : TimeUtil.today());
+        if (request.getNotes() != null) tyre.setNotes(request.getNotes());
+
+        return toTyreResponse(tyreRepository.save(tyre), null);
+    }
+
+    @Override
+    public List<TyreRetreadLogResponse> getRetreadHistory(Long tyreId) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        findTyre(tyreId, tenantId); // ownership check
+        return retreadLogRepository.findByTyreIdOrderByRetreadNumberDesc(tyreId)
+                .stream().map(this::toRetreadLogResponse).toList();
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -501,8 +584,31 @@ public class TyreServiceImpl implements TyreService {
                 .currentFittingId(currentFitting != null ? currentFitting.getId() : null)
                 .currentVehicleRegistrationNumber(currentFitting != null ? currentFitting.getVehicle().getRegistrationNumber() : null)
                 .currentPositionCode(currentFitting != null ? currentFitting.getPosition().getPositionCode() : null)
+                .purchaseCondition(tyre.getPurchaseCondition())
+                .kmAtPurchase(tyre.getKmAtPurchase())
+                .totalRetreadingCost(tyre.getTotalRetreadingCost())
+                .scrapReason(tyre.getScrapReason())
+                .scrapDate(tyre.getScrapDate())
                 .createdAt(tyre.getCreatedAt())
                 .updatedAt(tyre.getUpdatedAt())
+                .build();
+    }
+
+    private TyreRetreadLogResponse toRetreadLogResponse(TyreRetreadLog log) {
+        return TyreRetreadLogResponse.builder()
+                .id(log.getId())
+                .tyreId(log.getTyre().getId())
+                .tyreSerialNumber(log.getTyre().getSerialNumber())
+                .retreadNumber(log.getRetreadNumber())
+                .sentDate(log.getSentDate())
+                .returnDate(log.getReturnDate())
+                .retreaderName(log.getRetreaderName())
+                .kmAtSend(log.getKmAtSend())
+                .retreadingCost(log.getRetreadingCost())
+                .newMaxLifetimeKm(log.getNewMaxLifetimeKm())
+                .notes(log.getNotes())
+                .createdAt(log.getCreatedAt())
+                .updatedAt(log.getUpdatedAt())
                 .build();
     }
 

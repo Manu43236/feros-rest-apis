@@ -1,5 +1,6 @@
 package com.feros.api.dto.request;
 
+import com.feros.api.enums.TyrePurchaseCondition;
 import com.feros.api.enums.TyreType;
 import lombok.Data;
 
@@ -18,4 +19,8 @@ public class TyreRequest {
     private String notes;
     private Integer tyreLifeYears;
     private BigDecimal maxLifetimeKm;
+    // New fields — all optional, zero impact on existing creates
+    private TyrePurchaseCondition purchaseCondition;
+    private BigDecimal kmAtPurchase;
+    private Integer retreadCountAtPurchase;
 }

@@ -1,5 +1,6 @@
 package com.feros.api.entity;
 
+import com.feros.api.enums.TyrePurchaseCondition;
 import com.feros.api.enums.TyreStatus;
 import com.feros.api.enums.TyreType;
 import jakarta.persistence.*;
@@ -81,6 +82,29 @@ public class Tyre extends BaseEntity {
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
+
+    // Purchase condition — NEW / SECOND_HAND / RETREADED
+    @Builder.Default
+    @Column(name = "purchase_condition", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private TyrePurchaseCondition purchaseCondition = TyrePurchaseCondition.NEW;
+
+    // For second-hand/retreaded tyres: KM already on the tyre when purchased
+    @Builder.Default
+    @Column(name = "km_at_purchase", precision = 12, scale = 2)
+    private BigDecimal kmAtPurchase = BigDecimal.ZERO;
+
+    // Cumulative retreading cost across all retread cycles
+    @Builder.Default
+    @Column(name = "total_retreading_cost", precision = 12, scale = 2)
+    private BigDecimal totalRetreadingCost = BigDecimal.ZERO;
+
+    // Reason and date when directly scrapped (without vehicle removal)
+    @Column(name = "scrap_reason")
+    private String scrapReason;
+
+    @Column(name = "scrap_date")
+    private LocalDate scrapDate;
 
     @Builder.Default
     @Column(name = "is_active")

@@ -12,7 +12,9 @@ public interface TyreService {
     List<TyreResponse> getAllTyres();
     List<TyreResponse> getAvailableTyres();
     TyreResponse updateTyre(Long id, TyreRequest request);
-    TyreResponse markBackToStock(Long id);
+    TyreResponse markBackToStock(Long id, TyreBackToStockRequest request);
+    TyreResponse scrapTyre(Long id, TyreScrapRequest request);
+    List<TyreRetreadLogResponse> getRetreadHistory(Long tyreId);
 
     // Positions
     TyrePositionResponse addPosition(TyrePositionRequest request);

@@ -1,9 +1,12 @@
 package com.feros.api.controller;
 
+import com.feros.api.dto.request.TyreBackToStockRequest;
 import com.feros.api.dto.request.TyreRequest;
+import com.feros.api.dto.request.TyreScrapRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.TyreFittingResponse;
 import com.feros.api.dto.response.TyreResponse;
+import com.feros.api.dto.response.TyreRetreadLogResponse;
 import com.feros.api.service.TyreService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -51,7 +54,23 @@ public class TyreController {
 
     @PatchMapping("/{id}/back-to-stock")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
-    public ResponseEntity<ApiResponse<TyreResponse>> markBackToStock(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success("Tyre marked back to stock", tyreService.markBackToStock(id)));
+    public ResponseEntity<ApiResponse<TyreResponse>> markBackToStock(
+            @PathVariable Long id,
+            @RequestBody(required = false) TyreBackToStockRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Tyre marked back to stock", tyreService.markBackToStock(id, request)));
+    }
+
+    @PatchMapping("/{id}/scrap")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<TyreResponse>> scrapTyre(
+            @PathVariable Long id,
+            @RequestBody TyreScrapRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Tyre marked as scrapped", tyreService.scrapTyre(id, request)));
+    }
+
+    @GetMapping("/{id}/retread-history")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<List<TyreRetreadLogResponse>>> getRetreadHistory(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Retread history fetched", tyreService.getRetreadHistory(id)));
     }
 }

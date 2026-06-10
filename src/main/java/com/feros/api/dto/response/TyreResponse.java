@@ -1,5 +1,6 @@
 package com.feros.api.dto.response;
 
+import com.feros.api.enums.TyrePurchaseCondition;
 import com.feros.api.enums.TyreStatus;
 import com.feros.api.enums.TyreType;
 import lombok.Builder;
@@ -35,6 +36,14 @@ public class TyreResponse {
     private Long currentFittingId;
     private String currentVehicleRegistrationNumber;
     private String currentPositionCode;
+    // Purchase condition
+    private TyrePurchaseCondition purchaseCondition;
+    private BigDecimal kmAtPurchase;
+    // Retread cost tracking
+    private BigDecimal totalRetreadingCost;
+    // Scrap info (populated when directly scrapped)
+    private String scrapReason;
+    private LocalDate scrapDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
