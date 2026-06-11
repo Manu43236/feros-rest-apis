@@ -45,7 +45,7 @@ public class AuthServiceImpl implements AuthService {
     private final RoleModuleAccessService roleModuleAccessService;
     private final NotificationService notificationService;
 
-    @Transactional
+    @Transactional(noRollbackFor = {AccountLockedException.class, FerosException.class})
     @Override
     public LoginResponse login(LoginRequest request, String ipAddress) {
 
