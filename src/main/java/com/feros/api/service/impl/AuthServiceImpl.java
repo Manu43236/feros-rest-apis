@@ -9,6 +9,7 @@ import com.feros.api.util.SecurityUtil;
 import com.feros.api.entity.User;
 import com.feros.api.exception.FerosException;
 import com.feros.api.entity.RbacLoginAccess;
+import com.feros.api.enums.DeviceType;
 import com.feros.api.enums.RoleName;
 import com.feros.api.repository.RbacLoginAccessRepository;
 import com.feros.api.repository.UserRepository;
@@ -105,23 +106,23 @@ public class AuthServiceImpl implements AuthService {
                 role
         );
 
-        // 7. Upsert session — one row per user+device type
+        // 7. Create new session — for WEB, displace any existing session first
+        //    so the previous device gets a SESSION_DISPLACED 401 on next request
         LocalDateTime now = LocalDateTime.now();
-        UserSession session = userSessionRepository
-                .findByUserIdAndDeviceType(user.getId(), request.getDeviceType())
-                .orElse(UserSession.builder()
-                        .user(user)
-                        .deviceType(request.getDeviceType())
-                        .loggedInAt(now)
-                        .build());
-        session.setToken(token);
-        session.setIpAddress(ipAddress);
-        session.setDeviceInfo(request.getDeviceInfo());
-        session.setFcmToken(request.getFcmToken());
-        session.setAppVersion(request.getAppVersion());
-        session.setLoggedInAt(now);
-        session.setLastActiveAt(now);
-        session.setLoggedOutAt(null);
+        if (request.getDeviceType() == DeviceType.WEB) {
+            userSessionRepository.deleteAllByUserIdAndDeviceType(user.getId(), DeviceType.WEB);
+        }
+        UserSession session = UserSession.builder()
+                .user(user)
+                .deviceType(request.getDeviceType())
+                .token(token)
+                .ipAddress(ipAddress)
+                .deviceInfo(request.getDeviceInfo())
+                .fcmToken(request.getFcmToken())
+                .appVersion(request.getAppVersion())
+                .loggedInAt(now)
+                .lastActiveAt(now)
+                .build();
         userSessionRepository.save(session);
 
         // 8. Resolve allowed modules (null for ADMIN/SUPER_ADMIN — means all visible)

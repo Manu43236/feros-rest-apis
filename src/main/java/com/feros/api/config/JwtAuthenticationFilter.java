@@ -48,11 +48,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 2. Validate token is the active session in DB
+        // 2. Validate token is an active session in DB
         Optional<UserSession> sessionOpt = userSessionRepository.findByToken(token);
         if (sessionOpt.isEmpty()) {
-            // Token was logged out or replaced by a new login on the same device type
-            filterChain.doFilter(request, response);
+            // Token was displaced by a new login on another device
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"message\":\"SESSION_DISPLACED\"}");
             return;
         }
 

@@ -13,7 +13,6 @@ import com.feros.api.entity.Designation;
 import com.feros.api.entity.SubscriptionHistory;
 import com.feros.api.entity.SubscriptionPlan;
 import com.feros.api.entity.Tenant;
-import com.feros.api.entity.User;
 import com.feros.api.entity.UserSession;
 import com.feros.api.enums.DeviceType;
 import com.feros.api.repository.UserRepository;
@@ -44,7 +43,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -539,17 +537,13 @@ public class TenantServiceImpl implements TenantService {
 
         // Save impersonation session so JwtAuthenticationFilter can validate it
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        UserSession session = userSessionRepository
-                .findByUserIdAndDeviceType(saUserId, DeviceType.WEB)
-                .orElse(UserSession.builder()
-                        .user(userRepository.getReferenceById(saUserId))
-                        .deviceType(DeviceType.WEB)
-                        .loggedInAt(now)
-                        .build());
-        session.setToken(token);
-        session.setLoggedInAt(now);
-        session.setLastActiveAt(now);
-        session.setLoggedOutAt(null);
+        UserSession session = UserSession.builder()
+                .user(userRepository.getReferenceById(saUserId))
+                .deviceType(DeviceType.WEB)
+                .token(token)
+                .loggedInAt(now)
+                .lastActiveAt(now)
+                .build();
         userSessionRepository.save(session);
 
         return LoginResponse.builder()
