@@ -59,6 +59,7 @@ public class SecurityConfig {
         config.setAllowedOrigins(List.of(
                 "https://feros.in",
                 "https://www.feros.in",
+                "https://console.feros.in",
                 "http://localhost:5173"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
