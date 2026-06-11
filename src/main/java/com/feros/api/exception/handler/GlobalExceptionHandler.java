@@ -3,6 +3,7 @@ package com.feros.api.exception.handler;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.exception.AccountLockedException;
 import com.feros.api.exception.FerosException;
+import com.feros.api.exception.WrongPinException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -26,6 +27,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.LOCKED)
                 .body(new com.feros.api.dto.response.ApiResponse<>(false, "ACCOUNT_LOCKED", data));
+    }
+
+    @ExceptionHandler(WrongPinException.class)
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> handleWrongPinException(WrongPinException ex) {
+        java.util.Map<String, Object> data = java.util.Map.of("failedAttempts", ex.getFailedAttempts());
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(new ApiResponse<>(false, "Invalid mobile number or PIN", data));
     }
 
     @ExceptionHandler(FerosException.class)

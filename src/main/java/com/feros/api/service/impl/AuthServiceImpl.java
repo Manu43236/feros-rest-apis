@@ -45,7 +45,7 @@ public class AuthServiceImpl implements AuthService {
     private final RoleModuleAccessService roleModuleAccessService;
     private final NotificationService notificationService;
 
-    @Transactional(noRollbackFor = {AccountLockedException.class, FerosException.class})
+    @Transactional(noRollbackFor = {AccountLockedException.class, FerosException.class, com.feros.api.exception.WrongPinException.class})
     @Override
     public LoginResponse login(LoginRequest request, String ipAddress) {
 
@@ -97,7 +97,7 @@ public class AuthServiceImpl implements AuthService {
             }
             user.setFailedLoginAttempts(attempts);
             userRepository.save(user);
-            throw new FerosException("Invalid mobile number or PIN", HttpStatus.UNAUTHORIZED);
+            throw new com.feros.api.exception.WrongPinException(attempts);
         }
 
         // 5. PIN correct — clear failed attempts
