@@ -5,7 +5,6 @@ import com.feros.api.entity.Payroll;
 import com.feros.api.entity.PayrollDeduction;
 import com.feros.api.entity.StaffProfile;
 import com.feros.api.entity.VehicleStaffAssignment;
-import com.feros.api.enums.PayrollStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.AttendanceRepository;
 import com.feros.api.repository.PayrollDeductionRepository;
@@ -60,9 +59,7 @@ public class PayslipPdfService {
         Payroll payroll = payrollRepository.findByIdAndTenantIdAndIsActiveTrue(payrollId, tenantId)
                 .orElseThrow(() -> new FerosException("Payroll not found", HttpStatus.NOT_FOUND));
 
-        if (payroll.getPayrollStatus() != PayrollStatus.PAID) {
-            throw new FerosException("Payslip PDF is only available for approved (PAID) payrolls", HttpStatus.BAD_REQUEST);
-        }
+
 
         List<PayrollDeduction> deductions = payrollDeductionRepository
                 .findByPayrollIdAndIsActiveTrue(payrollId);

@@ -2,8 +2,11 @@ package com.feros.api.service.impl;
 
 import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.ApprovePayrollRequest;
+import com.feros.api.dto.request.BulkGeneratePayrollRequest;
 import com.feros.api.dto.request.GeneratePayrollRequest;
 import com.feros.api.dto.request.SalaryAdvanceRequest;
+import com.feros.api.dto.request.UpdatePayrollRequest;
+import com.feros.api.dto.response.BulkPayrollResult;
 import com.feros.api.dto.response.PayrollDeductionResponse;
 import com.feros.api.dto.response.PayrollResponse;
 import com.feros.api.dto.response.SalaryAdvanceResponse;
@@ -21,7 +24,10 @@ import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,7 +39,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +57,7 @@ public class PayrollServiceImpl implements PayrollService {
     private final StaffProfileRepository staffProfileRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final NotificationService notificationService;
+    private final PlatformTransactionManager transactionManager;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -70,7 +76,6 @@ public class PayrollServiceImpl implements PayrollService {
     @Override
     @Transactional
     public SalaryAdvanceResponse createAdvance(SalaryAdvanceRequest request) {
-        Long tenantId = getCurrentTenantId();
 
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
@@ -130,9 +135,9 @@ public class PayrollServiceImpl implements PayrollService {
         return workingDays;
     }
 
-    @Override
-    @Transactional
-    public PayrollResponse generatePayroll(GeneratePayrollRequest request) {
+    // ── Core generation logic (no @Transactional — callers manage transactions) ──
+
+    private PayrollResponse generatePayrollCore(GeneratePayrollRequest request) {
         Long tenantId = getCurrentTenantId();
 
         if (payrollRepository.existsByUserIdAndTenantIdAndPayCycleStartDateAndIsActiveTrue(
@@ -151,7 +156,6 @@ public class PayrollServiceImpl implements PayrollService {
 
         SalaryType salaryType = profile.getSalaryType() != null ? profile.getSalaryType() : SalaryType.DAILY;
 
-        // Calculate attendance stats from attendance records
         List<com.feros.api.entity.Attendance> attendanceList = attendanceRepository
                 .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrue(
                         request.getUserId(), tenantId,
@@ -178,7 +182,6 @@ public class PayrollServiceImpl implements PayrollService {
         BigDecimal resolvedMonthlySalary = null;
 
         if (salaryType == SalaryType.MONTHLY) {
-            // Resolve monthly salary — use override if provided, else fetch from profile
             resolvedMonthlySalary = request.getMonthlySalary();
             if (resolvedMonthlySalary == null) {
                 if (profile.getMonthlySalary() == null) {
@@ -188,10 +191,8 @@ public class PayrollServiceImpl implements PayrollService {
                 resolvedMonthlySalary = profile.getMonthlySalary();
             }
 
-            // LOP deduction: (monthlySalary / workingDays) × lopDays
-            // lopDays = absent days only (leave days are paid, half days deduct 0.5)
             int workingDays = countWorkingDaysInMonth(request.getPayCycleStartDate(), request.getPayCycleEndDate());
-            if (workingDays == 0) workingDays = 1; // safety guard
+            if (workingDays == 0) workingDays = 1;
 
             BigDecimal lopDays = BigDecimal.valueOf(absentDays)
                     .add(BigDecimal.valueOf(halfDays).multiply(new BigDecimal("0.5")));
@@ -202,7 +203,6 @@ public class PayrollServiceImpl implements PayrollService {
 
             basicPay = resolvedMonthlySalary.subtract(lopDeduction).setScale(2, RoundingMode.HALF_UP);
         } else {
-            // DAILY — existing logic
             resolvedDailyRate = request.getDailyRate();
             if (resolvedDailyRate == null) {
                 if (profile.getDesignation() == null) {
@@ -225,7 +225,6 @@ public class PayrollServiceImpl implements PayrollService {
                     .setScale(2, RoundingMode.HALF_UP);
         }
 
-        // Overtime pay — based on daily rate equivalent (monthly / workingDays if monthly)
         BigDecimal overtimePay = BigDecimal.ZERO;
         if (request.getOvertimeHours() != null &&
                 request.getOvertimeHours().compareTo(BigDecimal.ZERO) > 0) {
@@ -245,7 +244,6 @@ public class PayrollServiceImpl implements PayrollService {
 
         BigDecimal tripBonus = request.getTripBonus() != null ? request.getTripBonus() : BigDecimal.ZERO;
 
-        // Vehicle extra pay — sum extraPayPerDay × present days in each vehicle assignment period
         BigDecimal vehicleExtraPay = BigDecimal.ZERO;
         try {
             List<VehicleStaffAssignment> assignments = vehicleStaffAssignmentRepository
@@ -281,7 +279,6 @@ public class PayrollServiceImpl implements PayrollService {
 
         BigDecimal grossPay = basicPay.add(overtimePay).add(tripBonus).add(vehicleExtraPay);
 
-        // Build payroll
         Payroll payroll = Payroll.builder()
                 .tenant(getCurrentTenant())
                 .user(user)
@@ -311,7 +308,6 @@ public class PayrollServiceImpl implements PayrollService {
 
         Payroll savedPayroll = payrollRepository.save(payroll);
 
-        // Process deductions
         BigDecimal totalDeductions = BigDecimal.ZERO;
         if (request.getDeductions() != null) {
             for (GeneratePayrollRequest.DeductionItem item : request.getDeductions()) {
@@ -329,7 +325,6 @@ public class PayrollServiceImpl implements PayrollService {
                         .isActive(true)
                         .build();
 
-                // Link salary advance if provided and update repayment
                 if (item.getSalaryAdvanceId() != null) {
                     SalaryAdvance advance = salaryAdvanceRepository
                             .findByIdAndTenantIdAndIsActiveTrue(
@@ -339,7 +334,6 @@ public class PayrollServiceImpl implements PayrollService {
 
                     deduction.setSalaryAdvance(advance);
 
-                    // Update advance repayment
                     BigDecimal newRepaid = advance.getTotalRepaid().add(item.getAmount());
                     BigDecimal newBalance = advance.getAmount().subtract(newRepaid);
                     advance.setTotalRepaid(newRepaid);
@@ -353,12 +347,17 @@ public class PayrollServiceImpl implements PayrollService {
             }
         }
 
-        // Update totals
         savedPayroll.setTotalDeductions(totalDeductions);
         savedPayroll.setNetPay(grossPay.subtract(totalDeductions));
         payrollRepository.save(savedPayroll);
 
         return mapToPayrollResponse(savedPayroll);
+    }
+
+    @Override
+    @Transactional
+    public PayrollResponse generatePayroll(GeneratePayrollRequest request) {
+        return generatePayrollCore(request);
     }
 
     @Override
@@ -381,6 +380,140 @@ public class PayrollServiceImpl implements PayrollService {
     public List<PayrollResponse> getPayrollsByUser(Long userId) {
         return payrollRepository.findByUserIdAndTenantIdAndIsActiveTrue(userId, getCurrentTenantId())
                 .stream().map(this::mapToPayrollResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public PayrollResponse updatePayroll(Long id, UpdatePayrollRequest request) {
+        Long tenantId = getCurrentTenantId();
+
+        Payroll payroll = payrollRepository.findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
+                .orElseThrow(() -> new FerosException("Payroll not found", HttpStatus.NOT_FOUND));
+
+        if (payroll.getPayrollStatus() != PayrollStatus.DRAFT) {
+            throw new FerosException("Only DRAFT payrolls can be edited", HttpStatus.BAD_REQUEST);
+        }
+
+        SalaryType salaryType = payroll.getSalaryType();
+
+        // Use request values if provided, otherwise keep existing
+        BigDecimal newDailyRate      = request.getDailyRate()      != null ? request.getDailyRate()      : payroll.getDailyRate();
+        BigDecimal newMonthlySalary  = request.getMonthlySalary()  != null ? request.getMonthlySalary()  : payroll.getMonthlySalary();
+        BigDecimal newOvertimeHours  = request.getOvertimeHours()  != null ? request.getOvertimeHours()  : payroll.getOvertimeHours();
+        BigDecimal newTripBonus      = request.getTripBonus()      != null ? request.getTripBonus()      : payroll.getTripBonus();
+
+        // Recalculate basicPay using stored attendance counts + updated rate
+        BigDecimal basicPay;
+        if (salaryType == SalaryType.MONTHLY) {
+            if (newMonthlySalary == null) {
+                throw new FerosException("Monthly salary is required", HttpStatus.BAD_REQUEST);
+            }
+            int workingDays = countWorkingDaysInMonth(payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
+            if (workingDays == 0) workingDays = 1;
+
+            BigDecimal lopDays = BigDecimal.valueOf(payroll.getAbsentDays())
+                    .add(BigDecimal.valueOf(payroll.getHalfDays()).multiply(new BigDecimal("0.5")));
+            BigDecimal perDayRate = newMonthlySalary.divide(BigDecimal.valueOf(workingDays), 4, RoundingMode.HALF_UP);
+            BigDecimal lopDeduction = perDayRate.multiply(lopDays).setScale(2, RoundingMode.HALF_UP);
+            basicPay = newMonthlySalary.subtract(lopDeduction).setScale(2, RoundingMode.HALF_UP);
+        } else {
+            if (newDailyRate == null) {
+                throw new FerosException("Daily rate is required", HttpStatus.BAD_REQUEST);
+            }
+            BigDecimal effectiveDays = BigDecimal.valueOf(payroll.getPresentDays())
+                    .add(BigDecimal.valueOf(payroll.getHalfDays()).multiply(new BigDecimal("0.5")))
+                    .add(BigDecimal.valueOf(payroll.getLeaveDays()));
+            basicPay = newDailyRate.multiply(effectiveDays).setScale(2, RoundingMode.HALF_UP);
+        }
+
+        // Recalculate overtime pay
+        BigDecimal overtimePay = BigDecimal.ZERO;
+        if (newOvertimeHours != null && newOvertimeHours.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal dailyRateForOt = newDailyRate;
+            if (dailyRateForOt == null && newMonthlySalary != null) {
+                int wd = countWorkingDaysInMonth(payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
+                dailyRateForOt = newMonthlySalary.divide(BigDecimal.valueOf(wd == 0 ? 1 : wd), 4, RoundingMode.HALF_UP);
+            }
+            if (dailyRateForOt != null) {
+                BigDecimal hourlyRate = dailyRateForOt.divide(BigDecimal.valueOf(8), 4, RoundingMode.HALF_UP);
+                overtimePay = hourlyRate.multiply(new BigDecimal("1.5")).multiply(newOvertimeHours)
+                        .setScale(2, RoundingMode.HALF_UP);
+            }
+        }
+
+        BigDecimal vehicleExtraPay = payroll.getVehicleExtraPay() != null ? payroll.getVehicleExtraPay() : BigDecimal.ZERO;
+        BigDecimal grossPay = basicPay.add(overtimePay)
+                .add(newTripBonus != null ? newTripBonus : BigDecimal.ZERO)
+                .add(vehicleExtraPay);
+
+        payroll.setDailyRate(newDailyRate);
+        payroll.setMonthlySalary(newMonthlySalary);
+        payroll.setOvertimeHours(newOvertimeHours != null ? newOvertimeHours : BigDecimal.ZERO);
+        payroll.setTripBonus(newTripBonus != null ? newTripBonus : BigDecimal.ZERO);
+        payroll.setBasicPay(basicPay);
+        payroll.setOvertimePay(overtimePay);
+        payroll.setGrossPay(grossPay);
+        if (request.getRemarks() != null) payroll.setRemarks(request.getRemarks());
+
+        // Handle deductions: null = keep existing; list (even empty) = replace all
+        BigDecimal totalDeductions;
+        if (request.getDeductions() != null) {
+            // Reverse existing advance repayments, then deactivate
+            List<PayrollDeduction> existing = payrollDeductionRepository.findByPayrollIdAndIsActiveTrue(id);
+            for (PayrollDeduction d : existing) {
+                if (d.getSalaryAdvance() != null) {
+                    SalaryAdvance adv = d.getSalaryAdvance();
+                    BigDecimal newRepaid = adv.getTotalRepaid().subtract(d.getAmount()).max(BigDecimal.ZERO);
+                    adv.setTotalRepaid(newRepaid);
+                    adv.setBalanceAmount(adv.getAmount().subtract(newRepaid).max(BigDecimal.ZERO));
+                    adv.setIsFullyRepaid(false);
+                    salaryAdvanceRepository.save(adv);
+                }
+                d.setIsActive(false);
+                payrollDeductionRepository.save(d);
+            }
+
+            // Create new deductions
+            totalDeductions = BigDecimal.ZERO;
+            for (UpdatePayrollRequest.DeductionItem item : request.getDeductions()) {
+                DeductionType deductionType = deductionTypeRepository.findById(item.getDeductionTypeId())
+                        .orElseThrow(() -> new FerosException("Deduction type not found", HttpStatus.NOT_FOUND));
+
+                PayrollDeduction deduction = PayrollDeduction.builder()
+                        .tenant(payroll.getTenant())
+                        .payroll(payroll)
+                        .deductionType(deductionType)
+                        .amount(item.getAmount())
+                        .remarks(item.getRemarks())
+                        .isActive(true)
+                        .build();
+
+                if (item.getSalaryAdvanceId() != null) {
+                    SalaryAdvance advance = salaryAdvanceRepository
+                            .findByIdAndTenantIdAndIsActiveTrue(item.getSalaryAdvanceId(), tenantId)
+                            .orElseThrow(() -> new FerosException("Salary advance not found", HttpStatus.NOT_FOUND));
+                    deduction.setSalaryAdvance(advance);
+                    BigDecimal newRepaid = advance.getTotalRepaid().add(item.getAmount());
+                    BigDecimal newBalance = advance.getAmount().subtract(newRepaid);
+                    advance.setTotalRepaid(newRepaid);
+                    advance.setBalanceAmount(newBalance.max(BigDecimal.ZERO));
+                    advance.setIsFullyRepaid(newBalance.compareTo(BigDecimal.ZERO) <= 0);
+                    salaryAdvanceRepository.save(advance);
+                }
+
+                payrollDeductionRepository.save(deduction);
+                totalDeductions = totalDeductions.add(item.getAmount());
+            }
+        } else {
+            // Keep existing — sum active deductions
+            totalDeductions = payrollDeductionRepository.findByPayrollIdAndIsActiveTrue(id)
+                    .stream().map(PayrollDeduction::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+
+        payroll.setTotalDeductions(totalDeductions);
+        payroll.setNetPay(grossPay.subtract(totalDeductions));
+
+        return mapToPayrollResponse(payrollRepository.save(payroll));
     }
 
     @Override
@@ -427,6 +560,48 @@ public class PayrollServiceImpl implements PayrollService {
         payroll.setPayrollStatus(PayrollStatus.CANCELLED);
         payroll.setIsActive(false);
         return mapToPayrollResponse(payrollRepository.save(payroll));
+    }
+
+    @Override
+    public BulkPayrollResult bulkGeneratePayroll(BulkGeneratePayrollRequest request) {
+        // Each user's payroll runs in its own independent transaction so a failure
+        // for one user does not roll back successful payrolls for others.
+        TransactionTemplate tt = new TransactionTemplate(transactionManager);
+        tt.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        List<PayrollResponse> succeeded = new ArrayList<>();
+        List<BulkPayrollResult.FailedEntry> failed = new ArrayList<>();
+
+        for (Long userId : request.getUserIds()) {
+            User user = userRepository.findById(userId).orElse(null);
+            String userName = user != null ? user.getName() : "User #" + userId;
+
+            try {
+                PayrollResponse response = tt.execute(status -> {
+                    GeneratePayrollRequest singleRequest = new GeneratePayrollRequest();
+                    singleRequest.setUserId(userId);
+                    singleRequest.setPayCycleStartDate(request.getPayCycleStartDate());
+                    singleRequest.setPayCycleEndDate(request.getPayCycleEndDate());
+                    return generatePayrollCore(singleRequest);
+                });
+                if (response != null) succeeded.add(response);
+            } catch (Exception e) {
+                String reason = e.getMessage() != null ? e.getMessage() : "Unexpected error";
+                failed.add(BulkPayrollResult.FailedEntry.builder()
+                        .userId(userId)
+                        .userName(userName)
+                        .reason(reason)
+                        .build());
+            }
+        }
+
+        return BulkPayrollResult.builder()
+                .totalRequested(request.getUserIds().size())
+                .successCount(succeeded.size())
+                .failedCount(failed.size())
+                .succeeded(succeeded)
+                .failed(failed)
+                .build();
     }
 
     // ===================== MAPPERS =====================

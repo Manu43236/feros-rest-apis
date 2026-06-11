@@ -1,8 +1,11 @@
 package com.feros.api.service;
 
 import com.feros.api.dto.request.ApprovePayrollRequest;
+import com.feros.api.dto.request.BulkGeneratePayrollRequest;
 import com.feros.api.dto.request.GeneratePayrollRequest;
 import com.feros.api.dto.request.SalaryAdvanceRequest;
+import com.feros.api.dto.request.UpdatePayrollRequest;
+import com.feros.api.dto.response.BulkPayrollResult;
 import com.feros.api.dto.response.PayrollResponse;
 import com.feros.api.dto.response.SalaryAdvanceResponse;
 
@@ -27,7 +30,11 @@ public interface PayrollService {
 
     List<PayrollResponse> getPayrollsByUser(Long userId);
 
+    PayrollResponse updatePayroll(Long id, UpdatePayrollRequest request);
+
     PayrollResponse approvePayroll(Long id, ApprovePayrollRequest request);
 
     PayrollResponse cancelPayroll(Long id);
+
+    BulkPayrollResult bulkGeneratePayroll(BulkGeneratePayrollRequest request);
 }

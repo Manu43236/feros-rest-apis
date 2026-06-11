@@ -1,9 +1,12 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.request.ApprovePayrollRequest;
+import com.feros.api.dto.request.BulkGeneratePayrollRequest;
 import com.feros.api.dto.request.GeneratePayrollRequest;
 import com.feros.api.dto.request.SalaryAdvanceRequest;
+import com.feros.api.dto.request.UpdatePayrollRequest;
 import com.feros.api.dto.response.ApiResponse;
+import com.feros.api.dto.response.BulkPayrollResult;
 import com.feros.api.dto.response.PayrollResponse;
 import com.feros.api.dto.response.SalaryAdvanceResponse;
 import com.feros.api.service.PayrollService;
@@ -105,12 +108,28 @@ public class PayrollController {
                 "Payrolls fetched successfully", payrollService.getPayrollsByUser(userId)));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<PayrollResponse>> updatePayroll(
+            @PathVariable Long id, @RequestBody UpdatePayrollRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Payroll updated successfully", payrollService.updatePayroll(id, request)));
+    }
+
     @PutMapping("/{id}/approve")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<PayrollResponse>> approvePayroll(
             @PathVariable Long id, @Valid @RequestBody ApprovePayrollRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Payroll approved successfully", payrollService.approvePayroll(id, request)));
+    }
+
+    @PostMapping("/bulk-generate")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<BulkPayrollResult>> bulkGeneratePayroll(
+            @Valid @RequestBody BulkGeneratePayrollRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Bulk payroll generation complete", payrollService.bulkGeneratePayroll(request)));
     }
 
     @DeleteMapping("/{id}")
