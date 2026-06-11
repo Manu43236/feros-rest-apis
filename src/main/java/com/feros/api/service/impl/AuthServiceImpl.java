@@ -24,7 +24,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -45,7 +44,6 @@ public class AuthServiceImpl implements AuthService {
     private final RoleModuleAccessService roleModuleAccessService;
     private final NotificationService notificationService;
 
-    @Transactional(noRollbackFor = {AccountLockedException.class, FerosException.class, com.feros.api.exception.WrongPinException.class})
     @Override
     public LoginResponse login(LoginRequest request, String ipAddress) {
 
@@ -214,7 +212,6 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional
     public void askPinReset(String phone) {
         // Find user by phone — silently ignore if not found (prevent phone enumeration)
         userRepository.findByPhone(phone).ifPresent(user -> {
