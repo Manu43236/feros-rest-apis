@@ -15,7 +15,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "orders")
+@Table(name = "orders", indexes = {
+    @Index(name = "idx_orders_tenant_date",   columnList = "tenant_id, order_date"),
+    @Index(name = "idx_orders_tenant_status", columnList = "tenant_id, order_status")
+})
 @Getter
 @Setter
 @NoArgsConstructor
