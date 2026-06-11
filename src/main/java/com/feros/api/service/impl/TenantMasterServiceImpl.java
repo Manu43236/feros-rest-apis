@@ -20,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -149,6 +150,22 @@ public class TenantMasterServiceImpl implements TenantMasterService {
     @Override
     public TenantMasterResponse createDesignation(DesignationRequest request) {
         Tenant tenant = getCurrentTenant();
+
+        // If a soft-deleted designation with the same name exists, reactivate it
+        Optional<Designation> existing = designationRepository
+                .findByTenantIdAndNameIgnoreCase(tenant.getId(), request.getName());
+        if (existing.isPresent()) {
+            Designation d = existing.get();
+            if (Boolean.TRUE.equals(d.getIsActive())) {
+                throw new FerosException("Designation '" + request.getName() + "' already exists", HttpStatus.CONFLICT);
+            }
+            d.setName(request.getName());
+            d.setRoleType(request.getRoleType());
+            d.setPayPerDay(request.getPayPerDay());
+            d.setIsActive(true);
+            return mapDesignation(designationRepository.save(d));
+        }
+
         Designation designation = Designation.builder()
                 .tenant(tenant).name(request.getName())
                 .roleType(request.getRoleType())

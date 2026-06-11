@@ -14,4 +14,6 @@ public interface DesignationRepository extends JpaRepository<Designation, Long> 
 
     Optional<Designation> findByIdAndTenantId(Long id, Long tenantId);
 
+    Optional<Designation> findByTenantIdAndNameIgnoreCase(Long tenantId, String name);
+
 }
