@@ -7,13 +7,16 @@ import com.feros.api.entity.UserSession;
 import com.feros.api.repository.UserSessionRepository;
 import com.feros.api.util.SecurityUtil;
 import com.feros.api.entity.User;
+import com.feros.api.exception.AccountLockedException;
 import com.feros.api.exception.FerosException;
 import com.feros.api.entity.RbacLoginAccess;
 import com.feros.api.enums.DeviceType;
+import com.feros.api.enums.NotificationType;
 import com.feros.api.enums.RoleName;
 import com.feros.api.repository.RbacLoginAccessRepository;
 import com.feros.api.repository.UserRepository;
 import com.feros.api.service.AuthService;
+import com.feros.api.service.NotificationService;
 import com.feros.api.service.RoleModuleAccessService;
 import com.feros.api.service.S3Service;
 import com.feros.api.util.JwtUtil;
@@ -30,6 +33,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
+    private static final int MAX_FAILED_ATTEMPTS = 5;
+    private static final int LOCKOUT_MINUTES = 5;
+
     private final UserRepository userRepository;
     private final UserSessionRepository userSessionRepository;
     private final PasswordEncoder passwordEncoder;
@@ -37,6 +43,7 @@ public class AuthServiceImpl implements AuthService {
     private final S3Service s3Service;
     private final RbacLoginAccessRepository rbacLoginAccessRepository;
     private final RoleModuleAccessService roleModuleAccessService;
+    private final NotificationService notificationService;
 
     @Transactional
     @Override
@@ -57,15 +64,47 @@ public class AuthServiceImpl implements AuthService {
             );
         }
 
-        // 3. Validate PIN
-        if (!passwordEncoder.matches(request.getPin(), user.getPin())) {
-            throw new FerosException(
-                    "Invalid mobile number or PIN",
-                    HttpStatus.UNAUTHORIZED
-            );
+        // 3. Check lockout — if locked and timer not expired, reject
+        if (user.getLockedUntil() != null) {
+            if (user.getLockedUntil().isAfter(LocalDateTime.now())) {
+                throw new AccountLockedException(user.getLockedUntil());
+            }
+            // Lockout expired — clear it automatically
+            user.setFailedLoginAttempts(0);
+            user.setLockedUntil(null);
         }
 
-        // 4. Get primary role
+        // 4. Validate PIN
+        if (!passwordEncoder.matches(request.getPin(), user.getPin())) {
+            int attempts = user.getFailedLoginAttempts() + 1;
+            if (attempts >= MAX_FAILED_ATTEMPTS) {
+                // Lock the account
+                LocalDateTime lockedUntil = LocalDateTime.now().plusMinutes(LOCKOUT_MINUTES);
+                user.setFailedLoginAttempts(0);
+                user.setLockedUntil(lockedUntil);
+                userRepository.save(user);
+                // Notify tenant admins
+                if (user.getTenant() != null) {
+                    notificationService.sendToRoles(
+                            user.getTenant(),
+                            List.of(RoleName.ADMIN),
+                            NotificationType.PIN_RESET_REQUEST,
+                            "User Locked Out",
+                            user.getName() + " (" + user.getPhone() + ") has been locked out after " + MAX_FAILED_ATTEMPTS + " failed login attempts. Reset their PIN to unlock immediately."
+                    );
+                }
+                throw new AccountLockedException(lockedUntil);
+            }
+            user.setFailedLoginAttempts(attempts);
+            userRepository.save(user);
+            throw new FerosException("Invalid mobile number or PIN", HttpStatus.UNAUTHORIZED);
+        }
+
+        // 5. PIN correct — clear failed attempts
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
+
+        // 6. Get primary role
         String role = user.getRoles()
                 .stream()
                 .map(r -> r.getName().name())
@@ -75,13 +114,13 @@ public class AuthServiceImpl implements AuthService {
                         HttpStatus.UNAUTHORIZED
                 ));
 
-        // 5. Get tenant info
+        // 7. Get tenant info
         Long tenantId = user.getTenant() != null ? user.getTenant().getId() : null;
         String companyName = user.getTenant() != null ? user.getTenant().getCompanyName() : "FEROS";
         String logoKey = user.getTenant() != null ? user.getTenant().getLogoUrl() : null;
         String logoUrl = logoKey != null ? s3Service.getPublicUrl(logoKey) : null;
 
-        // 5b. Enforce login access RBAC (skip for SUPER_ADMIN and ADMIN)
+        // 7b. Enforce login access RBAC (skip for SUPER_ADMIN and ADMIN)
         if (tenantId != null && !role.equals("SUPER_ADMIN") && !role.equals("ADMIN")) {
             try {
                 RoleName roleName = RoleName.valueOf(role);
@@ -100,7 +139,7 @@ public class AuthServiceImpl implements AuthService {
             }
         }
 
-        // 6. Generate JWT token
+        // 8. Generate JWT token
         String token = jwtUtil.generateToken(
                 user.getId(),
                 tenantId,
@@ -108,8 +147,7 @@ public class AuthServiceImpl implements AuthService {
                 role
         );
 
-        // 7. Create new session — for WEB, displace any existing session first
-        //    so the previous device gets a SESSION_DISPLACED 401 on next request
+        // 9. Create new session — for WEB, displace any existing session first
         LocalDateTime now = LocalDateTime.now();
         if (request.getDeviceType() == DeviceType.WEB) {
             userSessionRepository.deleteAllByUserIdAndDeviceType(user.getId(), DeviceType.WEB);
@@ -127,7 +165,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
         userSessionRepository.save(session);
 
-        // 8. Resolve allowed modules (null for ADMIN/SUPER_ADMIN — means all visible)
+        // 10. Resolve allowed modules (null for ADMIN/SUPER_ADMIN — means all visible)
         List<String> allowedModules = null;
         if (tenantId != null && !role.equals("SUPER_ADMIN") && !role.equals("ADMIN")) {
             try {
@@ -138,7 +176,7 @@ public class AuthServiceImpl implements AuthService {
             }
         }
 
-        // 9. Return response
+        // 11. Return response
         return LoginResponse.builder()
                 .token(token)
                 .userId(user.getId())
@@ -156,7 +194,6 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void logout() {
         String token = SecurityUtil.getCurrentToken();
-
         userSessionRepository.findByToken(token).ifPresent(userSessionRepository::delete);
     }
 
@@ -174,5 +211,22 @@ public class AuthServiceImpl implements AuthService {
         user.setPlainPin(request.getNewPin());
         user.setIsPinResetRequired(false);
         userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void askPinReset(String phone) {
+        // Find user by phone — silently ignore if not found (prevent phone enumeration)
+        userRepository.findByPhone(phone).ifPresent(user -> {
+            if (user.getTenant() != null) {
+                notificationService.sendToRoles(
+                        user.getTenant(),
+                        List.of(RoleName.ADMIN),
+                        NotificationType.PIN_RESET_REQUEST,
+                        "PIN Reset Requested",
+                        user.getName() + " (" + user.getPhone() + ") cannot log in and is requesting a PIN reset."
+                );
+            }
+        });
     }
 }

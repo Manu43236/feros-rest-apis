@@ -53,6 +53,12 @@ public class AuthController {
         return request.getRemoteAddr();
     }
 
+    @PostMapping("/ask-pin-reset")
+    public ResponseEntity<ApiResponse<Void>> askPinReset(@RequestParam String phone) {
+        authService.askPinReset(phone);
+        return ResponseEntity.ok(ApiResponse.success("Request sent to admin", null));
+    }
+
     @GetMapping("/hash/{pin}")
     public String hashPin(@PathVariable String pin) {
         return passwordEncoder.encode(pin);

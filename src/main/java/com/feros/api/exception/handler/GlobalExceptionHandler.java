@@ -1,6 +1,7 @@
 package com.feros.api.exception.handler;
 
 import com.feros.api.dto.response.ApiResponse;
+import com.feros.api.exception.AccountLockedException;
 import com.feros.api.exception.FerosException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +17,16 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> handleAccountLockedException(AccountLockedException ex) {
+        java.util.Map<String, String> data = java.util.Map.of(
+                "lockedUntil", ex.getLockedUntil().toString()
+        );
+        return ResponseEntity
+                .status(HttpStatus.LOCKED)
+                .body(new com.feros.api.dto.response.ApiResponse<>(false, "ACCOUNT_LOCKED", data));
+    }
 
     @ExceptionHandler(FerosException.class)
     public ResponseEntity<ApiResponse<Void>> handleFerosException(FerosException ex) {

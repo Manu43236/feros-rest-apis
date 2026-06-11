@@ -229,6 +229,9 @@ public class UserServiceImpl implements UserService {
         user.setPlainPin(rawPin);
         user.setPinGeneratedAt(TimeUtil.nowIst());
         user.setIsPinResetRequired(true);
+        // Clear any active lockout so user can login immediately with new PIN
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
         userRepository.save(user);
 
         notificationService.sendToUser(user.getTenant(), user, NotificationType.PIN_RESET,

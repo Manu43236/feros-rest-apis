@@ -8,4 +8,5 @@ public interface AuthService {
     LoginResponse login(LoginRequest request, String ipAddress);
     void logout();
     void changePin(ChangePinRequest request);
+    void askPinReset(String phone);
 }
