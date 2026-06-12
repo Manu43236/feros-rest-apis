@@ -72,7 +72,21 @@ public class AttendanceServiceImpl implements AttendanceService {
                     request.getAttendanceDate(), HttpStatus.CONFLICT);
         }
 
-        return mapToResponse(saveAttendance(request, tenantId, AttendanceApprovalStatus.APPROVED));
+        boolean isSupervisor = "SUPERVISOR".equals(SecurityUtil.getCurrentRole());
+        AttendanceApprovalStatus status = isSupervisor
+                ? AttendanceApprovalStatus.PENDING
+                : AttendanceApprovalStatus.APPROVED;
+
+        Attendance saved = saveAttendance(request, tenantId, status);
+
+        if (isSupervisor) {
+            notificationService.sendToRoles(saved.getTenant(), List.of(RoleName.ADMIN),
+                    NotificationType.ATTENDANCE_PENDING,
+                    "Attendance Pending Approval",
+                    saved.getUser().getName() + " attendance for " + saved.getAttendanceDate() + " marked by supervisor. Please review.");
+        }
+
+        return mapToResponse(saved);
     }
 
     @Override
@@ -174,6 +188,11 @@ public class AttendanceServiceImpl implements AttendanceService {
         Long tenantId = getCurrentTenantId();
         List<AttendanceResponse> responses = new ArrayList<>();
 
+        boolean isSupervisor = "SUPERVISOR".equals(SecurityUtil.getCurrentRole());
+        AttendanceApprovalStatus status = isSupervisor
+                ? AttendanceApprovalStatus.PENDING
+                : AttendanceApprovalStatus.APPROVED;
+
         for (BulkAttendanceRequest.AttendanceEntry entry : request.getEntries()) {
             if (attendanceRepository.existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
                     entry.getUserId(), tenantId, request.getAttendanceDate())) {
@@ -188,7 +207,15 @@ public class AttendanceServiceImpl implements AttendanceService {
             req.setLeaveReason(entry.getLeaveReason());
             req.setRemarks(entry.getRemarks());
 
-            responses.add(mapToResponse(saveAttendance(req, tenantId, AttendanceApprovalStatus.APPROVED)));
+            responses.add(mapToResponse(saveAttendance(req, tenantId, status)));
+        }
+
+        if (isSupervisor && !responses.isEmpty()) {
+            Tenant tenant = getCurrentTenant();
+            notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN),
+                    NotificationType.ATTENDANCE_PENDING,
+                    "Bulk Attendance Pending Approval",
+                    responses.size() + " attendance record(s) for " + request.getAttendanceDate() + " marked by supervisor. Please review.");
         }
 
         return responses;
@@ -436,6 +463,8 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .approvedById(a.getApprovedBy() != null ? a.getApprovedBy().getId() : null)
                 .approvedByName(a.getApprovedBy() != null ? a.getApprovedBy().getName() : null)
                 .approvedAt(a.getApprovedAt())
+                .assignedVehicleNumber(vehicleRepository.findAssignedVehicleByStaffUserId(a.getUser().getId())
+                        .map(v -> v.getRegistrationNumber()).orElse(null))
                 .selfieUrl(a.getSelfieUrl() != null ? s3Service.getPublicUrl(a.getSelfieUrl()) : null)
                 .latitude(a.getLatitude())
                 .longitude(a.getLongitude())
