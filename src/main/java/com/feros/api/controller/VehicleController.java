@@ -67,7 +67,7 @@ public class VehicleController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<VehicleResponse>> updateVehicleStatus(
             @PathVariable Long id, @RequestBody UpdateStatusRequest request) {
         return ResponseEntity.ok(ApiResponse.success(

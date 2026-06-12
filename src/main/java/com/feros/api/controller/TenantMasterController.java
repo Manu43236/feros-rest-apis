@@ -26,14 +26,14 @@ public class TenantMasterController {
 
     // ===================== VEHICLE STATUSES =====================
     @GetMapping("/vehicle-statuses")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<TenantMasterResponse>>> getAllVehicleStatuses() {
         return ResponseEntity.ok(ApiResponse.success("Vehicle statuses fetched successfully",
                 tenantMasterService.getAllVehicleStatuses()));
     }
 
     @GetMapping("/vehicle-statuses/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<TenantMasterResponse>> getVehicleStatusById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Vehicle status fetched successfully",
                 tenantMasterService.getVehicleStatusById(id)));
