@@ -101,7 +101,7 @@ public class TenantMasterController {
 
     // ===================== DESIGNATIONS =====================
     @GetMapping("/designations")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<TenantMasterResponse>>> getAllDesignations() {
         return ResponseEntity
                 .ok(ApiResponse.success("Designations fetched successfully", tenantMasterService.getAllDesignations()));

@@ -26,14 +26,14 @@ public class StaffProfileController {
 
     // ===================== STAFF PROFILES =====================
     @GetMapping("/profiles")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<StaffProfileResponse>>> getAllProfiles() {
         return ResponseEntity.ok(ApiResponse.success(
                 "Profiles fetched successfully", staffProfileService.getAllProfiles()));
     }
 
     @GetMapping("/profiles/{userId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<StaffProfileResponse>> getProfileByUserId(
             @PathVariable Long userId) {
         return ResponseEntity.ok(ApiResponse.success(
