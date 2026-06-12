@@ -121,7 +121,7 @@ public class InventoryController {
     }
 
     @GetMapping("/service-parts/service/{serviceId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'STORE_KEEPER', 'SERVICE_MANAGER', 'TECHNICIAN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'STORE_KEEPER', 'SERVICE_MANAGER', 'TECHNICIAN', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<ServicePartResponse>>> getPartsForService(@PathVariable Long serviceId) {
         return ResponseEntity.ok(ApiResponse.success("Service parts fetched", inventoryService.getPartsForService(serviceId)));
     }
