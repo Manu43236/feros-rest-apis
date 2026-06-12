@@ -36,7 +36,7 @@ public class VehicleMaintenanceController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Vehicle service fetched successfully", vehicleMaintenanceService.getById(id)));
     }

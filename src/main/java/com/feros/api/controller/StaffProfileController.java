@@ -126,7 +126,7 @@ public class StaffProfileController {
 
     // ===================== VEHICLE IMAGES =====================
     @GetMapping("/vehicles/{vehicleId}/images")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<VehicleImageResponse>>> getVehicleImages(
             @PathVariable Long vehicleId) {
         return ResponseEntity.ok(ApiResponse.success(

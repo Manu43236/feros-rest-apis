@@ -139,14 +139,14 @@ public class TenantMasterController {
 
     // ===================== CHARGE TYPES =====================
     @GetMapping("/charge-types")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<TenantMasterResponse>>> getAllChargeTypes() {
         return ResponseEntity
                 .ok(ApiResponse.success("Charge types fetched successfully", tenantMasterService.getAllChargeTypes()));
     }
 
     @GetMapping("/charge-types/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<TenantMasterResponse>> getChargeTypeById(@PathVariable Long id) {
         return ResponseEntity
                 .ok(ApiResponse.success("Charge type fetched successfully", tenantMasterService.getChargeTypeById(id)));

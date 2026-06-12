@@ -42,7 +42,7 @@ public class TyreController {
     }
 
     @GetMapping("/available")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<TyreResponse>>> getAvailable() {
         return ResponseEntity.ok(ApiResponse.success("Available tyres fetched", tyreService.getAvailableTyres()));
     }
