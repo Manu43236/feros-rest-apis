@@ -145,11 +145,9 @@ public class AuthServiceImpl implements AuthService {
                 role
         );
 
-        // 9. Create new session — for WEB, displace any existing session first
+        // 9. Create new session — displace any existing session for this user + device type first
         LocalDateTime now = LocalDateTime.now();
-        if (request.getDeviceType() == DeviceType.WEB) {
-            userSessionRepository.deleteAllByUserIdAndDeviceType(user.getId(), DeviceType.WEB);
-        }
+        userSessionRepository.deleteAllByUserIdAndDeviceType(user.getId(), request.getDeviceType());
         UserSession session = UserSession.builder()
                 .user(user)
                 .deviceType(request.getDeviceType())
