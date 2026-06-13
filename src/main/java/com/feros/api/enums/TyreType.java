@@ -4,5 +4,6 @@ public enum TyreType {
     RADIAL,
     BIAS,
     TUBELESS,
-    TUBE_TYPE
+    TUBE_TYPE,
+    NYLON
 }
