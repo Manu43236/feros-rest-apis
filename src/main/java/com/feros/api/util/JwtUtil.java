@@ -38,6 +38,30 @@ public class JwtUtil {
                 .compact();
     }
 
+    public String generateImpersonationToken(Long userId, Long tenantId, String phone, String role) {
+        return Jwts.builder()
+                .subject(phone)
+                .claims(Map.of(
+                        "userId", userId,
+                        "tenantId", tenantId != null ? tenantId : "",
+                        "role", role,
+                        "impersonation", true
+                ))
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + jwtConfig.getExpiration()))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    public boolean isImpersonationToken(String token) {
+        try {
+            Object flag = extractClaims(token).get("impersonation");
+            return Boolean.TRUE.equals(flag);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public Claims extractClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())

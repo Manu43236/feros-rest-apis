@@ -48,20 +48,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 2. Validate token is an active session in DB
-        Optional<UserSession> sessionOpt = userSessionRepository.findByToken(token);
-        if (sessionOpt.isEmpty()) {
-            // Token was displaced by a new login on another device
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"message\":\"SESSION_DISPLACED\"}");
-            return;
+        // 2. Impersonation tokens are JWT-only — skip DB session check
+        if (!jwtUtil.isImpersonationToken(token)) {
+            Optional<UserSession> sessionOpt = userSessionRepository.findByToken(token);
+            if (sessionOpt.isEmpty()) {
+                // Token was displaced by a new login on another device
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"message\":\"SESSION_DISPLACED\"}");
+                return;
+            }
+            // 3. Update last active timestamp
+            UserSession session = sessionOpt.get();
+            session.setLastActiveAt(LocalDateTime.now());
+            userSessionRepository.save(session);
         }
-
-        // 3. Update last active timestamp
-        UserSession session = sessionOpt.get();
-        session.setLastActiveAt(LocalDateTime.now());
-        userSessionRepository.save(session);
 
         // 4. Set authentication in security context
         String phone = jwtUtil.extractPhone(token);
