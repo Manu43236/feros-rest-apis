@@ -25,6 +25,45 @@ public class ReportController {
 
     private static final String DATE_FORMAT = "yyyy-MM-dd";
 
+    // ── Vehicle Master ────────────────────────────────────────────────────────
+
+    @GetMapping("/vehicles/master")
+    public ResponseEntity<ApiResponse<List<VehicleMasterRow>>> getVehicleMaster() {
+        return ResponseEntity.ok(ApiResponse.success("Vehicle master fetched", reportService.getVehicleMaster()));
+    }
+
+    @GetMapping("/vehicles/master/export")
+    public ResponseEntity<byte[]> exportVehicleMaster(
+            @RequestParam(defaultValue = "csv") String format) {
+        List<VehicleMasterRow> rows = reportService.getVehicleMaster();
+        String[] headers = {
+                "Vehicle No.", "Brand", "Model", "Type", "Fuel Type", "Ownership", "Status",
+                "Capacity (T)", "GVW", "Mfg Year", "Tank Cap. (L)",
+                "Chassis No.", "Engine No.",
+                "RC No.", "Insurance No.", "Permit No.", "Fitness No.", "PUC No.", "Road Tax Expiry",
+                "Financed", "Financer Name", "Finance From", "Finance To", "IoT"
+        };
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getRegistrationNumber(),
+                safe(r.getBrand()), safe(r.getModel()), safe(r.getVehicleType()),
+                safe(r.getFuelType()), safe(r.getOwnershipType()), safe(r.getCurrentStatus()),
+                r.getCapacityInTons() != null ? r.getCapacityInTons().toPlainString() : "—",
+                r.getGrossVehicleWeight() != null ? r.getGrossVehicleWeight().toPlainString() : "—",
+                r.getManufactureYear() != null ? String.valueOf(r.getManufactureYear()) : "—",
+                r.getFuelTankCapacity() != null ? r.getFuelTankCapacity().toPlainString() : "—",
+                safe(r.getChassisNumber()), safe(r.getEngineNumber()),
+                safe(r.getRcNumber()), safe(r.getInsuranceNumber()), safe(r.getPermitNumber()),
+                safe(r.getFitnessNumber()), safe(r.getPucNumber()),
+                r.getRoadTaxExpiry() != null ? r.getRoadTaxExpiry().toString() : "—",
+                Boolean.TRUE.equals(r.getIsFinanced()) ? "Yes" : "No",
+                safe(r.getFinancerName()),
+                r.getFinanceFrom() != null ? r.getFinanceFrom().toString() : "—",
+                r.getFinanceTo() != null ? r.getFinanceTo().toString() : "—",
+                Boolean.TRUE.equals(r.getIsIot()) ? "Yes" : "No"
+        }).toList();
+        return export("vehicle-master", "Vehicle Master Report", headers, data, format);
+    }
+
     // ── Fleet Status ──────────────────────────────────────────────────────────
 
     @GetMapping("/vehicles/fleet-status")

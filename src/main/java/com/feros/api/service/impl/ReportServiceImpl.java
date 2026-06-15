@@ -60,6 +60,71 @@ public class ReportServiceImpl implements ReportService {
     private final StaffProfileRepository staffProfileRepository;
     private final VehicleServiceTaskRepository vehicleServiceTaskRepository;
 
+    // ── 0. Vehicle Master ──────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VehicleMasterRow> getVehicleMaster() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<Vehicle> vehicles = vehicleRepository.findByTenantIdAndIsActiveTrue(tenantId);
+
+        // Group active documents by vehicleId → (docTypeName → first active doc)
+        Map<Long, Map<String, VehicleDocument>> docsByVehicle = documentRepository
+                .findByTenantIdAndIsActiveTrue(tenantId)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        d -> d.getVehicle().getId(),
+                        Collectors.toMap(
+                                d -> d.getDocumentType().getName(),
+                                d -> d,
+                                (a, b) -> a
+                        )
+                ));
+
+        return vehicles.stream().map(v -> {
+            Map<String, VehicleDocument> docs = docsByVehicle.getOrDefault(v.getId(), Map.of());
+
+            VehicleDocument nationalPermit = docs.get("National Permit");
+            VehicleDocument statePermit = docs.get("State Permit");
+            String permitNumber = nationalPermit != null ? nationalPermit.getDocumentNumber()
+                    : statePermit != null ? statePermit.getDocumentNumber() : null;
+
+            VehicleDocument rc = docs.get("Registration Certificate (RC)");
+            VehicleDocument insurance = docs.get("Insurance Certificate");
+            VehicleDocument fitness = docs.get("Fitness Certificate");
+            VehicleDocument puc = docs.get("Pollution Under Control (PUC)");
+            VehicleDocument roadTax = docs.get("Road Tax Receipt");
+
+            return VehicleMasterRow.builder()
+                    .vehicleId(v.getId())
+                    .registrationNumber(v.getRegistrationNumber())
+                    .brand(v.getBrand() != null ? v.getBrand().getName() : null)
+                    .model(v.getModel())
+                    .vehicleType(v.getVehicleType() != null ? v.getVehicleType().getName() : null)
+                    .fuelType(v.getFuelType() != null ? v.getFuelType().getName() : null)
+                    .ownershipType(v.getOwnershipType() != null ? v.getOwnershipType().getName() : null)
+                    .currentStatus(v.getCurrentStatus() != null ? v.getCurrentStatus().getStatusType().name() : null)
+                    .capacityInTons(v.getCapacityInTons())
+                    .grossVehicleWeight(v.getGrossVehicleWeight())
+                    .manufactureYear(v.getManufactureYear())
+                    .fuelTankCapacity(v.getFuelTankCapacity())
+                    .chassisNumber(v.getChassisNumber())
+                    .engineNumber(v.getEngineNumber())
+                    .rcNumber(rc != null ? rc.getDocumentNumber() : null)
+                    .insuranceNumber(insurance != null ? insurance.getDocumentNumber() : null)
+                    .permitNumber(permitNumber)
+                    .fitnessNumber(fitness != null ? fitness.getDocumentNumber() : null)
+                    .pucNumber(puc != null ? puc.getDocumentNumber() : null)
+                    .roadTaxExpiry(roadTax != null ? roadTax.getExpiryDate() : null)
+                    .isFinanced(v.getIsFinanced())
+                    .financerName(v.getFinancerName())
+                    .financeFrom(v.getFinanceStartDate())
+                    .financeTo(v.getFinanceEndDate())
+                    .isIot(v.getIsIot())
+                    .build();
+        }).toList();
+    }
+
     // ── 1. Fleet Status ────────────────────────────────────────────────────────
 
     @Override

@@ -7,6 +7,8 @@ import java.util.List;
 
 public interface ReportService {
 
+    List<VehicleMasterRow> getVehicleMaster();
+
     List<FleetStatusRow> getFleetStatus(LocalDate date);
 
 List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
