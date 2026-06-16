@@ -36,7 +36,7 @@ public class MeterReadingController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<MeterReadingResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody MeterReadingRequest request) {
