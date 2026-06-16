@@ -61,4 +61,9 @@ public interface OrderVehicleAllocationRepository extends JpaRepository<OrderVeh
            "LEFT JOIN FETCH ova.allocatedBy LEFT JOIN FETCH ova.unassignedBy " +
            "WHERE ova.vehicle.id = :vehicleId AND ova.tenant.id = :tenantId ORDER BY ova.createdAt DESC")
     List<OrderVehicleAllocation> findByVehicleIdAndTenantIdOrderByCreatedAtDesc(@Param("vehicleId") Long vehicleId, @Param("tenantId") Long tenantId);
+
+    @Query("SELECT ova FROM OrderVehicleAllocation ova WHERE ova.vehicle.id = :vehicleId AND ova.isActive = true " +
+           "AND ova.allocationStatus IN ('ALLOCATED', 'LR_CREATED', 'IN_TRANSIT') " +
+           "ORDER BY ova.createdAt DESC")
+    Optional<OrderVehicleAllocation> findCurrentActiveAllocationForVehicle(@Param("vehicleId") Long vehicleId);
 }

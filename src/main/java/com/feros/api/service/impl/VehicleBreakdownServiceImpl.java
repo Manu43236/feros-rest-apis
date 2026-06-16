@@ -378,10 +378,13 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         if (vehicle.getCurrentStatus() != null &&
                 (vehicle.getCurrentStatus().getStatusType() == VehicleStatusType.ASSIGNED ||
                  vehicle.getCurrentStatus().getStatusType() == VehicleStatusType.ON_TRIP)) {
-            throw new FerosException(
-                    "Vehicle is currently " + vehicle.getCurrentStatus().getName() +
-                    " — report breakdown from the active order instead",
-                    HttpStatus.BAD_REQUEST);
+            OrderVehicleAllocation allocation = vehicleAllocationRepository
+                    .findCurrentActiveAllocationForVehicle(vehicleId)
+                    .orElseThrow(() -> new FerosException(
+                            "Vehicle is currently " + vehicle.getCurrentStatus().getName() +
+                            " but no active allocation was found — please contact admin",
+                            HttpStatus.BAD_REQUEST));
+            return doReportBreakdown(allocation, request, tenantId);
         }
 
         Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(tenantId).orElseThrow();
