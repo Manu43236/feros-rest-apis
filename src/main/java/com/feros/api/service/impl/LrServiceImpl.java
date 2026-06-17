@@ -496,7 +496,8 @@ public class LrServiceImpl implements LrService {
     // ===================== MAPPERS =====================
     private LrResponse mapToLrResponse(Lr lr) {
         Vehicle vehicle = lr.getVehicleAllocation().getVehicle();
-        InvoiceLr invoiceLr = invoiceLrRepository.findByLrIdFetchInvoice(lr.getId()).orElse(null);
+        Long invoiceId     = invoiceLrRepository.findInvoiceIdByLrId(lr.getId()).orElse(null);
+        String invoiceNumber = invoiceLrRepository.findInvoiceNumberByLrId(lr.getId()).orElse(null);
         return LrResponse.builder()
                 .id(lr.getId())
                 .tenantId(lr.getTenant().getId())
@@ -538,8 +539,8 @@ public class LrServiceImpl implements LrService {
                 .ewayBillValidUpto(lr.getEwayBillValidUpto())
                 .lrStatus(lr.getLrStatus())
                 .remarks(lr.getRemarks())
-                .invoiceId(invoiceLr != null ? invoiceLr.getInvoice().getId() : null)
-                .invoiceNumber(invoiceLr != null ? invoiceLr.getInvoice().getInvoiceNumber() : null)
+                .invoiceId(invoiceId)
+                .invoiceNumber(invoiceNumber)
                 .checkposts(lrCheckpostRepository.findByLrIdAndIsActiveTrue(lr.getId())
                         .stream().map(this::mapToCheckpostResponse).toList())
                 .charges(lrChargeRepository.findByLrIdAndIsActiveTrue(lr.getId())
