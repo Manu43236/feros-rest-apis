@@ -284,6 +284,11 @@ public class InvoiceServiceImpl implements InvoiceService {
                     HttpStatus.BAD_REQUEST);
         }
 
+        if (request.getPaymentMode() == com.feros.api.enums.PaymentMode.OTHER &&
+                (request.getPaymentModeLabel() == null || request.getPaymentModeLabel().isBlank())) {
+            throw new FerosException("Please describe the payment mode when selecting 'Other'", HttpStatus.BAD_REQUEST);
+        }
+
         InvoicePayment payment = InvoicePayment.builder()
                 .tenant(getCurrentTenant())
                 .invoice(invoice)
@@ -291,6 +296,8 @@ public class InvoiceServiceImpl implements InvoiceService {
                         request.getPaymentDate() : TimeUtil.today())
                 .amount(request.getAmount())
                 .paymentMode(request.getPaymentMode())
+                .paymentModeLabel(request.getPaymentMode() == com.feros.api.enums.PaymentMode.OTHER
+                        ? request.getPaymentModeLabel().trim() : null)
                 .referenceNumber(request.getReferenceNumber())
                 .remarks(request.getRemarks())
                 .createdBy(getCurrentUser())
@@ -489,6 +496,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .paymentDate(p.getPaymentDate())
                 .amount(p.getAmount())
                 .paymentMode(p.getPaymentMode())
+                .paymentModeLabel(p.getPaymentModeLabel())
                 .referenceNumber(p.getReferenceNumber())
                 .remarks(p.getRemarks())
                 .createdById(p.getCreatedBy().getId())

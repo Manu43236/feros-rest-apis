@@ -5,5 +5,6 @@ public enum PaymentMode {
     CHEQUE,
     NEFT,
     UPI,
-    RTGS
+    RTGS,
+    OTHER
 }

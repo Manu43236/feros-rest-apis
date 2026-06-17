@@ -38,6 +38,9 @@ public class InvoicePayment extends BaseEntity {
     @Column(name = "payment_mode", nullable = false)
     private PaymentMode paymentMode;
 
+    @Column(name = "payment_mode_label")
+    private String paymentModeLabel;
+
     @Column(name = "reference_number")
     private String referenceNumber;
 

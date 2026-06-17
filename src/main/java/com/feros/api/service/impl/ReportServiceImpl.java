@@ -865,7 +865,11 @@ public class ReportServiceImpl implements ReportService {
                         .invoiceNumber(p.getInvoice().getInvoiceNumber())
                         .clientName(p.getInvoice().getClient().getClientName())
                         .amount(p.getAmount())
-                        .paymentMode(p.getPaymentMode() != null ? p.getPaymentMode().name() : "—")
+                        .paymentMode(p.getPaymentMode() != null
+                                ? (p.getPaymentMode() == com.feros.api.enums.PaymentMode.OTHER && p.getPaymentModeLabel() != null
+                                        ? p.getPaymentModeLabel()
+                                        : p.getPaymentMode().name())
+                                : "—")
                         .referenceNumber(p.getReferenceNumber())
                         .remarks(p.getRemarks())
                         .build())

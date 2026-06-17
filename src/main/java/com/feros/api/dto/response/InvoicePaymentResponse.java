@@ -17,6 +17,7 @@ public class InvoicePaymentResponse {
     private LocalDate paymentDate;
     private BigDecimal amount;
     private PaymentMode paymentMode;
+    private String paymentModeLabel;
     private String referenceNumber;
     private String remarks;
     private Long createdById;

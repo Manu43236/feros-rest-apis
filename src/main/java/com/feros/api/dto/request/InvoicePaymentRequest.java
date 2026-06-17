@@ -18,6 +18,8 @@ public class InvoicePaymentRequest {
     @NotNull(message = "Payment mode is required")
     private PaymentMode paymentMode;
 
+    private String paymentModeLabel;
+
     private LocalDate paymentDate;
     private String referenceNumber;
     private String remarks;
