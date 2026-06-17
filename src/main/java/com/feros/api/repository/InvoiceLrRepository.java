@@ -27,4 +27,7 @@ public interface InvoiceLrRepository extends JpaRepository<InvoiceLr, Long> {
 
     @Query("SELECT il FROM InvoiceLr il WHERE il.tenant.id = :tenantId AND il.isActive = true AND il.lr.lrDate BETWEEN :from AND :to")
     List<InvoiceLr> findByTenantIdAndLrDateRange(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("SELECT il FROM InvoiceLr il JOIN FETCH il.invoice WHERE il.lr.id = :lrId AND il.isActive = true")
+    java.util.Optional<InvoiceLr> findByLrIdFetchInvoice(@Param("lrId") Long lrId);
 }

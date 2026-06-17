@@ -57,6 +57,9 @@ public class LrResponse {
     private LrStatus lrStatus;
     private String remarks;
 
+    private Long invoiceId;
+    private String invoiceNumber;
+
     private List<LrCheckpostResponse> checkposts;
     private List<LrChargeResponse> charges;
 
