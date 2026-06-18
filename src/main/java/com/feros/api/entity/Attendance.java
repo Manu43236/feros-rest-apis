@@ -81,4 +81,7 @@ public class Attendance extends BaseEntity {
 
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+    @Column(name = "location_name", columnDefinition = "TEXT")
+    private String locationName;
 }

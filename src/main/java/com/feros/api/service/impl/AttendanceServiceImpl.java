@@ -18,6 +18,7 @@ import com.feros.api.enums.RoleName;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.AttendanceService;
+import com.feros.api.service.LocationResolverService;
 import com.feros.api.service.NotificationService;
 import com.feros.api.service.S3Service;
 import com.feros.api.util.SecurityUtil;
@@ -46,6 +47,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final NotificationService notificationService;
     private final VehicleRepository vehicleRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    private final LocationResolverService locationResolverService;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -468,6 +470,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .selfieUrl(a.getSelfieUrl() != null ? s3Service.getPublicUrl(a.getSelfieUrl()) : null)
                 .latitude(a.getLatitude())
                 .longitude(a.getLongitude())
+                .locationName(a.getLocationName())
                 .createdAt(a.getCreatedAt())
                 .updatedAt(a.getUpdatedAt())
                 .build();
@@ -507,6 +510,7 @@ public class AttendanceServiceImpl implements AttendanceService {
         attendance.setSelfieUrl(request.getSelfieUrl());
         attendance.setLatitude(request.getLatitude());
         attendance.setLongitude(request.getLongitude());
+        attendance.setLocationName(locationResolverService.resolve(request.getLatitude(), request.getLongitude()));
         attendance.setRemarks(request.getRemarks());
         attendance.setMarkedBy(user);
         attendance.setMarkedAt(TimeUtil.nowIst());

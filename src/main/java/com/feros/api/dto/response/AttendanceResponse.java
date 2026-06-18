@@ -39,6 +39,7 @@ public class AttendanceResponse {
     private String selfieUrl;
     private Double latitude;
     private Double longitude;
+    private String locationName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
