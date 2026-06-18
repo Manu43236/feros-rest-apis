@@ -37,7 +37,11 @@ public class LocationResolverService {
         }
 
         // Step 2: fallback to OpenStreetMap Nominatim
-        return reverseGeocode(latitude, longitude);
+        String geocoded = reverseGeocode(latitude, longitude);
+        if (geocoded != null) return geocoded;
+
+        // Step 3: final fallback — raw coordinates
+        return String.format("%.6f, %.6f", latitude, longitude);
     }
 
     @SuppressWarnings("unchecked")
