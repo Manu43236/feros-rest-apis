@@ -551,7 +551,8 @@ public class TenantServiceImpl implements TenantService {
         SubscriptionHistory current = subscriptionHistoryRepository
                 .findCurrentByTenantId(tenant.getId()).orElse(null);
         String currentPlanName           = current != null && current.getPlan() != null ? current.getPlan().getName() : null;
-        Integer currentVehicleCount      = current != null ? current.getVehicleCount() : null;
+        Integer currentVehicleCount      = (current != null && current.getVehicleCount() != null)
+                                           ? current.getVehicleCount() : tenant.getLorryCount();
         java.math.BigDecimal currentPpv  = current != null ? current.getPricePerVehicle() : null;
         String currentBillingCycle       = current != null && current.getBillingCycle() != null
                                            ? current.getBillingCycle().name() : null;
