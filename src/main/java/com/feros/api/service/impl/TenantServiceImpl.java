@@ -23,6 +23,7 @@ import com.feros.api.repository.SubscriptionPlanRepository;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.repository.TenantDocumentRepository;
+import com.feros.api.repository.VehicleRepository;
 import com.feros.api.repository.TenantRepository;
 import com.feros.api.service.S3Service;
 import com.feros.api.service.TenantService;
@@ -58,6 +59,7 @@ public class TenantServiceImpl implements TenantService {
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final UserRepository userRepository;
+    private final VehicleRepository vehicleRepository;
     private final S3Service s3Service;
     private final JwtUtil jwtUtil;
 
@@ -551,8 +553,13 @@ public class TenantServiceImpl implements TenantService {
         SubscriptionHistory current = subscriptionHistoryRepository
                 .findCurrentByTenantId(tenant.getId()).orElse(null);
         String currentPlanName           = current != null && current.getPlan() != null ? current.getPlan().getName() : null;
-        Integer currentVehicleCount      = (current != null && current.getVehicleCount() != null)
-                                           ? current.getVehicleCount() : tenant.getLorryCount();
+        Integer currentVehicleCount;
+        if (current != null && current.getVehicleCount() != null && current.getVehicleCount() > 0) {
+            currentVehicleCount = current.getVehicleCount();
+        } else {
+            long fleetCount = vehicleRepository.countByTenantIdAndIsActiveTrue(tenant.getId());
+            currentVehicleCount = fleetCount > 0 ? (int) fleetCount : null;
+        }
         java.math.BigDecimal currentPpv  = current != null ? current.getPricePerVehicle() : null;
         String currentBillingCycle       = current != null && current.getBillingCycle() != null
                                            ? current.getBillingCycle().name() : null;

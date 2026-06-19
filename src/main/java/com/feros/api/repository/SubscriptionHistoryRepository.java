@@ -26,6 +26,6 @@ public interface SubscriptionHistoryRepository extends JpaRepository<Subscriptio
     @Query("SELECT h FROM SubscriptionHistory h WHERE h.tenant.id = :tenantId AND h.status = 'ACTIVE' ORDER BY h.createdAt DESC")
     List<SubscriptionHistory> findActiveByTenantId(@Param("tenantId") Long tenantId);
 
-    @Query("SELECT h FROM SubscriptionHistory h WHERE h.tenant.id = :tenantId AND h.status IN ('ACTIVE', 'TRIAL') ORDER BY h.createdAt DESC LIMIT 1")
+    @Query("SELECT h FROM SubscriptionHistory h WHERE h.tenant.id = :tenantId ORDER BY h.createdAt DESC LIMIT 1")
     java.util.Optional<SubscriptionHistory> findCurrentByTenantId(@Param("tenantId") Long tenantId);
 }
