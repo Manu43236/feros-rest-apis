@@ -1,6 +1,7 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.request.ActivateSubscriptionRequest;
+import com.feros.api.dto.request.CorrectSubscriptionRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
 import com.feros.api.dto.request.UpgradeRequestRequest;
@@ -96,6 +97,15 @@ public class SubscriptionController {
             @PathVariable Long tenantId) {
         return ResponseEntity.ok(ApiResponse.success("Current subscription fetched",
                 subscriptionService.getCurrentSubscription(tenantId)));
+    }
+
+    @PatchMapping("/{tenantId}/correct")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<SubscriptionHistoryResponse>> correct(
+            @PathVariable Long tenantId,
+            @Valid @RequestBody CorrectSubscriptionRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Subscription corrected",
+                subscriptionService.correctSubscription(tenantId, request)));
     }
 
     // ─── Tenant self-service (ADMIN can view own subscription) ───────────────

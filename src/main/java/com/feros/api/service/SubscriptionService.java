@@ -1,6 +1,7 @@
 package com.feros.api.service;
 
 import com.feros.api.dto.request.ActivateSubscriptionRequest;
+import com.feros.api.dto.request.CorrectSubscriptionRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
 import com.feros.api.dto.request.UpgradeRequestRequest;
@@ -24,4 +25,5 @@ public interface SubscriptionService {
     UpgradeRequestResponse submitUpgradeRequest(Long tenantId, UpgradeRequestRequest request);
     List<UpgradeRequestResponse> getUpgradeRequests();
     void dismissUpgradeRequest(Long id);
+    SubscriptionHistoryResponse correctSubscription(Long tenantId, CorrectSubscriptionRequest request);
 }

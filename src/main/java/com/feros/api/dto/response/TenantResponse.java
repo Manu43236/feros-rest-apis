@@ -44,4 +44,13 @@ public class TenantResponse {
     private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // Subscription overview (populated for SA views)
+    private String currentPlanName;
+    private Integer currentVehicleCount;
+    private java.math.BigDecimal currentPricePerVehicle;
+    private String currentBillingCycle;
+    private Integer customUserLimit;
+    private Integer effectiveUserLimit;   // customUserLimit ?? vehicleCount × 5
+    private Long activeUserCount;
 }

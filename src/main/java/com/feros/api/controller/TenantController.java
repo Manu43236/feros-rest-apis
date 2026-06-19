@@ -209,6 +209,17 @@ public class TenantController {
         return ResponseEntity.ok(ApiResponse.success("Document deleted successfully", null));
     }
 
+    // ─── User Limit ────────────────────────────────────────────────────────────
+
+    @PatchMapping("/{id}/user-limit")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<TenantResponse>> updateUserLimit(
+            @PathVariable Long id,
+            @RequestParam Integer customUserLimit) {
+        return ResponseEntity.ok(ApiResponse.success("User limit updated",
+                tenantService.updateUserLimit(id, customUserLimit)));
+    }
+
     // ─── Impersonation ─────────────────────────────────────────────────────────
 
     @PostMapping("/{id}/impersonate")

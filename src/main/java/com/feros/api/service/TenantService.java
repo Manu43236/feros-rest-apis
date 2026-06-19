@@ -27,6 +27,9 @@ public interface TenantService {
     TenantSettingsResponse getSettings();
     TenantSettingsResponse updateSettings(TenantSettingsUpdateRequest request);
 
+    // Subscription overrides
+    TenantResponse updateUserLimit(Long tenantId, Integer customUserLimit);
+
     // S3 — Logo
     TenantResponse uploadLogo(Long tenantId, MultipartFile file);
     TenantResponse uploadMyLogo(MultipartFile file);

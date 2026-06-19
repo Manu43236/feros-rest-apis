@@ -2,6 +2,7 @@ package com.feros.api.service.impl;
 
 import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.ActivateSubscriptionRequest;
+import com.feros.api.dto.request.CorrectSubscriptionRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
 import com.feros.api.dto.request.UpgradeRequestRequest;
@@ -489,7 +490,65 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .build();
     }
 
-        // ─── Upgrade Requests ─────────────────────────────────────────────────────
+    // ─── Correct ──────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public SubscriptionHistoryResponse correctSubscription(Long tenantId, CorrectSubscriptionRequest request) {
+        Tenant tenant = getTenant(tenantId);
+
+        SubscriptionHistory current = historyRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId)
+                .stream()
+                .filter(h -> h.getStatus() == SubscriptionStatus.ACTIVE)
+                .findFirst()
+                .orElseThrow(() -> new FerosException("No active subscription to correct", HttpStatus.NOT_FOUND));
+
+        int vehicleCount = request.getVehicleCount() != null
+                ? request.getVehicleCount()
+                : (current.getVehicleCount() != null ? current.getVehicleCount() : 1);
+
+        BigDecimal pricePerVehicle = current.getPricePerVehicle() != null
+                ? current.getPricePerVehicle() : BigDecimal.ZERO;
+
+        BigDecimal baseAmount;
+        if (request.getAmount() != null) {
+            baseAmount = request.getAmount();
+        } else if (request.getVehicleCount() != null
+                && !request.getVehicleCount().equals(current.getVehicleCount())) {
+            int planMin = current.getPlan() != null && current.getPlan().getMinVehicles() != null
+                    ? current.getPlan().getMinVehicles() : 0;
+            baseAmount = calculateBaseAmount(null, pricePerVehicle, vehicleCount, current.getBillingCycle(), planMin);
+        } else {
+            baseAmount = current.getAmount() != null ? current.getAmount() : BigDecimal.ZERO;
+        }
+        BigDecimal gstAmount   = baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalAmount = baseAmount.add(gstAmount);
+
+        String paymentRef = request.getPaymentRef() != null ? request.getPaymentRef() : current.getPaymentRef();
+
+        SubscriptionHistory correction = SubscriptionHistory.builder()
+                .tenant(tenant)
+                .plan(current.getPlan())
+                .status(SubscriptionStatus.ACTIVE)
+                .billingCycle(current.getBillingCycle())
+                .vehicleCount(vehicleCount)
+                .pricePerVehicle(pricePerVehicle)
+                .startDate(current.getStartDate())
+                .endDate(current.getEndDate())
+                .amount(baseAmount)
+                .gstAmount(gstAmount)
+                .totalAmount(totalAmount)
+                .paymentRef(paymentRef)
+                .notes("[CORRECTION] " + request.getNotes())
+                .createdBy(SecurityUtil.getCurrentUserId())
+                .build();
+        correction = historyRepository.save(correction);
+
+        String planName = current.getPlan() != null ? current.getPlan().getName() : "-";
+        return toHistoryResponse(correction, tenant, planName);
+    }
+
+    // ─── Upgrade Requests ─────────────────────────────────────────────────────
 
     @Override
     @Transactional

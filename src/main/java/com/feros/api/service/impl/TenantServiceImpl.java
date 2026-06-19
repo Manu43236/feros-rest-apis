@@ -57,6 +57,7 @@ public class TenantServiceImpl implements TenantService {
     private final TenantSettingsRepository tenantSettingsRepository;
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final UserRepository userRepository;
     private final S3Service s3Service;
     private final JwtUtil jwtUtil;
 
@@ -546,6 +547,26 @@ public class TenantServiceImpl implements TenantService {
 
     // ===================== MAPPER =====================
     private TenantResponse mapToResponse(Tenant tenant) {
+        // Current subscription info
+        SubscriptionHistory current = subscriptionHistoryRepository
+                .findCurrentByTenantId(tenant.getId()).orElse(null);
+        String currentPlanName           = current != null && current.getPlan() != null ? current.getPlan().getName() : null;
+        Integer currentVehicleCount      = current != null ? current.getVehicleCount() : null;
+        java.math.BigDecimal currentPpv  = current != null ? current.getPricePerVehicle() : null;
+        String currentBillingCycle       = current != null && current.getBillingCycle() != null
+                                           ? current.getBillingCycle().name() : null;
+
+        Integer effectiveUserLimit;
+        if (tenant.getCustomUserLimit() != null) {
+            effectiveUserLimit = tenant.getCustomUserLimit();
+        } else if (currentVehicleCount != null && currentVehicleCount > 0) {
+            effectiveUserLimit = currentVehicleCount * 5;
+        } else {
+            effectiveUserLimit = null;
+        }
+
+        long activeUserCount = userRepository.countByTenantIdAndIsActiveTrue(tenant.getId());
+
         return TenantResponse.builder()
                 .id(tenant.getId())
                 .companyName(tenant.getCompanyName())
@@ -579,7 +600,23 @@ public class TenantServiceImpl implements TenantService {
                 .isActive(tenant.getIsActive())
                 .createdAt(tenant.getCreatedAt())
                 .updatedAt(tenant.getUpdatedAt())
+                .currentPlanName(currentPlanName)
+                .currentVehicleCount(currentVehicleCount)
+                .currentPricePerVehicle(currentPpv)
+                .currentBillingCycle(currentBillingCycle)
+                .customUserLimit(tenant.getCustomUserLimit())
+                .effectiveUserLimit(effectiveUserLimit)
+                .activeUserCount(activeUserCount)
                 .build();
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public TenantResponse updateUserLimit(Long tenantId, Integer customUserLimit) {
+        Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(tenantId)
+                .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+        tenant.setCustomUserLimit(customUserLimit);
+        return mapToResponse(tenantRepository.save(tenant));
     }
 
     private void createTrialHistory(Tenant tenant) {

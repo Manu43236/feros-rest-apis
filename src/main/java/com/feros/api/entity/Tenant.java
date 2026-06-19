@@ -114,6 +114,10 @@ public class Tenant extends BaseEntity {
     @Column(name = "subscription_end_date")
     private LocalDate subscriptionEndDate;
 
+    // User limit override (null = default: vehicleCount × 5)
+    @Column(name = "custom_user_limit")
+    private Integer customUserLimit;
+
     // System
     @Column(name = "is_active")
     private Boolean isActive = true;
