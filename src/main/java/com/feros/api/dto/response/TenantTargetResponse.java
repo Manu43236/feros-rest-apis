@@ -15,8 +15,15 @@ public class TenantTargetResponse {
     private BigDecimal targetTons;
 
     // Actuals
-    private Integer actualTrips;
-    private BigDecimal actualTons;
+    private Integer completedTrips;
+    private Integer pendingTrips;
+    private Integer localTrips;
+    private Integer nonLocalTrips;
+
+    private BigDecimal completedTons;
+    private BigDecimal pendingTons;
+    private BigDecimal localTons;
+    private BigDecimal nonLocalTons;
 
     // Progress percentages
     private Double tripsProgressPct;

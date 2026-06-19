@@ -18,7 +18,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -66,28 +65,80 @@ public class TenantTargetServiceImpl implements TenantTargetService {
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public TenantTargetResponse getCurrentMonthTarget() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDate today = LocalDate.now();
+        int year  = today.getYear();
+        int month = today.getMonthValue();
+
+        // Try current month; if not set, carry forward from previous month
+        TenantTarget target = targetRepository
+                .findByTenantIdAndYearAndMonth(tenantId, year, month)
+                .orElseGet(() -> {
+                    LocalDate prev = today.minusMonths(1);
+                    return targetRepository
+                            .findByTenantIdAndYearAndMonth(tenantId, prev.getYear(), prev.getMonthValue())
+                            .map(t -> TenantTarget.builder()
+                                    .year(year).month(month)
+                                    .targetTrips(t.getTargetTrips())
+                                    .targetTons(t.getTargetTons())
+                                    .build())
+                            .orElse(TenantTarget.builder().year(year).month(month).build());
+                });
+
+        return buildResponse(target, tenantId);
+    }
+
     private TenantTargetResponse buildResponse(TenantTarget target, Long tenantId) {
-        // Calculate actuals from LRs for the target period
-        Integer year = target.getYear();
+        Integer year  = target.getYear();
         Integer month = target.getMonth();
 
-        int actualTrips = 0;
-        BigDecimal actualTons = BigDecimal.ZERO;
+        int completedTrips = 0, localTrips = 0, nonLocalTrips = 0;
+        BigDecimal completedTons = BigDecimal.ZERO;
+        BigDecimal localTons     = BigDecimal.ZERO;
+        BigDecimal nonLocalTons  = BigDecimal.ZERO;
 
         if (year != null && month != null) {
             LocalDate from = LocalDate.of(year, month, 1);
-            LocalDate to = from.withDayOfMonth(from.lengthOfMonth());
-            List<Lr> lrs = lrRepository.findByTenantIdAndDateRange(tenantId, from, to);
-            actualTrips = lrs.size();
-            actualTons = lrs.stream()
-                    .map(Lr::getLoadedWeight)
-                    .filter(Objects::nonNull)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            LocalDate to   = from.withDayOfMonth(from.lengthOfMonth());
+
+            List<Lr> deliveredLrs = lrRepository.findByTenantIdAndLrStatusAndDateRange(
+                    tenantId, com.feros.api.enums.LrStatus.DELIVERED, from, to);
+
+            for (Lr lr : deliveredLrs) {
+                completedTrips++;
+                BigDecimal weight = lr.getLoadedWeight() != null ? lr.getLoadedWeight()
+                        : (lr.getAllocatedWeight() != null ? lr.getAllocatedWeight() : BigDecimal.ZERO);
+                completedTons = completedTons.add(weight);
+
+                boolean isLocal = lr.getOrder().getSourceState() != null
+                        && lr.getOrder().getDestinationState() != null
+                        && lr.getOrder().getSourceState().getId()
+                               .equals(lr.getOrder().getDestinationState().getId());
+                if (isLocal) {
+                    localTrips++;
+                    localTons = localTons.add(weight);
+                } else {
+                    nonLocalTrips++;
+                    nonLocalTons = nonLocalTons.add(weight);
+                }
+            }
+        }
+
+        int pendingTrips = 0;
+        BigDecimal pendingTons = BigDecimal.ZERO;
+        if (target.getTargetTrips() != null) {
+            pendingTrips = Math.max(0, target.getTargetTrips() - completedTrips);
+        }
+        if (target.getTargetTons() != null) {
+            pendingTons = target.getTargetTons().subtract(completedTons).max(BigDecimal.ZERO);
         }
 
         Double tripsProgressPct = null;
         if (target.getTargetTrips() != null && target.getTargetTrips() > 0) {
-            tripsProgressPct = BigDecimal.valueOf(actualTrips)
+            tripsProgressPct = BigDecimal.valueOf(completedTrips)
                     .divide(BigDecimal.valueOf(target.getTargetTrips()), 4, RoundingMode.HALF_UP)
                     .multiply(BigDecimal.valueOf(100))
                     .setScale(1, RoundingMode.HALF_UP)
@@ -96,7 +147,7 @@ public class TenantTargetServiceImpl implements TenantTargetService {
 
         Double tonsProgressPct = null;
         if (target.getTargetTons() != null && target.getTargetTons().compareTo(BigDecimal.ZERO) > 0) {
-            tonsProgressPct = actualTons
+            tonsProgressPct = completedTons
                     .divide(target.getTargetTons(), 4, RoundingMode.HALF_UP)
                     .multiply(BigDecimal.valueOf(100))
                     .setScale(1, RoundingMode.HALF_UP)
@@ -109,8 +160,14 @@ public class TenantTargetServiceImpl implements TenantTargetService {
                 .month(month)
                 .targetTrips(target.getTargetTrips())
                 .targetTons(target.getTargetTons())
-                .actualTrips(actualTrips)
-                .actualTons(actualTons)
+                .completedTrips(completedTrips)
+                .pendingTrips(pendingTrips)
+                .localTrips(localTrips)
+                .nonLocalTrips(nonLocalTrips)
+                .completedTons(completedTons)
+                .pendingTons(pendingTons)
+                .localTons(localTons)
+                .nonLocalTons(nonLocalTons)
                 .tripsProgressPct(tripsProgressPct)
                 .tonsProgressPct(tonsProgressPct)
                 .build();

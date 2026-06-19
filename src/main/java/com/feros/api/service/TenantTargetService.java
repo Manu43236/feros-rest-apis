@@ -8,5 +8,6 @@ import java.util.List;
 public interface TenantTargetService {
     TenantTargetResponse setTarget(TenantTargetRequest request);
     TenantTargetResponse getTarget(Integer year, Integer month);
+    TenantTargetResponse getCurrentMonthTarget();
     List<TenantTargetResponse> getAllTargets();
 }
