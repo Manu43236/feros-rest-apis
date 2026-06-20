@@ -12,6 +12,7 @@ public class SubscriptionHistoryResponse {
     private Long id;
     private Long tenantId;
     private String companyName;
+    private Long planId;
     private String planName;
     private Integer vehicleCount;
     private BigDecimal pricePerVehicle;

@@ -461,6 +461,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .id(h.getId())
                 .tenantId(tenant.getId())
                 .companyName(tenant.getCompanyName())
+                .planId(plan != null ? plan.getId() : null)
                 .planName(planName)
                 .vehicleCount(h.getVehicleCount())
                 .pricePerVehicle(h.getPricePerVehicle())
