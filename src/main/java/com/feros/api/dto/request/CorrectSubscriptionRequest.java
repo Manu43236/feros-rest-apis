@@ -7,19 +7,28 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Getter
 @Setter
 @NoArgsConstructor
 public class CorrectSubscriptionRequest {
 
+    private Long planId;                // optional — link to a plan (null = custom)
+
     @Min(1)
-    private Integer vehicleCount;   // optional — if null, keeps existing
+    private Integer vehicleCount;       // optional — if null, keeps existing
 
-    private String paymentRef;      // optional
+    private BigDecimal pricePerVehicle; // optional — override price per vehicle
 
-    private BigDecimal amount;      // optional override — recalculates if null
+    private String billingCycle;        // optional — BillingCycle name (MONTHLY, etc.)
+
+    private LocalDate endDate;          // optional — new expiry date
+
+    private String paymentRef;          // optional
+
+    private BigDecimal amount;          // optional override — recalculates if null
 
     @NotBlank
-    private String notes;           // required — reason for correction
+    private String notes;               // required — reason for correction
 }
