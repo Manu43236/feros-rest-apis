@@ -17,6 +17,7 @@ public class VehiclePnlRow {
     private BigDecimal tripExpenses;
     private BigDecimal fuelCost;
     private BigDecimal maintenanceCost;
+    private BigDecimal tyreCost;
     private BigDecimal documentCost;
     private BigDecimal totalExpenses;
     private BigDecimal netPnl;

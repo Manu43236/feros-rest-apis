@@ -1253,7 +1253,11 @@ public class ReportServiceImpl implements ReportService {
                 .stream().map(d -> d.getCost() != null ? d.getCost() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal totalExpenses = tripExpenses.add(fuelExpenses).add(maintenanceExpenses).add(documentExpenses);
+        BigDecimal tyreExpenses = tyreRepository.findByTenantIdAndPurchaseDateBetweenAndIsActiveTrue(tenantId, startDate, endDate)
+                .stream().map(t -> t.getPurchaseCost() != null ? t.getPurchaseCost() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalExpenses = tripExpenses.add(fuelExpenses).add(maintenanceExpenses).add(tyreExpenses).add(documentExpenses);
 
         return PnlSummaryRow.builder()
                 .totalInvoiced(totalInvoiced)
@@ -1262,6 +1266,7 @@ public class ReportServiceImpl implements ReportService {
                 .tripExpenses(tripExpenses)
                 .fuelExpenses(fuelExpenses)
                 .maintenanceExpenses(maintenanceExpenses)
+                .tyreExpenses(tyreExpenses)
                 .documentExpenses(documentExpenses)
                 .totalExpenses(totalExpenses)
                 .grossPnl(totalInvoiced.subtract(tripExpenses))
@@ -1367,6 +1372,24 @@ public class ReportServiceImpl implements ReportService {
                 .collect(Collectors.groupingBy(d -> d.getVehicle().getId(),
                         Collectors.reducing(BigDecimal.ZERO, d -> d.getCost() != null ? d.getCost() : BigDecimal.ZERO, BigDecimal::add)));
 
+        List<com.feros.api.entity.Tyre> pnlTyres = tyreRepository.findByTenantIdAndPurchaseDateBetweenAndIsActiveTrue(tenantId, startDate, endDate);
+        Map<Long, BigDecimal> tyreCostByVehicle = new java.util.HashMap<>();
+        if (!pnlTyres.isEmpty()) {
+            List<Long> pnlTyreIds = pnlTyres.stream().map(com.feros.api.entity.Tyre::getId).toList();
+            List<VehicleTyreFitting> pnlFittings = vehicleTyreFittingRepository
+                    .findByTyreIdInAndIsActiveTrueOrderByFittedDateAscIdAsc(pnlTyreIds);
+            Map<Long, VehicleTyreFitting> firstFittingByTyreId = new LinkedHashMap<>();
+            for (VehicleTyreFitting f : pnlFittings) firstFittingByTyreId.putIfAbsent(f.getTyre().getId(), f);
+            for (com.feros.api.entity.Tyre t : pnlTyres) {
+                VehicleTyreFitting fitting = firstFittingByTyreId.get(t.getId());
+                if (fitting != null) {
+                    Long vid = fitting.getVehicle().getId();
+                    BigDecimal cost = t.getPurchaseCost() != null ? t.getPurchaseCost() : BigDecimal.ZERO;
+                    tyreCostByVehicle.merge(vid, cost, BigDecimal::add);
+                }
+            }
+        }
+
         return byVehicle.entrySet().stream().map(entry -> {
             Long vehicleId = entry.getKey();
             List<InvoiceLr> vLrs = entry.getValue();
@@ -1377,8 +1400,9 @@ public class ReportServiceImpl implements ReportService {
             BigDecimal tripExp = tripExpByVehicle.getOrDefault(vehicleId, BigDecimal.ZERO);
             BigDecimal fuel = fuelByVehicle.getOrDefault(vehicleId, BigDecimal.ZERO);
             BigDecimal maint = maintByVehicle.getOrDefault(vehicleId, BigDecimal.ZERO);
+            BigDecimal tyre = tyreCostByVehicle.getOrDefault(vehicleId, BigDecimal.ZERO);
             BigDecimal doc = docByVehicle.getOrDefault(vehicleId, BigDecimal.ZERO);
-            BigDecimal totalExp = tripExp.add(fuel).add(maint).add(doc);
+            BigDecimal totalExp = tripExp.add(fuel).add(maint).add(tyre).add(doc);
             return VehiclePnlRow.builder()
                     .vehicleId(vehicleId)
                     .registrationNumber(vehicle.getRegistrationNumber())
@@ -1387,6 +1411,7 @@ public class ReportServiceImpl implements ReportService {
                     .tripExpenses(tripExp)
                     .fuelCost(fuel)
                     .maintenanceCost(maint)
+                    .tyreCost(tyre)
                     .documentCost(doc)
                     .totalExpenses(totalExp)
                     .netPnl(revenue.subtract(totalExp))

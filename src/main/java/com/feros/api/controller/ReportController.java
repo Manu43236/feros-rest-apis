@@ -965,6 +965,7 @@ public class ReportController {
                 new String[]{"Trip Expenses", safe(r.getTripExpenses())},
                 new String[]{"Fuel Expenses", safe(r.getFuelExpenses())},
                 new String[]{"Maintenance Expenses", safe(r.getMaintenanceExpenses())},
+                new String[]{"Tyre Expenses", safe(r.getTyreExpenses())},
                 new String[]{"Document Expenses", safe(r.getDocumentExpenses())},
                 new String[]{"Total Expenses", safe(r.getTotalExpenses())},
                 new String[]{"Gross P&L", safe(r.getGrossPnl())},
@@ -1015,11 +1016,11 @@ public class ReportController {
             @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
             @RequestParam(defaultValue = "csv") String format) {
         List<VehiclePnlRow> rows = reportService.getVehiclePnl(startDate, endDate);
-        String[] headers = {"Vehicle", "Type", "Revenue (₹)", "Trip Exp (₹)", "Fuel (₹)", "Maintenance (₹)", "Documents (₹)", "Total Exp (₹)", "Net P&L (₹)"};
+        String[] headers = {"Vehicle", "Type", "Revenue (₹)", "Trip Exp (₹)", "Fuel (₹)", "Maintenance (₹)", "Tyres (₹)", "Documents (₹)", "Total Exp (₹)", "Net P&L (₹)"};
         List<String[]> data = rows.stream().map(r -> new String[]{
                 r.getRegistrationNumber(), r.getVehicleType(), safe(r.getRevenue()),
                 safe(r.getTripExpenses()), safe(r.getFuelCost()), safe(r.getMaintenanceCost()),
-                safe(r.getDocumentCost()), safe(r.getTotalExpenses()), safe(r.getNetPnl())
+                safe(r.getTyreCost()), safe(r.getDocumentCost()), safe(r.getTotalExpenses()), safe(r.getNetPnl())
         }).toList();
         return export("vehicle-pnl-" + startDate + "-" + endDate,
                 "P&L Per Vehicle — " + startDate + " to " + endDate, headers, data, format);
