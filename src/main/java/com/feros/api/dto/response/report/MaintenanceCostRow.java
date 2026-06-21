@@ -12,5 +12,7 @@ public class MaintenanceCostRow {
     private String registrationNumber;
     private String vehicleType;
     private int totalServices;
+    private BigDecimal serviceCost;
+    private BigDecimal sparePartsCost;
     private BigDecimal totalCost;
 }

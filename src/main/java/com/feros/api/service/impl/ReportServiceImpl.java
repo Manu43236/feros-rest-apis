@@ -971,20 +971,49 @@ public class ReportServiceImpl implements ReportService {
         List<VehicleService> services = vehicleServiceRepository
                 .findForMaintenanceCostReport(tenantId, startDate, endDate);
 
+        // Fetch all service parts and their transactions in bulk (avoids N+1)
+        List<Long> serviceIds = services.stream().map(VehicleService::getId).toList();
+        List<ServicePart> allParts = servicePartRepository.findByServiceIdIn(serviceIds);
+
+        List<Long> partIds = allParts.stream().map(ServicePart::getId).toList();
+        Map<Long, BigDecimal> txCostByPartId = partIds.isEmpty()
+                ? Map.of()
+                : sparePartsTransactionRepository.findByServicePart_IdIn(partIds).stream()
+                        .filter(tx -> tx.getTotalCost() != null)
+                        .collect(Collectors.toMap(
+                                tx -> tx.getServicePart().getId(),
+                                SparePartsTransaction::getTotalCost,
+                                BigDecimal::add));
+
+        // parts cost per service: sum transaction costs for each part linked to the service
+        Map<Long, BigDecimal> partsCostByServiceId = allParts.stream()
+                .collect(Collectors.toMap(
+                        sp -> sp.getService().getId(),
+                        sp -> txCostByPartId.getOrDefault(sp.getId(), BigDecimal.ZERO),
+                        BigDecimal::add));
+
         Map<Long, List<VehicleService>> byVehicle = services.stream()
                 .collect(Collectors.groupingBy(s -> s.getVehicle().getId()));
 
         return byVehicle.entrySet().stream().map(entry -> {
             List<VehicleService> vServices = entry.getValue();
             Vehicle vehicle = vServices.get(0).getVehicle();
-            BigDecimal totalCost = vServices.stream().map(VehicleService::getTotalCost).filter(Objects::nonNull)
+
+            BigDecimal serviceCost = vServices.stream().map(VehicleService::getTotalCost).filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal sparePartsCost = vServices.stream()
+                    .map(vs -> partsCostByServiceId.getOrDefault(vs.getId(), BigDecimal.ZERO))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
             return MaintenanceCostRow.builder()
                     .vehicleId(vehicle.getId())
                     .registrationNumber(vehicle.getRegistrationNumber())
                     .vehicleType(vehicle.getVehicleType() != null ? vehicle.getVehicleType().getName() : "—")
                     .totalServices(vServices.size())
-                    .totalCost(totalCost)
+                    .serviceCost(serviceCost)
+                    .sparePartsCost(sparePartsCost)
+                    .totalCost(serviceCost.add(sparePartsCost))
                     .build();
         }).sorted(Comparator.comparing(MaintenanceCostRow::getRegistrationNumber)).toList();
     }

@@ -798,10 +798,11 @@ public class ReportController {
             @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
             @RequestParam(defaultValue = "csv") String format) {
         List<MaintenanceCostRow> rows = reportService.getMaintenanceCostSummary(startDate, endDate);
-        String[] headers = {"Vehicle", "Type", "Total Services", "Total Cost"};
+        String[] headers = {"Vehicle", "Type", "Total Services", "Service Cost (₹)", "Parts Cost (₹)", "Total Cost (₹)"};
         List<String[]> data = rows.stream().map(r -> new String[]{
                 r.getRegistrationNumber(), r.getVehicleType(),
-                String.valueOf(r.getTotalServices()), safe(r.getTotalCost())
+                String.valueOf(r.getTotalServices()),
+                safe(r.getServiceCost()), safe(r.getSparePartsCost()), safe(r.getTotalCost())
         }).toList();
         return export("maintenance-cost-" + startDate + "-" + endDate,
                 "Maintenance Cost Summary — " + startDate + " to " + endDate, headers, data, format);
