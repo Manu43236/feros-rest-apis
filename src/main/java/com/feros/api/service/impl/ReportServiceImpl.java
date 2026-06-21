@@ -1328,10 +1328,26 @@ public class ReportServiceImpl implements ReportService {
                 .collect(Collectors.groupingBy(l -> l.getVehicle().getId(),
                         Collectors.reducing(BigDecimal.ZERO, l -> l.getTotalCost() != null ? l.getTotalCost() : BigDecimal.ZERO, BigDecimal::add)));
 
-        Map<Long, BigDecimal> maintByVehicle = vehicleServiceRepository
-                .findByTenantIdAndServiceDateBetweenAndIsActiveTrue(tenantId, startDate, endDate).stream()
+        List<VehicleService> maintServices = vehicleServiceRepository.findForMaintenanceCostReport(tenantId, startDate, endDate);
+        List<Long> maintServiceIds = maintServices.stream().map(VehicleService::getId).toList();
+        List<ServicePart> maintParts = servicePartRepository.findByServiceIdIn(maintServiceIds);
+        List<Long> maintPartIds = maintParts.stream().map(ServicePart::getId).toList();
+        Map<Long, BigDecimal> maintTxCostByPartId = maintPartIds.isEmpty()
+                ? Map.of()
+                : sparePartsTransactionRepository.findByServicePart_IdIn(maintPartIds).stream()
+                        .filter(tx -> tx.getTotalCost() != null)
+                        .collect(Collectors.toMap(tx -> tx.getServicePart().getId(),
+                                SparePartsTransaction::getTotalCost, BigDecimal::add));
+        Map<Long, BigDecimal> maintPartsCostByServiceId = maintParts.stream()
+                .collect(Collectors.toMap(sp -> sp.getService().getId(),
+                        sp -> maintTxCostByPartId.getOrDefault(sp.getId(), BigDecimal.ZERO), BigDecimal::add));
+        Map<Long, BigDecimal> maintByVehicle = maintServices.stream()
                 .collect(Collectors.groupingBy(s -> s.getVehicle().getId(),
-                        Collectors.reducing(BigDecimal.ZERO, s -> s.getTotalCost() != null ? s.getTotalCost() : BigDecimal.ZERO, BigDecimal::add)));
+                        Collectors.reducing(BigDecimal.ZERO, s -> {
+                            BigDecimal labor = s.getTotalCost() != null ? s.getTotalCost() : BigDecimal.ZERO;
+                            BigDecimal parts = maintPartsCostByServiceId.getOrDefault(s.getId(), BigDecimal.ZERO);
+                            return labor.add(parts);
+                        }, BigDecimal::add)));
 
         Map<Long, BigDecimal> docByVehicle = documentRepository.findByTenantIdAndPaidOnBetween(tenantId, startDate, endDate).stream()
                 .collect(Collectors.groupingBy(d -> d.getVehicle().getId(),
