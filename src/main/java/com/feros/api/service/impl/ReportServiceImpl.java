@@ -60,6 +60,7 @@ public class ReportServiceImpl implements ReportService {
     private final PayrollDeductionRepository payrollDeductionRepository;
     private final SalaryAdvanceRepository salaryAdvanceRepository;
     private final StaffProfileRepository staffProfileRepository;
+    private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final VehicleServiceTaskRepository vehicleServiceTaskRepository;
 
     // ── 0. Vehicle Master ──────────────────────────────────────────────────────
@@ -1208,94 +1209,136 @@ public class ReportServiceImpl implements ReportService {
     @Transactional(readOnly = true)
     public List<VehicleSalaryDayRow> getVehicleSalaryExpense(Long vehicleId, int year, int month) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+        vehicleRepository.findById(vehicleId)
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
 
         java.time.YearMonth ym = java.time.YearMonth.of(year, month);
         int daysInMonth = ym.lengthOfMonth();
         LocalDate firstDay = ym.atDay(1);
         LocalDate lastDay = ym.atEndOfMonth();
-        java.math.BigDecimal divisor = new java.math.BigDecimal(daysInMonth);
 
-        // Driver info
-        com.feros.api.entity.User driver = vehicle.getCurrentDriver();
-        String driverName = null;
-        String driverRole = null;
-        java.math.BigDecimal driverDailyRate = java.math.BigDecimal.ZERO;
-        if (driver != null) {
-            driverName = driver.getName();
-            Optional<StaffProfile> dp = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(driver.getId(), tenantId);
-            if (dp.isPresent()) {
-                driverRole = dp.get().getDesignation() != null ? dp.get().getDesignation().getName() : "Driver";
-                java.math.BigDecimal sal = dp.get().getMonthlySalary() != null ? dp.get().getMonthlySalary() : java.math.BigDecimal.ZERO;
-                driverDailyRate = sal.divide(divisor, 2, java.math.RoundingMode.HALF_UP);
+        // Get all staff assigned to this vehicle in the month via VehicleStaffAssignment
+        List<VehicleStaffAssignment> assignments = vehicleStaffAssignmentRepository
+                .findByVehicleIdAndPeriod(vehicleId, tenantId, firstDay, lastDay);
+
+        if (assignments.isEmpty()) return buildEmptyRows(ym, daysInMonth);
+
+        // Build per-user profile info (daily rate + role name)
+        java.util.Map<Long, String> nameByUser = new java.util.HashMap<>();
+        java.util.Map<Long, String> roleByUser = new java.util.HashMap<>();
+        java.util.Map<Long, java.math.BigDecimal> dailyRateByUser = new java.util.HashMap<>();
+
+        java.util.Set<Long> userIds = assignments.stream().map(a -> a.getUser().getId()).collect(java.util.stream.Collectors.toSet());
+        for (Long uid : userIds) {
+            Optional<StaffProfile> profileOpt = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(uid, tenantId);
+            if (profileOpt.isEmpty()) continue;
+            StaffProfile profile = profileOpt.get();
+            String uName = assignments.stream().filter(a -> a.getUser().getId().equals(uid))
+                    .findFirst().map(a -> a.getUser().getName()).orElse("—");
+            nameByUser.put(uid, uName);
+            roleByUser.put(uid, profile.getDesignation() != null ? profile.getDesignation().getName() : "Staff");
+
+            com.feros.api.enums.SalaryType st = profile.getSalaryType() != null
+                    ? profile.getSalaryType() : com.feros.api.enums.SalaryType.DAILY;
+            java.math.BigDecimal rate;
+            if (st == com.feros.api.enums.SalaryType.MONTHLY) {
+                java.math.BigDecimal sal = profile.getMonthlySalary() != null ? profile.getMonthlySalary() : java.math.BigDecimal.ZERO;
+                rate = sal.divide(new java.math.BigDecimal(daysInMonth), 2, java.math.RoundingMode.HALF_UP);
+            } else {
+                rate = (profile.getDesignation() != null && profile.getDesignation().getPayPerDay() != null)
+                        ? profile.getDesignation().getPayPerDay() : java.math.BigDecimal.ZERO;
             }
+            dailyRateByUser.put(uid, rate);
         }
 
-        // Cleaner info
-        com.feros.api.entity.User cleaner = vehicle.getCurrentCleaner();
-        String cleanerName = null;
-        String cleanerRole = null;
-        java.math.BigDecimal cleanerDailyRate = java.math.BigDecimal.ZERO;
-        if (cleaner != null) {
-            cleanerName = cleaner.getName();
-            Optional<StaffProfile> cp = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(cleaner.getId(), tenantId);
-            if (cp.isPresent()) {
-                cleanerRole = cp.get().getDesignation() != null ? cp.get().getDesignation().getName() : "Cleaner";
-                java.math.BigDecimal sal = cp.get().getMonthlySalary() != null ? cp.get().getMonthlySalary() : java.math.BigDecimal.ZERO;
-                cleanerDailyRate = sal.divide(divisor, 2, java.math.RoundingMode.HALF_UP);
-            }
+        // Determine driver vs cleaner user IDs from role name (DRIVER / CLEANER)
+        // We classify by designation name; fallback: first two distinct users = driver then cleaner
+        Long driverUserId = null, cleanerUserId = null;
+        for (VehicleStaffAssignment a : assignments) {
+            Long uid = a.getUser().getId();
+            String role = roleByUser.getOrDefault(uid, "").toLowerCase();
+            if (driverUserId == null && (role.contains("driver") || role.contains("drv"))) driverUserId = uid;
+            else if (cleanerUserId == null && (role.contains("cleaner") || role.contains("helper"))) cleanerUserId = uid;
+        }
+        // fallback if designation names don't match keywords
+        if (driverUserId == null && !userIds.isEmpty()) driverUserId = userIds.iterator().next();
+        if (cleanerUserId == null && userIds.size() > 1) {
+            for (Long uid : userIds) { if (!uid.equals(driverUserId)) { cleanerUserId = uid; break; } }
         }
 
-        // Extra pay per staff per day (if enabled on vehicle)
-        java.math.BigDecimal extraPerDay = (vehicle.getExtraPayEnabled() != null && vehicle.getExtraPayEnabled()
-                && vehicle.getExtraPayPerDay() != null)
-                ? vehicle.getExtraPayPerDay() : java.math.BigDecimal.ZERO;
-
-        // Attendance maps
+        // Attendance sets per user
+        final Long finalDriverId = driverUserId;
+        final Long finalCleanerId = cleanerUserId;
         java.util.Set<LocalDate> driverPresent = new java.util.HashSet<>();
         java.util.Set<LocalDate> cleanerPresent = new java.util.HashSet<>();
-        if (driver != null) {
+        if (finalDriverId != null) {
             attendanceRepository.findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrue(
-                    driver.getId(), tenantId, firstDay, lastDay)
+                    finalDriverId, tenantId, firstDay, lastDay)
+                    .stream().filter(a -> a.getAttendanceType().getName().toLowerCase().contains("present"))
                     .forEach(a -> driverPresent.add(a.getAttendanceDate()));
         }
-        if (cleaner != null) {
+        if (finalCleanerId != null) {
             attendanceRepository.findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrue(
-                    cleaner.getId(), tenantId, firstDay, lastDay)
+                    finalCleanerId, tenantId, firstDay, lastDay)
+                    .stream().filter(a -> a.getAttendanceType().getName().toLowerCase().contains("present"))
                     .forEach(a -> cleanerPresent.add(a.getAttendanceDate()));
         }
 
-        // Build day rows
+        // Extra pay (vehicle-level, per assigned staff per day present)
+        java.math.BigDecimal extraPerDay = java.math.BigDecimal.ZERO;
+        if (!assignments.isEmpty()) {
+            Vehicle v = assignments.get(0).getVehicle();
+            if (Boolean.TRUE.equals(v.getExtraPayEnabled()) && v.getExtraPayPerDay() != null)
+                extraPerDay = v.getExtraPayPerDay();
+        }
+
+        java.math.BigDecimal driverRate  = finalDriverId  != null ? dailyRateByUser.getOrDefault(finalDriverId,  java.math.BigDecimal.ZERO) : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal cleanerRate = finalCleanerId != null ? dailyRateByUser.getOrDefault(finalCleanerId, java.math.BigDecimal.ZERO) : java.math.BigDecimal.ZERO;
+        String driverName  = finalDriverId  != null ? nameByUser.getOrDefault(finalDriverId,  "—") : null;
+        String cleanerName = finalCleanerId != null ? nameByUser.getOrDefault(finalCleanerId, "—") : null;
+        String driverRole  = finalDriverId  != null ? roleByUser.getOrDefault(finalDriverId,  "Driver") : null;
+        String cleanerRole = finalCleanerId != null ? roleByUser.getOrDefault(finalCleanerId, "Cleaner") : null;
+
+        // Build day rows — check assignment covers that date before counting presence
         List<VehicleSalaryDayRow> rows = new ArrayList<>();
         for (int d = 1; d <= daysInMonth; d++) {
             LocalDate date = ym.atDay(d);
-            boolean dp = driver != null && driverPresent.contains(date);
-            boolean cp = cleaner != null && cleanerPresent.contains(date);
 
-            java.math.BigDecimal dTotal = dp ? driverDailyRate.add(extraPerDay) : null;
-            java.math.BigDecimal cTotal = cp ? cleanerDailyRate.add(extraPerDay) : null;
+            boolean driverAssigned = finalDriverId != null && assignments.stream()
+                    .anyMatch(a -> a.getUser().getId().equals(finalDriverId)
+                            && !date.isBefore(a.getAssignedFrom())
+                            && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo())));
+            boolean cleanerAssigned = finalCleanerId != null && assignments.stream()
+                    .anyMatch(a -> a.getUser().getId().equals(finalCleanerId)
+                            && !date.isBefore(a.getAssignedFrom())
+                            && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo())));
+
+            boolean dp = driverAssigned && driverPresent.contains(date);
+            boolean cp = cleanerAssigned && cleanerPresent.contains(date);
+
+            java.math.BigDecimal dTotal = dp ? driverRate.add(extraPerDay) : null;
+            java.math.BigDecimal cTotal = cp ? cleanerRate.add(extraPerDay) : null;
             java.math.BigDecimal dayTotal = (dp || cp)
                     ? (dTotal != null ? dTotal : java.math.BigDecimal.ZERO)
                             .add(cTotal != null ? cTotal : java.math.BigDecimal.ZERO)
                     : null;
 
             rows.add(VehicleSalaryDayRow.builder()
-                    .day(d)
-                    .date(date)
-                    .driverName(dp ? driverName : null)
-                    .driverRole(dp ? driverRole : null)
-                    .driverDailyRate(dp ? driverDailyRate : null)
-                    .driverExtraPay(dp ? extraPerDay : null)
-                    .driverTotal(dTotal)
-                    .cleanerName(cp ? cleanerName : null)
-                    .cleanerRole(cp ? cleanerRole : null)
-                    .cleanerDailyRate(cp ? cleanerDailyRate : null)
-                    .cleanerExtraPay(cp ? extraPerDay : null)
-                    .cleanerTotal(cTotal)
+                    .day(d).date(date)
+                    .driverName(dp ? driverName : null).driverRole(dp ? driverRole : null)
+                    .driverDailyRate(dp ? driverRate : null).driverExtraPay(dp ? extraPerDay : null).driverTotal(dTotal)
+                    .cleanerName(cp ? cleanerName : null).cleanerRole(cp ? cleanerRole : null)
+                    .cleanerDailyRate(cp ? cleanerRate : null).cleanerExtraPay(cp ? extraPerDay : null).cleanerTotal(cTotal)
                     .dayTotal(dayTotal)
                     .build());
         }
+        return rows;
+    }
+
+    private List<VehicleSalaryDayRow> buildEmptyRows(java.time.YearMonth ym, int daysInMonth) {
+        List<VehicleSalaryDayRow> rows = new ArrayList<>();
+        for (int d = 1; d <= daysInMonth; d++)
+            rows.add(VehicleSalaryDayRow.builder().day(d).date(ym.atDay(d)).build());
         return rows;
     }
 

@@ -30,6 +30,21 @@ public interface VehicleStaffAssignmentRepository extends JpaRepository<VehicleS
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
 
+    // All assignments for a vehicle that overlap with the given date range (for salary expense report)
+    @Query("""
+            SELECT a FROM VehicleStaffAssignment a
+            WHERE a.vehicle.id = :vehicleId
+              AND a.tenant.id = :tenantId
+              AND a.isActive = true
+              AND a.assignedFrom <= :endDate
+              AND (a.assignedTo IS NULL OR a.assignedTo >= :startDate)
+            """)
+    List<VehicleStaffAssignment> findByVehicleIdAndPeriod(
+            @Param("vehicleId") Long vehicleId,
+            @Param("tenantId") Long tenantId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
     @Query("SELECT a FROM VehicleStaffAssignment a " +
            "LEFT JOIN FETCH a.vehicle LEFT JOIN FETCH a.user LEFT JOIN FETCH a.user.roles " +
            "LEFT JOIN FETCH a.assignedBy LEFT JOIN FETCH a.unassignedBy " +
