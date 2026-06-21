@@ -1230,10 +1230,24 @@ public class ReportServiceImpl implements ReportService {
                 .stream().map(l -> l.getTotalCost() != null ? l.getTotalCost() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal maintenanceExpenses = vehicleServiceRepository
-                .findByTenantIdAndServiceDateBetweenAndIsActiveTrue(tenantId, startDate, endDate)
-                .stream().map(s -> s.getTotalCost() != null ? s.getTotalCost() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<VehicleService> summaryMaintServices = vehicleServiceRepository.findForMaintenanceCostReport(tenantId, startDate, endDate);
+        List<Long> summaryMaintServiceIds = summaryMaintServices.stream().map(VehicleService::getId).toList();
+        List<ServicePart> summaryMaintParts = servicePartRepository.findByServiceIdIn(summaryMaintServiceIds);
+        List<Long> summaryMaintPartIds = summaryMaintParts.stream().map(ServicePart::getId).toList();
+        Map<Long, BigDecimal> summaryMaintTxCostByPartId = summaryMaintPartIds.isEmpty()
+                ? Map.of()
+                : sparePartsTransactionRepository.findByServicePart_IdIn(summaryMaintPartIds).stream()
+                        .filter(tx -> tx.getTotalCost() != null)
+                        .collect(Collectors.toMap(tx -> tx.getServicePart().getId(),
+                                SparePartsTransaction::getTotalCost, BigDecimal::add));
+        BigDecimal maintenanceExpenses = summaryMaintServices.stream().map(s -> {
+            BigDecimal labor = s.getTotalCost() != null ? s.getTotalCost() : BigDecimal.ZERO;
+            BigDecimal parts = summaryMaintParts.stream()
+                    .filter(sp -> sp.getService().getId().equals(s.getId()))
+                    .map(sp -> summaryMaintTxCostByPartId.getOrDefault(sp.getId(), BigDecimal.ZERO))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            return labor.add(parts);
+        }).reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal documentExpenses = documentRepository.findByTenantIdAndPaidOnBetween(tenantId, startDate, endDate)
                 .stream().map(d -> d.getCost() != null ? d.getCost() : BigDecimal.ZERO)
