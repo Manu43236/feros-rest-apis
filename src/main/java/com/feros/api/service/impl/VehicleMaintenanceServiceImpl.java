@@ -239,6 +239,14 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
         if (request.getOdometer() != null) vs.setOdometer(request.getOdometer());
 
         vs.getTasks().forEach(t -> t.setStatus(ServiceTaskStatus.COMPLETED));
+
+        // Persist the total cost so reports can read it directly from the DB
+        BigDecimal calculatedCost = vs.getTasks().stream()
+                .filter(t -> t.getCost() != null)
+                .map(VehicleServiceTask::getCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        vs.setTotalCost(calculatedCost);
+
         vehicleServiceRepository.save(vs);
 
         // When a breakdown-triggered service is completed → resolve breakdown + move vehicle to AVAILABLE

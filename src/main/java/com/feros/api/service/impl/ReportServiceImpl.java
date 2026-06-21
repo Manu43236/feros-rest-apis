@@ -969,7 +969,7 @@ public class ReportServiceImpl implements ReportService {
     public List<MaintenanceCostRow> getMaintenanceCostSummary(LocalDate startDate, LocalDate endDate) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         List<VehicleService> services = vehicleServiceRepository
-                .findByTenantIdAndServiceDateBetweenAndIsActiveTrue(tenantId, startDate, endDate);
+                .findForMaintenanceCostReport(tenantId, startDate, endDate);
 
         Map<Long, List<VehicleService>> byVehicle = services.stream()
                 .collect(Collectors.groupingBy(s -> s.getVehicle().getId()));

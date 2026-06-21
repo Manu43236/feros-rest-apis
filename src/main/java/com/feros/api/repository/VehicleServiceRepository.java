@@ -16,6 +16,12 @@ import java.util.Optional;
 public interface VehicleServiceRepository extends JpaRepository<VehicleService, Long> {
     List<VehicleService> findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(Long tenantId);
     List<VehicleService> findByTenantIdAndServiceDateBetweenAndIsActiveTrue(Long tenantId, LocalDate from, LocalDate to);
+
+    @Query("SELECT s FROM VehicleService s WHERE s.tenant.id = :tenantId AND s.isActive = true " +
+           "AND COALESCE(s.serviceDate, s.completedDate) BETWEEN :from AND :to")
+    List<VehicleService> findForMaintenanceCostReport(@Param("tenantId") Long tenantId,
+                                                      @Param("from") LocalDate from,
+                                                      @Param("to") LocalDate to);
     List<VehicleService> findByTenantIdAndVehicleIdAndIsActiveTrueOrderByCreatedAtDesc(Long tenantId, Long vehicleId);
     Optional<VehicleService> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     boolean existsByBreakdownIdAndIsActiveTrueAndStatusNot(Long breakdownId, ServiceStatus status);
