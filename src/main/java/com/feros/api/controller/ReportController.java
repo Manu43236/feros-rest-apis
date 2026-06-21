@@ -808,6 +808,32 @@ public class ReportController {
                 "Maintenance Cost Summary — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── Tyre Cost Summary ─────────────────────────────────────────────────────
+
+    @GetMapping("/expenses/tyres")
+    public ResponseEntity<ApiResponse<List<TyreCostRow>>> getTyreCostSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Tyre cost summary fetched", reportService.getTyreCostSummary(startDate, endDate)));
+    }
+
+    @GetMapping("/expenses/tyres/export")
+    public ResponseEntity<byte[]> exportTyreCostSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<TyreCostRow> rows = reportService.getTyreCostSummary(startDate, endDate);
+        String[] headers = {"Vehicle", "Type", "Tyres Purchased", "Purchase Cost (₹)", "Retreading Cost (₹) *Lifetime", "Total Cost (₹)"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getRegistrationNumber(), r.getVehicleType(),
+                String.valueOf(r.getTyreCount()),
+                safe(r.getPurchaseCost()), safe(r.getRetreadingCost()), safe(r.getTotalCost())
+        }).toList();
+        return export("tyre-cost-" + startDate + "-" + endDate,
+                "Tyre Cost Summary — " + startDate + " to " + endDate, headers, data, format);
+    }
+
     // ── Driver Performance ────────────────────────────────────────────────────
 
     @GetMapping("/staff/drivers")

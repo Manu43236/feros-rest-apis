@@ -4,6 +4,7 @@ import com.feros.api.entity.Tyre;
 import com.feros.api.enums.TyreStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,4 +17,6 @@ public interface TyreRepository extends JpaRepository<Tyre, Long> {
     Optional<Tyre> findFirstByTenantIdAndStatusAndIsActiveTrueOrderByIdAsc(Long tenantId, TyreStatus status);
 
     Optional<Tyre> findByTenantIdAndSerialNumberAndIsActiveTrue(Long tenantId, String serialNumber);
+
+    List<Tyre> findByTenantIdAndPurchaseDateBetweenAndIsActiveTrue(Long tenantId, LocalDate from, LocalDate to);
 }

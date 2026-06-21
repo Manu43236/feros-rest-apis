@@ -1018,6 +1018,66 @@ public class ReportServiceImpl implements ReportService {
         }).sorted(Comparator.comparing(MaintenanceCostRow::getRegistrationNumber)).toList();
     }
 
+    // ── Tyre Cost Summary ─────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TyreCostRow> getTyreCostSummary(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        List<com.feros.api.entity.Tyre> tyres =
+                tyreRepository.findByTenantIdAndPurchaseDateBetweenAndIsActiveTrue(tenantId, startDate, endDate);
+
+        if (tyres.isEmpty()) return List.of();
+
+        // For each tyre, find its first fitting to attribute the cost to a vehicle
+        List<Long> tyreIds = tyres.stream().map(com.feros.api.entity.Tyre::getId).toList();
+        List<VehicleTyreFitting> fittings =
+                vehicleTyreFittingRepository.findByTyreIdInAndIsActiveTrueOrderByFittedDateAscIdAsc(tyreIds);
+
+        // Keep only the FIRST fitting per tyre (earliest fittedDate)
+        Map<Long, VehicleTyreFitting> firstFittingByTyreId = new LinkedHashMap<>();
+        for (VehicleTyreFitting f : fittings) {
+            firstFittingByTyreId.putIfAbsent(f.getTyre().getId(), f);
+        }
+
+        // Group tyres by vehicle registration (null vehicle = "Unassigned / In Stock")
+        Map<String, List<com.feros.api.entity.Tyre>> byVehicleKey = new LinkedHashMap<>();
+        Map<String, VehicleTyreFitting> fittingByKey = new LinkedHashMap<>();
+
+        for (com.feros.api.entity.Tyre t : tyres) {
+            VehicleTyreFitting fitting = firstFittingByTyreId.get(t.getId());
+            String key = fitting != null ? fitting.getVehicle().getRegistrationNumber() : "UNASSIGNED";
+            byVehicleKey.computeIfAbsent(key, k -> new ArrayList<>()).add(t);
+            if (fitting != null) fittingByKey.putIfAbsent(key, fitting);
+        }
+
+        return byVehicleKey.entrySet().stream().map(entry -> {
+            String key = entry.getKey();
+            List<com.feros.api.entity.Tyre> vTyres = entry.getValue();
+            VehicleTyreFitting fitting = fittingByKey.get(key);
+
+            BigDecimal purchaseCost = vTyres.stream()
+                    .map(t -> t.getPurchaseCost() != null ? t.getPurchaseCost() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal retreadingCost = vTyres.stream()
+                    .map(t -> t.getTotalRetreadingCost() != null ? t.getTotalRetreadingCost() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            Vehicle vehicle = fitting != null ? fitting.getVehicle() : null;
+            return TyreCostRow.builder()
+                    .vehicleId(vehicle != null ? vehicle.getId() : null)
+                    .registrationNumber(vehicle != null ? vehicle.getRegistrationNumber() : "Unassigned / In Stock")
+                    .vehicleType(vehicle != null && vehicle.getVehicleType() != null ? vehicle.getVehicleType().getName() : "—")
+                    .tyreCount(vTyres.size())
+                    .purchaseCost(purchaseCost)
+                    .retreadingCost(retreadingCost)
+                    .totalCost(purchaseCost.add(retreadingCost))
+                    .build();
+        }).sorted(Comparator.comparing(TyreCostRow::getRegistrationNumber)).toList();
+    }
+
     // ── Document Cost Summary ────────────────────────────────────────────────────
 
     @Override

@@ -45,4 +45,7 @@ public interface VehicleTyreFittingRepository extends JpaRepository<VehicleTyreF
 
     // Most recent RETREAD removal for a tyre — used when building the retread log on return
     Optional<VehicleTyreFitting> findFirstByTyreIdAndRemovalReasonAndIsActiveTrueOrderByRemovedDateDescIdDesc(Long tyreId, TyreRemovalReason removalReason);
+
+    // First fitting per tyre (for vehicle attribution in reports)
+    List<VehicleTyreFitting> findByTyreIdInAndIsActiveTrueOrderByFittedDateAscIdAsc(java.util.Collection<Long> tyreIds);
 }
