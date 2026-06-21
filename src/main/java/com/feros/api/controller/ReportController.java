@@ -834,6 +834,40 @@ public class ReportController {
                 "Tyre Cost Summary — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── Vehicle Salary Expense ────────────────────────────────────────────────
+
+    @GetMapping("/expenses/vehicle-salary")
+    public ResponseEntity<ApiResponse<List<VehicleSalaryDayRow>>> getVehicleSalaryExpense(
+            @RequestParam Long vehicleId,
+            @RequestParam int year,
+            @RequestParam int month) {
+        return ResponseEntity.ok(ApiResponse.success("Vehicle salary expense fetched",
+                reportService.getVehicleSalaryExpense(vehicleId, year, month)));
+    }
+
+    @GetMapping("/expenses/vehicle-salary/export")
+    public ResponseEntity<byte[]> exportVehicleSalaryExpense(
+            @RequestParam Long vehicleId,
+            @RequestParam int year,
+            @RequestParam int month,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<VehicleSalaryDayRow> rows = reportService.getVehicleSalaryExpense(vehicleId, year, month);
+        String[] headers = {"Day", "Date", "Driver", "Driver Role", "Daily Rate (₹)", "Extra Pay (₹)", "Driver Total (₹)",
+                "Cleaner", "Cleaner Role", "Daily Rate (₹)", "Extra Pay (₹)", "Cleaner Total (₹)", "Day Total (₹)"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                String.valueOf(r.getDay()), r.getDate().toString(),
+                r.getDriverName() != null ? r.getDriverName() : "—",
+                r.getDriverRole() != null ? r.getDriverRole() : "—",
+                safe(r.getDriverDailyRate()), safe(r.getDriverExtraPay()), safe(r.getDriverTotal()),
+                r.getCleanerName() != null ? r.getCleanerName() : "—",
+                r.getCleanerRole() != null ? r.getCleanerRole() : "—",
+                safe(r.getCleanerDailyRate()), safe(r.getCleanerExtraPay()), safe(r.getCleanerTotal()),
+                safe(r.getDayTotal())
+        }).toList();
+        return export("vehicle-salary-" + year + "-" + month,
+                "Vehicle Salary Expense — " + year + "/" + month, headers, data, format);
+    }
+
     // ── Driver Performance ────────────────────────────────────────────────────
 
     @GetMapping("/staff/drivers")

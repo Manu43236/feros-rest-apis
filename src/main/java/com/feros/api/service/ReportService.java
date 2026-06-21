@@ -67,6 +67,8 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
 
     List<TyreCostRow> getTyreCostSummary(LocalDate startDate, LocalDate endDate);
 
+    List<VehicleSalaryDayRow> getVehicleSalaryExpense(Long vehicleId, int year, int month);
+
     List<DriverPerformanceRow> getDriverPerformance(LocalDate startDate, LocalDate endDate);
 
     List<CleanerPerformanceRow> getCleanerPerformance(LocalDate startDate, LocalDate endDate);
