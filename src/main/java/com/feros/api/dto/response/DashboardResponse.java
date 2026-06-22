@@ -32,8 +32,12 @@ public class DashboardResponse {
     @Builder
     public static class VehicleSummary {
         private long total;
-        private long onTrip;
         private long available;
+        private long assigned;
+        private long onTrip;
+        private long underMaintenance;
+        private long breakdown;
+        private long inactive;
     }
 
     @Data
@@ -45,6 +49,7 @@ public class DashboardResponse {
         private long overdue;
         private long paid;
         private BigDecimal totalOutstanding;
+        private BigDecimal totalRevenue;
     }
 
     @Data

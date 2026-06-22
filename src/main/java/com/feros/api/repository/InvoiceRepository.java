@@ -31,6 +31,9 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     long countByTenantIdAndInvoiceStatusAndIsActiveTrue(Long tenantId, InvoiceStatus status);
     @Query("SELECT COALESCE(SUM(i.balanceDue), 0) FROM Invoice i WHERE i.tenant.id = :tenantId AND i.invoiceStatus NOT IN ('PAID', 'CANCELLED') AND i.isActive = true")
     BigDecimal sumOutstandingBalanceByTenantId(@Param("tenantId") Long tenantId);
+
+    @Query("SELECT COALESCE(SUM(i.totalAmount), 0) FROM Invoice i WHERE i.tenant.id = :tenantId AND i.isActive = true AND i.invoiceStatus != 'CANCELLED'")
+    BigDecimal sumTotalRevenueByTenantId(@Param("tenantId") Long tenantId);
     @Query("SELECT i FROM Invoice i WHERE i.tenant.id = :tenantId AND i.isActive = true AND i.balanceDue > 0 ORDER BY i.dueDate ASC")
     List<Invoice> findOutstandingInvoices(@Param("tenantId") Long tenantId);
     @Query("SELECT i FROM Invoice i WHERE i.tenant.id = :tenantId AND i.isActive = true AND i.balanceDue > 0 AND i.client.id = :clientId ORDER BY i.dueDate ASC")

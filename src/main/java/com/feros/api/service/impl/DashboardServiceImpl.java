@@ -19,7 +19,6 @@ import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.OrderStatus;
 import com.feros.api.enums.RoleName;
 import com.feros.api.enums.StaffAllocationStatus;
-import com.feros.api.enums.VehicleAllocationStatus;
 import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.repository.*;
 import com.feros.api.service.DashboardService;
@@ -40,7 +39,6 @@ import java.util.stream.Collectors;
 public class DashboardServiceImpl implements DashboardService {
 
     private final OrderRepository orderRepository;
-    private final OrderVehicleAllocationRepository allocationRepository;
     private final OrderStaffAllocationRepository staffAllocationRepository;
     private final InvoiceRepository invoiceRepository;
     private final VehicleRepository vehicleRepository;
@@ -75,11 +73,14 @@ public class DashboardServiceImpl implements DashboardService {
 
         // Vehicles
         long totalVehicles = vehicleRepository.countByTenantIdAndIsActiveTrue(tenantId);
-        long onTrip = allocationRepository.countDistinctVehiclesByTenantIdAndStatus(tenantId, VehicleAllocationStatus.IN_TRANSIT);
         DashboardResponse.VehicleSummary vehicleSummary = DashboardResponse.VehicleSummary.builder()
                 .total(totalVehicles)
-                .onTrip(onTrip)
-                .available(totalVehicles - onTrip)
+                .available(vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.AVAILABLE))
+                .assigned(vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.ASSIGNED))
+                .onTrip(vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.ON_TRIP))
+                .underMaintenance(vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.IN_REPAIR))
+                .breakdown(vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.BREAKDOWN))
+                .inactive(vehicleRepository.countByTenantIdAndIsActiveFalse(tenantId))
                 .build();
 
         // Invoices
@@ -90,6 +91,7 @@ public class DashboardServiceImpl implements DashboardService {
                 .overdue(invoiceRepository.countByTenantIdAndInvoiceStatusAndIsActiveTrue(tenantId, InvoiceStatus.OVERDUE))
                 .paid(invoiceRepository.countByTenantIdAndInvoiceStatusAndIsActiveTrue(tenantId, InvoiceStatus.PAID))
                 .totalOutstanding(invoiceRepository.sumOutstandingBalanceByTenantId(tenantId))
+                .totalRevenue(invoiceRepository.sumTotalRevenueByTenantId(tenantId))
                 .build();
 
         // Today's Attendance
