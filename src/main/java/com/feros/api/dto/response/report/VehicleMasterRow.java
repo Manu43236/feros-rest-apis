@@ -27,9 +27,7 @@ public class VehicleMasterRow {
     private LocalDate rcExpiry;
     private String insuranceNumber;
     private LocalDate insuranceExpiry;
-    private String permitNumber;
     private LocalDate permitExpiry;
-    private String fitnessNumber;
     private LocalDate fitnessExpiry;
     private String pucNumber;
     private LocalDate pucExpiry;

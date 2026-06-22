@@ -89,8 +89,6 @@ public class ReportServiceImpl implements ReportService {
 
             VehicleDocument nationalPermit = docs.get("National Permit");
             VehicleDocument statePermit = docs.get("State Permit");
-            String permitNumber = nationalPermit != null ? nationalPermit.getDocumentNumber()
-                    : statePermit != null ? statePermit.getDocumentNumber() : null;
 
             VehicleDocument rc = docs.get("Registration Certificate (RC)");
             VehicleDocument insurance = docs.get("Insurance Certificate");
@@ -117,10 +115,8 @@ public class ReportServiceImpl implements ReportService {
                     .rcExpiry(rc != null ? rc.getExpiryDate() : null)
                     .insuranceNumber(insurance != null ? insurance.getDocumentNumber() : null)
                     .insuranceExpiry(insurance != null ? insurance.getExpiryDate() : null)
-                    .permitNumber(permitNumber)
                     .permitExpiry(nationalPermit != null ? nationalPermit.getExpiryDate()
                             : statePermit != null ? statePermit.getExpiryDate() : null)
-                    .fitnessNumber(fitness != null ? fitness.getDocumentNumber() : null)
                     .fitnessExpiry(fitness != null ? fitness.getExpiryDate() : null)
                     .pucNumber(puc != null ? puc.getDocumentNumber() : null)
                     .pucExpiry(puc != null ? puc.getExpiryDate() : null)

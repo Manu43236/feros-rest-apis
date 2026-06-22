@@ -29,6 +29,8 @@ public class LrResponse {
     private Long clientId;
     private String clientName;
 
+    private String materialTypeName;
+
     private String fromCity;
     private String fromState;
     private String toCity;
