@@ -24,10 +24,15 @@ public class VehicleMasterRow {
     private String chassisNumber;
     private String engineNumber;
     private String rcNumber;
+    private LocalDate rcExpiry;
     private String insuranceNumber;
+    private LocalDate insuranceExpiry;
     private String permitNumber;
+    private LocalDate permitExpiry;
     private String fitnessNumber;
+    private LocalDate fitnessExpiry;
     private String pucNumber;
+    private LocalDate pucExpiry;
     private LocalDate roadTaxExpiry;
     private Boolean isFinanced;
     private String financerName;
