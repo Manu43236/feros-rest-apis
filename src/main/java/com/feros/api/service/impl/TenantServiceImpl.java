@@ -150,6 +150,7 @@ public class TenantServiceImpl implements TenantService {
         tenant.setOwnerName(request.getOwnerName());
         tenant.setOwnerPhone(request.getOwnerPhone());
         tenant.setOwnerEmail(request.getOwnerEmail());
+        if (request.getModuleType() != null) tenant.setModuleType(request.getModuleType());
 
         return mapToResponse(tenantRepository.save(tenant));
     }
