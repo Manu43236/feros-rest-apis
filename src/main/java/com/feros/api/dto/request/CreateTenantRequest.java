@@ -1,5 +1,6 @@
 package com.feros.api.dto.request;
 
+import com.feros.api.enums.ModuleType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -48,4 +49,6 @@ public class CreateTenantRequest {
 
     @Email(message = "Invalid owner email format")
     private String ownerEmail;
+
+    private ModuleType moduleType = ModuleType.VEHICLES_ONLY;
 }

@@ -99,6 +99,7 @@ public class TenantServiceImpl implements TenantService {
                 .subscriptionStatus(SubscriptionStatus.TRIAL)
                 .trialStartDate(TimeUtil.today())
                 .trialEndDate(TimeUtil.today().plusMonths(1))
+                .moduleType(request.getModuleType() != null ? request.getModuleType() : com.feros.api.enums.ModuleType.VEHICLES_ONLY)
                 .isActive(true)
                 .build();
 
@@ -544,6 +545,7 @@ public class TenantServiceImpl implements TenantService {
                 .companyName(tenant.getCompanyName())
                 .logoUrl(tenant.getLogoUrl() != null ? s3Service.getPublicUrl(tenant.getLogoUrl()) : null)
                 .isPinResetRequired(false)
+                .moduleType(tenant.getModuleType())
                 .build();
     }
 
@@ -612,6 +614,7 @@ public class TenantServiceImpl implements TenantService {
                 .currentVehicleCount(currentVehicleCount)
                 .currentPricePerVehicle(currentPpv)
                 .currentBillingCycle(currentBillingCycle)
+                .moduleType(tenant.getModuleType())
                 .customUserLimit(tenant.getCustomUserLimit())
                 .effectiveUserLimit(effectiveUserLimit)
                 .activeUserCount(activeUserCount)

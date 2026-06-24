@@ -184,6 +184,7 @@ public class AuthServiceImpl implements AuthService {
                 .logoUrl(logoUrl)
                 .isPinResetRequired(user.getIsPinResetRequired())
                 .allowedModules(allowedModules)
+                .moduleType(user.getTenant() != null ? user.getTenant().getModuleType() : null)
                 .build();
     }
 
