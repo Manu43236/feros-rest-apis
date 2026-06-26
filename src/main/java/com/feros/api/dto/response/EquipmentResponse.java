@@ -28,6 +28,11 @@ public class EquipmentResponse {
     private String serialNumber;
     private String registrationNumber;
     private Integer manufactureYear;
+    private String color;
+    private String chassisNumber;
+    private String engineNumber;
+    private String fuelType;
+    private BigDecimal fuelTankCapacity;
 
     private EquipmentOwnershipType ownershipType;
 

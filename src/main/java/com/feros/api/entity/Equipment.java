@@ -41,6 +41,21 @@ public class Equipment extends BaseEntity {
     @Column(name = "manufacture_year")
     private Integer manufactureYear;
 
+    @Column(name = "color")
+    private String color;
+
+    @Column(name = "chassis_number")
+    private String chassisNumber;
+
+    @Column(name = "engine_number")
+    private String engineNumber;
+
+    @Column(name = "fuel_type")
+    private String fuelType;
+
+    @Column(name = "fuel_tank_capacity", precision = 10, scale = 2)
+    private BigDecimal fuelTankCapacity;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "ownership_type", nullable = false)
     private EquipmentOwnershipType ownershipType;

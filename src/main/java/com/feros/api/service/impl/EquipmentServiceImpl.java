@@ -83,6 +83,11 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .serialNumber(request.getSerialNumber())
                 .registrationNumber(request.getRegistrationNumber())
                 .manufactureYear(request.getManufactureYear())
+                .color(request.getColor())
+                .chassisNumber(request.getChassisNumber())
+                .engineNumber(request.getEngineNumber())
+                .fuelType(request.getFuelType())
+                .fuelTankCapacity(request.getFuelTankCapacity())
                 .ownershipType(request.getOwnershipType())
                 .meterType(equipmentType.getDefaultMeterType())
                 .currentMeterReading(request.getCurrentMeterReading())
@@ -119,6 +124,11 @@ public class EquipmentServiceImpl implements EquipmentService {
         equipment.setSerialNumber(request.getSerialNumber());
         equipment.setRegistrationNumber(request.getRegistrationNumber());
         equipment.setManufactureYear(request.getManufactureYear());
+        equipment.setColor(request.getColor());
+        equipment.setChassisNumber(request.getChassisNumber());
+        equipment.setEngineNumber(request.getEngineNumber());
+        equipment.setFuelType(request.getFuelType());
+        equipment.setFuelTankCapacity(request.getFuelTankCapacity());
         equipment.setOwnershipType(request.getOwnershipType());
         equipment.setCurrentMeterReading(request.getCurrentMeterReading());
         equipment.setNotes(request.getNotes());
@@ -191,6 +201,11 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .serialNumber(e.getSerialNumber())
                 .registrationNumber(e.getRegistrationNumber())
                 .manufactureYear(e.getManufactureYear())
+                .color(e.getColor())
+                .chassisNumber(e.getChassisNumber())
+                .engineNumber(e.getEngineNumber())
+                .fuelType(e.getFuelType())
+                .fuelTankCapacity(e.getFuelTankCapacity())
                 .ownershipType(e.getOwnershipType())
                 .isFinanced(e.getIsFinanced())
                 .financerName(e.getFinancerName())
