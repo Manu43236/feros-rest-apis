@@ -99,6 +99,9 @@ public class Tenant extends BaseEntity {
     @Column(name = "lorry_count")
     private Integer lorryCount;
 
+    @Column(name = "equipment_count")
+    private Integer equipmentCount;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "subscription_status")
     private SubscriptionStatus subscriptionStatus = SubscriptionStatus.TRIAL;

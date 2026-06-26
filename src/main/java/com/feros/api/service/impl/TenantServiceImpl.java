@@ -603,6 +603,7 @@ public class TenantServiceImpl implements TenantService {
                 .prefix(tenant.getPrefix())
                 .logoUrl(tenant.getLogoUrl() != null ? s3Service.getPublicUrl(tenant.getLogoUrl()) : null)
                 .lorryCount(tenant.getLorryCount())
+                .equipmentCount(tenant.getEquipmentCount())
                 .subscriptionStatus(tenant.getSubscriptionStatus())
                 .trialStartDate(tenant.getTrialStartDate())
                 .trialEndDate(tenant.getTrialEndDate())

@@ -37,6 +37,7 @@ public class TenantResponse {
     private String prefix;
     private String logoUrl;
     private Integer lorryCount;
+    private Integer equipmentCount;
     private SubscriptionStatus subscriptionStatus;
     private LocalDate trialStartDate;
     private LocalDate trialEndDate;
