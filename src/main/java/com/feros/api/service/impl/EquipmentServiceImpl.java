@@ -10,7 +10,9 @@ import com.feros.api.enums.EquipmentWorkStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.EquipmentRepository;
 import com.feros.api.repository.EquipmentTypeRepository;
+import com.feros.api.repository.SubscriptionHistoryRepository;
 import com.feros.api.repository.TenantRepository;
+import com.feros.api.repository.VehicleRepository;
 import com.feros.api.service.EquipmentService;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,8 @@ public class EquipmentServiceImpl implements EquipmentService {
     private final EquipmentRepository equipmentRepository;
     private final TenantRepository tenantRepository;
     private final EquipmentTypeRepository equipmentTypeRepository;
+    private final SubscriptionHistoryRepository subscriptionHistoryRepository;
+    private final VehicleRepository vehicleRepository;
 
     private Long getTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -56,17 +60,22 @@ public class EquipmentServiceImpl implements EquipmentService {
         Long tenantId = getTenantId();
         Tenant tenant = getTenant(tenantId);
 
-        // Slot limit check — all machines count (active + inactive)
-        Integer equipmentLimit = tenant.getEquipmentCount();
-        if (equipmentLimit == null || equipmentLimit <= 0) {
-            throw new FerosException("No equipment subscription active for this tenant", HttpStatus.FORBIDDEN);
-        }
-        long current = equipmentRepository.countByTenantId(tenantId);
-        if (current >= equipmentLimit) {
-            throw new FerosException(
-                    "Equipment slot limit reached (" + equipmentLimit + "). Contact FEROS support to upgrade.",
-                    HttpStatus.FORBIDDEN);
-        }
+        // Slot limit check — shared pool across vehicles + machines based on moduleType
+        subscriptionHistoryRepository.findActiveByTenantId(tenantId).stream().findFirst().ifPresent(h -> {
+            Integer totalSlots = h.getVehicleCount();
+            if (totalSlots != null && totalSlots > 0) {
+                long machines = equipmentRepository.countByTenantId(tenantId);
+                long combined = switch (tenant.getModuleType()) {
+                    case BOTH -> vehicleRepository.countByTenantIdAndIsActiveTrue(tenantId) + machines;
+                    default   -> machines; // EQUIPMENT_ONLY
+                };
+                if (combined >= totalSlots) {
+                    throw new FerosException(
+                            "Slot limit reached (" + totalSlots + "). Contact FEROS support to upgrade.",
+                            HttpStatus.FORBIDDEN);
+                }
+            }
+        });
 
         // Serial number uniqueness
         if (request.getSerialNumber() != null && !request.getSerialNumber().isBlank()) {

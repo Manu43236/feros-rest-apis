@@ -96,11 +96,8 @@ public class Tenant extends BaseEntity {
     private String logoUrl;
 
     // Subscription Info
-    @Column(name = "lorry_count")
-    private Integer lorryCount;
-
-    @Column(name = "equipment_count")
-    private Integer equipmentCount;
+    @Column(name = "total_slots_count")
+    private Integer totalSlotsCount;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "subscription_status")
