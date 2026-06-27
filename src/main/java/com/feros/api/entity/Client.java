@@ -1,6 +1,7 @@
 package com.feros.api.entity;
 
 import com.feros.api.entity.master.*;
+import com.feros.api.enums.ClientCategory;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -28,6 +29,10 @@ public class Client extends BaseEntity {
 
     @Column(name = "client_name", nullable = false)
     private String clientName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "client_category")
+    private ClientCategory clientCategory = ClientCategory.COMPANY;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_type_id", nullable = false)

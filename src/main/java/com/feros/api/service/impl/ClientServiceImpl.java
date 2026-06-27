@@ -2,10 +2,13 @@ package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.ClientRequest;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
+import com.feros.api.dto.response.ClientDivisionResponse;
 import com.feros.api.dto.response.ClientResponse;
 import com.feros.api.entity.Client;
+import com.feros.api.entity.ClientDivision;
 import com.feros.api.entity.Tenant;
 import com.feros.api.entity.master.*;
+import com.feros.api.enums.ClientCategory;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.ClientService;
@@ -24,6 +27,7 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +39,7 @@ public class ClientServiceImpl implements ClientService {
     private final CityRepository cityRepository;
     private final StateRepository stateRepository;
     private final PaymentTermsRepository paymentTermsRepository;
+    private final ClientDivisionRepository clientDivisionRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -57,6 +62,7 @@ public class ClientServiceImpl implements ClientService {
                 .tenant(tenant)
                 .clientNumber(NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.CLNT))
                 .clientName(request.getClientName())
+                .clientCategory(request.getClientCategory() != null ? request.getClientCategory() : ClientCategory.COMPANY)
                 .clientType(clientType)
                 .phone(request.getPhone())
                 .email(request.getEmail())
@@ -115,6 +121,7 @@ public class ClientServiceImpl implements ClientService {
                 .orElseThrow(() -> new FerosException("Client type not found", HttpStatus.NOT_FOUND));
 
         client.setClientName(request.getClientName());
+        if (request.getClientCategory() != null) client.setClientCategory(request.getClientCategory());
         client.setClientType(clientType);
         client.setPhone(request.getPhone());
         client.setEmail(request.getEmail());
@@ -262,12 +269,46 @@ public class ClientServiceImpl implements ClientService {
                 .build();
     }
 
+    @Override
+    public List<ClientDivisionResponse> getDivisions(Long clientId) {
+        verifyClientBelongsToTenant(clientId);
+        return clientDivisionRepository.findByClientIdAndIsActiveTrueOrderByNameAsc(clientId)
+                .stream().map(d -> ClientDivisionResponse.builder().id(d.getId()).name(d.getName()).build())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public ClientDivisionResponse addDivision(Long clientId, String name) {
+        Client client = clientRepository.findByIdAndTenantIdAndIsActiveTrue(clientId, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
+        if (clientDivisionRepository.existsByNameIgnoreCaseAndClientId(name.trim(), clientId))
+            throw new FerosException("Division '" + name + "' already exists for this client", HttpStatus.CONFLICT);
+        ClientDivision div = clientDivisionRepository.save(
+                ClientDivision.builder().client(client).name(name.trim()).isActive(true).build());
+        return ClientDivisionResponse.builder().id(div.getId()).name(div.getName()).build();
+    }
+
+    @Override
+    public void deleteDivision(Long clientId, Long divisionId) {
+        verifyClientBelongsToTenant(clientId);
+        ClientDivision div = clientDivisionRepository.findByIdAndClientId(divisionId, clientId)
+                .orElseThrow(() -> new FerosException("Division not found", HttpStatus.NOT_FOUND));
+        div.setIsActive(false);
+        clientDivisionRepository.save(div);
+    }
+
+    private void verifyClientBelongsToTenant(Long clientId) {
+        if (!clientRepository.existsByIdAndTenantId(clientId, getCurrentTenantId()))
+            throw new FerosException("Client not found", HttpStatus.NOT_FOUND);
+    }
+
     private ClientResponse mapToResponse(Client c) {
         return ClientResponse.builder()
                 .id(c.getId())
                 .tenantId(c.getTenant().getId())
                 .clientNumber(c.getClientNumber())
                 .clientName(c.getClientName())
+                .clientCategory(c.getClientCategory())
                 .clientTypeId(c.getClientType().getId())
                 .clientTypeName(c.getClientType().getName())
                 .phone(c.getPhone())
@@ -291,6 +332,9 @@ public class ClientServiceImpl implements ClientService {
                 .isActive(c.getIsActive())
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
+                .divisions(clientDivisionRepository.findByClientIdAndIsActiveTrueOrderByNameAsc(c.getId())
+                        .stream().map(d -> ClientDivisionResponse.builder().id(d.getId()).name(d.getName()).build())
+                        .collect(Collectors.toList()))
                 .build();
     }
 }

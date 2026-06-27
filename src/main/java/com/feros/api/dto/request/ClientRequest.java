@@ -1,5 +1,6 @@
 package com.feros.api.dto.request;
 
+import com.feros.api.enums.ClientCategory;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -13,6 +14,8 @@ public class ClientRequest {
 
     @NotBlank(message = "Client name is required")
     private String clientName;
+
+    private ClientCategory clientCategory; // defaults to COMPANY if null
 
     @NotNull(message = "Client type is required")
     private Long clientTypeId;
