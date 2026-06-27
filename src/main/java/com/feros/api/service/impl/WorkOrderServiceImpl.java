@@ -1,0 +1,436 @@
+package com.feros.api.service.impl;
+
+import com.feros.api.dto.request.DailyLogRequest;
+import com.feros.api.dto.request.MachineAssignmentRequest;
+import com.feros.api.dto.request.WorkOrderRequest;
+import com.feros.api.dto.response.*;
+import com.feros.api.entity.*;
+import com.feros.api.enums.*;
+import com.feros.api.exception.FerosException;
+import com.feros.api.repository.*;
+import com.feros.api.service.WorkOrderService;
+import com.feros.api.util.NumberUtil;
+import com.feros.api.util.SecurityUtil;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class WorkOrderServiceImpl implements WorkOrderService {
+
+    private final WorkOrderRepository workOrderRepository;
+    private final MachineAssignmentRepository machineAssignmentRepository;
+    private final EquipmentDailyLogRepository dailyLogRepository;
+    private final TenantRepository tenantRepository;
+    private final ClientRepository clientRepository;
+    private final EquipmentRepository equipmentRepository;
+    private final StaffProfileRepository staffProfileRepository;
+
+    private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
+
+    private Tenant tenant() {
+        return tenantRepository.findByIdAndIsActiveTrue(tenantId())
+                .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+    }
+
+    private WorkOrder fetchWo(Long id) {
+        return workOrderRepository.findByIdAndTenantIdAndIsActiveTrue(id, tenantId())
+                .orElseThrow(() -> new FerosException("Work order not found", HttpStatus.NOT_FOUND));
+    }
+
+    // ── List ──────────────────────────────────────────────────────────────────
+
+    @Override
+    public Page<WorkOrderResponse> getAll(int page, int size, WorkOrderStatus status, Long clientId) {
+        return workOrderRepository
+                .findAllPaged(tenantId(), status, clientId, PageRequest.of(page, size))
+                .map(wo -> toResponse(wo, machineAssignmentRepository.countByWorkOrderId(wo.getId())));
+    }
+
+    // ── Detail ────────────────────────────────────────────────────────────────
+
+    @Override
+    public WorkOrderDetailResponse getById(Long id) {
+        WorkOrder wo = fetchWo(id);
+        List<MachineAssignment> assignments = machineAssignmentRepository.findByWorkOrderIdOrderByStartDateAsc(id);
+        List<EquipmentDailyLog> logs = dailyLogRepository.findByWorkOrderIdOrderByLogDateAscIdAsc(id);
+
+        Map<Long, MachineAssignment> assignmentMap = assignments.stream()
+                .collect(Collectors.toMap(MachineAssignment::getId, a -> a));
+
+        return WorkOrderDetailResponse.builder()
+                .workOrder(toResponse(wo, assignments.size()))
+                .assignments(assignments.stream().map(this::toAssignmentResponse).collect(Collectors.toList()))
+                .logs(logs.stream().map(l -> toLogResponse(l, assignmentMap.get(l.getMachineAssignment().getId()))).collect(Collectors.toList()))
+                .billing(calculateBilling(wo, logs))
+                .build();
+    }
+
+    // ── Create ────────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public WorkOrderResponse create(WorkOrderRequest req) {
+        Tenant t = tenant();
+
+        Client client = clientRepository.findByIdAndTenantIdAndIsActiveTrue(req.getClientId(), t.getId())
+                .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
+
+        WorkOrder.WorkOrderBuilder builder = WorkOrder.builder()
+                .tenant(t)
+                .woNumber(NumberUtil.generate(t.getPrefix(), t.getId(), NumberUtil.Type.WO))
+                .client(client)
+                .site(req.getSite())
+                .rateType(req.getRateType())
+                .rateAmount(req.getRateAmount())
+                .shiftHours(req.getShiftHours() != null ? req.getShiftHours() : 8)
+                .overtimeRatePerHour(req.getOvertimeRatePerHour())
+                .operatorType(req.getOperatorType())
+                .hiredOperatorName(req.getHiredOperatorName())
+                .hiredOperatorPhone(req.getHiredOperatorPhone())
+                .operatorBilling(req.getOperatorBilling() != null ? req.getOperatorBilling() : OperatorBilling.NOT_BILLED)
+                .operatorRatePerDay(req.getOperatorRatePerDay())
+                .mobilizationCharge(req.getMobilizationCharge())
+                .demobilizationCharge(req.getDemobilizationCharge())
+                .startDate(req.getStartDate())
+                .endDate(req.getEndDate())
+                .parentWoId(req.getParentWoId())
+                .notes(req.getNotes());
+
+        if (req.getOperatorStaffId() != null)
+            builder.operatorStaff(staffProfileRepository.findByIdAndTenantId(req.getOperatorStaffId(), t.getId())
+                    .orElseThrow(() -> new FerosException("Staff not found", HttpStatus.NOT_FOUND)));
+
+        WorkOrder saved = workOrderRepository.save(builder.build());
+        return toResponse(saved, 0);
+    }
+
+    // ── Update ────────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public WorkOrderResponse update(Long id, WorkOrderRequest req) {
+        WorkOrder wo = fetchWo(id);
+        if (wo.getStatus() != WorkOrderStatus.DRAFT && wo.getStatus() != WorkOrderStatus.CONFIRMED)
+            throw new FerosException("Only DRAFT or CONFIRMED work orders can be edited", HttpStatus.BAD_REQUEST);
+
+        Client client = clientRepository.findByIdAndTenantIdAndIsActiveTrue(req.getClientId(), tenantId())
+                .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
+
+        wo.setClient(client);
+        wo.setSite(req.getSite());
+        wo.setRateType(req.getRateType());
+        wo.setRateAmount(req.getRateAmount());
+        wo.setShiftHours(req.getShiftHours() != null ? req.getShiftHours() : wo.getShiftHours());
+        wo.setOvertimeRatePerHour(req.getOvertimeRatePerHour());
+        wo.setOperatorType(req.getOperatorType());
+        wo.setHiredOperatorName(req.getHiredOperatorName());
+        wo.setHiredOperatorPhone(req.getHiredOperatorPhone());
+        if (req.getOperatorBilling() != null) wo.setOperatorBilling(req.getOperatorBilling());
+        wo.setOperatorRatePerDay(req.getOperatorRatePerDay());
+        wo.setMobilizationCharge(req.getMobilizationCharge());
+        wo.setDemobilizationCharge(req.getDemobilizationCharge());
+        wo.setStartDate(req.getStartDate());
+        wo.setEndDate(req.getEndDate());
+        wo.setNotes(req.getNotes());
+
+        if (req.getOperatorStaffId() != null)
+            wo.setOperatorStaff(staffProfileRepository.findByIdAndTenantId(req.getOperatorStaffId(), tenantId())
+                    .orElseThrow(() -> new FerosException("Staff not found", HttpStatus.NOT_FOUND)));
+        else
+            wo.setOperatorStaff(null);
+
+        return toResponse(workOrderRepository.save(wo), machineAssignmentRepository.countByWorkOrderId(id));
+    }
+
+    // ── Status ────────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public WorkOrderResponse updateStatus(Long id, WorkOrderStatus newStatus) {
+        WorkOrder wo = fetchWo(id);
+        validateTransition(wo.getStatus(), newStatus);
+        wo.setStatus(newStatus);
+        return toResponse(workOrderRepository.save(wo), machineAssignmentRepository.countByWorkOrderId(id));
+    }
+
+    private void validateTransition(WorkOrderStatus current, WorkOrderStatus next) {
+        boolean valid = switch (current) {
+            case DRAFT      -> next == WorkOrderStatus.CONFIRMED || next == WorkOrderStatus.CANCELLED;
+            case CONFIRMED  -> next == WorkOrderStatus.IN_PROGRESS || next == WorkOrderStatus.CANCELLED;
+            case IN_PROGRESS -> next == WorkOrderStatus.COMPLETED || next == WorkOrderStatus.CANCELLED;
+            case COMPLETED  -> next == WorkOrderStatus.INVOICED;
+            default         -> false;
+        };
+        if (!valid)
+            throw new FerosException("Invalid status transition: " + current + " → " + next, HttpStatus.BAD_REQUEST);
+    }
+
+    // ── Extend ────────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public WorkOrderResponse extend(Long id, LocalDate newEndDate) {
+        WorkOrder wo = fetchWo(id);
+        if (wo.getStatus() != WorkOrderStatus.IN_PROGRESS && wo.getStatus() != WorkOrderStatus.CONFIRMED)
+            throw new FerosException("Only IN_PROGRESS or CONFIRMED work orders can be extended", HttpStatus.BAD_REQUEST);
+        if (wo.getEndDate() != null && !newEndDate.isAfter(wo.getEndDate()))
+            throw new FerosException("New end date must be after current end date", HttpStatus.BAD_REQUEST);
+        wo.setEndDate(newEndDate);
+        return toResponse(workOrderRepository.save(wo), machineAssignmentRepository.countByWorkOrderId(id));
+    }
+
+    // ── Machine Assignments ───────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public MachineAssignmentResponse addMachine(Long workOrderId, MachineAssignmentRequest req) {
+        WorkOrder wo = fetchWo(workOrderId);
+        if (wo.getStatus() == WorkOrderStatus.COMPLETED || wo.getStatus() == WorkOrderStatus.INVOICED
+                || wo.getStatus() == WorkOrderStatus.CANCELLED)
+            throw new FerosException("Cannot add machine to a " + wo.getStatus() + " work order", HttpStatus.BAD_REQUEST);
+
+        Equipment equipment = equipmentRepository.findByIdAndTenantId(req.getEquipmentId(), tenantId())
+                .orElseThrow(() -> new FerosException("Equipment not found", HttpStatus.NOT_FOUND));
+
+        if (machineAssignmentRepository.existsByEquipmentIdAndIsActiveTrue(equipment.getId()))
+            throw new FerosException("This machine is already assigned to another active work order", HttpStatus.CONFLICT);
+
+        MachineAssignment assignment = machineAssignmentRepository.save(
+                MachineAssignment.builder()
+                        .workOrder(wo)
+                        .equipment(equipment)
+                        .startDate(req.getStartDate() != null ? req.getStartDate() : LocalDate.now())
+                        .build());
+
+        equipment.setWorkStatus(EquipmentWorkStatus.ASSIGNED);
+        equipmentRepository.save(equipment);
+
+        return toAssignmentResponse(assignment);
+    }
+
+    @Override
+    @Transactional
+    public void closeMachineAssignment(Long workOrderId, Long assignmentId, LocalDate endDate, AssignmentEndReason reason) {
+        if (!workOrderRepository.existsByIdAndTenantId(workOrderId, tenantId()))
+            throw new FerosException("Work order not found", HttpStatus.NOT_FOUND);
+        MachineAssignment assignment = machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
+                .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
+        assignment.setEndDate(endDate != null ? endDate : LocalDate.now());
+        assignment.setEndReason(reason);
+        assignment.setIsActive(false);
+        machineAssignmentRepository.save(assignment);
+
+        Equipment eq = assignment.getEquipment();
+        eq.setWorkStatus(EquipmentWorkStatus.AVAILABLE);
+        equipmentRepository.save(eq);
+    }
+
+    // ── Daily Logs ────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public DailyLogResponse addLog(Long workOrderId, DailyLogRequest req) {
+        WorkOrder wo = fetchWo(workOrderId);
+
+        MachineAssignment assignment = machineAssignmentRepository
+                .findByIdAndWorkOrderId(req.getMachineAssignmentId(), workOrderId)
+                .orElseThrow(() -> new FerosException("Machine assignment not found for this work order", HttpStatus.NOT_FOUND));
+
+        if (dailyLogRepository.existsByMachineAssignmentIdAndLogDate(assignment.getId(), req.getLogDate()))
+            throw new FerosException("A log already exists for this machine on " + req.getLogDate(), HttpStatus.CONFLICT);
+
+        BigDecimal hours = calcHours(req.getStartHourMeter(), req.getEndHourMeter());
+
+        EquipmentDailyLog log = dailyLogRepository.save(
+                EquipmentDailyLog.builder()
+                        .machineAssignment(assignment)
+                        .workOrderId(workOrderId)
+                        .logDate(req.getLogDate())
+                        .status(req.getStatus())
+                        .startHourMeter(req.getStartHourMeter())
+                        .endHourMeter(req.getEndHourMeter())
+                        .hoursWorked(hours)
+                        .fuelConsumed(req.getFuelConsumed())
+                        .notes(req.getNotes())
+                        .build());
+
+        return toLogResponse(log, assignment);
+    }
+
+    @Override
+    @Transactional
+    public DailyLogResponse updateLog(Long workOrderId, Long logId, DailyLogRequest req) {
+        if (!workOrderRepository.existsByIdAndTenantId(workOrderId, tenantId()))
+            throw new FerosException("Work order not found", HttpStatus.NOT_FOUND);
+        // verify WO belongs to tenant (existsByIdAndTenantId already checked above)
+
+        EquipmentDailyLog log = dailyLogRepository.findByIdAndWorkOrderId(logId, workOrderId)
+                .orElseThrow(() -> new FerosException("Log not found", HttpStatus.NOT_FOUND));
+
+        log.setStatus(req.getStatus());
+        log.setStartHourMeter(req.getStartHourMeter());
+        log.setEndHourMeter(req.getEndHourMeter());
+        log.setHoursWorked(calcHours(req.getStartHourMeter(), req.getEndHourMeter()));
+        log.setFuelConsumed(req.getFuelConsumed());
+        log.setNotes(req.getNotes());
+
+        MachineAssignment assignment = log.getMachineAssignment();
+        return toLogResponse(dailyLogRepository.save(log), assignment);
+    }
+
+    @Override
+    @Transactional
+    public void deleteLog(Long workOrderId, Long logId) {
+        if (!workOrderRepository.existsByIdAndTenantId(workOrderId, tenantId()))
+            throw new FerosException("Work order not found", HttpStatus.NOT_FOUND);
+        EquipmentDailyLog log = dailyLogRepository.findByIdAndWorkOrderId(logId, workOrderId)
+                .orElseThrow(() -> new FerosException("Log not found", HttpStatus.NOT_FOUND));
+        dailyLogRepository.delete(log);
+    }
+
+    // ── Billing Calculation ───────────────────────────────────────────────────
+
+    private BillingSummaryResponse calculateBilling(WorkOrder wo, List<EquipmentDailyLog> logs) {
+        List<EquipmentDailyLog> working = logs.stream()
+                .filter(l -> l.getStatus() == DailyLogStatus.WORKING)
+                .collect(Collectors.toList());
+
+        int workingDays = working.size();
+        BigDecimal totalHours = working.stream()
+                .map(l -> l.getHoursWorked() != null ? l.getHoursWorked() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal machineAmount = switch (wo.getRateType()) {
+            case HOURLY -> totalHours.multiply(wo.getRateAmount());
+            case DAILY_SHIFT -> {
+                BigDecimal total = BigDecimal.ZERO;
+                int shiftHrs = wo.getShiftHours() != null ? wo.getShiftHours() : 8;
+                for (EquipmentDailyLog log : working) {
+                    BigDecimal hrs = log.getHoursWorked() != null ? log.getHoursWorked() : BigDecimal.ZERO;
+                    BigDecimal dayAmount = wo.getRateAmount();
+                    if (wo.getOvertimeRatePerHour() != null && hrs.compareTo(BigDecimal.valueOf(shiftHrs)) > 0) {
+                        BigDecimal extraHrs = hrs.subtract(BigDecimal.valueOf(shiftHrs));
+                        dayAmount = dayAmount.add(extraHrs.multiply(wo.getOvertimeRatePerHour()));
+                    }
+                    total = total.add(dayAmount);
+                }
+                yield total;
+            }
+            case MONTHLY -> {
+                LocalDate from = wo.getStartDate();
+                LocalDate to = wo.getEndDate() != null ? wo.getEndDate() : LocalDate.now();
+                long days = ChronoUnit.DAYS.between(from, to) + 1;
+                BigDecimal months = BigDecimal.valueOf(days).divide(BigDecimal.valueOf(30), 4, RoundingMode.HALF_UP);
+                yield months.multiply(wo.getRateAmount()).setScale(2, RoundingMode.HALF_UP);
+            }
+        };
+
+        BigDecimal operatorAmount = BigDecimal.ZERO;
+        if (wo.getOperatorBilling() == OperatorBilling.BILLED_SEPARATELY && wo.getOperatorRatePerDay() != null)
+            operatorAmount = wo.getOperatorRatePerDay().multiply(BigDecimal.valueOf(workingDays));
+
+        BigDecimal mobilization = wo.getMobilizationCharge() != null ? wo.getMobilizationCharge() : BigDecimal.ZERO;
+        BigDecimal demobilization = wo.getDemobilizationCharge() != null ? wo.getDemobilizationCharge() : BigDecimal.ZERO;
+        BigDecimal total = machineAmount.add(operatorAmount).add(mobilization).add(demobilization);
+
+        return BillingSummaryResponse.builder()
+                .machineRentalAmount(machineAmount.setScale(2, RoundingMode.HALF_UP))
+                .operatorAmount(operatorAmount.setScale(2, RoundingMode.HALF_UP))
+                .mobilizationCharge(mobilization)
+                .demobilizationCharge(demobilization)
+                .totalAmount(total.setScale(2, RoundingMode.HALF_UP))
+                .totalHours(totalHours.setScale(2, RoundingMode.HALF_UP))
+                .totalWorkingDays(workingDays)
+                .build();
+    }
+
+    // ── Mappers ───────────────────────────────────────────────────────────────
+
+    private WorkOrderResponse toResponse(WorkOrder wo, long machineCount) {
+        return WorkOrderResponse.builder()
+                .id(wo.getId())
+                .tenantId(wo.getTenant().getId())
+                .woNumber(wo.getWoNumber())
+                .clientId(wo.getClient().getId())
+                .clientName(wo.getClient().getClientName())
+                .site(wo.getSite())
+                .rateType(wo.getRateType())
+                .rateAmount(wo.getRateAmount())
+                .shiftHours(wo.getShiftHours())
+                .overtimeRatePerHour(wo.getOvertimeRatePerHour())
+                .operatorType(wo.getOperatorType())
+                .operatorStaffId(wo.getOperatorStaff() != null ? wo.getOperatorStaff().getId() : null)
+                .operatorStaffName(wo.getOperatorStaff() != null ? wo.getOperatorStaff().getUser().getName() : null)
+                .hiredOperatorName(wo.getHiredOperatorName())
+                .hiredOperatorPhone(wo.getHiredOperatorPhone())
+                .operatorBilling(wo.getOperatorBilling())
+                .operatorRatePerDay(wo.getOperatorRatePerDay())
+                .mobilizationCharge(wo.getMobilizationCharge())
+                .demobilizationCharge(wo.getDemobilizationCharge())
+                .startDate(wo.getStartDate())
+                .endDate(wo.getEndDate())
+                .status(wo.getStatus())
+                .parentWoId(wo.getParentWoId())
+                .notes(wo.getNotes())
+                .machineCount(machineCount)
+                .createdAt(wo.getCreatedAt())
+                .updatedAt(wo.getUpdatedAt())
+                .build();
+    }
+
+    private MachineAssignmentResponse toAssignmentResponse(MachineAssignment a) {
+        Equipment eq = a.getEquipment();
+        return MachineAssignmentResponse.builder()
+                .id(a.getId())
+                .workOrderId(a.getWorkOrder().getId())
+                .equipmentId(eq.getId())
+                .serialNumber(eq.getSerialNumber())
+                .equipmentTypeName(eq.getEquipmentType().getName())
+                .makeName(eq.getEquipmentType().getModel() != null ? eq.getEquipmentType().getModel().getMake().getName() : null)
+                .modelName(eq.getEquipmentType().getModel() != null ? eq.getEquipmentType().getModel().getName() : null)
+                .startDate(a.getStartDate())
+                .endDate(a.getEndDate())
+                .endReason(a.getEndReason())
+                .isActive(a.getIsActive())
+                .build();
+    }
+
+    private DailyLogResponse toLogResponse(EquipmentDailyLog l, MachineAssignment assignment) {
+        Equipment eq = assignment != null ? assignment.getEquipment() : null;
+        return DailyLogResponse.builder()
+                .id(l.getId())
+                .machineAssignmentId(l.getMachineAssignment().getId())
+                .workOrderId(l.getWorkOrderId())
+                .logDate(l.getLogDate())
+                .status(l.getStatus())
+                .startHourMeter(l.getStartHourMeter())
+                .endHourMeter(l.getEndHourMeter())
+                .hoursWorked(l.getHoursWorked())
+                .fuelConsumed(l.getFuelConsumed())
+                .notes(l.getNotes())
+                .serialNumber(eq != null ? eq.getSerialNumber() : null)
+                .equipmentTypeName(eq != null ? eq.getEquipmentType().getName() : null)
+                .createdAt(l.getCreatedAt())
+                .updatedAt(l.getUpdatedAt())
+                .build();
+    }
+
+    private BigDecimal calcHours(BigDecimal start, BigDecimal end) {
+        if (start == null || end == null) return null;
+        BigDecimal diff = end.subtract(start);
+        return diff.compareTo(BigDecimal.ZERO) >= 0 ? diff.setScale(2, RoundingMode.HALF_UP) : null;
+    }
+}

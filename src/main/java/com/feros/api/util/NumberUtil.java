@@ -30,7 +30,8 @@ public final class NumberUtil {
         RPT,   // Report
         CN,    // Credit Note
         SVC,   // Vehicle Service
-        PART   // Spare Part
+        PART,  // Spare Part
+        WO     // Work Order
     }
 
     /**
