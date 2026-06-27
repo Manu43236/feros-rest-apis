@@ -281,7 +281,7 @@ public class ClientServiceImpl implements ClientService {
     public ClientDivisionResponse addDivision(Long clientId, String name) {
         Client client = clientRepository.findByIdAndTenantIdAndIsActiveTrue(clientId, getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
-        if (clientDivisionRepository.existsByNameIgnoreCaseAndClientId(name.trim(), clientId))
+        if (clientDivisionRepository.existsByNameIgnoreCaseAndClientIdAndIsActiveTrue(name.trim(), clientId))
             throw new FerosException("Division '" + name + "' already exists for this client", HttpStatus.CONFLICT);
         ClientDivision div = clientDivisionRepository.save(
                 ClientDivision.builder().client(client).name(name.trim()).isActive(true).build());

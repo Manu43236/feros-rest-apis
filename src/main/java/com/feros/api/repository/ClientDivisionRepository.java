@@ -9,5 +9,5 @@ import java.util.Optional;
 public interface ClientDivisionRepository extends JpaRepository<ClientDivision, Long> {
     List<ClientDivision> findByClientIdAndIsActiveTrueOrderByNameAsc(Long clientId);
     Optional<ClientDivision> findByIdAndClientId(Long id, Long clientId);
-    boolean existsByNameIgnoreCaseAndClientId(String name, Long clientId);
+    boolean existsByNameIgnoreCaseAndClientIdAndIsActiveTrue(String name, Long clientId);
 }
