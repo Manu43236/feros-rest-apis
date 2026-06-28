@@ -27,9 +27,10 @@ public class StaffProfileController {
     // ===================== STAFF PROFILES =====================
     @GetMapping("/profiles")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
-    public ResponseEntity<ApiResponse<List<StaffProfileResponse>>> getAllProfiles() {
+    public ResponseEntity<ApiResponse<List<StaffProfileResponse>>> getAllProfiles(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "false") boolean equipmentOnly) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Profiles fetched successfully", staffProfileService.getAllProfiles()));
+                "Profiles fetched successfully", staffProfileService.getAllProfiles(equipmentOnly)));
     }
 
     @GetMapping("/profiles/{userId}")

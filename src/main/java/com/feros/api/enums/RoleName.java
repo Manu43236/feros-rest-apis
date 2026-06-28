@@ -9,5 +9,6 @@ public enum RoleName {
     CLEANER,
     SERVICE_MANAGER,
     TECHNICIAN,
-    STORE_KEEPER
+    STORE_KEEPER,
+    OPERATOR
 }

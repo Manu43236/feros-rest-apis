@@ -47,4 +47,7 @@ public class CreateUserRequest {
     private LocalDate licenseExpiryDate;
     private Long designationId;
 
+    // Equipment module access
+    private Boolean canAccessEquipment;
+
 }
