@@ -445,6 +445,7 @@ public class UserServiceImpl implements UserService {
     }
 
     private boolean resolveCanAccessEquipment(CreateUserRequest request, Tenant tenant) {
+        if (tenant.getModuleType() == null) return false;
         return switch (tenant.getModuleType()) {
             case EQUIPMENT_ONLY -> true;
             case VEHICLES_ONLY  -> false;
