@@ -53,7 +53,8 @@ public class CreateUserRequest {
     private SalaryType salaryType;
     private BigDecimal monthlySalary;
 
-    // Equipment module access
+    // Module access
+    private Boolean canAccessVehicles;
     private Boolean canAccessEquipment;
 
 }

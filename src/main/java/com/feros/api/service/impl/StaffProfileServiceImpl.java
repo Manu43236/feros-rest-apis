@@ -352,6 +352,7 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .salaryType(p.getSalaryType())
                 .monthlySalary(p.getMonthlySalary())
                 .isActive(p.getIsActive())
+                .canAccessVehicles(p.getCanAccessVehicles())
                 .canAccessEquipment(p.getCanAccessEquipment())
                 .createdAt(p.getCreatedAt())
                 .updatedAt(p.getUpdatedAt())

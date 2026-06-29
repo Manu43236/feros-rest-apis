@@ -444,6 +444,17 @@ public class UserServiceImpl implements UserService {
                 role == RoleName.OPERATOR;
     }
 
+    private boolean resolveCanAccessVehicles(CreateUserRequest request, Tenant tenant) {
+        if (tenant.getModuleType() == null) return true;
+        return switch (tenant.getModuleType()) {
+            case VEHICLES_ONLY  -> true;
+            case EQUIPMENT_ONLY -> false;
+            case BOTH           -> request.getRole() == RoleName.OPERATOR
+                                   ? false
+                                   : !Boolean.FALSE.equals(request.getCanAccessVehicles());
+        };
+    }
+
     private boolean resolveCanAccessEquipment(CreateUserRequest request, Tenant tenant) {
         if (tenant.getModuleType() == null) return false;
         return switch (tenant.getModuleType()) {
@@ -495,6 +506,7 @@ public class UserServiceImpl implements UserService {
                 .salaryType(request.getSalaryType() != null ? request.getSalaryType() : com.feros.api.enums.SalaryType.MONTHLY)
                 .monthlySalary(request.getMonthlySalary())
                 .isActive(true)
+                .canAccessVehicles(resolveCanAccessVehicles(request, tenant))
                 .canAccessEquipment(resolveCanAccessEquipment(request, tenant))
                 .build();
 

@@ -98,6 +98,10 @@ public class StaffProfile extends BaseEntity {
     private Boolean isActive = true;
 
     @Builder.Default
+    @Column(name = "can_access_vehicles", nullable = false)
+    private Boolean canAccessVehicles = true;
+
+    @Builder.Default
     @Column(name = "can_access_equipment", nullable = false)
     private Boolean canAccessEquipment = false;
 }
