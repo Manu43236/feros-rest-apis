@@ -27,7 +27,7 @@ public class WorkOrderController {
     // ── Work Orders ───────────────────────────────────────────────────────────
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<Page<WorkOrderResponse>>> getAll(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -38,7 +38,7 @@ public class WorkOrderController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<WorkOrderDetailResponse>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Work order fetched", workOrderService.getById(id)));
     }
