@@ -108,6 +108,13 @@ public class WorkOrderController {
         return ResponseEntity.ok(ApiResponse.success("Work stopped", workOrderService.stopWork(id, assignmentId, request)));
     }
 
+    @GetMapping("/{id}/work-entries")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<com.feros.api.dto.response.WorkEntryResponse>>> getAllWorkEntries(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Work entries fetched", workOrderService.getAllWorkEntries(id)));
+    }
+
     @GetMapping("/{id}/machines/{assignmentId}/work-entries")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<com.feros.api.dto.response.WorkEntryResponse>>> getWorkEntries(

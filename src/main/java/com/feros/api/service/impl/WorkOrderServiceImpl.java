@@ -510,10 +510,21 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .stream().map(this::toWorkEntryResponse).collect(Collectors.toList());
     }
 
+    public List<WorkEntryResponse> getAllWorkEntries(Long workOrderId) {
+        fetchWo(workOrderId);
+        return workEntryRepository.findByMachineAssignment_WorkOrder_IdOrderByStartTimeDesc(workOrderId)
+                .stream().map(this::toWorkEntryResponse).collect(Collectors.toList());
+    }
+
     private WorkEntryResponse toWorkEntryResponse(MachineWorkEntry e) {
+        MachineAssignment a = e.getMachineAssignment();
+        Equipment eq = a.getEquipment();
         return WorkEntryResponse.builder()
                 .id(e.getId())
-                .machineAssignmentId(e.getMachineAssignment().getId())
+                .machineAssignmentId(a.getId())
+                .serialNumber(eq.getSerialNumber())
+                .equipmentTypeName(eq.getEquipmentType().getName())
+                .divisionName(a.getDivisionName())
                 .status(e.getStatus())
                 .operatorType(e.getOperatorType())
                 .operatorStaffId(e.getOperatorStaff() != null ? e.getOperatorStaff().getId() : null)

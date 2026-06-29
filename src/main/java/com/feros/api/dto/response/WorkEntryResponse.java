@@ -13,6 +13,9 @@ import java.time.LocalDateTime;
 public class WorkEntryResponse {
     private Long id;
     private Long machineAssignmentId;
+    private String serialNumber;
+    private String equipmentTypeName;
+    private String divisionName;
     private WorkEntryStatus status;
 
     private OperatorType operatorType;
