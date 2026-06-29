@@ -23,4 +23,6 @@ public class LoginResponse {
     /** Null for ADMIN/SUPER_ADMIN (all modules visible). Non-null list of enabled module keys for other roles. */
     private List<String> allowedModules;
     private ModuleType moduleType;
+    private Boolean canAccessVehicles;
+    private Boolean canAccessEquipment;
 }
