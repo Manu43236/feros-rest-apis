@@ -54,6 +54,10 @@ public class MachineWorkEntry extends BaseEntity {
     @Column(name = "notes")
     private String notes;
 
+    // Snapshotted at start time — reflects which division the machine was working for at that session
+    @Column(name = "division_name")
+    private String divisionName;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     @Builder.Default

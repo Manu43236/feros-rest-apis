@@ -483,7 +483,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .machineAssignment(assignment)
                 .operatorType(req.getOperatorType())
                 .startTime(java.time.LocalDateTime.now())
-                .startMeter(req.getStartMeter());
+                .startMeter(req.getStartMeter())
+                .divisionName(assignment.getDivisionName()); // snapshot at start time
 
         if (req.getOperatorType() == OperatorType.OWN_STAFF) {
             StaffProfile staff = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(req.getOperatorStaffId(), tenantId())
@@ -536,7 +537,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .machineAssignmentId(a.getId())
                 .serialNumber(eq.getSerialNumber())
                 .equipmentTypeName(eq.getEquipmentType().getName())
-                .divisionName(a.getDivisionName())
+                .divisionName(e.getDivisionName()) // use snapshot, not current assignment state
                 .status(e.getStatus())
                 .operatorType(e.getOperatorType())
                 .operatorStaffId(e.getOperatorStaff() != null ? e.getOperatorStaff().getId() : null)
