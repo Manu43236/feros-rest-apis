@@ -467,6 +467,18 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         if (workEntryRepository.existsByMachineAssignmentIdAndStatus(assignmentId, WorkEntryStatus.ACTIVE))
             throw new FerosException("Machine is already running. Stop the current session first.", HttpStatus.CONFLICT);
 
+        // Meter continuity: start meter must be ≥ last completed session's end meter
+        workEntryRepository
+                .findTopByMachineAssignmentIdAndStatusOrderByEndTimeDesc(assignmentId, WorkEntryStatus.COMPLETED)
+                .ifPresent(last -> {
+                    if (last.getEndMeter() != null && req.getStartMeter() != null
+                            && req.getStartMeter().compareTo(last.getEndMeter()) < 0) {
+                        throw new FerosException(
+                                "Start meter (" + req.getStartMeter() + ") must be ≥ last session end meter (" + last.getEndMeter() + ")",
+                                HttpStatus.BAD_REQUEST);
+                    }
+                });
+
         MachineWorkEntry.MachineWorkEntryBuilder builder = MachineWorkEntry.builder()
                 .machineAssignment(assignment)
                 .operatorType(req.getOperatorType())

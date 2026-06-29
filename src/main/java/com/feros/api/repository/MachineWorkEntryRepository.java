@@ -16,4 +16,6 @@ public interface MachineWorkEntryRepository extends JpaRepository<MachineWorkEnt
     boolean existsByMachineAssignmentIdAndStatus(Long machineAssignmentId, WorkEntryStatus status);
 
     List<MachineWorkEntry> findByMachineAssignment_WorkOrder_IdOrderByStartTimeDesc(Long workOrderId);
+
+    Optional<MachineWorkEntry> findTopByMachineAssignmentIdAndStatusOrderByEndTimeDesc(Long machineAssignmentId, WorkEntryStatus status);
 }
