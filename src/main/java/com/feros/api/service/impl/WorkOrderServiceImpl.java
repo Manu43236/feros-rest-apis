@@ -113,7 +113,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .notes(req.getNotes());
 
         if (req.getOperatorStaffId() != null)
-            builder.operatorStaff(staffProfileRepository.findByIdAndTenantId(req.getOperatorStaffId(), t.getId())
+            builder.operatorStaff(staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(req.getOperatorStaffId(), t.getId())
                     .orElseThrow(() -> new FerosException("Staff not found", HttpStatus.NOT_FOUND)));
 
         WorkOrder saved = workOrderRepository.save(builder.build());
@@ -150,7 +150,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         wo.setNotes(req.getNotes());
 
         if (req.getOperatorStaffId() != null)
-            wo.setOperatorStaff(staffProfileRepository.findByIdAndTenantId(req.getOperatorStaffId(), tenantId())
+            wo.setOperatorStaff(staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(req.getOperatorStaffId(), tenantId())
                     .orElseThrow(() -> new FerosException("Staff not found", HttpStatus.NOT_FOUND)));
         else
             wo.setOperatorStaff(null);
@@ -431,7 +431,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
             assignment.setHiredOperatorName(null);
             assignment.setHiredOperatorPhone(null);
         } else if (req.getOperatorType() == com.feros.api.enums.OperatorType.OWN_STAFF) {
-            StaffProfile staff = staffProfileRepository.findByIdAndTenantId(req.getOperatorStaffId(), tenantId())
+            StaffProfile staff = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(req.getOperatorStaffId(), tenantId())
                     .orElseThrow(() -> new FerosException("Staff not found", HttpStatus.NOT_FOUND));
             assignment.setOperatorStaff(staff);
             assignment.setHiredOperatorName(null);
@@ -474,7 +474,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .startMeter(req.getStartMeter());
 
         if (req.getOperatorType() == OperatorType.OWN_STAFF) {
-            StaffProfile staff = staffProfileRepository.findByIdAndTenantId(req.getOperatorStaffId(), tenantId())
+            StaffProfile staff = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(req.getOperatorStaffId(), tenantId())
                     .orElseThrow(() -> new FerosException("Staff not found", HttpStatus.NOT_FOUND));
             builder.operatorStaff(staff);
         } else {
