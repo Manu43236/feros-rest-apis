@@ -77,7 +77,7 @@ public class ClientController {
     // ── Divisions ─────────────────────────────────────────────────────────────
 
     @GetMapping("/{id}/divisions")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<ClientDivisionResponse>>> getDivisions(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Divisions fetched", clientService.getDivisions(id)));
     }
