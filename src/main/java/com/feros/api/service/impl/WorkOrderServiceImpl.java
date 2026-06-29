@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.dto.request.AssignDivisionRequest;
 import com.feros.api.dto.request.DailyLogRequest;
 import com.feros.api.dto.request.MachineAssignmentRequest;
 import com.feros.api.dto.request.WorkOrderRequest;
@@ -37,6 +38,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     private final ClientRepository clientRepository;
     private final EquipmentRepository equipmentRepository;
     private final StaffProfileRepository staffProfileRepository;
+    private final MachineWorkEntryRepository workEntryRepository;
+    private final ClientDivisionRepository clientDivisionRepository;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
 
@@ -405,6 +408,123 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .endDate(a.getEndDate())
                 .endReason(a.getEndReason())
                 .isActive(a.getIsActive())
+                .operatorType(a.getOperatorType())
+                .operatorStaffId(a.getOperatorStaff() != null ? a.getOperatorStaff().getId() : null)
+                .operatorStaffName(a.getOperatorStaff() != null ? a.getOperatorStaff().getUser().getName() : null)
+                .hiredOperatorName(a.getHiredOperatorName())
+                .hiredOperatorPhone(a.getHiredOperatorPhone())
+                .activeWorkEntry(workEntryRepository
+                        .findByMachineAssignmentIdAndStatus(a.getId(), WorkEntryStatus.ACTIVE)
+                        .map(this::toWorkEntryResponse).orElse(null))
+                .divisionId(a.getDivisionId())
+                .divisionName(a.getDivisionName())
+                .build();
+    }
+
+    public MachineAssignmentResponse assignOperator(Long workOrderId, Long assignmentId, com.feros.api.dto.request.AssignOperatorRequest req) {
+        MachineAssignment assignment = machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
+                .orElseThrow(() -> new FerosException("Machine assignment not found", HttpStatus.NOT_FOUND));
+
+        assignment.setOperatorType(req.getOperatorType());
+        if (req.getOperatorType() == null) {
+            assignment.setOperatorStaff(null);
+            assignment.setHiredOperatorName(null);
+            assignment.setHiredOperatorPhone(null);
+        } else if (req.getOperatorType() == com.feros.api.enums.OperatorType.OWN_STAFF) {
+            StaffProfile staff = staffProfileRepository.findByIdAndTenantId(req.getOperatorStaffId(), tenantId())
+                    .orElseThrow(() -> new FerosException("Staff not found", HttpStatus.NOT_FOUND));
+            assignment.setOperatorStaff(staff);
+            assignment.setHiredOperatorName(null);
+            assignment.setHiredOperatorPhone(null);
+        } else {
+            assignment.setOperatorStaff(null);
+            assignment.setHiredOperatorName(req.getHiredOperatorName());
+            assignment.setHiredOperatorPhone(req.getHiredOperatorPhone());
+        }
+        return toAssignmentResponse(machineAssignmentRepository.save(assignment));
+    }
+
+    public MachineAssignmentResponse assignDivision(Long workOrderId, Long assignmentId, AssignDivisionRequest req) {
+        MachineAssignment assignment = machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
+                .orElseThrow(() -> new FerosException("Machine assignment not found", HttpStatus.NOT_FOUND));
+
+        if (req.getDivisionId() == null) {
+            assignment.setDivisionId(null);
+            assignment.setDivisionName(null);
+        } else {
+            ClientDivision division = clientDivisionRepository.findById(req.getDivisionId())
+                    .orElseThrow(() -> new FerosException("Division not found", HttpStatus.NOT_FOUND));
+            assignment.setDivisionId(division.getId());
+            assignment.setDivisionName(division.getName());
+        }
+        return toAssignmentResponse(machineAssignmentRepository.save(assignment));
+    }
+
+    public WorkEntryResponse startWork(Long workOrderId, Long assignmentId, com.feros.api.dto.request.StartWorkEntryRequest req) {
+        MachineAssignment assignment = machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
+                .orElseThrow(() -> new FerosException("Machine assignment not found", HttpStatus.NOT_FOUND));
+
+        if (workEntryRepository.existsByMachineAssignmentIdAndStatus(assignmentId, WorkEntryStatus.ACTIVE))
+            throw new FerosException("Machine is already running. Stop the current session first.", HttpStatus.CONFLICT);
+
+        MachineWorkEntry.MachineWorkEntryBuilder builder = MachineWorkEntry.builder()
+                .machineAssignment(assignment)
+                .operatorType(req.getOperatorType())
+                .startTime(java.time.LocalDateTime.now())
+                .startMeter(req.getStartMeter());
+
+        if (req.getOperatorType() == OperatorType.OWN_STAFF) {
+            StaffProfile staff = staffProfileRepository.findByIdAndTenantId(req.getOperatorStaffId(), tenantId())
+                    .orElseThrow(() -> new FerosException("Staff not found", HttpStatus.NOT_FOUND));
+            builder.operatorStaff(staff);
+        } else {
+            builder.hiredOperatorName(req.getHiredOperatorName());
+        }
+
+        return toWorkEntryResponse(workEntryRepository.save(builder.build()));
+    }
+
+    public WorkEntryResponse stopWork(Long workOrderId, Long assignmentId, com.feros.api.dto.request.StopWorkEntryRequest req) {
+        machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
+                .orElseThrow(() -> new FerosException("Machine assignment not found", HttpStatus.NOT_FOUND));
+
+        MachineWorkEntry entry = workEntryRepository.findByMachineAssignmentIdAndStatus(assignmentId, WorkEntryStatus.ACTIVE)
+                .orElseThrow(() -> new FerosException("No active session found for this machine", HttpStatus.NOT_FOUND));
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        entry.setEndTime(now);
+        entry.setEndMeter(req.getEndMeter());
+        entry.setNotes(req.getNotes());
+        entry.setStatus(WorkEntryStatus.COMPLETED);
+
+        if (entry.getStartMeter() != null && req.getEndMeter() != null)
+            entry.setHoursWorked(req.getEndMeter().subtract(entry.getStartMeter()).setScale(2, RoundingMode.HALF_UP));
+
+        return toWorkEntryResponse(workEntryRepository.save(entry));
+    }
+
+    public List<WorkEntryResponse> getWorkEntries(Long workOrderId, Long assignmentId) {
+        machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
+                .orElseThrow(() -> new FerosException("Machine assignment not found", HttpStatus.NOT_FOUND));
+        return workEntryRepository.findByMachineAssignmentIdOrderByStartTimeDesc(assignmentId)
+                .stream().map(this::toWorkEntryResponse).collect(Collectors.toList());
+    }
+
+    private WorkEntryResponse toWorkEntryResponse(MachineWorkEntry e) {
+        return WorkEntryResponse.builder()
+                .id(e.getId())
+                .machineAssignmentId(e.getMachineAssignment().getId())
+                .status(e.getStatus())
+                .operatorType(e.getOperatorType())
+                .operatorStaffId(e.getOperatorStaff() != null ? e.getOperatorStaff().getId() : null)
+                .operatorStaffName(e.getOperatorStaff() != null ? e.getOperatorStaff().getUser().getName() : null)
+                .hiredOperatorName(e.getHiredOperatorName())
+                .startTime(e.getStartTime())
+                .endTime(e.getEndTime())
+                .startMeter(e.getStartMeter())
+                .endMeter(e.getEndMeter())
+                .hoursWorked(e.getHoursWorked())
+                .notes(e.getNotes())
                 .build();
     }
 

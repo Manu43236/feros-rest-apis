@@ -1,5 +1,6 @@
 package com.feros.api.controller;
 
+import com.feros.api.dto.request.AssignDivisionRequest;
 import com.feros.api.dto.request.DailyLogRequest;
 import com.feros.api.dto.request.MachineAssignmentRequest;
 import com.feros.api.dto.request.WorkOrderRequest;
@@ -15,6 +16,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -79,6 +81,47 @@ public class WorkOrderController {
     public ResponseEntity<ApiResponse<MachineAssignmentResponse>> addMachine(
             @PathVariable Long id, @Valid @RequestBody MachineAssignmentRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Machine assigned", workOrderService.addMachine(id, request)));
+    }
+
+    @PutMapping("/{id}/machines/{assignmentId}/operator")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<MachineAssignmentResponse>> assignOperator(
+            @PathVariable Long id,
+            @PathVariable Long assignmentId,
+            @RequestBody com.feros.api.dto.request.AssignOperatorRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Operator assigned", workOrderService.assignOperator(id, assignmentId, request)));
+    }
+
+    @PostMapping("/{id}/machines/{assignmentId}/start")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<com.feros.api.dto.response.WorkEntryResponse>> startWork(
+            @PathVariable Long id, @PathVariable Long assignmentId,
+            @Valid @RequestBody com.feros.api.dto.request.StartWorkEntryRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Work started", workOrderService.startWork(id, assignmentId, request)));
+    }
+
+    @PutMapping("/{id}/machines/{assignmentId}/stop")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<com.feros.api.dto.response.WorkEntryResponse>> stopWork(
+            @PathVariable Long id, @PathVariable Long assignmentId,
+            @Valid @RequestBody com.feros.api.dto.request.StopWorkEntryRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Work stopped", workOrderService.stopWork(id, assignmentId, request)));
+    }
+
+    @GetMapping("/{id}/machines/{assignmentId}/work-entries")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<com.feros.api.dto.response.WorkEntryResponse>>> getWorkEntries(
+            @PathVariable Long id, @PathVariable Long assignmentId) {
+        return ResponseEntity.ok(ApiResponse.success("Work entries fetched", workOrderService.getWorkEntries(id, assignmentId)));
+    }
+
+    @PutMapping("/{id}/machines/{assignmentId}/division")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<MachineAssignmentResponse>> assignDivision(
+            @PathVariable Long id,
+            @PathVariable Long assignmentId,
+            @RequestBody AssignDivisionRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Division assigned", workOrderService.assignDivision(id, assignmentId, request)));
     }
 
     @PutMapping("/{id}/machines/{assignmentId}/close")

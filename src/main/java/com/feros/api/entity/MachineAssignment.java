@@ -1,6 +1,7 @@
 package com.feros.api.entity;
 
 import com.feros.api.enums.AssignmentEndReason;
+import com.feros.api.enums.OperatorType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -40,4 +41,24 @@ public class MachineAssignment extends BaseEntity {
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "operator_type")
+    private OperatorType operatorType;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "operator_staff_id")
+    private StaffProfile operatorStaff;
+
+    @Column(name = "hired_operator_name")
+    private String hiredOperatorName;
+
+    @Column(name = "hired_operator_phone")
+    private String hiredOperatorPhone;
+
+    @Column(name = "division_id")
+    private Long divisionId;
+
+    @Column(name = "division_name")
+    private String divisionName;
 }
