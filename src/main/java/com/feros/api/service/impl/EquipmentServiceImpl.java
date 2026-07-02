@@ -203,6 +203,8 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .id(e.getId())
                 .equipmentTypeId(type.getId())
                 .equipmentTypeName(type.getName())
+                .capacity(type.getCapacity())
+                .capacityUnit(type.getCapacityUnit())
                 .modelId(model.getId())
                 .modelName(model.getName())
                 .makeId(make.getId())

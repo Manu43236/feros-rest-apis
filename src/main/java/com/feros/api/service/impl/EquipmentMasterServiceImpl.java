@@ -123,6 +123,8 @@ public class EquipmentMasterServiceImpl implements EquipmentMasterService {
                 .model(model)
                 .name(request.getName())
                 .defaultMeterType(request.getDefaultMeterType())
+                .capacity(request.getCapacity())
+                .capacityUnit(request.getCapacityUnit())
                 .isActive(true)
                 .build();
         return toTypeResponse(typeRepository.save(type));
@@ -134,6 +136,8 @@ public class EquipmentMasterServiceImpl implements EquipmentMasterService {
         type.setModel(findModel(request.getModelId()));
         type.setName(request.getName());
         type.setDefaultMeterType(request.getDefaultMeterType());
+        type.setCapacity(request.getCapacity());
+        type.setCapacityUnit(request.getCapacityUnit());
         return toTypeResponse(typeRepository.save(type));
     }
 
@@ -193,6 +197,8 @@ public class EquipmentMasterServiceImpl implements EquipmentMasterService {
                 .makeId(model.getMake().getId())
                 .makeName(model.getMake().getName())
                 .defaultMeterType(t.getDefaultMeterType())
+                .capacity(t.getCapacity())
+                .capacityUnit(t.getCapacityUnit())
                 .isActive(t.getIsActive())
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())

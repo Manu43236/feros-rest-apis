@@ -3,6 +3,7 @@ package com.feros.api.entity.master;
 import com.feros.api.entity.BaseEntity;
 import com.feros.api.enums.MeterType;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import lombok.*;
 
 @Entity
@@ -28,6 +29,12 @@ public class EquipmentType extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "default_meter_type", nullable = false)
     private MeterType defaultMeterType;
+
+    @Column(name = "capacity", precision = 10, scale = 2)
+    private BigDecimal capacity;
+
+    @Column(name = "capacity_unit", length = 10)
+    private String capacityUnit;
 
     @Column(name = "is_active")
     private Boolean isActive = true;

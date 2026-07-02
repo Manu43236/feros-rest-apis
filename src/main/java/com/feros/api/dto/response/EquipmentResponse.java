@@ -20,6 +20,8 @@ public class EquipmentResponse {
     // Catalog info (resolved)
     private Long equipmentTypeId;
     private String equipmentTypeName;
+    private BigDecimal capacity;
+    private String capacityUnit;
     private Long modelId;
     private String modelName;
     private Long makeId;

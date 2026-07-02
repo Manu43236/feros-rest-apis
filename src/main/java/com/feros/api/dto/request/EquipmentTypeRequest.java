@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
+import java.math.BigDecimal;
 
 @Getter
 @Setter
@@ -18,4 +19,7 @@ public class EquipmentTypeRequest {
 
     @NotNull(message = "Default meter type is required")
     private MeterType defaultMeterType;
+
+    private BigDecimal capacity;
+    private String capacityUnit;
 }
