@@ -15,4 +15,5 @@ public interface EquipmentDailyLogRepository extends JpaRepository<EquipmentDail
     List<EquipmentDailyLog> findByWorkOrderIdAndStatus(Long workOrderId, DailyLogStatus status);
     boolean existsByMachineAssignmentIdAndLogDate(Long machineAssignmentId, LocalDate logDate);
     Optional<EquipmentDailyLog> findByIdAndWorkOrderId(Long id, Long workOrderId);
+    Optional<EquipmentDailyLog> findTopByMachineAssignmentIdOrderByLogDateDescIdDesc(Long machineAssignmentId);
 }

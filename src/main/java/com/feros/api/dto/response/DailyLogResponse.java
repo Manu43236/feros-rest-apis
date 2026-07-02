@@ -7,6 +7,7 @@ import lombok.Getter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Builder
@@ -16,6 +17,7 @@ public class DailyLogResponse {
     private Long workOrderId;
     private LocalDate logDate;
     private DailyLogStatus status;
+    // Aggregates computed from division lines
     private BigDecimal startHourMeter;
     private BigDecimal endHourMeter;
     private BigDecimal hoursWorked;
@@ -24,8 +26,8 @@ public class DailyLogResponse {
     // denormalized for display
     private String serialNumber;
     private String equipmentTypeName;
-    private String divisionName;
     private String source; // MANUAL or AUTO
+    private List<DailyLogDivisionResponse> divisions;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

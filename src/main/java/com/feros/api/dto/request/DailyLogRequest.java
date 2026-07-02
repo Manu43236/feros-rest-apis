@@ -7,6 +7,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Setter
@@ -21,9 +22,9 @@ public class DailyLogRequest {
     @NotNull(message = "Status is required")
     private DailyLogStatus status;
 
-    private BigDecimal startHourMeter;
-    private BigDecimal endHourMeter;
     private BigDecimal fuelConsumed;
     private String notes;
-    private Long divisionId;
+
+    // Each division line: division + HMR range + notes
+    private List<DailyLogDivisionRequest> divisions;
 }

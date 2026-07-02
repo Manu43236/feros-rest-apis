@@ -1,6 +1,7 @@
 package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.AssignDivisionRequest;
+import com.feros.api.dto.request.DailyLogDivisionRequest;
 import com.feros.api.dto.request.DailyLogRequest;
 import com.feros.api.dto.request.MachineAssignmentRequest;
 import com.feros.api.dto.request.WorkOrderRequest;
@@ -40,6 +41,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     private final StaffProfileRepository staffProfileRepository;
     private final MachineWorkEntryRepository workEntryRepository;
     private final ClientDivisionRepository clientDivisionRepository;
+    private final DailyLogDivisionRepository dailyLogDivisionRepository;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
 
@@ -246,7 +248,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     @Override
     @Transactional
     public DailyLogResponse addLog(Long workOrderId, DailyLogRequest req) {
-        WorkOrder wo = fetchWo(workOrderId);
+        fetchWo(workOrderId);
 
         MachineAssignment assignment = machineAssignmentRepository
                 .findByIdAndWorkOrderId(req.getMachineAssignmentId(), workOrderId)
@@ -255,13 +257,39 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         if (dailyLogRepository.existsByMachineAssignmentIdAndLogDate(assignment.getId(), req.getLogDate()))
             throw new FerosException("A log already exists for this machine on " + req.getLogDate(), HttpStatus.CONFLICT);
 
-        BigDecimal hours = calcHours(req.getStartHourMeter(), req.getEndHourMeter());
+        List<DailyLogDivisionRequest> divReqs = req.getDivisions() != null ? req.getDivisions() : List.of();
 
-        String divisionName = null;
-        if (req.getDivisionId() != null)
-            divisionName = clientDivisionRepository.findById(req.getDivisionId())
-                    .map(d -> d.getName())
-                    .orElse(null);
+        // Validate HMR continuity on first division against last saved log
+        if (!divReqs.isEmpty() && divReqs.get(0).getStartHourMeter() != null) {
+            dailyLogRepository.findTopByMachineAssignmentIdOrderByLogDateDescIdDesc(assignment.getId())
+                    .ifPresent(last -> {
+                        if (last.getEndHourMeter() != null &&
+                                divReqs.get(0).getStartHourMeter().compareTo(last.getEndHourMeter()) < 0)
+                            throw new FerosException(
+                                "Start HM (" + divReqs.get(0).getStartHourMeter() + ") must be ≥ last log end HM (" + last.getEndHourMeter() + ")",
+                                HttpStatus.BAD_REQUEST);
+                    });
+        }
+
+        // Validate each division: endHMR > startHMR
+        for (DailyLogDivisionRequest d : divReqs) {
+            if (d.getStartHourMeter() != null && d.getEndHourMeter() != null
+                    && d.getEndHourMeter().compareTo(d.getStartHourMeter()) <= 0)
+                throw new FerosException("End HM must be greater than Start HM for each division", HttpStatus.BAD_REQUEST);
+        }
+
+        // Compute aggregate HMR and hours from division lines
+        BigDecimal startHmr = divReqs.stream().filter(d -> d.getStartHourMeter() != null)
+                .map(DailyLogDivisionRequest::getStartHourMeter)
+                .min(BigDecimal::compareTo).orElse(null);
+        BigDecimal endHmr = divReqs.stream().filter(d -> d.getEndHourMeter() != null)
+                .map(DailyLogDivisionRequest::getEndHourMeter)
+                .max(BigDecimal::compareTo).orElse(null);
+        BigDecimal totalHours = divReqs.stream()
+                .map(d -> calcHours(d.getStartHourMeter(), d.getEndHourMeter()))
+                .filter(h -> h != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (totalHours.compareTo(BigDecimal.ZERO) == 0) totalHours = null;
 
         EquipmentDailyLog log = dailyLogRepository.save(
                 EquipmentDailyLog.builder()
@@ -269,14 +297,14 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                         .workOrderId(workOrderId)
                         .logDate(req.getLogDate())
                         .status(req.getStatus())
-                        .startHourMeter(req.getStartHourMeter())
-                        .endHourMeter(req.getEndHourMeter())
-                        .hoursWorked(hours)
+                        .startHourMeter(startHmr)
+                        .endHourMeter(endHmr)
+                        .hoursWorked(totalHours)
                         .fuelConsumed(req.getFuelConsumed())
                         .notes(req.getNotes())
-                        .divisionName(divisionName)
                         .build());
 
+        saveDivisions(log, divReqs);
         return toLogResponse(log, assignment);
     }
 
@@ -285,24 +313,42 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     public DailyLogResponse updateLog(Long workOrderId, Long logId, DailyLogRequest req) {
         if (!workOrderRepository.existsByIdAndTenantId(workOrderId, tenantId()))
             throw new FerosException("Work order not found", HttpStatus.NOT_FOUND);
-        // verify WO belongs to tenant (existsByIdAndTenantId already checked above)
 
         EquipmentDailyLog log = dailyLogRepository.findByIdAndWorkOrderId(logId, workOrderId)
                 .orElseThrow(() -> new FerosException("Log not found", HttpStatus.NOT_FOUND));
 
+        List<DailyLogDivisionRequest> divReqs = req.getDivisions() != null ? req.getDivisions() : List.of();
+
+        // Validate each division: endHMR > startHMR
+        for (DailyLogDivisionRequest d : divReqs) {
+            if (d.getStartHourMeter() != null && d.getEndHourMeter() != null
+                    && d.getEndHourMeter().compareTo(d.getStartHourMeter()) <= 0)
+                throw new FerosException("End HM must be greater than Start HM for each division", HttpStatus.BAD_REQUEST);
+        }
+
+        BigDecimal startHmr = divReqs.stream().filter(d -> d.getStartHourMeter() != null)
+                .map(DailyLogDivisionRequest::getStartHourMeter)
+                .min(BigDecimal::compareTo).orElse(null);
+        BigDecimal endHmr = divReqs.stream().filter(d -> d.getEndHourMeter() != null)
+                .map(DailyLogDivisionRequest::getEndHourMeter)
+                .max(BigDecimal::compareTo).orElse(null);
+        BigDecimal totalHours = divReqs.stream()
+                .map(d -> calcHours(d.getStartHourMeter(), d.getEndHourMeter()))
+                .filter(h -> h != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (totalHours.compareTo(BigDecimal.ZERO) == 0) totalHours = null;
+
         log.setStatus(req.getStatus());
-        log.setStartHourMeter(req.getStartHourMeter());
-        log.setEndHourMeter(req.getEndHourMeter());
-        log.setHoursWorked(calcHours(req.getStartHourMeter(), req.getEndHourMeter()));
+        log.setStartHourMeter(startHmr);
+        log.setEndHourMeter(endHmr);
+        log.setHoursWorked(totalHours);
         log.setFuelConsumed(req.getFuelConsumed());
         log.setNotes(req.getNotes());
-        if (req.getDivisionId() != null)
-            log.setDivisionName(clientDivisionRepository.findById(req.getDivisionId()).map(d -> d.getName()).orElse(null));
-        else
-            log.setDivisionName(null);
+        log.getDivisions().clear();
+        dailyLogRepository.save(log);
 
-        MachineAssignment assignment = log.getMachineAssignment();
-        return toLogResponse(dailyLogRepository.save(log), assignment);
+        saveDivisions(log, divReqs);
+        return toLogResponse(log, log.getMachineAssignment());
     }
 
     @Override
@@ -563,8 +609,39 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .build();
     }
 
+    private void saveDivisions(EquipmentDailyLog log, List<DailyLogDivisionRequest> divReqs) {
+        for (DailyLogDivisionRequest d : divReqs) {
+            String divName = null;
+            if (d.getDivisionId() != null)
+                divName = clientDivisionRepository.findById(d.getDivisionId()).map(cd -> cd.getName()).orElse(null);
+
+            BigDecimal hours = calcHours(d.getStartHourMeter(), d.getEndHourMeter());
+
+            dailyLogDivisionRepository.save(DailyLogDivision.builder()
+                    .dailyLog(log)
+                    .divisionName(divName)
+                    .startHourMeter(d.getStartHourMeter())
+                    .endHourMeter(d.getEndHourMeter())
+                    .hoursWorked(hours)
+                    .notes(d.getNotes())
+                    .build());
+        }
+    }
+
     private DailyLogResponse toLogResponse(EquipmentDailyLog l, MachineAssignment assignment) {
         Equipment eq = assignment != null ? assignment.getEquipment() : null;
+        List<DailyLogDivisionResponse> divResponses = dailyLogDivisionRepository.findByDailyLogId(l.getId())
+                .stream()
+                .map(d -> DailyLogDivisionResponse.builder()
+                        .id(d.getId())
+                        .divisionName(d.getDivisionName())
+                        .startHourMeter(d.getStartHourMeter())
+                        .endHourMeter(d.getEndHourMeter())
+                        .hoursWorked(d.getHoursWorked())
+                        .notes(d.getNotes())
+                        .build())
+                .collect(Collectors.toList());
+
         return DailyLogResponse.builder()
                 .id(l.getId())
                 .machineAssignmentId(l.getMachineAssignment().getId())
@@ -576,10 +653,10 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .hoursWorked(l.getHoursWorked())
                 .fuelConsumed(l.getFuelConsumed())
                 .notes(l.getNotes())
-                .divisionName(l.getDivisionName())
                 .source(l.getSource())
                 .serialNumber(eq != null ? eq.getSerialNumber() : null)
                 .equipmentTypeName(eq != null ? eq.getEquipmentType().getName() : null)
+                .divisions(divResponses)
                 .createdAt(l.getCreatedAt())
                 .updatedAt(l.getUpdatedAt())
                 .build();

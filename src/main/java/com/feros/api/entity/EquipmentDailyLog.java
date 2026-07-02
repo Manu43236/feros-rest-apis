@@ -6,6 +6,8 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "equipment_daily_logs",
@@ -36,6 +38,7 @@ public class EquipmentDailyLog extends BaseEntity {
     @Column(name = "status", nullable = false)
     private DailyLogStatus status;
 
+    // Aggregate computed from division lines: min(startHMR), max(endHMR), sum(hours)
     @Column(name = "start_hour_meter", precision = 10, scale = 2)
     private BigDecimal startHourMeter;
 
@@ -51,11 +54,12 @@ public class EquipmentDailyLog extends BaseEntity {
     @Column(name = "notes")
     private String notes;
 
-    @Column(name = "division_name")
-    private String divisionName;
-
     // MANUAL = office staff entered | AUTO = midnight scheduler generated
     @Column(name = "source", nullable = false)
     @Builder.Default
     private String source = "MANUAL";
+
+    @OneToMany(mappedBy = "dailyLog", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<DailyLogDivision> divisions = new ArrayList<>();
 }
