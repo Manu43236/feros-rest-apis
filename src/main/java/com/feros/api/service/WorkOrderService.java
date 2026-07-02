@@ -49,6 +49,8 @@ public interface WorkOrderService {
 
     List<WorkEntryResponse> getAllWorkEntries(Long workOrderId);
 
+    List<DailyLogResponse> getLogs(Long workOrderId, LocalDate from, LocalDate to);
+
     DailyLogResponse addLog(Long workOrderId, DailyLogRequest request);
 
     DailyLogResponse updateLog(Long workOrderId, Long logId, DailyLogRequest request);

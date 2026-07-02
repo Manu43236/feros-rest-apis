@@ -354,6 +354,17 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     }
 
     @Override
+    public List<DailyLogResponse> getLogs(Long workOrderId, LocalDate from, LocalDate to) {
+        fetchWo(workOrderId);
+        List<EquipmentDailyLog> logs = (from != null && to != null)
+                ? dailyLogRepository.findByWorkOrderIdAndLogDateBetween(workOrderId, from, to)
+                : dailyLogRepository.findByWorkOrderIdOrderByLogDateAscIdAsc(workOrderId);
+        return logs.stream()
+                .map(l -> toLogResponse(l, l.getMachineAssignment()))
+                .collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional
     public void deleteLog(Long workOrderId, Long logId) {
         if (!workOrderRepository.existsByIdAndTenantId(workOrderId, tenantId()))

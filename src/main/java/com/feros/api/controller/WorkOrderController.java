@@ -145,6 +145,15 @@ public class WorkOrderController {
 
     // ── Daily Logs ────────────────────────────────────────────────────────────
 
+    @GetMapping("/{id}/logs")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<DailyLogResponse>>> getLogs(
+            @PathVariable Long id,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success("Logs fetched", workOrderService.getLogs(id, from, to)));
+    }
+
     @PostMapping("/{id}/logs")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<DailyLogResponse>> addLog(
