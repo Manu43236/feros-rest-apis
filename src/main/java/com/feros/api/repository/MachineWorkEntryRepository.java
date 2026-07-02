@@ -18,4 +18,12 @@ public interface MachineWorkEntryRepository extends JpaRepository<MachineWorkEnt
     List<MachineWorkEntry> findByMachineAssignment_WorkOrder_IdOrderByStartTimeDesc(Long workOrderId);
 
     Optional<MachineWorkEntry> findTopByMachineAssignmentIdAndStatusOrderByEndTimeDesc(Long machineAssignmentId, WorkEntryStatus status);
+
+    // For scheduler — all completed entries for a machine assignment on a given day
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT e FROM MachineWorkEntry e WHERE e.machineAssignment.id = :assignmentId " +
+        "AND e.status = 'COMPLETED' AND FUNCTION('DATE', e.startTime) = :date")
+    List<MachineWorkEntry> findCompletedByAssignmentAndDate(
+        @org.springframework.data.repository.query.Param("assignmentId") Long assignmentId,
+        @org.springframework.data.repository.query.Param("date") java.time.LocalDate date);
 }

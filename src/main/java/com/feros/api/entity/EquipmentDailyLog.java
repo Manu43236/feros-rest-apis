@@ -50,4 +50,12 @@ public class EquipmentDailyLog extends BaseEntity {
 
     @Column(name = "notes")
     private String notes;
+
+    @Column(name = "division_name")
+    private String divisionName;
+
+    // MANUAL = office staff entered | AUTO = midnight scheduler generated
+    @Column(name = "source", nullable = false)
+    @Builder.Default
+    private String source = "MANUAL";
 }

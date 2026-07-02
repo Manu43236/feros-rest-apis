@@ -25,4 +25,5 @@ public class DailyLogRequest {
     private BigDecimal endHourMeter;
     private BigDecimal fuelConsumed;
     private String notes;
+    private Long divisionId;
 }

@@ -24,6 +24,8 @@ public class DailyLogResponse {
     // denormalized for display
     private String serialNumber;
     private String equipmentTypeName;
+    private String divisionName;
+    private String source; // MANUAL or AUTO
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

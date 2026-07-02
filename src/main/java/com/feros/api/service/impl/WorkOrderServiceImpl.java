@@ -257,6 +257,12 @@ public class WorkOrderServiceImpl implements WorkOrderService {
 
         BigDecimal hours = calcHours(req.getStartHourMeter(), req.getEndHourMeter());
 
+        String divisionName = null;
+        if (req.getDivisionId() != null)
+            divisionName = clientDivisionRepository.findById(req.getDivisionId())
+                    .map(d -> d.getName())
+                    .orElse(null);
+
         EquipmentDailyLog log = dailyLogRepository.save(
                 EquipmentDailyLog.builder()
                         .machineAssignment(assignment)
@@ -268,6 +274,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                         .hoursWorked(hours)
                         .fuelConsumed(req.getFuelConsumed())
                         .notes(req.getNotes())
+                        .divisionName(divisionName)
                         .build());
 
         return toLogResponse(log, assignment);
@@ -289,6 +296,10 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         log.setHoursWorked(calcHours(req.getStartHourMeter(), req.getEndHourMeter()));
         log.setFuelConsumed(req.getFuelConsumed());
         log.setNotes(req.getNotes());
+        if (req.getDivisionId() != null)
+            log.setDivisionName(clientDivisionRepository.findById(req.getDivisionId()).map(d -> d.getName()).orElse(null));
+        else
+            log.setDivisionName(null);
 
         MachineAssignment assignment = log.getMachineAssignment();
         return toLogResponse(dailyLogRepository.save(log), assignment);
@@ -565,6 +576,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .hoursWorked(l.getHoursWorked())
                 .fuelConsumed(l.getFuelConsumed())
                 .notes(l.getNotes())
+                .divisionName(l.getDivisionName())
+                .source(l.getSource())
                 .serialNumber(eq != null ? eq.getSerialNumber() : null)
                 .equipmentTypeName(eq != null ? eq.getEquipmentType().getName() : null)
                 .createdAt(l.getCreatedAt())
