@@ -2,9 +2,11 @@ package com.feros.api.dto.response;
 
 import com.feros.api.enums.AssignmentEndReason;
 import com.feros.api.enums.OperatorType;
+import com.feros.api.enums.RateType;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Getter
@@ -29,4 +31,6 @@ public class MachineAssignmentResponse {
     private WorkEntryResponse activeWorkEntry;
     private Long divisionId;
     private String divisionName;
+    private RateType rateType;
+    private BigDecimal rateAmount;
 }

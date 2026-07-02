@@ -31,7 +31,8 @@ public final class NumberUtil {
         CN,    // Credit Note
         SVC,   // Vehicle Service
         PART,  // Spare Part
-        WO     // Work Order
+        WO,    // Work Order
+        EINV   // Equipment Invoice
     }
 
     /**

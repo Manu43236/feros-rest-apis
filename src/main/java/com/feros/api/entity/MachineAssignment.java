@@ -2,7 +2,10 @@ package com.feros.api.entity;
 
 import com.feros.api.enums.AssignmentEndReason;
 import com.feros.api.enums.OperatorType;
+import com.feros.api.enums.RateType;
 import jakarta.persistence.*;
+
+import java.math.BigDecimal;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -61,4 +64,12 @@ public class MachineAssignment extends BaseEntity {
 
     @Column(name = "division_name")
     private String divisionName;
+
+    // Per-machine billing rate — overrides WO rate when set
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rate_type")
+    private RateType rateType;
+
+    @Column(name = "rate_amount", precision = 12, scale = 2)
+    private BigDecimal rateAmount;
 }

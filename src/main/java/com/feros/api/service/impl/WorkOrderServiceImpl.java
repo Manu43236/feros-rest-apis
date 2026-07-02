@@ -218,6 +218,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                         .workOrder(wo)
                         .equipment(equipment)
                         .startDate(req.getStartDate() != null ? req.getStartDate() : LocalDate.now())
+                        .rateType(req.getRateType())
+                        .rateAmount(req.getRateAmount())
                         .build());
 
         equipment.setWorkStatus(EquipmentWorkStatus.ASSIGNED);
@@ -475,6 +477,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                         .map(this::toWorkEntryResponse).orElse(null))
                 .divisionId(a.getDivisionId())
                 .divisionName(a.getDivisionName())
+                .rateType(a.getRateType())
+                .rateAmount(a.getRateAmount())
                 .build();
     }
 
