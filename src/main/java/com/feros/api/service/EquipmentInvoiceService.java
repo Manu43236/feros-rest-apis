@@ -12,10 +12,11 @@ import java.util.List;
 public interface EquipmentInvoiceService {
 
     EquipmentInvoiceResponse create(Long woId, EquipmentInvoiceRequest request);
+    EquipmentInvoiceResponse createForClient(EquipmentInvoiceRequest request);
 
     List<EquipmentInvoiceResponse> getByWorkOrder(Long woId);
 
-    Page<EquipmentInvoiceResponse> getAll(int page, int size, EquipmentInvoiceStatus status);
+    Page<EquipmentInvoiceResponse> getAll(int page, int size, EquipmentInvoiceStatus status, Long clientId);
 
     EquipmentInvoiceResponse getById(Long id);
 
@@ -26,4 +27,5 @@ public interface EquipmentInvoiceService {
     void delete(Long id);
 
     List<EquipmentInvoicePrefillResponse> prefill(Long woId, LocalDate from, LocalDate to);
+    List<EquipmentInvoicePrefillResponse> prefillByClient(Long clientId, LocalDate from, LocalDate to);
 }

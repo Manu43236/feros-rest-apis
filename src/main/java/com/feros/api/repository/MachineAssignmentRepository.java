@@ -12,4 +12,6 @@ public interface MachineAssignmentRepository extends JpaRepository<MachineAssign
     Optional<MachineAssignment> findByIdAndWorkOrderId(Long id, Long workOrderId);
     boolean existsByEquipmentIdAndIsActiveTrue(Long equipmentId);
     long countByWorkOrderId(Long workOrderId);
+    List<MachineAssignment> findByWorkOrder_Client_IdAndWorkOrder_Tenant_Id(Long clientId, Long tenantId);
+    Optional<MachineAssignment> findByIdAndWorkOrder_Tenant_Id(Long id, Long tenantId);
 }

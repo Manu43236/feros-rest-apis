@@ -9,6 +9,8 @@ import java.math.BigDecimal;
 @Builder
 public class EquipmentInvoicePrefillResponse {
     private Long machineAssignmentId;
+    private Long workOrderId;
+    private String woNumber;
     private String serialNumber;
     private String equipmentTypeName;
     private BigDecimal suggestedHours;   // sum of hoursWorked in period

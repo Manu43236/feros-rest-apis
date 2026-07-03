@@ -18,4 +18,6 @@ public interface EquipmentDailyLogRepository extends JpaRepository<EquipmentDail
     Optional<EquipmentDailyLog> findTopByMachineAssignmentIdOrderByLogDateDescIdDesc(Long machineAssignmentId);
 
     List<EquipmentDailyLog> findByWorkOrderIdAndLogDateBetween(Long workOrderId, LocalDate from, LocalDate to);
+    List<EquipmentDailyLog> findByMachineAssignmentIdInAndLogDateBetween(List<Long> assignmentIds, LocalDate from, LocalDate to);
+    List<EquipmentDailyLog> findByMachineAssignmentIdIn(List<Long> assignmentIds);
 }

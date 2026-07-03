@@ -13,6 +13,7 @@ import com.feros.api.exception.FerosException;
 import com.feros.api.repository.EquipmentDailyLogRepository;
 import com.feros.api.repository.EquipmentInvoiceRepository;
 import com.feros.api.repository.MachineAssignmentRepository;
+import com.feros.api.repository.ClientRepository;
 import com.feros.api.repository.TenantRepository;
 import com.feros.api.repository.WorkOrderRepository;
 import com.feros.api.service.EquipmentInvoiceService;
@@ -44,6 +45,7 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
     private final MachineAssignmentRepository assignmentRepository;
     private final EquipmentDailyLogRepository dailyLogRepository;
     private final TenantRepository tenantRepository;
+    private final ClientRepository clientRepository;
 
     private Long tenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -86,18 +88,47 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
         return toResponse(invoiceRepository.save(invoice));
     }
 
+    @Override
+    @Transactional
+    public EquipmentInvoiceResponse createForClient(EquipmentInvoiceRequest req) {
+        if (req.getClientId() == null) {
+            throw new FerosException("clientId is required", HttpStatus.BAD_REQUEST);
+        }
+        Tenant t = tenant();
+        Client client = clientRepository.findByIdAndTenantIdAndIsActiveTrue(req.getClientId(), t.getId())
+                .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
+
+        EquipmentInvoice invoice = EquipmentInvoice.builder()
+                .tenant(t)
+                .workOrder(null)
+                .client(client)
+                .invoiceNumber(NumberUtil.generate(t.getPrefix(), t.getId(), NumberUtil.Type.EINV))
+                .invoiceDate(req.getInvoiceDate())
+                .dueDate(req.getDueDate())
+                .billingPeriodStart(req.getBillingPeriodStart())
+                .billingPeriodEnd(req.getBillingPeriodEnd())
+                .taxPercent(req.getTaxPercent() != null ? req.getTaxPercent() : BigDecimal.ZERO)
+                .notes(req.getNotes())
+                .build();
+
+        buildItems(invoice, req.getItems(), null);
+        computeTotals(invoice);
+
+        return toResponse(invoiceRepository.save(invoice));
+    }
+
     // ── Read ───────────────────────────────────────────────────────────────────
 
     @Override
     public List<EquipmentInvoiceResponse> getByWorkOrder(Long woId) {
         workOrder(woId); // validates WO belongs to tenant
-        return invoiceRepository.findByWorkOrderIdOrderByCreatedAtDesc(woId)
+        return invoiceRepository.findByWorkOrderViaItems(tenantId(), woId)
                 .stream().map(this::toResponse).toList();
     }
 
     @Override
-    public Page<EquipmentInvoiceResponse> getAll(int page, int size, EquipmentInvoiceStatus status) {
-        return invoiceRepository.findAllPaged(tenantId(), status,
+    public Page<EquipmentInvoiceResponse> getAll(int page, int size, EquipmentInvoiceStatus status, Long clientId) {
+        return invoiceRepository.findAllPaged(tenantId(), status, clientId,
                         PageRequest.of(page, size, Sort.by("createdAt").descending()))
                 .map(this::toResponse);
     }
@@ -117,7 +148,6 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
             throw new FerosException("Only DRAFT invoices can be edited", HttpStatus.BAD_REQUEST);
         }
 
-        WorkOrder wo = invoice.getWorkOrder();
         invoice.setInvoiceDate(req.getInvoiceDate());
         invoice.setDueDate(req.getDueDate());
         invoice.setBillingPeriodStart(req.getBillingPeriodStart());
@@ -126,7 +156,7 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
         invoice.setNotes(req.getNotes());
 
         invoice.getItems().clear();
-        buildItems(invoice, req.getItems(), wo);
+        buildItems(invoice, req.getItems(), invoice.getWorkOrder()); // null-safe: workOrder may be null
         computeTotals(invoice);
 
         return toResponse(invoiceRepository.save(invoice));
@@ -157,16 +187,30 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
     @Override
     public List<EquipmentInvoicePrefillResponse> prefill(Long woId, LocalDate from, LocalDate to) {
         WorkOrder wo = workOrder(woId);
-
-        List<MachineAssignment> assignments =
-                assignmentRepository.findByWorkOrderIdOrderByStartDateAsc(woId);
-
+        List<MachineAssignment> assignments = assignmentRepository.findByWorkOrderIdOrderByStartDateAsc(woId);
         List<EquipmentDailyLog> logs = from != null && to != null
                 ? dailyLogRepository.findByWorkOrderIdAndLogDateBetween(woId, from, to)
                 : dailyLogRepository.findByWorkOrderIdOrderByLogDateAscIdAsc(woId);
+        return buildPrefillList(assignments, logs, from, to, wo);
+    }
 
-        // WORKING only → hours (machine actually ran)
-        // WORKING + IDLE → days (machine was on site and available; breakdown/no-machine days excluded)
+    @Override
+    public List<EquipmentInvoicePrefillResponse> prefillByClient(Long clientId, LocalDate from, LocalDate to) {
+        List<MachineAssignment> assignments =
+                assignmentRepository.findByWorkOrder_Client_IdAndWorkOrder_Tenant_Id(clientId, tenantId());
+        if (assignments.isEmpty()) return List.of();
+
+        List<Long> assignmentIds = assignments.stream().map(MachineAssignment::getId).toList();
+        List<EquipmentDailyLog> logs = from != null && to != null
+                ? dailyLogRepository.findByMachineAssignmentIdInAndLogDateBetween(assignmentIds, from, to)
+                : dailyLogRepository.findByMachineAssignmentIdIn(assignmentIds);
+        return buildPrefillList(assignments, logs, from, to, null);
+    }
+
+    private List<EquipmentInvoicePrefillResponse> buildPrefillList(
+            List<MachineAssignment> assignments, List<EquipmentDailyLog> logs,
+            LocalDate from, LocalDate to, WorkOrder wo) {
+
         Map<Long, List<EquipmentDailyLog>> workingByAssignment = logs.stream()
                 .filter(l -> l.getStatus() == DailyLogStatus.WORKING)
                 .collect(Collectors.groupingBy(l -> l.getMachineAssignment().getId()));
@@ -175,24 +219,28 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
                 .filter(l -> l.getStatus() == DailyLogStatus.WORKING || l.getStatus() == DailyLogStatus.IDLE)
                 .collect(Collectors.groupingBy(l -> l.getMachineAssignment().getId()));
 
-        BigDecimal periodMonths = computePeriodMonths(from, to, wo);
-
         List<EquipmentInvoicePrefillResponse> result = new ArrayList<>();
         for (MachineAssignment a : assignments) {
-            List<EquipmentDailyLog> workingLogs  = workingByAssignment.getOrDefault(a.getId(), List.of());
-            List<EquipmentDailyLog> billableLogs  = billableDaysByAssignment.getOrDefault(a.getId(), List.of());
+            List<EquipmentDailyLog> workingLogs = workingByAssignment.getOrDefault(a.getId(), List.of());
+            List<EquipmentDailyLog> billableLogs = billableDaysByAssignment.getOrDefault(a.getId(), List.of());
             Equipment eq = a.getEquipment();
+            WorkOrder aWo = a.getWorkOrder();
 
             BigDecimal totalHours = workingLogs.stream()
                     .map(l -> l.getHoursWorked() != null ? l.getHoursWorked() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            // Per-machine rate overrides WO rate
-            BigDecimal effectiveRate = a.getRateAmount() != null ? a.getRateAmount() : wo.getRateAmount();
-            String effectiveRateType = a.getRateType() != null ? a.getRateType().name() : wo.getRateType().name();
+            BigDecimal effectiveRate = a.getRateAmount() != null ? a.getRateAmount()
+                    : (aWo.getRateAmount() != null ? aWo.getRateAmount() : BigDecimal.ZERO);
+            String effectiveRateType = a.getRateType() != null ? a.getRateType().name()
+                    : (aWo.getRateType() != null ? aWo.getRateType().name() : "HOURLY");
+
+            BigDecimal periodMonths = computePeriodMonths(from, to, aWo);
 
             result.add(EquipmentInvoicePrefillResponse.builder()
                     .machineAssignmentId(a.getId())
+                    .workOrderId(aWo.getId())
+                    .woNumber(aWo.getWoNumber())
                     .serialNumber(eq.getSerialNumber())
                     .equipmentTypeName(eq.getEquipmentType().getName())
                     .suggestedHours(totalHours)
@@ -222,9 +270,11 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
                 if (req.getMachineAssignmentId() == null) {
                     throw new FerosException("machineAssignmentId required for MACHINE items", HttpStatus.BAD_REQUEST);
                 }
-                MachineAssignment a = assignmentRepository.findByIdAndWorkOrderId(
-                        req.getMachineAssignmentId(), wo.getId())
-                        .orElseThrow(() -> new FerosException("Machine assignment not found", HttpStatus.NOT_FOUND));
+                MachineAssignment a = wo != null
+                        ? assignmentRepository.findByIdAndWorkOrderId(req.getMachineAssignmentId(), wo.getId())
+                                .orElseThrow(() -> new FerosException("Machine assignment not found", HttpStatus.NOT_FOUND))
+                        : assignmentRepository.findByIdAndWorkOrder_Tenant_Id(req.getMachineAssignmentId(), tenantId())
+                                .orElseThrow(() -> new FerosException("Machine assignment not found", HttpStatus.NOT_FOUND));
                 Equipment eq = a.getEquipment();
                 serialNumber = eq.getSerialNumber();
                 typeName = eq.getEquipmentType().getName();
@@ -297,8 +347,8 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
         return EquipmentInvoiceResponse.builder()
                 .id(inv.getId())
                 .invoiceNumber(inv.getInvoiceNumber())
-                .workOrderId(wo.getId())
-                .woNumber(wo.getWoNumber())
+                .workOrderId(wo != null ? wo.getId() : null)
+                .woNumber(wo != null ? wo.getWoNumber() : null)
                 .clientId(client.getId())
                 .clientName(client.getClientName())
                 .invoiceDate(inv.getInvoiceDate())

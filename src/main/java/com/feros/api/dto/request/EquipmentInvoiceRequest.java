@@ -13,6 +13,8 @@ import java.util.List;
 @Setter
 public class EquipmentInvoiceRequest {
 
+    private Long clientId; // required for client-level invoices (no woId in path)
+
     @NotNull(message = "Invoice date is required")
     private LocalDate invoiceDate;
 

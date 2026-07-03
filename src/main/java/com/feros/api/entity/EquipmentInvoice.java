@@ -27,7 +27,7 @@ public class EquipmentInvoice extends BaseEntity {
     private Tenant tenant;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "work_order_id", nullable = false)
+    @JoinColumn(name = "work_order_id")
     private WorkOrder workOrder;
 
     @ManyToOne(fetch = FetchType.LAZY)

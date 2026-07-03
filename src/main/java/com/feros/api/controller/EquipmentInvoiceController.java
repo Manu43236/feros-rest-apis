@@ -55,16 +55,35 @@ public class EquipmentInvoiceController {
                 invoiceService.getByWorkOrder(woId)));
     }
 
-    // ── Tenant-level invoice endpoints ─────────────────────────────────────────
+    // ── Client-level invoice endpoints ─────────────────────────────────────────
+
+    @PostMapping("/api/v1/equipment-invoices")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<EquipmentInvoiceResponse>> createForClient(
+            @Valid @RequestBody EquipmentInvoiceRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Invoice created",
+                invoiceService.createForClient(request)));
+    }
+
+    @GetMapping("/api/v1/equipment-invoices/prefill")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<EquipmentInvoicePrefillResponse>>> prefillByClient(
+            @RequestParam Long clientId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success("Prefill data fetched",
+                invoiceService.prefillByClient(clientId, from, to)));
+    }
 
     @GetMapping("/api/v1/equipment-invoices")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<Page<EquipmentInvoiceResponse>>> getAll(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) EquipmentInvoiceStatus status) {
+            @RequestParam(required = false) EquipmentInvoiceStatus status,
+            @RequestParam(required = false) Long clientId) {
         return ResponseEntity.ok(ApiResponse.success("Invoices fetched",
-                invoiceService.getAll(page, size, status)));
+                invoiceService.getAll(page, size, status, clientId)));
     }
 
     @GetMapping("/api/v1/equipment-invoices/{id}")
