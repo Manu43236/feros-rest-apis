@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 @Builder
 public class EquipmentInvoicePrefillResponse {
     private Long machineAssignmentId;
+    private Long equipmentId;
     private Long workOrderId;
     private String woNumber;
     private String serialNumber;

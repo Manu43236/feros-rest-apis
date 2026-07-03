@@ -200,6 +200,15 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
                 assignmentRepository.findByWorkOrder_Client_IdAndWorkOrder_Tenant_Id(clientId, tenantId());
         if (assignments.isEmpty()) return List.of();
 
+        // Only include assignments whose period overlaps the billing range
+        if (from != null && to != null) {
+            assignments = assignments.stream()
+                    .filter(a -> !a.getStartDate().isAfter(to)
+                            && (a.getEndDate() == null || !a.getEndDate().isBefore(from)))
+                    .toList();
+        }
+        if (assignments.isEmpty()) return List.of();
+
         List<Long> assignmentIds = assignments.stream().map(MachineAssignment::getId).toList();
         List<EquipmentDailyLog> logs = from != null && to != null
                 ? dailyLogRepository.findByMachineAssignmentIdInAndLogDateBetween(assignmentIds, from, to)
@@ -239,6 +248,7 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
 
             result.add(EquipmentInvoicePrefillResponse.builder()
                     .machineAssignmentId(a.getId())
+                    .equipmentId(eq.getId())
                     .workOrderId(aWo.getId())
                     .woNumber(aWo.getWoNumber())
                     .serialNumber(eq.getSerialNumber())
