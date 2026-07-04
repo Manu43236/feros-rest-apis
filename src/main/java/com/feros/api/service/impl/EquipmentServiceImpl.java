@@ -2,6 +2,7 @@ package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.EquipmentRequest;
 import com.feros.api.dto.response.DailyLogResponse;
+import com.feros.api.dto.response.EquipmentDashboardResponse;
 import com.feros.api.dto.response.EquipmentResponse;
 import com.feros.api.dto.response.MachineAssignmentHistoryResponse;
 import com.feros.api.dto.response.MachineInvoiceItemResponse;
@@ -14,6 +15,8 @@ import com.feros.api.entity.WorkOrder;
 import com.feros.api.entity.master.EquipmentType;
 import com.feros.api.enums.EquipmentOwnershipType;
 import com.feros.api.enums.EquipmentWorkStatus;
+import com.feros.api.enums.WorkOrderStatus;
+import com.feros.api.repository.WorkOrderRepository;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.EquipmentDailyLogRepository;
 import com.feros.api.repository.EquipmentInvoiceItemRepository;
@@ -49,6 +52,7 @@ public class EquipmentServiceImpl implements EquipmentService {
     private final MachineAssignmentRepository machineAssignmentRepository;
     private final EquipmentDailyLogRepository dailyLogRepository;
     private final EquipmentInvoiceItemRepository invoiceItemRepository;
+    private final WorkOrderRepository workOrderRepository;
 
     private Long getTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -57,6 +61,27 @@ public class EquipmentServiceImpl implements EquipmentService {
     private Tenant getTenant(Long tenantId) {
         return tenantRepository.findByIdAndIsActiveTrue(tenantId)
                 .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public EquipmentDashboardResponse getDashboard() {
+        Long tenantId = getTenantId();
+        LocalDate today = LocalDate.now();
+        LocalDate monthStart = today.withDayOfMonth(1);
+
+        return EquipmentDashboardResponse.builder()
+                .totalMachines(equipmentRepository.countByTenantId(tenantId))
+                .available(equipmentRepository.countByTenantIdAndWorkStatus(tenantId, EquipmentWorkStatus.AVAILABLE))
+                .assigned(equipmentRepository.countByTenantIdAndWorkStatus(tenantId, EquipmentWorkStatus.ASSIGNED))
+                .busy(equipmentRepository.countByTenantIdAndWorkStatus(tenantId, EquipmentWorkStatus.BUSY))
+                .inRepair(equipmentRepository.countByTenantIdAndWorkStatus(tenantId, EquipmentWorkStatus.IN_REPAIR))
+                .breakdown(equipmentRepository.countByTenantIdAndWorkStatus(tenantId, EquipmentWorkStatus.BREAKDOWN))
+                .activeWorkOrders(workOrderRepository.countByTenantIdAndIsActiveTrueAndStatus(tenantId, WorkOrderStatus.IN_PROGRESS))
+                .totalWorkOrders(workOrderRepository.countByTenantIdAndIsActiveTrue(tenantId))
+                .hoursToday(dailyLogRepository.sumHoursByTenantAndDate(tenantId, today))
+                .hoursThisMonth(dailyLogRepository.sumHoursByTenantAndDateRange(tenantId, monthStart, today))
+                .build();
     }
 
     @Override

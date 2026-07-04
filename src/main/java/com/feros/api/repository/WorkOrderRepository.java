@@ -24,6 +24,9 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
     Optional<WorkOrder> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     boolean existsByIdAndTenantId(Long id, Long tenantId);
 
+    long countByTenantIdAndIsActiveTrue(Long tenantId);
+    long countByTenantIdAndIsActiveTrueAndStatus(Long tenantId, WorkOrderStatus status);
+
     // For scheduler — all active IN_PROGRESS work orders across all tenants
     List<WorkOrder> findByStatusAndIsActiveTrue(WorkOrderStatus status);
 }

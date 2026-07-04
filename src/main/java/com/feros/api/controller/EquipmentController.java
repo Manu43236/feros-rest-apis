@@ -3,6 +3,7 @@ package com.feros.api.controller;
 import com.feros.api.dto.request.EquipmentRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.DailyLogResponse;
+import com.feros.api.dto.response.EquipmentDashboardResponse;
 import com.feros.api.dto.response.EquipmentResponse;
 import com.feros.api.dto.response.MachineAssignmentHistoryResponse;
 import com.feros.api.dto.response.MachineInvoiceItemResponse;
@@ -24,6 +25,12 @@ import java.util.Map;
 public class EquipmentController {
 
     private final EquipmentService equipmentService;
+
+    @GetMapping("/dashboard")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<EquipmentDashboardResponse>> getDashboard() {
+        return ResponseEntity.ok(ApiResponse.success("Dashboard fetched", equipmentService.getDashboard()));
+    }
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")

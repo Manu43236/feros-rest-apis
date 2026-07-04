@@ -2,6 +2,7 @@ package com.feros.api.service;
 
 import com.feros.api.dto.request.EquipmentRequest;
 import com.feros.api.dto.response.DailyLogResponse;
+import com.feros.api.dto.response.EquipmentDashboardResponse;
 import com.feros.api.dto.response.EquipmentResponse;
 import com.feros.api.dto.response.MachineAssignmentHistoryResponse;
 import com.feros.api.dto.response.MachineInvoiceItemResponse;
@@ -11,6 +12,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface EquipmentService {
+    EquipmentDashboardResponse getDashboard();
     List<EquipmentResponse> getAllEquipment();
     EquipmentResponse getEquipmentById(Long id);
     EquipmentResponse createEquipment(EquipmentRequest request);
