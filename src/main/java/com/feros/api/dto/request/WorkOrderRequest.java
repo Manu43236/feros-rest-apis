@@ -19,10 +19,7 @@ public class WorkOrderRequest {
 
     private String site;
 
-    @NotNull(message = "Rate type is required")
     private RateType rateType;
-
-    @NotNull(message = "Rate amount is required")
     private BigDecimal rateAmount;
 
     private Integer shiftHours;             // DAILY_SHIFT only, defaults to 8
