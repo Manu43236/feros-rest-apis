@@ -115,4 +115,10 @@ public interface GlobalMasterService {
     List<MasterResponse> getAllServiceTaskTypes();
     MasterResponse updateServiceTaskType(Long id, MasterRequest request);
     void deleteServiceTaskType(Long id);
+
+    // Equipment Service Task Types
+    MasterResponse createEquipmentServiceTaskType(MasterRequest request);
+    List<MasterResponse> getAllEquipmentServiceTaskTypes();
+    MasterResponse updateEquipmentServiceTaskType(Long id, MasterRequest request);
+    void deleteEquipmentServiceTaskType(Long id);
 }

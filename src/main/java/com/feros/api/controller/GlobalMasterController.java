@@ -467,4 +467,31 @@ public class GlobalMasterController {
         globalMasterService.deleteServiceTaskType(id);
         return ResponseEntity.ok(ApiResponse.success("Service task type deleted successfully", null));
     }
+
+    // ── Equipment Service Task Types ──────────────────────────────────────────
+
+    @GetMapping("/equipment-service-task-types")
+    public ResponseEntity<ApiResponse<List<MasterResponse>>> getAllEquipmentServiceTaskTypes() {
+        return ResponseEntity.ok(ApiResponse.success("Equipment service task types fetched", globalMasterService.getAllEquipmentServiceTaskTypes()));
+    }
+
+    @PostMapping("/equipment-service-task-types")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<MasterResponse>> createEquipmentServiceTaskType(@Valid @RequestBody MasterRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Equipment service task type created", globalMasterService.createEquipmentServiceTaskType(request)));
+    }
+
+    @PutMapping("/equipment-service-task-types/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<MasterResponse>> updateEquipmentServiceTaskType(@PathVariable Long id, @Valid @RequestBody MasterRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Equipment service task type updated", globalMasterService.updateEquipmentServiceTaskType(id, request)));
+    }
+
+    @DeleteMapping("/equipment-service-task-types/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteEquipmentServiceTaskType(@PathVariable Long id) {
+        globalMasterService.deleteEquipmentServiceTaskType(id);
+        return ResponseEntity.ok(ApiResponse.success("Equipment service task type deleted", null));
+    }
+
 }

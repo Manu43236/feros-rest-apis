@@ -26,7 +26,6 @@ import com.feros.api.entity.Tenant;
 import com.feros.api.entity.WorkOrder;
 import com.feros.api.entity.master.EquipmentType;
 import com.feros.api.enums.EquipmentOwnershipType;
-import com.feros.api.enums.EquipmentServiceType;
 import com.feros.api.enums.EquipmentWorkStatus;
 import com.feros.api.enums.ServicePayerType;
 import com.feros.api.enums.ServiceStatus;
@@ -39,7 +38,7 @@ import com.feros.api.repository.EquipmentFuelLogRepository;
 import com.feros.api.repository.EquipmentInvoiceItemRepository;
 import com.feros.api.repository.EquipmentMeterReadingRepository;
 import com.feros.api.repository.EquipmentServiceRepository;
-import com.feros.api.repository.ServiceTaskTypeRepository;
+import com.feros.api.repository.EquipmentServiceTaskTypeRepository;
 import com.feros.api.repository.EquipmentRepository;
 import com.feros.api.repository.EquipmentTypeRepository;
 import com.feros.api.repository.MachineAssignmentRepository;
@@ -56,7 +55,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -78,7 +76,7 @@ public class EquipmentServiceImpl implements EquipmentService {
     private final EquipmentFuelLogRepository fuelLogRepository;
     private final EquipmentMeterReadingRepository meterReadingRepository;
     private final EquipmentServiceRepository equipmentServiceRepository;
-    private final ServiceTaskTypeRepository serviceTaskTypeRepository;
+    private final EquipmentServiceTaskTypeRepository equipmentServiceTaskTypeRepository;
 
     private Long getTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -741,7 +739,7 @@ public class EquipmentServiceImpl implements EquipmentService {
         List<EquipmentServiceTaskResponse> taskResponses = r.getTasks().stream().map(t -> {
             String taskTypeName = null;
             if (t.getTaskTypeId() != null) {
-                taskTypeName = serviceTaskTypeRepository.findById(t.getTaskTypeId())
+                taskTypeName = equipmentServiceTaskTypeRepository.findById(t.getTaskTypeId())
                         .map(st -> st.getName()).orElse(null);
             }
             String displayName = t.getCustomName() != null ? t.getCustomName() : taskTypeName;

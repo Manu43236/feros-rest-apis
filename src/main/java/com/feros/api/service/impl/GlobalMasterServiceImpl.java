@@ -35,6 +35,7 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
     private final DeductionTypeRepository deductionTypeRepository;
     private final PaymentStatusRepository paymentStatusRepository;
     private final ServiceTaskTypeRepository serviceTaskTypeRepository;
+    private final EquipmentServiceTaskTypeRepository equipmentServiceTaskTypeRepository;
 
     // ===================== STATES =====================
     @Override
@@ -688,6 +689,39 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
                 .orElseThrow(() -> new FerosException("Service task type not found", HttpStatus.NOT_FOUND));
         t.setIsActive(false);
         serviceTaskTypeRepository.save(t);
+    }
+
+
+    // Equipment Service Task Types
+
+    @Override
+    public MasterResponse createEquipmentServiceTaskType(MasterRequest request) {
+        EquipmentServiceTaskType t = EquipmentServiceTaskType.builder().name(request.getName()).isActive(true).build();
+        EquipmentServiceTaskType saved = equipmentServiceTaskTypeRepository.save(t);
+        return MasterResponse.builder().id(saved.getId()).name(saved.getName()).build();
+    }
+
+    @Override
+    public List<MasterResponse> getAllEquipmentServiceTaskTypes() {
+        return equipmentServiceTaskTypeRepository.findAllByIsActiveTrueOrderByNameAsc()
+                .stream().map(t -> MasterResponse.builder().id(t.getId()).name(t.getName()).build()).toList();
+    }
+
+    @Override
+    public MasterResponse updateEquipmentServiceTaskType(Long id, MasterRequest request) {
+        EquipmentServiceTaskType t = equipmentServiceTaskTypeRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Equipment service task type not found", HttpStatus.NOT_FOUND));
+        t.setName(request.getName());
+        equipmentServiceTaskTypeRepository.save(t);
+        return MasterResponse.builder().id(t.getId()).name(t.getName()).build();
+    }
+
+    @Override
+    public void deleteEquipmentServiceTaskType(Long id) {
+        EquipmentServiceTaskType t = equipmentServiceTaskTypeRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Equipment service task type not found", HttpStatus.NOT_FOUND));
+        t.setIsActive(false);
+        equipmentServiceTaskTypeRepository.save(t);
     }
 
     private List<String> parseRoles(String json) {
