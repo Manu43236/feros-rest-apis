@@ -239,10 +239,8 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
                     .map(l -> l.getHoursWorked() != null ? l.getHoursWorked() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            BigDecimal effectiveRate = a.getRateAmount() != null ? a.getRateAmount()
-                    : (aWo.getRateAmount() != null ? aWo.getRateAmount() : BigDecimal.ZERO);
-            String effectiveRateType = a.getRateType() != null ? a.getRateType().name()
-                    : (aWo.getRateType() != null ? aWo.getRateType().name() : "HOURLY");
+            BigDecimal effectiveRate = a.getRateAmount() != null ? a.getRateAmount() : BigDecimal.ZERO;
+            String effectiveRateType = a.getRateType() != null ? a.getRateType().name() : "HOURLY";
 
             BigDecimal periodMonths = computePeriodMonths(from, to, aWo);
 
