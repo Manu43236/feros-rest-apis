@@ -111,8 +111,18 @@ public class WorkOrderController {
     @GetMapping("/{id}/work-entries")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<com.feros.api.dto.response.WorkEntryResponse>>> getAllWorkEntries(
-            @PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success("Work entries fetched", workOrderService.getAllWorkEntries(id)));
+            @PathVariable Long id,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success("Work entries fetched", workOrderService.getAllWorkEntries(id, from, to)));
+    }
+
+    @PostMapping("/{id}/work-entries/convert-to-logs")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<Integer>> convertToLogs(@PathVariable Long id) {
+        int created = workOrderService.convertWorkEntriesToLogs(id);
+        String msg = created > 0 ? created + " daily log(s) created" : "All sessions already synced";
+        return ResponseEntity.ok(ApiResponse.success(msg, created));
     }
 
     @GetMapping("/{id}/machines/{assignmentId}/work-entries")

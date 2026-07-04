@@ -17,6 +17,9 @@ public interface MachineWorkEntryRepository extends JpaRepository<MachineWorkEnt
 
     List<MachineWorkEntry> findByMachineAssignment_WorkOrder_IdOrderByStartTimeDesc(Long workOrderId);
 
+    List<MachineWorkEntry> findByMachineAssignment_WorkOrder_IdAndStartTimeBetweenOrderByStartTimeDesc(
+            Long workOrderId, java.time.LocalDateTime from, java.time.LocalDateTime to);
+
     Optional<MachineWorkEntry> findTopByMachineAssignmentIdAndStatusOrderByEndTimeDesc(Long machineAssignmentId, WorkEntryStatus status);
 
     // For scheduler — all completed entries for a machine assignment on a given day

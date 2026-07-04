@@ -595,10 +595,87 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .stream().map(this::toWorkEntryResponse).collect(Collectors.toList());
     }
 
-    public List<WorkEntryResponse> getAllWorkEntries(Long workOrderId) {
+    public List<WorkEntryResponse> getAllWorkEntries(Long workOrderId, LocalDate from, LocalDate to) {
         fetchWo(workOrderId);
-        return workEntryRepository.findByMachineAssignment_WorkOrder_IdOrderByStartTimeDesc(workOrderId)
-                .stream().map(this::toWorkEntryResponse).collect(Collectors.toList());
+        List<MachineWorkEntry> entries = (from != null && to != null)
+                ? workEntryRepository.findByMachineAssignment_WorkOrder_IdAndStartTimeBetweenOrderByStartTimeDesc(
+                        workOrderId, from.atStartOfDay(), to.plusDays(1).atStartOfDay())
+                : workEntryRepository.findByMachineAssignment_WorkOrder_IdOrderByStartTimeDesc(workOrderId);
+        return entries.stream().map(this::toWorkEntryResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public int convertWorkEntriesToLogs(Long workOrderId) {
+        WorkOrder wo = fetchWo(workOrderId);
+
+        // All completed work entries for this WO grouped by assignment → date
+        Map<MachineAssignment, Map<LocalDate, List<MachineWorkEntry>>> grouped =
+                workEntryRepository.findByMachineAssignment_WorkOrder_IdOrderByStartTimeDesc(workOrderId)
+                        .stream()
+                        .filter(e -> e.getStatus() == WorkEntryStatus.COMPLETED)
+                        .collect(Collectors.groupingBy(
+                                MachineWorkEntry::getMachineAssignment,
+                                Collectors.groupingBy(e -> e.getStartTime().toLocalDate())
+                        ));
+
+        int created = 0;
+        for (Map.Entry<MachineAssignment, Map<LocalDate, List<MachineWorkEntry>>> assignEntry : grouped.entrySet()) {
+            MachineAssignment assignment = assignEntry.getKey();
+            for (Map.Entry<LocalDate, List<MachineWorkEntry>> dateEntry : assignEntry.getValue().entrySet()) {
+                LocalDate date = dateEntry.getKey();
+                List<MachineWorkEntry> sessions = dateEntry.getValue();
+
+                // Skip if a log already exists for this machine on this date
+                if (dailyLogRepository.existsByMachineAssignmentIdAndLogDate(assignment.getId(), date)) continue;
+
+                BigDecimal startHmr = sessions.stream()
+                        .filter(e -> e.getStartMeter() != null).map(MachineWorkEntry::getStartMeter)
+                        .min(java.util.Comparator.naturalOrder()).orElse(null);
+                BigDecimal endHmr = sessions.stream()
+                        .filter(e -> e.getEndMeter() != null).map(MachineWorkEntry::getEndMeter)
+                        .max(java.util.Comparator.naturalOrder()).orElse(null);
+                BigDecimal totalHours = sessions.stream()
+                        .map(e -> e.getHoursWorked() != null ? e.getHoursWorked() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+
+                EquipmentDailyLog log = dailyLogRepository.save(
+                        EquipmentDailyLog.builder()
+                                .machineAssignment(assignment)
+                                .workOrderId(wo.getId())
+                                .logDate(date)
+                                .status(DailyLogStatus.WORKING)
+                                .startHourMeter(startHmr)
+                                .endHourMeter(endHmr)
+                                .hoursWorked(totalHours)
+                                .notes("Converted from " + sessions.size() + " session(s)")
+                                .source("AUTO")
+                                .build());
+
+                // Division lines grouped by division snapshot
+                Map<String, List<MachineWorkEntry>> byDivision = sessions.stream()
+                        .collect(Collectors.groupingBy(
+                                e -> e.getDivisionName() != null ? e.getDivisionName() : ""));
+                byDivision.forEach((div, group) -> {
+                    BigDecimal divStart = group.stream().filter(e -> e.getStartMeter() != null)
+                            .map(MachineWorkEntry::getStartMeter).min(java.util.Comparator.naturalOrder()).orElse(null);
+                    BigDecimal divEnd = group.stream().filter(e -> e.getEndMeter() != null)
+                            .map(MachineWorkEntry::getEndMeter).max(java.util.Comparator.naturalOrder()).orElse(null);
+                    BigDecimal divHours = group.stream()
+                            .map(e -> e.getHoursWorked() != null ? e.getHoursWorked() : BigDecimal.ZERO)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+                    dailyLogDivisionRepository.save(DailyLogDivision.builder()
+                            .dailyLog(log)
+                            .divisionName(div.isEmpty() ? null : div)
+                            .startHourMeter(divStart)
+                            .endHourMeter(divEnd)
+                            .hoursWorked(divHours)
+                            .build());
+                });
+                created++;
+            }
+        }
+        return created;
     }
 
     private WorkEntryResponse toWorkEntryResponse(MachineWorkEntry e) {
