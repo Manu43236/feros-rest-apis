@@ -3,14 +3,20 @@ package com.feros.api.service.impl;
 import com.feros.api.dto.request.EquipmentFuelLogRequest;
 import com.feros.api.dto.request.EquipmentMeterReadingRequest;
 import com.feros.api.dto.request.EquipmentRequest;
+import com.feros.api.dto.request.EquipmentServiceRequest;
+import com.feros.api.dto.request.EquipmentServiceTaskRequest;
 import com.feros.api.dto.response.DailyLogResponse;
 import com.feros.api.dto.response.EquipmentDashboardResponse;
 import com.feros.api.dto.response.EquipmentFuelLogResponse;
 import com.feros.api.dto.response.EquipmentMeterReadingResponse;
 import com.feros.api.dto.response.EquipmentResponse;
+import com.feros.api.dto.response.EquipmentServiceResponse;
+import com.feros.api.dto.response.EquipmentServiceTaskResponse;
 import com.feros.api.dto.response.MachineAssignmentHistoryResponse;
 import com.feros.api.dto.response.MachineInvoiceItemResponse;
 import com.feros.api.entity.Equipment;
+import com.feros.api.entity.EquipmentServiceRecord;
+import com.feros.api.entity.EquipmentServiceTask;
 import com.feros.api.entity.EquipmentDailyLog;
 import com.feros.api.entity.EquipmentFuelLog;
 import com.feros.api.entity.EquipmentInvoice;
@@ -20,7 +26,11 @@ import com.feros.api.entity.Tenant;
 import com.feros.api.entity.WorkOrder;
 import com.feros.api.entity.master.EquipmentType;
 import com.feros.api.enums.EquipmentOwnershipType;
+import com.feros.api.enums.EquipmentServiceType;
 import com.feros.api.enums.EquipmentWorkStatus;
+import com.feros.api.enums.ServicePayerType;
+import com.feros.api.enums.ServiceStatus;
+import com.feros.api.enums.ServiceTaskStatus;
 import com.feros.api.enums.WorkOrderStatus;
 import com.feros.api.repository.WorkOrderRepository;
 import com.feros.api.exception.FerosException;
@@ -28,6 +38,8 @@ import com.feros.api.repository.EquipmentDailyLogRepository;
 import com.feros.api.repository.EquipmentFuelLogRepository;
 import com.feros.api.repository.EquipmentInvoiceItemRepository;
 import com.feros.api.repository.EquipmentMeterReadingRepository;
+import com.feros.api.repository.EquipmentServiceRepository;
+import com.feros.api.repository.ServiceTaskTypeRepository;
 import com.feros.api.repository.EquipmentRepository;
 import com.feros.api.repository.EquipmentTypeRepository;
 import com.feros.api.repository.MachineAssignmentRepository;
@@ -43,6 +55,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +77,8 @@ public class EquipmentServiceImpl implements EquipmentService {
     private final WorkOrderRepository workOrderRepository;
     private final EquipmentFuelLogRepository fuelLogRepository;
     private final EquipmentMeterReadingRepository meterReadingRepository;
+    private final EquipmentServiceRepository equipmentServiceRepository;
+    private final ServiceTaskTypeRepository serviceTaskTypeRepository;
 
     private Long getTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -555,4 +571,223 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .updatedAt(e.getUpdatedAt())
                 .build();
     }
+    // ── Service Records ───────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EquipmentServiceResponse> getServices(Long equipmentId) {
+        Long tenantId = getTenantId();
+        return equipmentServiceRepository
+                .findByEquipmentIdAndTenantIdAndIsActiveTrueOrderByCreatedAtDesc(equipmentId, tenantId)
+                .stream().map(this::toServiceResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public EquipmentServiceResponse createService(Long equipmentId, EquipmentServiceRequest request) {
+        Long tenantId = getTenantId();
+        Tenant tenant = getTenant(tenantId);
+        Equipment eq = equipmentRepository.findByIdAndTenantId(equipmentId, tenantId)
+                .orElseThrow(() -> new FerosException("Equipment not found", HttpStatus.NOT_FOUND));
+
+        EquipmentServiceRecord record = EquipmentServiceRecord.builder()
+                .tenant(tenant)
+                .equipment(eq)
+                .serviceNumber(com.feros.api.util.NumberUtil.generate(tenant.getPrefix(), tenantId, com.feros.api.util.NumberUtil.Type.ESVC))
+                .triggeredBy(request.getTriggeredBy())
+                .serviceType(request.getServiceType())
+                .payerType(request.getPayerType() != null ? request.getPayerType() : ServicePayerType.OWN_EXPENSE)
+                .status(ServiceStatus.OPEN)
+                .hmrAtService(request.getHmrAtService())
+                .dueAtHmr(request.getDueAtHmr())
+                .vendorName(request.getVendorName())
+                .location(request.getLocation())
+                .serviceDate(request.getServiceDate())
+                .notes(request.getNotes())
+                .insuranceClaimNo(request.getInsuranceClaimNo())
+                .insuranceClaimAmt(request.getInsuranceClaimAmt())
+                .certificateNumber(request.getCertificateNumber())
+                .certificateValidUntil(request.getCertificateValidUntil())
+                .isEscalated(Boolean.TRUE.equals(request.getIsEscalated()))
+                .build();
+
+        record = equipmentServiceRepository.save(record);
+        saveTasksOnRecord(record, request.getTasks());
+        record = equipmentServiceRepository.save(record);
+        return toServiceResponse(record);
+    }
+
+    @Override
+    @Transactional
+    public EquipmentServiceResponse updateService(Long equipmentId, Long serviceId, EquipmentServiceRequest request) {
+        Long tenantId = getTenantId();
+        EquipmentServiceRecord record = equipmentServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+
+        if (record.getStatus() == ServiceStatus.COMPLETED)
+            throw new FerosException("Cannot edit a completed service record", HttpStatus.BAD_REQUEST);
+
+        record.setTriggeredBy(request.getTriggeredBy());
+        record.setServiceType(request.getServiceType());
+        if (request.getPayerType() != null) record.setPayerType(request.getPayerType());
+        record.setVendorName(request.getVendorName());
+        record.setLocation(request.getLocation());
+        record.setServiceDate(request.getServiceDate());
+        record.setHmrAtService(request.getHmrAtService());
+        record.setDueAtHmr(request.getDueAtHmr());
+        record.setNotes(request.getNotes());
+        record.setInsuranceClaimNo(request.getInsuranceClaimNo());
+        record.setInsuranceClaimAmt(request.getInsuranceClaimAmt());
+        record.setCertificateNumber(request.getCertificateNumber());
+        record.setCertificateValidUntil(request.getCertificateValidUntil());
+        record.setIsEscalated(Boolean.TRUE.equals(request.getIsEscalated()));
+
+        record.getTasks().clear();
+        saveTasksOnRecord(record, request.getTasks());
+        record = equipmentServiceRepository.save(record);
+        return toServiceResponse(record);
+    }
+
+    @Override
+    @Transactional
+    public EquipmentServiceResponse startService(Long equipmentId, Long serviceId) {
+        Long tenantId = getTenantId();
+        EquipmentServiceRecord record = equipmentServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+
+        if (record.getStatus() != ServiceStatus.OPEN)
+            throw new FerosException("Service is not in OPEN status", HttpStatus.BAD_REQUEST);
+
+        record.setStatus(ServiceStatus.IN_PROGRESS);
+        record.setStartedAt(LocalDateTime.now());
+
+        Equipment eq = record.getEquipment();
+        eq.setWorkStatus(EquipmentWorkStatus.IN_REPAIR);
+        equipmentRepository.save(eq);
+
+        return toServiceResponse(equipmentServiceRepository.save(record));
+    }
+
+    @Override
+    @Transactional
+    public EquipmentServiceResponse completeService(Long equipmentId, Long serviceId) {
+        Long tenantId = getTenantId();
+        EquipmentServiceRecord record = equipmentServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+
+        if (record.getStatus() == ServiceStatus.COMPLETED)
+            throw new FerosException("Service is already completed", HttpStatus.BAD_REQUEST);
+
+        record.setStatus(ServiceStatus.COMPLETED);
+        record.setCompletedDate(LocalDate.now());
+
+        // Recalculate total cost from tasks
+        BigDecimal total = record.getTasks().stream()
+                .filter(t -> t.getCost() != null)
+                .map(EquipmentServiceTask::getCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        record.setTotalCost(total.compareTo(BigDecimal.ZERO) > 0 ? total : null);
+
+        Equipment eq = record.getEquipment();
+        if (eq.getWorkStatus() == EquipmentWorkStatus.IN_REPAIR) {
+            // If machine was on a work order when service started, it goes back to ASSIGNED; otherwise AVAILABLE
+            boolean hasActiveAssignment = machineAssignmentRepository
+                    .existsByEquipmentIdAndIsActiveTrue(eq.getId());
+            eq.setWorkStatus(hasActiveAssignment ? EquipmentWorkStatus.ASSIGNED : EquipmentWorkStatus.AVAILABLE);
+            equipmentRepository.save(eq);
+        }
+
+        return toServiceResponse(equipmentServiceRepository.save(record));
+    }
+
+    @Override
+    @Transactional
+    public void deleteService(Long equipmentId, Long serviceId) {
+        Long tenantId = getTenantId();
+        EquipmentServiceRecord record = equipmentServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+
+        if (record.getStatus() != ServiceStatus.OPEN)
+            throw new FerosException("Only OPEN service records can be deleted", HttpStatus.BAD_REQUEST);
+
+        record.setIsActive(false);
+        equipmentServiceRepository.save(record);
+    }
+
+    private void saveTasksOnRecord(EquipmentServiceRecord record, java.util.List<EquipmentServiceTaskRequest> taskRequests) {
+        if (taskRequests == null || taskRequests.isEmpty()) return;
+        for (EquipmentServiceTaskRequest tr : taskRequests) {
+            EquipmentServiceTask task = EquipmentServiceTask.builder()
+                    .serviceRecord(record)
+                    .taskTypeId(tr.getTaskTypeId())
+                    .customName(tr.getCustomName())
+                    .isRecurring(tr.isRecurring())
+                    .frequencyHmr(tr.isRecurring() ? tr.getFrequencyHmr() : null)
+                    .cost(tr.getCost())
+                    .status(ServiceTaskStatus.PENDING)
+                    .build();
+            record.getTasks().add(task);
+        }
+    }
+
+    private EquipmentServiceResponse toServiceResponse(EquipmentServiceRecord r) {
+        Equipment eq = r.getEquipment();
+        String identifier = eq.getRegistrationNumber() != null ? eq.getRegistrationNumber() : eq.getSerialNumber();
+
+        List<EquipmentServiceTaskResponse> taskResponses = r.getTasks().stream().map(t -> {
+            String taskTypeName = null;
+            if (t.getTaskTypeId() != null) {
+                taskTypeName = serviceTaskTypeRepository.findById(t.getTaskTypeId())
+                        .map(st -> st.getName()).orElse(null);
+            }
+            String displayName = t.getCustomName() != null ? t.getCustomName() : taskTypeName;
+            return EquipmentServiceTaskResponse.builder()
+                    .id(t.getId())
+                    .taskTypeId(t.getTaskTypeId())
+                    .taskTypeName(taskTypeName)
+                    .customName(t.getCustomName())
+                    .displayName(displayName)
+                    .isRecurring(Boolean.TRUE.equals(t.getIsRecurring()))
+                    .frequencyHmr(t.getFrequencyHmr())
+                    .cost(t.getCost())
+                    .status(t.getStatus())
+                    .startedAt(t.getStartedAt())
+                    .completedAt(t.getCompletedAt())
+                    .build();
+        }).toList();
+
+        return EquipmentServiceResponse.builder()
+                .id(r.getId())
+                .equipmentId(eq.getId())
+                .equipmentIdentifier(identifier)
+                .serviceNumber(r.getServiceNumber())
+                .triggeredBy(r.getTriggeredBy())
+                .serviceType(r.getServiceType())
+                .payerType(r.getPayerType())
+                .status(r.getStatus())
+                .hmrAtService(r.getHmrAtService())
+                .dueAtHmr(r.getDueAtHmr())
+                .vendorName(r.getVendorName())
+                .location(r.getLocation())
+                .serviceDate(r.getServiceDate())
+                .completedDate(r.getCompletedDate())
+                .startedAt(r.getStartedAt())
+                .totalCost(r.getTotalCost())
+                .insuranceClaimNo(r.getInsuranceClaimNo())
+                .insuranceClaimAmt(r.getInsuranceClaimAmt())
+                .certificateNumber(r.getCertificateNumber())
+                .certificateValidUntil(r.getCertificateValidUntil())
+                .isEscalated(r.getIsEscalated())
+                .notes(r.getNotes())
+                .invoiceId(r.getInvoiceId())
+                .tasks(taskResponses)
+                .createdAt(r.getCreatedAt())
+                .updatedAt(r.getUpdatedAt())
+                .build();
+    }
+
 }

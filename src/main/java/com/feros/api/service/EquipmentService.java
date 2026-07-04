@@ -3,11 +3,13 @@ package com.feros.api.service;
 import com.feros.api.dto.request.EquipmentFuelLogRequest;
 import com.feros.api.dto.request.EquipmentMeterReadingRequest;
 import com.feros.api.dto.request.EquipmentRequest;
+import com.feros.api.dto.request.EquipmentServiceRequest;
 import com.feros.api.dto.response.DailyLogResponse;
 import com.feros.api.dto.response.EquipmentDashboardResponse;
 import com.feros.api.dto.response.EquipmentFuelLogResponse;
 import com.feros.api.dto.response.EquipmentMeterReadingResponse;
 import com.feros.api.dto.response.EquipmentResponse;
+import com.feros.api.dto.response.EquipmentServiceResponse;
 import com.feros.api.dto.response.MachineAssignmentHistoryResponse;
 import com.feros.api.dto.response.MachineInvoiceItemResponse;
 import com.feros.api.enums.EquipmentWorkStatus;
@@ -39,4 +41,12 @@ public interface EquipmentService {
     EquipmentMeterReadingResponse addMeterReading(Long equipmentId, EquipmentMeterReadingRequest request);
     EquipmentMeterReadingResponse updateMeterReading(Long equipmentId, Long readingId, EquipmentMeterReadingRequest request);
     void deleteMeterReading(Long equipmentId, Long readingId);
+
+    // Service records
+    List<EquipmentServiceResponse> getServices(Long equipmentId);
+    EquipmentServiceResponse createService(Long equipmentId, EquipmentServiceRequest request);
+    EquipmentServiceResponse updateService(Long equipmentId, Long serviceId, EquipmentServiceRequest request);
+    EquipmentServiceResponse startService(Long equipmentId, Long serviceId);
+    EquipmentServiceResponse completeService(Long equipmentId, Long serviceId);
+    void deleteService(Long equipmentId, Long serviceId);
 }

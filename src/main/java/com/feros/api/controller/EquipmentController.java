@@ -1,12 +1,14 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.request.EquipmentFuelLogRequest;
+import com.feros.api.dto.request.EquipmentServiceRequest;
 import com.feros.api.dto.request.EquipmentMeterReadingRequest;
 import com.feros.api.dto.request.EquipmentRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.DailyLogResponse;
 import com.feros.api.dto.response.EquipmentDashboardResponse;
 import com.feros.api.dto.response.EquipmentFuelLogResponse;
+import com.feros.api.dto.response.EquipmentServiceResponse;
 import com.feros.api.dto.response.EquipmentMeterReadingResponse;
 import com.feros.api.dto.response.EquipmentResponse;
 import com.feros.api.dto.response.MachineAssignmentHistoryResponse;
@@ -157,4 +159,47 @@ public class EquipmentController {
         equipmentService.deleteMeterReading(id, readingId);
         return ResponseEntity.ok(ApiResponse.success("Meter reading deleted", null));
     }
+    // ── Service Records ───────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/services")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<EquipmentServiceResponse>>> getServices(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Services fetched", equipmentService.getServices(id)));
+    }
+
+    @PostMapping("/{id}/services")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<EquipmentServiceResponse>> createService(
+            @PathVariable Long id, @Valid @RequestBody EquipmentServiceRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Service created", equipmentService.createService(id, request)));
+    }
+
+    @PutMapping("/{id}/services/{serviceId}")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<EquipmentServiceResponse>> updateService(
+            @PathVariable Long id, @PathVariable Long serviceId, @Valid @RequestBody EquipmentServiceRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Service updated", equipmentService.updateService(id, serviceId, request)));
+    }
+
+    @PostMapping("/{id}/services/{serviceId}/start")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<EquipmentServiceResponse>> startService(
+            @PathVariable Long id, @PathVariable Long serviceId) {
+        return ResponseEntity.ok(ApiResponse.success("Service started", equipmentService.startService(id, serviceId)));
+    }
+
+    @PostMapping("/{id}/services/{serviceId}/complete")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<EquipmentServiceResponse>> completeService(
+            @PathVariable Long id, @PathVariable Long serviceId) {
+        return ResponseEntity.ok(ApiResponse.success("Service completed", equipmentService.completeService(id, serviceId)));
+    }
+
+    @DeleteMapping("/{id}/services/{serviceId}")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<Void>> deleteService(@PathVariable Long id, @PathVariable Long serviceId) {
+        equipmentService.deleteService(id, serviceId);
+        return ResponseEntity.ok(ApiResponse.success("Service deleted", null));
+    }
+
 }

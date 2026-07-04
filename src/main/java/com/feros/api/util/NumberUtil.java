@@ -32,7 +32,8 @@ public final class NumberUtil {
         SVC,   // Vehicle Service
         PART,  // Spare Part
         WO,    // Work Order
-        EINV   // Equipment Invoice
+        EINV,  // Equipment Invoice
+        ESVC   // Equipment Service
     }
 
     /**
