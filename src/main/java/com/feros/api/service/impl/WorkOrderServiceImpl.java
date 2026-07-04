@@ -79,7 +79,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .workOrder(toResponse(wo, assignments.size()))
                 .assignments(assignments.stream().map(this::toAssignmentResponse).collect(Collectors.toList()))
                 .logs(logs.stream().map(l -> toLogResponse(l, assignmentMap.get(l.getMachineAssignment().getId()))).collect(Collectors.toList()))
-                .billing(calculateBilling(wo, logs))
+                .billing(calculateBilling(wo, assignments, logs))
                 .build();
     }
 
@@ -98,25 +98,12 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .woNumber(NumberUtil.generate(t.getPrefix(), t.getId(), NumberUtil.Type.WO))
                 .client(client)
                 .site(req.getSite())
-                .rateType(req.getRateType())
-                .rateAmount(req.getRateAmount())
-                .shiftHours(req.getShiftHours() != null ? req.getShiftHours() : 8)
-                .overtimeRatePerHour(req.getOvertimeRatePerHour())
-                .operatorType(req.getOperatorType())
-                .hiredOperatorName(req.getHiredOperatorName())
-                .hiredOperatorPhone(req.getHiredOperatorPhone())
-                .operatorBilling(req.getOperatorBilling() != null ? req.getOperatorBilling() : OperatorBilling.NOT_BILLED)
-                .operatorRatePerDay(req.getOperatorRatePerDay())
                 .mobilizationCharge(req.getMobilizationCharge())
                 .demobilizationCharge(req.getDemobilizationCharge())
                 .startDate(req.getStartDate())
                 .endDate(req.getEndDate())
                 .parentWoId(req.getParentWoId())
                 .notes(req.getNotes());
-
-        if (req.getOperatorStaffId() != null)
-            builder.operatorStaff(staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(req.getOperatorStaffId(), t.getId())
-                    .orElseThrow(() -> new FerosException("Staff not found", HttpStatus.NOT_FOUND)));
 
         WorkOrder saved = workOrderRepository.save(builder.build());
         return toResponse(saved, 0);
@@ -136,26 +123,11 @@ public class WorkOrderServiceImpl implements WorkOrderService {
 
         wo.setClient(client);
         wo.setSite(req.getSite());
-        wo.setRateType(req.getRateType());
-        wo.setRateAmount(req.getRateAmount());
-        wo.setShiftHours(req.getShiftHours() != null ? req.getShiftHours() : wo.getShiftHours());
-        wo.setOvertimeRatePerHour(req.getOvertimeRatePerHour());
-        wo.setOperatorType(req.getOperatorType());
-        wo.setHiredOperatorName(req.getHiredOperatorName());
-        wo.setHiredOperatorPhone(req.getHiredOperatorPhone());
-        if (req.getOperatorBilling() != null) wo.setOperatorBilling(req.getOperatorBilling());
-        wo.setOperatorRatePerDay(req.getOperatorRatePerDay());
         wo.setMobilizationCharge(req.getMobilizationCharge());
         wo.setDemobilizationCharge(req.getDemobilizationCharge());
         wo.setStartDate(req.getStartDate());
         wo.setEndDate(req.getEndDate());
         wo.setNotes(req.getNotes());
-
-        if (req.getOperatorStaffId() != null)
-            wo.setOperatorStaff(staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(req.getOperatorStaffId(), tenantId())
-                    .orElseThrow(() -> new FerosException("Staff not found", HttpStatus.NOT_FOUND)));
-        else
-            wo.setOperatorStaff(null);
 
         return toResponse(workOrderRepository.save(wo), machineAssignmentRepository.countByWorkOrderId(id));
     }
@@ -376,57 +348,52 @@ public class WorkOrderServiceImpl implements WorkOrderService {
 
     // ── Billing Calculation ───────────────────────────────────────────────────
 
-    private BillingSummaryResponse calculateBilling(WorkOrder wo, List<EquipmentDailyLog> logs) {
-        List<EquipmentDailyLog> working = logs.stream()
+    private BillingSummaryResponse calculateBilling(WorkOrder wo, List<MachineAssignment> assignments, List<EquipmentDailyLog> logs) {
+        // Group logs by machineAssignmentId for per-assignment billing
+        Map<Long, List<EquipmentDailyLog>> logsByAssignment = logs.stream()
                 .filter(l -> l.getStatus() == DailyLogStatus.WORKING)
-                .collect(Collectors.toList());
+                .collect(Collectors.groupingBy(l -> l.getMachineAssignment().getId()));
 
-        int workingDays = working.size();
-        BigDecimal totalHours = working.stream()
-                .map(l -> l.getHoursWorked() != null ? l.getHoursWorked() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal machineAmount = BigDecimal.ZERO;
+        BigDecimal totalHours = BigDecimal.ZERO;
+        int totalWorkingDays = 0;
 
-        BigDecimal machineAmount = switch (wo.getRateType()) {
-            case HOURLY -> totalHours.multiply(wo.getRateAmount());
-            case DAILY_SHIFT -> {
-                BigDecimal total = BigDecimal.ZERO;
-                int shiftHrs = wo.getShiftHours() != null ? wo.getShiftHours() : 8;
-                for (EquipmentDailyLog log : working) {
-                    BigDecimal hrs = log.getHoursWorked() != null ? log.getHoursWorked() : BigDecimal.ZERO;
-                    BigDecimal dayAmount = wo.getRateAmount();
-                    if (wo.getOvertimeRatePerHour() != null && hrs.compareTo(BigDecimal.valueOf(shiftHrs)) > 0) {
-                        BigDecimal extraHrs = hrs.subtract(BigDecimal.valueOf(shiftHrs));
-                        dayAmount = dayAmount.add(extraHrs.multiply(wo.getOvertimeRatePerHour()));
-                    }
-                    total = total.add(dayAmount);
+        for (MachineAssignment a : assignments) {
+            if (a.getRateType() == null || a.getRateAmount() == null) continue;
+            List<EquipmentDailyLog> aLogs = logsByAssignment.getOrDefault(a.getId(), List.of());
+            totalWorkingDays += aLogs.size();
+
+            BigDecimal aHours = aLogs.stream()
+                    .map(l -> l.getHoursWorked() != null ? l.getHoursWorked() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            totalHours = totalHours.add(aHours);
+
+            BigDecimal aAmount = switch (a.getRateType()) {
+                case HOURLY -> aHours.multiply(a.getRateAmount());
+                case DAILY_SHIFT -> a.getRateAmount().multiply(BigDecimal.valueOf(aLogs.size()));
+                case MONTHLY -> {
+                    LocalDate from = a.getStartDate();
+                    LocalDate to = a.getEndDate() != null ? a.getEndDate() : LocalDate.now();
+                    long days = ChronoUnit.DAYS.between(from, to) + 1;
+                    yield BigDecimal.valueOf(days).divide(BigDecimal.valueOf(30), 4, RoundingMode.HALF_UP)
+                            .multiply(a.getRateAmount()).setScale(2, RoundingMode.HALF_UP);
                 }
-                yield total;
-            }
-            case MONTHLY -> {
-                LocalDate from = wo.getStartDate();
-                LocalDate to = wo.getEndDate() != null ? wo.getEndDate() : LocalDate.now();
-                long days = ChronoUnit.DAYS.between(from, to) + 1;
-                BigDecimal months = BigDecimal.valueOf(days).divide(BigDecimal.valueOf(30), 4, RoundingMode.HALF_UP);
-                yield months.multiply(wo.getRateAmount()).setScale(2, RoundingMode.HALF_UP);
-            }
-        };
-
-        BigDecimal operatorAmount = BigDecimal.ZERO;
-        if (wo.getOperatorBilling() == OperatorBilling.BILLED_SEPARATELY && wo.getOperatorRatePerDay() != null)
-            operatorAmount = wo.getOperatorRatePerDay().multiply(BigDecimal.valueOf(workingDays));
+            };
+            machineAmount = machineAmount.add(aAmount);
+        }
 
         BigDecimal mobilization = wo.getMobilizationCharge() != null ? wo.getMobilizationCharge() : BigDecimal.ZERO;
         BigDecimal demobilization = wo.getDemobilizationCharge() != null ? wo.getDemobilizationCharge() : BigDecimal.ZERO;
-        BigDecimal total = machineAmount.add(operatorAmount).add(mobilization).add(demobilization);
+        BigDecimal total = machineAmount.add(mobilization).add(demobilization);
 
         return BillingSummaryResponse.builder()
                 .machineRentalAmount(machineAmount.setScale(2, RoundingMode.HALF_UP))
-                .operatorAmount(operatorAmount.setScale(2, RoundingMode.HALF_UP))
+                .operatorAmount(BigDecimal.ZERO)
                 .mobilizationCharge(mobilization)
                 .demobilizationCharge(demobilization)
                 .totalAmount(total.setScale(2, RoundingMode.HALF_UP))
                 .totalHours(totalHours.setScale(2, RoundingMode.HALF_UP))
-                .totalWorkingDays(workingDays)
+                .totalWorkingDays(totalWorkingDays)
                 .build();
     }
 
@@ -440,17 +407,6 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .clientId(wo.getClient().getId())
                 .clientName(wo.getClient().getClientName())
                 .site(wo.getSite())
-                .rateType(wo.getRateType())
-                .rateAmount(wo.getRateAmount())
-                .shiftHours(wo.getShiftHours())
-                .overtimeRatePerHour(wo.getOvertimeRatePerHour())
-                .operatorType(wo.getOperatorType())
-                .operatorStaffId(wo.getOperatorStaff() != null ? wo.getOperatorStaff().getId() : null)
-                .operatorStaffName(wo.getOperatorStaff() != null ? wo.getOperatorStaff().getUser().getName() : null)
-                .hiredOperatorName(wo.getHiredOperatorName())
-                .hiredOperatorPhone(wo.getHiredOperatorPhone())
-                .operatorBilling(wo.getOperatorBilling())
-                .operatorRatePerDay(wo.getOperatorRatePerDay())
                 .mobilizationCharge(wo.getMobilizationCharge())
                 .demobilizationCharge(wo.getDemobilizationCharge())
                 .startDate(wo.getStartDate())

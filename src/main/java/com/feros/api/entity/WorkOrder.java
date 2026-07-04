@@ -34,42 +34,6 @@ public class WorkOrder extends BaseEntity {
     @Column(name = "site")
     private String site;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "rate_type", nullable = false)
-    private RateType rateType;
-
-    @Column(name = "rate_amount", nullable = false, precision = 12, scale = 2)
-    private BigDecimal rateAmount;
-
-    @Column(name = "shift_hours")
-    @Builder.Default
-    private Integer shiftHours = 8;
-
-    @Column(name = "overtime_rate_per_hour", precision = 10, scale = 2)
-    private BigDecimal overtimeRatePerHour;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "operator_type")
-    private OperatorType operatorType;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "operator_staff_id")
-    private StaffProfile operatorStaff;
-
-    @Column(name = "hired_operator_name")
-    private String hiredOperatorName;
-
-    @Column(name = "hired_operator_phone")
-    private String hiredOperatorPhone;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "operator_billing")
-    @Builder.Default
-    private OperatorBilling operatorBilling = OperatorBilling.NOT_BILLED;
-
-    @Column(name = "operator_rate_per_day", precision = 10, scale = 2)
-    private BigDecimal operatorRatePerDay;
-
     @Column(name = "mobilization_charge", precision = 10, scale = 2)
     private BigDecimal mobilizationCharge;
 
