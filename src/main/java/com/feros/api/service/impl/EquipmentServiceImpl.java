@@ -1,15 +1,25 @@
 package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.EquipmentRequest;
+import com.feros.api.dto.response.DailyLogResponse;
 import com.feros.api.dto.response.EquipmentResponse;
+import com.feros.api.dto.response.MachineAssignmentHistoryResponse;
+import com.feros.api.dto.response.MachineInvoiceItemResponse;
 import com.feros.api.entity.Equipment;
+import com.feros.api.entity.EquipmentDailyLog;
+import com.feros.api.entity.EquipmentInvoice;
+import com.feros.api.entity.MachineAssignment;
 import com.feros.api.entity.Tenant;
+import com.feros.api.entity.WorkOrder;
 import com.feros.api.entity.master.EquipmentType;
 import com.feros.api.enums.EquipmentOwnershipType;
 import com.feros.api.enums.EquipmentWorkStatus;
 import com.feros.api.exception.FerosException;
+import com.feros.api.repository.EquipmentDailyLogRepository;
+import com.feros.api.repository.EquipmentInvoiceItemRepository;
 import com.feros.api.repository.EquipmentRepository;
 import com.feros.api.repository.EquipmentTypeRepository;
+import com.feros.api.repository.MachineAssignmentRepository;
 import com.feros.api.repository.SubscriptionHistoryRepository;
 import com.feros.api.repository.TenantRepository;
 import com.feros.api.repository.VehicleRepository;
@@ -20,7 +30,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +46,9 @@ public class EquipmentServiceImpl implements EquipmentService {
     private final EquipmentTypeRepository equipmentTypeRepository;
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
     private final VehicleRepository vehicleRepository;
+    private final MachineAssignmentRepository machineAssignmentRepository;
+    private final EquipmentDailyLogRepository dailyLogRepository;
+    private final EquipmentInvoiceItemRepository invoiceItemRepository;
 
     private Long getTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -155,6 +173,124 @@ public class EquipmentServiceImpl implements EquipmentService {
         Equipment equipment = findByIdAndTenant(id);
         equipment.setWorkStatus(workStatus);
         return toResponse(equipmentRepository.save(equipment));
+    }
+
+    // ── Machine Detail ───────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MachineAssignmentHistoryResponse> getMachineAssignmentHistory(Long equipmentId) {
+        Long tenantId = getTenantId();
+        findByIdAndTenant(equipmentId); // validate ownership
+        List<MachineAssignment> assignments = machineAssignmentRepository.findHistoryByEquipmentId(equipmentId, tenantId);
+        if (assignments.isEmpty()) return List.of();
+
+        List<Long> assignmentIds = assignments.stream().map(MachineAssignment::getId).toList();
+
+        // sum hoursWorked per assignment from daily logs
+        Map<Long, BigDecimal> hoursByAssignment = new HashMap<>();
+        dailyLogRepository.findByMachineAssignmentIdIn(assignmentIds).forEach(log -> {
+            // proxy ID access — no DB query (Hibernate returns FK value directly)
+            Long aid = log.getMachineAssignment().getId();
+            BigDecimal h = log.getHoursWorked() != null ? log.getHoursWorked() : BigDecimal.ZERO;
+            hoursByAssignment.merge(aid, h, BigDecimal::add);
+        });
+
+        return assignments.stream().map(a -> {
+            WorkOrder wo = a.getWorkOrder();
+            return MachineAssignmentHistoryResponse.builder()
+                    .id(a.getId())
+                    .workOrderId(wo.getId())
+                    .woNumber(wo.getWoNumber())
+                    .clientName(wo.getClient().getClientName())
+                    .site(wo.getSite())
+                    .workOrderStatus(wo.getStatus().name())
+                    .startDate(a.getStartDate())
+                    .endDate(a.getEndDate())
+                    .isActive(a.getIsActive())
+                    .endReason(a.getEndReason())
+                    .rateType(a.getRateType())
+                    .rateAmount(a.getRateAmount())
+                    .totalHoursWorked(hoursByAssignment.getOrDefault(a.getId(), BigDecimal.ZERO))
+                    .build();
+        }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DailyLogResponse> getMachineDailyLogs(Long equipmentId, LocalDate from, LocalDate to) {
+        Long tenantId = getTenantId();
+        Equipment eq = findByIdAndTenant(equipmentId);
+        List<MachineAssignment> assignments = machineAssignmentRepository.findHistoryByEquipmentId(equipmentId, tenantId);
+        if (assignments.isEmpty()) return List.of();
+
+        List<Long> assignmentIds = assignments.stream().map(MachineAssignment::getId).toList();
+        // build woNumber map keyed by workOrderId (denormalized on each log)
+        Map<Long, String> woNumberByWoId = assignments.stream()
+                .collect(Collectors.toMap(
+                        a -> a.getWorkOrder().getId(),
+                        a -> a.getWorkOrder().getWoNumber(),
+                        (a, b) -> a));
+
+        List<EquipmentDailyLog> logs = (from != null && to != null)
+                ? dailyLogRepository.findByMachineAssignmentIdInAndLogDateBetween(assignmentIds, from, to)
+                : dailyLogRepository.findByMachineAssignmentIdIn(assignmentIds);
+
+        String serialNumber = eq.getSerialNumber();
+        String typeName = eq.getEquipmentType().getName();
+
+        return logs.stream()
+                .sorted((a, b) -> {
+                    int d = b.getLogDate().compareTo(a.getLogDate());
+                    return d != 0 ? d : Long.compare(b.getId(), a.getId());
+                })
+                .map(log -> DailyLogResponse.builder()
+                        .id(log.getId())
+                        .machineAssignmentId(log.getMachineAssignment().getId())
+                        .workOrderId(log.getWorkOrderId())
+                        .woNumber(woNumberByWoId.get(log.getWorkOrderId()))
+                        .logDate(log.getLogDate())
+                        .status(log.getStatus())
+                        .startHourMeter(log.getStartHourMeter())
+                        .endHourMeter(log.getEndHourMeter())
+                        .hoursWorked(log.getHoursWorked())
+                        .fuelConsumed(log.getFuelConsumed())
+                        .notes(log.getNotes())
+                        .source(log.getSource())
+                        .serialNumber(serialNumber)
+                        .equipmentTypeName(typeName)
+                        .divisions(List.of()) // ponytail: not needed for machine-scope tabs
+                        .createdAt(log.getCreatedAt())
+                        .updatedAt(log.getUpdatedAt())
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MachineInvoiceItemResponse> getMachineInvoiceItems(Long equipmentId) {
+        Long tenantId = getTenantId();
+        findByIdAndTenant(equipmentId);
+        return invoiceItemRepository.findByEquipmentIdAndTenantId(equipmentId, tenantId).stream()
+                .map(i -> {
+                    EquipmentInvoice inv = i.getInvoice();
+                    return MachineInvoiceItemResponse.builder()
+                            .id(i.getId())
+                            .invoiceId(inv.getId())
+                            .invoiceNumber(inv.getInvoiceNumber())
+                            .invoiceDate(inv.getInvoiceDate())
+                            .invoiceStatus(inv.getStatus().name())
+                            .clientName(inv.getClient().getClientName())
+                            .billingPeriodStart(inv.getBillingPeriodStart())
+                            .billingPeriodEnd(inv.getBillingPeriodEnd())
+                            .description(i.getDescription())
+                            .billingType(i.getBillingType())
+                            .quantity(i.getQuantity())
+                            .rate(i.getRate())
+                            .amount(i.getAmount())
+                            .build();
+                })
+                .toList();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

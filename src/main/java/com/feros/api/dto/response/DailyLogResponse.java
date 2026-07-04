@@ -27,6 +27,7 @@ public class DailyLogResponse {
     private String serialNumber;
     private String equipmentTypeName;
     private String source; // MANUAL or AUTO
+    private String woNumber; // populated for machine-scoped log queries
     private List<DailyLogDivisionResponse> divisions;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

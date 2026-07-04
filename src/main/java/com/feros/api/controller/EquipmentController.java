@@ -2,7 +2,10 @@ package com.feros.api.controller;
 
 import com.feros.api.dto.request.EquipmentRequest;
 import com.feros.api.dto.response.ApiResponse;
+import com.feros.api.dto.response.DailyLogResponse;
 import com.feros.api.dto.response.EquipmentResponse;
+import com.feros.api.dto.response.MachineAssignmentHistoryResponse;
+import com.feros.api.dto.response.MachineInvoiceItemResponse;
 import com.feros.api.enums.EquipmentWorkStatus;
 import com.feros.api.service.EquipmentService;
 import jakarta.validation.Valid;
@@ -11,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -57,5 +61,31 @@ public class EquipmentController {
         EquipmentWorkStatus status = EquipmentWorkStatus.valueOf(body.get("workStatus"));
         return ResponseEntity.ok(ApiResponse.success("Work status updated successfully",
                 equipmentService.updateWorkStatus(id, status)));
+    }
+
+    // ── Machine Detail ───────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/assignments")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<MachineAssignmentHistoryResponse>>> getMachineHistory(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Assignment history fetched",
+                equipmentService.getMachineAssignmentHistory(id)));
+    }
+
+    @GetMapping("/{id}/daily-logs")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<DailyLogResponse>>> getMachineLogs(
+            @PathVariable Long id,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success("Daily logs fetched",
+                equipmentService.getMachineDailyLogs(id, from, to)));
+    }
+
+    @GetMapping("/{id}/invoice-items")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<MachineInvoiceItemResponse>>> getMachineInvoiceItems(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Invoice items fetched",
+                equipmentService.getMachineInvoiceItems(id)));
     }
 }
