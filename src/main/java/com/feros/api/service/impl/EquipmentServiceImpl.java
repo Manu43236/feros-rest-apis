@@ -1,14 +1,20 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.dto.request.EquipmentFuelLogRequest;
+import com.feros.api.dto.request.EquipmentMeterReadingRequest;
 import com.feros.api.dto.request.EquipmentRequest;
 import com.feros.api.dto.response.DailyLogResponse;
 import com.feros.api.dto.response.EquipmentDashboardResponse;
+import com.feros.api.dto.response.EquipmentFuelLogResponse;
+import com.feros.api.dto.response.EquipmentMeterReadingResponse;
 import com.feros.api.dto.response.EquipmentResponse;
 import com.feros.api.dto.response.MachineAssignmentHistoryResponse;
 import com.feros.api.dto.response.MachineInvoiceItemResponse;
 import com.feros.api.entity.Equipment;
 import com.feros.api.entity.EquipmentDailyLog;
+import com.feros.api.entity.EquipmentFuelLog;
 import com.feros.api.entity.EquipmentInvoice;
+import com.feros.api.entity.EquipmentMeterReading;
 import com.feros.api.entity.MachineAssignment;
 import com.feros.api.entity.Tenant;
 import com.feros.api.entity.WorkOrder;
@@ -19,7 +25,9 @@ import com.feros.api.enums.WorkOrderStatus;
 import com.feros.api.repository.WorkOrderRepository;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.EquipmentDailyLogRepository;
+import com.feros.api.repository.EquipmentFuelLogRepository;
 import com.feros.api.repository.EquipmentInvoiceItemRepository;
+import com.feros.api.repository.EquipmentMeterReadingRepository;
 import com.feros.api.repository.EquipmentRepository;
 import com.feros.api.repository.EquipmentTypeRepository;
 import com.feros.api.repository.MachineAssignmentRepository;
@@ -53,6 +61,8 @@ public class EquipmentServiceImpl implements EquipmentService {
     private final EquipmentDailyLogRepository dailyLogRepository;
     private final EquipmentInvoiceItemRepository invoiceItemRepository;
     private final WorkOrderRepository workOrderRepository;
+    private final EquipmentFuelLogRepository fuelLogRepository;
+    private final EquipmentMeterReadingRepository meterReadingRepository;
 
     private Long getTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -318,6 +328,112 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .toList();
     }
 
+    // ── Fuel Logs ─────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EquipmentFuelLogResponse> getFuelLogs(Long equipmentId) {
+        Long tenantId = getTenantId();
+        findByIdAndTenant(equipmentId);
+        return fuelLogRepository.findByEquipmentIdAndTenantIdOrderByFillDateDescIdDesc(equipmentId, tenantId)
+                .stream().map(this::toFuelLogResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public EquipmentFuelLogResponse addFuelLog(Long equipmentId, EquipmentFuelLogRequest req) {
+        Long tenantId = getTenantId();
+        Equipment eq = findByIdAndTenant(equipmentId);
+        EquipmentFuelLog log = EquipmentFuelLog.builder()
+                .tenant(getTenant(tenantId))
+                .equipment(eq)
+                .fillDate(req.getFillDate())
+                .litresFilled(req.getLitresFilled())
+                .hmrAtFill(req.getHmrAtFill())
+                .costPerLitre(req.getCostPerLitre())
+                .totalCost(req.getTotalCost())
+                .isFullTank(req.getIsFullTank() != null && req.getIsFullTank())
+                .paymentMode(req.getPaymentMode())
+                .fuelStation(req.getFuelStation())
+                .notes(req.getNotes())
+                .build();
+        return toFuelLogResponse(fuelLogRepository.save(log));
+    }
+
+    @Override
+    @Transactional
+    public EquipmentFuelLogResponse updateFuelLog(Long equipmentId, Long logId, EquipmentFuelLogRequest req) {
+        findByIdAndTenant(equipmentId);
+        EquipmentFuelLog log = fuelLogRepository.findByIdAndTenantId(logId, getTenantId())
+                .orElseThrow(() -> new FerosException("Fuel log not found", HttpStatus.NOT_FOUND));
+        log.setFillDate(req.getFillDate());
+        log.setLitresFilled(req.getLitresFilled());
+        log.setHmrAtFill(req.getHmrAtFill());
+        log.setCostPerLitre(req.getCostPerLitre());
+        log.setTotalCost(req.getTotalCost());
+        if (req.getIsFullTank() != null) log.setIsFullTank(req.getIsFullTank());
+        log.setPaymentMode(req.getPaymentMode());
+        log.setFuelStation(req.getFuelStation());
+        log.setNotes(req.getNotes());
+        return toFuelLogResponse(fuelLogRepository.save(log));
+    }
+
+    @Override
+    @Transactional
+    public void deleteFuelLog(Long equipmentId, Long logId) {
+        findByIdAndTenant(equipmentId);
+        EquipmentFuelLog log = fuelLogRepository.findByIdAndTenantId(logId, getTenantId())
+                .orElseThrow(() -> new FerosException("Fuel log not found", HttpStatus.NOT_FOUND));
+        fuelLogRepository.delete(log);
+    }
+
+    // ── Meter Readings ────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EquipmentMeterReadingResponse> getMeterReadings(Long equipmentId) {
+        Long tenantId = getTenantId();
+        findByIdAndTenant(equipmentId);
+        return meterReadingRepository.findByEquipmentIdAndTenantIdOrderByReadingDateDescIdDesc(equipmentId, tenantId)
+                .stream().map(this::toMeterReadingResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public EquipmentMeterReadingResponse addMeterReading(Long equipmentId, EquipmentMeterReadingRequest req) {
+        Long tenantId = getTenantId();
+        Equipment eq = findByIdAndTenant(equipmentId);
+        EquipmentMeterReading reading = EquipmentMeterReading.builder()
+                .tenant(getTenant(tenantId))
+                .equipment(eq)
+                .readingDate(req.getReadingDate())
+                .readingValue(req.getReadingValue())
+                .notes(req.getNotes())
+                .build();
+        return toMeterReadingResponse(meterReadingRepository.save(reading));
+    }
+
+    @Override
+    @Transactional
+    public EquipmentMeterReadingResponse updateMeterReading(Long equipmentId, Long readingId, EquipmentMeterReadingRequest req) {
+        findByIdAndTenant(equipmentId);
+        EquipmentMeterReading reading = meterReadingRepository.findByIdAndTenantId(readingId, getTenantId())
+                .orElseThrow(() -> new FerosException("Meter reading not found", HttpStatus.NOT_FOUND));
+        reading.setReadingDate(req.getReadingDate());
+        reading.setReadingValue(req.getReadingValue());
+        reading.setNotes(req.getNotes());
+        return toMeterReadingResponse(meterReadingRepository.save(reading));
+    }
+
+    @Override
+    @Transactional
+    public void deleteMeterReading(Long equipmentId, Long readingId) {
+        findByIdAndTenant(equipmentId);
+        EquipmentMeterReading reading = meterReadingRepository.findByIdAndTenantId(readingId, getTenantId())
+                .orElseThrow(() -> new FerosException("Meter reading not found", HttpStatus.NOT_FOUND));
+        meterReadingRepository.delete(reading);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private Equipment findByIdAndTenant(Long id) {
@@ -328,6 +444,36 @@ public class EquipmentServiceImpl implements EquipmentService {
     private EquipmentType findEquipmentType(Long typeId) {
         return equipmentTypeRepository.findById(typeId)
                 .orElseThrow(() -> new FerosException("Equipment type not found", HttpStatus.NOT_FOUND));
+    }
+
+    private EquipmentFuelLogResponse toFuelLogResponse(EquipmentFuelLog l) {
+        return EquipmentFuelLogResponse.builder()
+                .id(l.getId())
+                .equipmentId(l.getEquipment().getId())
+                .fillDate(l.getFillDate())
+                .litresFilled(l.getLitresFilled())
+                .hmrAtFill(l.getHmrAtFill())
+                .costPerLitre(l.getCostPerLitre())
+                .totalCost(l.getTotalCost())
+                .isFullTank(l.getIsFullTank())
+                .paymentMode(l.getPaymentMode())
+                .fuelStation(l.getFuelStation())
+                .notes(l.getNotes())
+                .createdAt(l.getCreatedAt())
+                .updatedAt(l.getUpdatedAt())
+                .build();
+    }
+
+    private EquipmentMeterReadingResponse toMeterReadingResponse(EquipmentMeterReading r) {
+        return EquipmentMeterReadingResponse.builder()
+                .id(r.getId())
+                .equipmentId(r.getEquipment().getId())
+                .readingDate(r.getReadingDate())
+                .readingValue(r.getReadingValue())
+                .notes(r.getNotes())
+                .createdAt(r.getCreatedAt())
+                .updatedAt(r.getUpdatedAt())
+                .build();
     }
 
     private void applyOwnershipFields(Equipment equipment, EquipmentRequest request) {

@@ -1,9 +1,13 @@
 package com.feros.api.controller;
 
+import com.feros.api.dto.request.EquipmentFuelLogRequest;
+import com.feros.api.dto.request.EquipmentMeterReadingRequest;
 import com.feros.api.dto.request.EquipmentRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.DailyLogResponse;
 import com.feros.api.dto.response.EquipmentDashboardResponse;
+import com.feros.api.dto.response.EquipmentFuelLogResponse;
+import com.feros.api.dto.response.EquipmentMeterReadingResponse;
 import com.feros.api.dto.response.EquipmentResponse;
 import com.feros.api.dto.response.MachineAssignmentHistoryResponse;
 import com.feros.api.dto.response.MachineInvoiceItemResponse;
@@ -94,5 +98,63 @@ public class EquipmentController {
     public ResponseEntity<ApiResponse<List<MachineInvoiceItemResponse>>> getMachineInvoiceItems(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Invoice items fetched",
                 equipmentService.getMachineInvoiceItems(id)));
+    }
+
+    // ── Fuel Logs ─────────────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/fuel-logs")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<EquipmentFuelLogResponse>>> getFuelLogs(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Fuel logs fetched", equipmentService.getFuelLogs(id)));
+    }
+
+    @PostMapping("/{id}/fuel-logs")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<EquipmentFuelLogResponse>> addFuelLog(
+            @PathVariable Long id, @RequestBody EquipmentFuelLogRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Fuel log added", equipmentService.addFuelLog(id, request)));
+    }
+
+    @PutMapping("/{id}/fuel-logs/{logId}")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<EquipmentFuelLogResponse>> updateFuelLog(
+            @PathVariable Long id, @PathVariable Long logId, @RequestBody EquipmentFuelLogRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Fuel log updated", equipmentService.updateFuelLog(id, logId, request)));
+    }
+
+    @DeleteMapping("/{id}/fuel-logs/{logId}")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<Void>> deleteFuelLog(@PathVariable Long id, @PathVariable Long logId) {
+        equipmentService.deleteFuelLog(id, logId);
+        return ResponseEntity.ok(ApiResponse.success("Fuel log deleted", null));
+    }
+
+    // ── Meter Readings ────────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/meter-readings")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<EquipmentMeterReadingResponse>>> getMeterReadings(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Meter readings fetched", equipmentService.getMeterReadings(id)));
+    }
+
+    @PostMapping("/{id}/meter-readings")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<EquipmentMeterReadingResponse>> addMeterReading(
+            @PathVariable Long id, @RequestBody EquipmentMeterReadingRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Meter reading added", equipmentService.addMeterReading(id, request)));
+    }
+
+    @PutMapping("/{id}/meter-readings/{readingId}")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<EquipmentMeterReadingResponse>> updateMeterReading(
+            @PathVariable Long id, @PathVariable Long readingId, @RequestBody EquipmentMeterReadingRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Meter reading updated", equipmentService.updateMeterReading(id, readingId, request)));
+    }
+
+    @DeleteMapping("/{id}/meter-readings/{readingId}")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<Void>> deleteMeterReading(@PathVariable Long id, @PathVariable Long readingId) {
+        equipmentService.deleteMeterReading(id, readingId);
+        return ResponseEntity.ok(ApiResponse.success("Meter reading deleted", null));
     }
 }
