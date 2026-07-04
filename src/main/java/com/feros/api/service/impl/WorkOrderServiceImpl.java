@@ -279,6 +279,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                         .build());
 
         saveDivisions(log, divReqs);
+        updateEquipmentMeter(assignment.getEquipment(), endHmr);
         return toLogResponse(log, assignment);
     }
 
@@ -322,6 +323,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         dailyLogRepository.save(log);
 
         saveDivisions(log, divReqs);
+        updateEquipmentMeter(log.getMachineAssignment().getEquipment(), endHmr);
         return toLogResponse(log, log.getMachineAssignment());
     }
 
@@ -549,6 +551,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         Equipment eq = entry.getMachineAssignment().getEquipment();
         eq.setWorkStatus(EquipmentWorkStatus.ASSIGNED);
         equipmentRepository.save(eq);
+        updateEquipmentMeter(eq, req.getEndMeter());
         return response;
     }
 
@@ -716,6 +719,14 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .createdAt(l.getCreatedAt())
                 .updatedAt(l.getUpdatedAt())
                 .build();
+    }
+
+    private void updateEquipmentMeter(Equipment eq, BigDecimal newReading) {
+        if (newReading == null) return;
+        if (eq.getCurrentMeterReading() == null || newReading.compareTo(eq.getCurrentMeterReading()) > 0) {
+            eq.setCurrentMeterReading(newReading);
+            equipmentRepository.save(eq);
+        }
     }
 
     private BigDecimal calcHours(BigDecimal start, BigDecimal end) {

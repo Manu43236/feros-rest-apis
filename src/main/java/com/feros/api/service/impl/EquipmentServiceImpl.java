@@ -410,7 +410,9 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .readingValue(req.getReadingValue())
                 .notes(req.getNotes())
                 .build();
-        return toMeterReadingResponse(meterReadingRepository.save(reading));
+        EquipmentMeterReadingResponse result = toMeterReadingResponse(meterReadingRepository.save(reading));
+        updateEquipmentMeter(eq, req.getReadingValue());
+        return result;
     }
 
     @Override
@@ -422,7 +424,9 @@ public class EquipmentServiceImpl implements EquipmentService {
         reading.setReadingDate(req.getReadingDate());
         reading.setReadingValue(req.getReadingValue());
         reading.setNotes(req.getNotes());
-        return toMeterReadingResponse(meterReadingRepository.save(reading));
+        EquipmentMeterReadingResponse result = toMeterReadingResponse(meterReadingRepository.save(reading));
+        updateEquipmentMeter(reading.getEquipment(), req.getReadingValue());
+        return result;
     }
 
     @Override
@@ -444,6 +448,14 @@ public class EquipmentServiceImpl implements EquipmentService {
     private EquipmentType findEquipmentType(Long typeId) {
         return equipmentTypeRepository.findById(typeId)
                 .orElseThrow(() -> new FerosException("Equipment type not found", HttpStatus.NOT_FOUND));
+    }
+
+    private void updateEquipmentMeter(Equipment eq, BigDecimal newReading) {
+        if (newReading == null) return;
+        if (eq.getCurrentMeterReading() == null || newReading.compareTo(eq.getCurrentMeterReading()) > 0) {
+            eq.setCurrentMeterReading(newReading);
+            equipmentRepository.save(eq);
+        }
     }
 
     private EquipmentFuelLogResponse toFuelLogResponse(EquipmentFuelLog l) {

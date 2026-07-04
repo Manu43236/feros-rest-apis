@@ -1,6 +1,7 @@
 package com.feros.api.scheduler;
 
 import com.feros.api.entity.DailyLogDivision;
+import com.feros.api.entity.Equipment;
 import com.feros.api.entity.EquipmentDailyLog;
 import com.feros.api.entity.MachineAssignment;
 import com.feros.api.entity.MachineWorkEntry;
@@ -9,6 +10,7 @@ import com.feros.api.enums.DailyLogStatus;
 import com.feros.api.enums.WorkOrderStatus;
 import com.feros.api.repository.DailyLogDivisionRepository;
 import com.feros.api.repository.EquipmentDailyLogRepository;
+import com.feros.api.repository.EquipmentRepository;
 import com.feros.api.repository.MachineAssignmentRepository;
 import com.feros.api.repository.MachineWorkEntryRepository;
 import com.feros.api.repository.WorkOrderRepository;
@@ -36,6 +38,7 @@ public class DailyLogScheduler {
     private final MachineWorkEntryRepository workEntryRepository;
     private final EquipmentDailyLogRepository dailyLogRepository;
     private final DailyLogDivisionRepository dailyLogDivisionRepository;
+    private final EquipmentRepository equipmentRepository;
 
     @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Kolkata")
     @Transactional
@@ -121,6 +124,15 @@ public class DailyLogScheduler {
                             log.info("[DailyLogScheduler] Division line: WO {} / assignment {} / division '{}' / HMR {}→{} / {}h",
                                     wo.getId(), assignment.getId(), divisionName, divStart, divEnd, divHours);
                         });
+
+                // Sync currentMeterReading on equipment
+                if (endHmr != null) {
+                    Equipment eq = assignment.getEquipment();
+                    if (eq.getCurrentMeterReading() == null || endHmr.compareTo(eq.getCurrentMeterReading()) > 0) {
+                        eq.setCurrentMeterReading(endHmr);
+                        equipmentRepository.save(eq);
+                    }
+                }
 
                 log.info("[DailyLogScheduler] Created log for assignment {} on {}", assignment.getId(), yesterday);
             }
