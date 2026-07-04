@@ -522,7 +522,11 @@ public class WorkOrderServiceImpl implements WorkOrderService {
             builder.hiredOperatorName(req.getHiredOperatorName());
         }
 
-        return toWorkEntryResponse(workEntryRepository.save(builder.build()));
+        WorkEntryResponse response = toWorkEntryResponse(workEntryRepository.save(builder.build()));
+        Equipment eq = assignment.getEquipment();
+        eq.setWorkStatus(EquipmentWorkStatus.BUSY);
+        equipmentRepository.save(eq);
+        return response;
     }
 
     public WorkEntryResponse stopWork(Long workOrderId, Long assignmentId, com.feros.api.dto.request.StopWorkEntryRequest req) {
@@ -541,7 +545,11 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         if (entry.getStartMeter() != null && req.getEndMeter() != null)
             entry.setHoursWorked(req.getEndMeter().subtract(entry.getStartMeter()).setScale(2, RoundingMode.HALF_UP));
 
-        return toWorkEntryResponse(workEntryRepository.save(entry));
+        WorkEntryResponse response = toWorkEntryResponse(workEntryRepository.save(entry));
+        Equipment eq = entry.getMachineAssignment().getEquipment();
+        eq.setWorkStatus(EquipmentWorkStatus.ASSIGNED);
+        equipmentRepository.save(eq);
+        return response;
     }
 
     public List<WorkEntryResponse> getWorkEntries(Long workOrderId, Long assignmentId) {
