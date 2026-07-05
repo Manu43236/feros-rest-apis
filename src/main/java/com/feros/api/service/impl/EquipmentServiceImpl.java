@@ -800,7 +800,7 @@ public class EquipmentServiceImpl implements EquipmentService {
                     com.feros.api.dto.request.EquipmentServiceTaskRequest.builder()
                             .taskTypeId(t.getTaskTypeId())
                             .customName(t.getCustomName())
-                            .isRecurring(true)
+                            .recurring(true)
                             .frequencyHmr(t.getFrequencyHmr())
                             .cost(null)
                             .build()

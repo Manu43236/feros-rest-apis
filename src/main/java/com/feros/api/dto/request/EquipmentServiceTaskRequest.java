@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 public class EquipmentServiceTaskRequest {
     private Long taskTypeId;
     private String customName;
-    private boolean isRecurring;
+    private boolean recurring;
     private BigDecimal frequencyHmr;
     private BigDecimal cost;
 }
