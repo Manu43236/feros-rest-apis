@@ -33,20 +33,20 @@ public class EquipmentController {
     private final EquipmentService equipmentService;
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
     public ResponseEntity<ApiResponse<EquipmentDashboardResponse>> getDashboard() {
         return ResponseEntity.ok(ApiResponse.success("Dashboard fetched", equipmentService.getDashboard()));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<EquipmentResponse>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success("Equipment fetched successfully",
                 equipmentService.getAllEquipment()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
     public ResponseEntity<ApiResponse<EquipmentResponse>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Equipment fetched successfully",
                 equipmentService.getEquipmentById(id)));
