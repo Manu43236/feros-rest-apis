@@ -749,6 +749,11 @@ public class EquipmentServiceImpl implements EquipmentService {
                 ? request.getCompletedDate()
                 : LocalDate.now();
 
+        // Capture recurring tasks BEFORE modifying status (avoids any post-save collection reload)
+        List<EquipmentServiceTask> recurringTasks = record.getTasks().stream()
+                .filter(t -> Boolean.TRUE.equals(t.getIsRecurring()) && t.getFrequencyHmr() != null)
+                .toList();
+
         record.setStatus(ServiceStatus.COMPLETED);
         record.setCompletedDate(completedDate);
         record.setCompletedHmr(completedHmr);
@@ -772,9 +777,6 @@ public class EquipmentServiceImpl implements EquipmentService {
         equipmentServiceRepository.save(record);
 
         // Auto-create next service for recurring tasks
-        List<EquipmentServiceTask> recurringTasks = record.getTasks().stream()
-                .filter(t -> Boolean.TRUE.equals(t.getIsRecurring()) && t.getFrequencyHmr() != null)
-                .toList();
         if (!recurringTasks.isEmpty() && completedHmr != null) {
             BigDecimal minFreq = recurringTasks.stream()
                     .map(EquipmentServiceTask::getFrequencyHmr)
@@ -790,6 +792,7 @@ public class EquipmentServiceImpl implements EquipmentService {
                     .serviceType(record.getServiceType())
                     .payerType(record.getPayerType())
                     .status(ServiceStatus.OPEN)
+                    .hmrAtService(completedHmr)
                     .dueAtHmr(nextDueHmr)
                     .isActive(true)
                     .build();
