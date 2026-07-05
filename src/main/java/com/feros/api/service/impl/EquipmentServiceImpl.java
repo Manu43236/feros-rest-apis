@@ -575,9 +575,12 @@ public class EquipmentServiceImpl implements EquipmentService {
     @Transactional(readOnly = true)
     public List<EquipmentServiceResponse> getServices(Long equipmentId) {
         Long tenantId = getTenantId();
+        Equipment eq = equipmentRepository.findByIdAndTenantId(equipmentId, tenantId)
+                .orElseThrow(() -> new FerosException("Equipment not found", HttpStatus.NOT_FOUND));
+        BigDecimal currentHmr = eq.getCurrentMeterReading();
         return equipmentServiceRepository
                 .findByEquipmentIdAndTenantIdAndIsActiveTrueOrderByCreatedAtDesc(equipmentId, tenantId)
-                .stream().map(this::toServiceResponse).toList();
+                .stream().map(r -> toServiceResponse(r, currentHmr)).toList();
     }
 
     @Override
@@ -670,7 +673,8 @@ public class EquipmentServiceImpl implements EquipmentService {
 
     @Override
     @Transactional
-    public EquipmentServiceResponse completeService(Long equipmentId, Long serviceId) {
+    public EquipmentServiceResponse completeService(Long equipmentId, Long serviceId,
+            com.feros.api.dto.request.EquipmentServiceCompleteRequest request) {
         Long tenantId = getTenantId();
         EquipmentServiceRecord record = equipmentServiceRepository
                 .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
@@ -679,8 +683,16 @@ public class EquipmentServiceImpl implements EquipmentService {
         if (record.getStatus() == ServiceStatus.COMPLETED)
             throw new FerosException("Service is already completed", HttpStatus.BAD_REQUEST);
 
+        BigDecimal completedHmr = request != null && request.getCompletedHmr() != null
+                ? request.getCompletedHmr()
+                : record.getHmrAtService();
+        LocalDate completedDate = request != null && request.getCompletedDate() != null
+                ? request.getCompletedDate()
+                : LocalDate.now();
+
         record.setStatus(ServiceStatus.COMPLETED);
-        record.setCompletedDate(LocalDate.now());
+        record.setCompletedDate(completedDate);
+        if (completedHmr != null) record.setHmrAtService(completedHmr);
 
         // Recalculate total cost from tasks
         BigDecimal total = record.getTasks().stream()
@@ -691,14 +703,49 @@ public class EquipmentServiceImpl implements EquipmentService {
 
         Equipment eq = record.getEquipment();
         if (eq.getWorkStatus() == EquipmentWorkStatus.IN_REPAIR) {
-            // If machine was on a work order when service started, it goes back to ASSIGNED; otherwise AVAILABLE
             boolean hasActiveAssignment = machineAssignmentRepository
                     .existsByEquipmentIdAndIsActiveTrue(eq.getId());
             eq.setWorkStatus(hasActiveAssignment ? EquipmentWorkStatus.ASSIGNED : EquipmentWorkStatus.AVAILABLE);
             equipmentRepository.save(eq);
         }
 
-        return toServiceResponse(equipmentServiceRepository.save(record));
+        equipmentServiceRepository.save(record);
+
+        // Auto-create next service for recurring tasks
+        List<EquipmentServiceTask> recurringTasks = record.getTasks().stream()
+                .filter(t -> Boolean.TRUE.equals(t.getIsRecurring()) && t.getFrequencyHmr() != null)
+                .toList();
+        if (!recurringTasks.isEmpty() && completedHmr != null) {
+            BigDecimal minFreq = recurringTasks.stream()
+                    .map(EquipmentServiceTask::getFrequencyHmr)
+                    .min(BigDecimal::compareTo).orElse(null);
+            BigDecimal nextDueHmr = minFreq != null ? completedHmr.add(minFreq) : null;
+
+            Tenant tenant = record.getTenant();
+            EquipmentServiceRecord next = EquipmentServiceRecord.builder()
+                    .tenant(tenant)
+                    .equipment(eq)
+                    .serviceNumber(com.feros.api.util.NumberUtil.generate(tenant.getPrefix(), tenantId, com.feros.api.util.NumberUtil.Type.ESVC))
+                    .triggeredBy(record.getTriggeredBy())
+                    .serviceType(record.getServiceType())
+                    .payerType(record.getPayerType())
+                    .status(ServiceStatus.OPEN)
+                    .dueAtHmr(nextDueHmr)
+                    .isActive(true)
+                    .build();
+            saveTasksOnRecord(next, recurringTasks.stream().map(t ->
+                    com.feros.api.dto.request.EquipmentServiceTaskRequest.builder()
+                            .taskTypeId(t.getTaskTypeId())
+                            .customName(t.getCustomName())
+                            .isRecurring(true)
+                            .frequencyHmr(t.getFrequencyHmr())
+                            .cost(null)
+                            .build()
+            ).toList());
+            equipmentServiceRepository.save(next);
+        }
+
+        return toServiceResponse(record);
     }
 
     @Override
@@ -733,8 +780,29 @@ public class EquipmentServiceImpl implements EquipmentService {
     }
 
     private EquipmentServiceResponse toServiceResponse(EquipmentServiceRecord r) {
+        return toServiceResponse(r, r.getEquipment().getCurrentMeterReading());
+    }
+
+    private EquipmentServiceResponse toServiceResponse(EquipmentServiceRecord r, BigDecimal currentHmr) {
         Equipment eq = r.getEquipment();
         String identifier = eq.getRegistrationNumber() != null ? eq.getRegistrationNumber() : eq.getSerialNumber();
+
+        String displayStatus;
+        if (r.getStatus() == ServiceStatus.COMPLETED) {
+            displayStatus = "COMPLETED";
+        } else if (r.getStatus() == ServiceStatus.IN_PROGRESS) {
+            displayStatus = "IN_PROGRESS";
+        } else if (r.getDueAtHmr() != null && currentHmr != null) {
+            if (currentHmr.compareTo(r.getDueAtHmr()) >= 0) {
+                displayStatus = "OVERDUE";
+            } else if (currentHmr.compareTo(r.getDueAtHmr().subtract(new BigDecimal("50"))) >= 0) {
+                displayStatus = "DUE_SOON";
+            } else {
+                displayStatus = "OPEN";
+            }
+        } else {
+            displayStatus = "OPEN";
+        }
 
         List<EquipmentServiceTaskResponse> taskResponses = r.getTasks().stream().map(t -> {
             String taskTypeName = null;
@@ -767,6 +835,7 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .serviceType(r.getServiceType())
                 .payerType(r.getPayerType())
                 .status(r.getStatus())
+                .displayStatus(displayStatus)
                 .hmrAtService(r.getHmrAtService())
                 .dueAtHmr(r.getDueAtHmr())
                 .vendorName(r.getVendorName())

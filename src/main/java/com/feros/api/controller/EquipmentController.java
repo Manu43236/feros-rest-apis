@@ -191,8 +191,9 @@ public class EquipmentController {
     @PostMapping("/{id}/services/{serviceId}/complete")
     @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<EquipmentServiceResponse>> completeService(
-            @PathVariable Long id, @PathVariable Long serviceId) {
-        return ResponseEntity.ok(ApiResponse.success("Service completed", equipmentService.completeService(id, serviceId)));
+            @PathVariable Long id, @PathVariable Long serviceId,
+            @org.springframework.web.bind.annotation.RequestBody(required = false) com.feros.api.dto.request.EquipmentServiceCompleteRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Service completed", equipmentService.completeService(id, serviceId, request)));
     }
 
     @DeleteMapping("/{id}/services/{serviceId}")

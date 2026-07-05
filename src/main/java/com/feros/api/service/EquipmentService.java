@@ -47,6 +47,6 @@ public interface EquipmentService {
     EquipmentServiceResponse createService(Long equipmentId, EquipmentServiceRequest request);
     EquipmentServiceResponse updateService(Long equipmentId, Long serviceId, EquipmentServiceRequest request);
     EquipmentServiceResponse startService(Long equipmentId, Long serviceId);
-    EquipmentServiceResponse completeService(Long equipmentId, Long serviceId);
+    EquipmentServiceResponse completeService(Long equipmentId, Long serviceId, com.feros.api.dto.request.EquipmentServiceCompleteRequest request);
     void deleteService(Long equipmentId, Long serviceId);
 }

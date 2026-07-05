@@ -25,6 +25,7 @@ public class EquipmentServiceResponse {
     private EquipmentServiceType serviceType;
     private ServicePayerType payerType;
     private ServiceStatus status;
+    private String displayStatus;
     private BigDecimal hmrAtService;
     private BigDecimal dueAtHmr;
     private String vendorName;
