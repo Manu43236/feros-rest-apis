@@ -417,6 +417,21 @@ public class EquipmentServiceImpl implements EquipmentService {
     public EquipmentMeterReadingResponse addMeterReading(Long equipmentId, EquipmentMeterReadingRequest req) {
         Long tenantId = getTenantId();
         Equipment eq = findByIdAndTenant(equipmentId);
+
+        // Validate: new reading must be >= max existing reading
+        List<EquipmentMeterReading> existing = meterReadingRepository
+                .findByEquipmentIdAndTenantIdOrderByReadingDateDescIdDesc(equipmentId, tenantId);
+        if (!existing.isEmpty() && req.getReadingValue() != null) {
+            BigDecimal maxExisting = existing.stream()
+                    .map(EquipmentMeterReading::getReadingValue)
+                    .filter(v -> v != null)
+                    .max(BigDecimal::compareTo).orElse(null);
+            if (maxExisting != null && req.getReadingValue().compareTo(maxExisting) < 0)
+                throw new FerosException(
+                    "New HMR (" + req.getReadingValue() + ") must be ≥ existing max HMR (" + maxExisting + ")",
+                    HttpStatus.BAD_REQUEST);
+        }
+
         EquipmentMeterReading reading = EquipmentMeterReading.builder()
                 .tenant(getTenant(tenantId))
                 .equipment(eq)
@@ -436,6 +451,34 @@ public class EquipmentServiceImpl implements EquipmentService {
         EquipmentMeterReading reading = meterReadingRepository.findByIdAndTenantId(readingId, getTenantId())
                 .orElseThrow(() -> new FerosException("Meter reading not found", HttpStatus.NOT_FOUND));
         Equipment eq = reading.getEquipment();
+
+        // Validate: value must stay between neighbours (sorted by readingDate ASC)
+        if (req.getReadingValue() != null) {
+            List<EquipmentMeterReading> all = meterReadingRepository
+                    .findByEquipmentIdAndTenantIdOrderByReadingDateDescIdDesc(eq.getId(), getTenantId())
+                    .stream()
+                    .sorted(java.util.Comparator.comparing(EquipmentMeterReading::getReadingDate))
+                    .toList();
+            int idx = -1;
+            for (int i = 0; i < all.size(); i++) {
+                if (all.get(i).getId().equals(reading.getId())) { idx = i; break; }
+            }
+            if (idx >= 0) {
+                if (idx > 0) {
+                    BigDecimal prevVal = all.get(idx - 1).getReadingValue();
+                    if (prevVal != null && req.getReadingValue().compareTo(prevVal) < 0)
+                        throw new FerosException(
+                            "HMR must be ≥ previous reading (" + prevVal + ")", HttpStatus.BAD_REQUEST);
+                }
+                if (idx < all.size() - 1) {
+                    BigDecimal nextVal = all.get(idx + 1).getReadingValue();
+                    if (nextVal != null && req.getReadingValue().compareTo(nextVal) > 0)
+                        throw new FerosException(
+                            "HMR must be ≤ next reading (" + nextVal + ")", HttpStatus.BAD_REQUEST);
+                }
+            }
+        }
+
         reading.setReadingDate(req.getReadingDate());
         reading.setReadingValue(req.getReadingValue());
         reading.setNotes(req.getNotes());

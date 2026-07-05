@@ -4,12 +4,12 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
 public class EquipmentMeterReadingRequest {
-    private LocalDate readingDate;
+    private LocalDateTime readingDate;
     private BigDecimal readingValue;
     private String notes;
 }

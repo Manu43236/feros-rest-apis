@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "equipment_meter_readings")
@@ -28,7 +28,7 @@ public class EquipmentMeterReading extends BaseEntity {
     private Equipment equipment;
 
     @Column(name = "reading_date", nullable = false)
-    private LocalDate readingDate;
+    private LocalDateTime readingDate;
 
     @Column(name = "reading_value", nullable = false, precision = 10, scale = 2)
     private BigDecimal readingValue;
