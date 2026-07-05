@@ -33,7 +33,8 @@ public final class NumberUtil {
         PART,  // Spare Part
         WO,    // Work Order
         EINV,  // Equipment Invoice
-        ESVC   // Equipment Service
+        ESVC,  // Equipment Service
+        LSE    // Vehicle Lease
     }
 
     /**
