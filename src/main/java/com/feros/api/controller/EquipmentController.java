@@ -79,14 +79,14 @@ public class EquipmentController {
     // ── Machine Detail ───────────────────────────────────────────────────────
 
     @GetMapping("/{id}/assignments")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<MachineAssignmentHistoryResponse>>> getMachineHistory(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Assignment history fetched",
                 equipmentService.getMachineAssignmentHistory(id)));
     }
 
     @GetMapping("/{id}/daily-logs")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<DailyLogResponse>>> getMachineLogs(
             @PathVariable Long id,
             @RequestParam(required = false) LocalDate from,
@@ -105,7 +105,7 @@ public class EquipmentController {
     // ── Fuel Logs ─────────────────────────────────────────────────────────────
 
     @GetMapping("/{id}/fuel-logs")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<EquipmentFuelLogResponse>>> getFuelLogs(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Fuel logs fetched", equipmentService.getFuelLogs(id)));
     }
@@ -134,7 +134,7 @@ public class EquipmentController {
     // ── Meter Readings ────────────────────────────────────────────────────────
 
     @GetMapping("/{id}/meter-readings")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<EquipmentMeterReadingResponse>>> getMeterReadings(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Meter readings fetched", equipmentService.getMeterReadings(id)));
     }
@@ -162,7 +162,7 @@ public class EquipmentController {
     // ── Service Records ───────────────────────────────────────────────────────
 
     @GetMapping("/{id}/services")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<EquipmentServiceResponse>>> getServices(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Services fetched", equipmentService.getServices(id)));
     }
