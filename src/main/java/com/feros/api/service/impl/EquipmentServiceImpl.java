@@ -435,11 +435,12 @@ public class EquipmentServiceImpl implements EquipmentService {
         findByIdAndTenant(equipmentId);
         EquipmentMeterReading reading = meterReadingRepository.findByIdAndTenantId(readingId, getTenantId())
                 .orElseThrow(() -> new FerosException("Meter reading not found", HttpStatus.NOT_FOUND));
+        Equipment eq = reading.getEquipment();
         reading.setReadingDate(req.getReadingDate());
         reading.setReadingValue(req.getReadingValue());
         reading.setNotes(req.getNotes());
         EquipmentMeterReadingResponse result = toMeterReadingResponse(meterReadingRepository.save(reading));
-        updateEquipmentMeter(reading.getEquipment(), req.getReadingValue());
+        recalculateCurrentMeter(eq);
         return result;
     }
 
@@ -449,7 +450,9 @@ public class EquipmentServiceImpl implements EquipmentService {
         findByIdAndTenant(equipmentId);
         EquipmentMeterReading reading = meterReadingRepository.findByIdAndTenantId(readingId, getTenantId())
                 .orElseThrow(() -> new FerosException("Meter reading not found", HttpStatus.NOT_FOUND));
+        Equipment eq = reading.getEquipment();
         meterReadingRepository.delete(reading);
+        recalculateCurrentMeter(eq);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -470,6 +473,19 @@ public class EquipmentServiceImpl implements EquipmentService {
             eq.setCurrentMeterReading(newReading);
             equipmentRepository.save(eq);
         }
+    }
+
+    private void recalculateCurrentMeter(Equipment eq) {
+        Long tenantId = getTenantId();
+        BigDecimal maxReading = meterReadingRepository
+                .findByEquipmentIdAndTenantIdOrderByReadingDateDescIdDesc(eq.getId(), tenantId)
+                .stream()
+                .map(EquipmentMeterReading::getReadingValue)
+                .filter(v -> v != null)
+                .max(BigDecimal::compareTo)
+                .orElse(null);
+        eq.setCurrentMeterReading(maxReading);
+        equipmentRepository.save(eq);
     }
 
     private EquipmentFuelLogResponse toFuelLogResponse(EquipmentFuelLog l) {
