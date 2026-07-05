@@ -1,5 +1,6 @@
 package com.feros.api.dto.response;
 
+import com.feros.api.enums.ModuleType;
 import com.feros.api.enums.SubscriptionStatus;
 import lombok.*;
 
@@ -35,12 +36,13 @@ public class TenantResponse {
     private String ownerEmail;
     private String prefix;
     private String logoUrl;
-    private Integer lorryCount;
+    private Integer totalSlotsCount;
     private SubscriptionStatus subscriptionStatus;
     private LocalDate trialStartDate;
     private LocalDate trialEndDate;
     private LocalDate subscriptionStartDate;
     private LocalDate subscriptionEndDate;
+    private ModuleType moduleType;
     private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

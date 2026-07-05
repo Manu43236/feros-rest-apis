@@ -4,8 +4,12 @@ import com.feros.api.dto.request.ClientRequest;
 import com.feros.api.dto.request.UserStatusRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.BulkTenantUploadResponse;
+import com.feros.api.dto.response.ClientDivisionResponse;
 import com.feros.api.dto.response.ClientResponse;
 import com.feros.api.service.ClientService;
+
+import java.util.List;
+import java.util.Map;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -68,5 +72,31 @@ public class ClientController {
             @RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Bulk upload completed", clientService.bulkUpload(file)));
+    }
+
+    // ── Divisions ─────────────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/divisions")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<ClientDivisionResponse>>> getDivisions(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Divisions fetched", clientService.getDivisions(id)));
+    }
+
+    @PostMapping("/{id}/divisions")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<ClientDivisionResponse>> addDivision(
+            @PathVariable Long id, @RequestBody Map<String, String> body) {
+        String name = body.get("name");
+        if (name == null || name.isBlank())
+            return ResponseEntity.badRequest().body(ApiResponse.error("Division name is required"));
+        return ResponseEntity.ok(ApiResponse.success("Division added", clientService.addDivision(id, name)));
+    }
+
+    @DeleteMapping("/{id}/divisions/{divisionId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteDivision(
+            @PathVariable Long id, @PathVariable Long divisionId) {
+        clientService.deleteDivision(id, divisionId);
+        return ResponseEntity.ok(ApiResponse.success("Division removed", null));
     }
 }

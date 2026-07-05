@@ -95,10 +95,11 @@ public class TenantServiceImpl implements TenantService {
                 .ownerName(request.getOwnerName())
                 .ownerPhone(request.getOwnerPhone())
                 .ownerEmail(request.getOwnerEmail())
-                .lorryCount(0)
+                .totalSlotsCount(0)
                 .subscriptionStatus(SubscriptionStatus.TRIAL)
                 .trialStartDate(TimeUtil.today())
                 .trialEndDate(TimeUtil.today().plusMonths(1))
+                .moduleType(request.getModuleType() != null ? request.getModuleType() : com.feros.api.enums.ModuleType.VEHICLES_ONLY)
                 .isActive(true)
                 .build();
 
@@ -149,6 +150,7 @@ public class TenantServiceImpl implements TenantService {
         tenant.setOwnerName(request.getOwnerName());
         tenant.setOwnerPhone(request.getOwnerPhone());
         tenant.setOwnerEmail(request.getOwnerEmail());
+        if (request.getModuleType() != null) tenant.setModuleType(request.getModuleType());
 
         return mapToResponse(tenantRepository.save(tenant));
     }
@@ -214,7 +216,7 @@ public class TenantServiceImpl implements TenantService {
                             .state(state).pincode(pincode)
                             .gstin(gstin).panNumber(panNumber)
                             .ownerName(ownerName).ownerPhone(ownerPhone)
-                            .ownerEmail(ownerEmail).lorryCount(0)
+                            .ownerEmail(ownerEmail).totalSlotsCount(0)
                             .subscriptionStatus(SubscriptionStatus.TRIAL)
                             .trialStartDate(TimeUtil.today())
                             .trialEndDate(TimeUtil.today().plusMonths(1))
@@ -544,6 +546,7 @@ public class TenantServiceImpl implements TenantService {
                 .companyName(tenant.getCompanyName())
                 .logoUrl(tenant.getLogoUrl() != null ? s3Service.getPublicUrl(tenant.getLogoUrl()) : null)
                 .isPinResetRequired(false)
+                .moduleType(tenant.getModuleType())
                 .build();
     }
 
@@ -599,7 +602,7 @@ public class TenantServiceImpl implements TenantService {
                 .ownerEmail(tenant.getOwnerEmail())
                 .prefix(tenant.getPrefix())
                 .logoUrl(tenant.getLogoUrl() != null ? s3Service.getPublicUrl(tenant.getLogoUrl()) : null)
-                .lorryCount(tenant.getLorryCount())
+                .totalSlotsCount(tenant.getTotalSlotsCount())
                 .subscriptionStatus(tenant.getSubscriptionStatus())
                 .trialStartDate(tenant.getTrialStartDate())
                 .trialEndDate(tenant.getTrialEndDate())
@@ -612,6 +615,7 @@ public class TenantServiceImpl implements TenantService {
                 .currentVehicleCount(currentVehicleCount)
                 .currentPricePerVehicle(currentPpv)
                 .currentBillingCycle(currentBillingCycle)
+                .moduleType(tenant.getModuleType())
                 .customUserLimit(tenant.getCustomUserLimit())
                 .effectiveUserLimit(effectiveUserLimit)
                 .activeUserCount(activeUserCount)

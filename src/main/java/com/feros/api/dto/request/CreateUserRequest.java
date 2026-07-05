@@ -1,12 +1,14 @@
 package com.feros.api.dto.request;
 
 import com.feros.api.enums.RoleName;
+import com.feros.api.enums.SalaryType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Getter
@@ -46,5 +48,13 @@ public class CreateUserRequest {
     private String licenseNumber;
     private LocalDate licenseExpiryDate;
     private Long designationId;
+
+    // Salary
+    private SalaryType salaryType;
+    private BigDecimal monthlySalary;
+
+    // Module access
+    private Boolean canAccessVehicles;
+    private Boolean canAccessEquipment;
 
 }

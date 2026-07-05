@@ -50,16 +50,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Copy config files to Stg EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.STG_EC2_HOST }}
-          username: ${{ secrets.STG_EC2_USER }}
-          key: ${{ secrets.STG_EC2_SSH_KEY }}
-          port: 1995
-          source: "docker-compose.yml,nginx.conf"
-          target: /home/ubuntu/feros-stg
-
       - name: Deploy on Stg EC2
         uses: appleboy/ssh-action@v1.0.3
         env:

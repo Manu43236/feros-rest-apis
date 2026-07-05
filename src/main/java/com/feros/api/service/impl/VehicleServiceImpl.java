@@ -64,6 +64,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final VehicleDocumentRepository vehicleDocumentRepository;
     private final DocumentTypeRepository documentTypeRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    private final EquipmentRepository equipmentRepository;
     private final VehicleImageRepository vehicleImageRepository;
     private final LrRepository lrRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
@@ -93,16 +94,20 @@ public class VehicleServiceImpl implements VehicleService {
     public VehicleResponse createVehicle(VehicleRequest request) {
         Tenant tenant = getCurrentTenant();
 
-        // Enforce vehicle count limit (per-vehicle billing: limit = vehicleCount paid for)
+        // Enforce slot limit — shared pool for BOTH tenants, vehicles-only for VEHICLES_ONLY
         subscriptionHistoryRepository.findActiveByTenantId(tenant.getId()).stream()
                 .findFirst()
                 .ifPresent(h -> {
-                    Integer limit = h.getVehicleCount();
-                    if (limit != null && limit > 0) {
-                        long current = vehicleRepository.countByTenantIdAndIsActiveTrue(tenant.getId());
-                        if (current >= limit) {
+                    Integer totalSlots = h.getVehicleCount();
+                    if (totalSlots != null && totalSlots > 0) {
+                        long vehicles = vehicleRepository.countByTenantIdAndIsActiveTrue(tenant.getId());
+                        long combined = switch (tenant.getModuleType()) {
+                            case BOTH -> vehicles + equipmentRepository.countByTenantId(tenant.getId());
+                            default   -> vehicles; // VEHICLES_ONLY
+                        };
+                        if (combined >= totalSlots) {
                             throw new FerosException(
-                                    "Vehicle limit reached (" + limit + " vehicles). Contact FEROS support to add more vehicles to your plan.",
+                                    "Slot limit reached (" + totalSlots + "). Contact FEROS support to upgrade.",
                                     HttpStatus.FORBIDDEN);
                         }
                     }

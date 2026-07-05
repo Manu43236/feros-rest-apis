@@ -14,6 +14,7 @@ import com.feros.api.enums.DeviceType;
 import com.feros.api.enums.NotificationType;
 import com.feros.api.enums.RoleName;
 import com.feros.api.repository.RbacLoginAccessRepository;
+import com.feros.api.repository.StaffProfileRepository;
 import com.feros.api.repository.UserRepository;
 import com.feros.api.service.AuthService;
 import com.feros.api.service.NotificationService;
@@ -43,6 +44,7 @@ public class AuthServiceImpl implements AuthService {
     private final RbacLoginAccessRepository rbacLoginAccessRepository;
     private final RoleModuleAccessService roleModuleAccessService;
     private final NotificationService notificationService;
+    private final StaffProfileRepository staffProfileRepository;
 
     @Override
     public LoginResponse login(LoginRequest request, String ipAddress) {
@@ -172,7 +174,18 @@ public class AuthServiceImpl implements AuthService {
             }
         }
 
-        // 11. Return response
+        // 11. Resolve staff access flags (only for staff roles)
+        Boolean canAccessVehicles = null;
+        Boolean canAccessEquipment = null;
+        if (tenantId != null) {
+            var profileOpt = staffProfileRepository.findByUserIdAndIsActiveTrue(user.getId());
+            if (profileOpt.isPresent()) {
+                canAccessVehicles = profileOpt.get().getCanAccessVehicles();
+                canAccessEquipment = profileOpt.get().getCanAccessEquipment();
+            }
+        }
+
+        // 12. Return response
         return LoginResponse.builder()
                 .token(token)
                 .userId(user.getId())
@@ -184,6 +197,9 @@ public class AuthServiceImpl implements AuthService {
                 .logoUrl(logoUrl)
                 .isPinResetRequired(user.getIsPinResetRequired())
                 .allowedModules(allowedModules)
+                .moduleType(user.getTenant() != null ? user.getTenant().getModuleType() : null)
+                .canAccessVehicles(canAccessVehicles)
+                .canAccessEquipment(canAccessEquipment)
                 .build();
     }
 

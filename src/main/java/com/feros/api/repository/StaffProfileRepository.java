@@ -15,7 +15,9 @@ public interface StaffProfileRepository extends JpaRepository<StaffProfile, Long
 
     Optional<StaffProfile> findByUserIdAndIsActiveTrue(Long userId);
 
+    Optional<StaffProfile> findByIdAndTenantId(Long id, Long tenantId);
     List<StaffProfile> findByTenantIdAndIsActiveTrue(Long tenantId);
+    List<StaffProfile> findByTenantIdAndIsActiveTrueAndCanAccessEquipmentTrue(Long tenantId);
 
     boolean existsByUserIdAndIsActiveTrue(Long userId);
 }

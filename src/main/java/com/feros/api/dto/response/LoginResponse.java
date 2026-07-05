@@ -1,5 +1,6 @@
 package com.feros.api.dto.response;
 
+import com.feros.api.enums.ModuleType;
 import lombok.*;
 
 import java.util.List;
@@ -21,4 +22,7 @@ public class LoginResponse {
     private boolean isPinResetRequired;
     /** Null for ADMIN/SUPER_ADMIN (all modules visible). Non-null list of enabled module keys for other roles. */
     private List<String> allowedModules;
+    private ModuleType moduleType;
+    private Boolean canAccessVehicles;
+    private Boolean canAccessEquipment;
 }

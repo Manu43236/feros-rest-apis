@@ -18,6 +18,7 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
     Optional<Client> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     Optional<Client> findByIdAndTenantId(Long id, Long tenantId);
     boolean existsByPhoneAndTenantId(String phone, Long tenantId);
+    boolean existsByIdAndTenantId(Long id, Long tenantId);
 
     @Query("""
         SELECT c FROM Client c

@@ -32,4 +32,7 @@ public class StaffProfileRequest {
 
     private SalaryType salaryType;
     private BigDecimal monthlySalary;
+
+    private Boolean canAccessVehicles;
+    private Boolean canAccessEquipment;
 }

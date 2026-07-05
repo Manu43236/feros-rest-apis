@@ -13,6 +13,7 @@ public interface StaffProfileService {
     StaffProfileResponse createOrUpdateProfile(Long userId, StaffProfileRequest request);
     StaffProfileResponse getProfileByUserId(Long userId);
     List<StaffProfileResponse> getAllProfiles();
+    List<StaffProfileResponse> getAllProfiles(boolean equipmentOnly);
 
     DocumentResponse addStaffDocument(Long userId, DocumentRequest request);
     List<DocumentResponse> getStaffDocuments(Long userId);

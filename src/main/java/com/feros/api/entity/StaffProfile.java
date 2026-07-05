@@ -85,13 +85,23 @@ public class StaffProfile extends BaseEntity {
     @Column(name = "profile_photo_url")
     private String profilePhotoUrl;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "salary_type", nullable = false)
-    private SalaryType salaryType = SalaryType.DAILY;
+    private SalaryType salaryType = SalaryType.MONTHLY;
 
     @Column(name = "monthly_salary", precision = 12, scale = 2)
     private java.math.BigDecimal monthlySalary;
 
+    @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+    @Builder.Default
+    @Column(name = "can_access_vehicles", nullable = false)
+    private Boolean canAccessVehicles = true;
+
+    @Builder.Default
+    @Column(name = "can_access_equipment", nullable = false)
+    private Boolean canAccessEquipment = false;
 }

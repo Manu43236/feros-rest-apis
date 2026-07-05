@@ -56,6 +56,8 @@ public class StaffProfileResponse {
     private BigDecimal monthlySalary;
 
     private Boolean isActive;
+    private Boolean canAccessVehicles;
+    private Boolean canAccessEquipment;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

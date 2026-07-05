@@ -1,5 +1,6 @@
 package com.feros.api.entity;
 
+import com.feros.api.enums.ModuleType;
 import com.feros.api.enums.SubscriptionStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -95,8 +96,8 @@ public class Tenant extends BaseEntity {
     private String logoUrl;
 
     // Subscription Info
-    @Column(name = "lorry_count")
-    private Integer lorryCount;
+    @Column(name = "total_slots_count")
+    private Integer totalSlotsCount;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "subscription_status")
@@ -117,6 +118,12 @@ public class Tenant extends BaseEntity {
     // User limit override (null = default: vehicleCount × 5)
     @Column(name = "custom_user_limit")
     private Integer customUserLimit;
+
+    // Module access
+    @Enumerated(EnumType.STRING)
+    @Column(name = "module_type", nullable = false)
+    @Builder.Default
+    private ModuleType moduleType = ModuleType.VEHICLES_ONLY;
 
     // System
     @Column(name = "is_active")

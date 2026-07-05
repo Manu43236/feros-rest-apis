@@ -440,7 +440,29 @@ public class UserServiceImpl implements UserService {
     private boolean isStaffRole(RoleName role) {
         return role == RoleName.DRIVER ||
                 role == RoleName.CLEANER ||
-                role == RoleName.SUPERVISOR;
+                role == RoleName.SUPERVISOR ||
+                role == RoleName.OPERATOR;
+    }
+
+    private boolean resolveCanAccessVehicles(CreateUserRequest request, Tenant tenant) {
+        if (tenant.getModuleType() == null) return true;
+        return switch (tenant.getModuleType()) {
+            case VEHICLES_ONLY  -> true;
+            case EQUIPMENT_ONLY -> false;
+            case BOTH           -> request.getRole() == RoleName.OPERATOR
+                                   ? false
+                                   : !Boolean.FALSE.equals(request.getCanAccessVehicles());
+        };
+    }
+
+    private boolean resolveCanAccessEquipment(CreateUserRequest request, Tenant tenant) {
+        if (tenant.getModuleType() == null) return false;
+        return switch (tenant.getModuleType()) {
+            case EQUIPMENT_ONLY -> true;
+            case VEHICLES_ONLY  -> false;
+            case BOTH           -> Boolean.TRUE.equals(request.getCanAccessEquipment())
+                                   || request.getRole() == RoleName.OPERATOR;
+        };
     }
 
     private Long resolveTenantId(Long requestTenantId) {
@@ -481,7 +503,11 @@ public class UserServiceImpl implements UserService {
                 .accountHolderName(request.getAccountHolderName())
                 .licenseNumber(request.getLicenseNumber())
                 .licenseExpiryDate(request.getLicenseExpiryDate())
+                .salaryType(request.getSalaryType() != null ? request.getSalaryType() : com.feros.api.enums.SalaryType.MONTHLY)
+                .monthlySalary(request.getMonthlySalary())
                 .isActive(true)
+                .canAccessVehicles(resolveCanAccessVehicles(request, tenant))
+                .canAccessEquipment(resolveCanAccessEquipment(request, tenant))
                 .build();
 
         if (request.getEmploymentTypeId() != null) {

@@ -88,6 +88,11 @@ public class StaffProfileServiceImpl implements StaffProfileService {
             profile.setSalaryType(request.getSalaryType());
         profile.setMonthlySalary(request.getMonthlySalary());
 
+        if (request.getCanAccessVehicles() != null)
+            profile.setCanAccessVehicles(request.getCanAccessVehicles());
+        if (request.getCanAccessEquipment() != null)
+            profile.setCanAccessEquipment(request.getCanAccessEquipment());
+
         if (request.getDesignationId() != null)
             profile.setDesignation(designationRepository
                     .findByIdAndTenantId(request.getDesignationId(), tenantId)
@@ -117,8 +122,16 @@ public class StaffProfileServiceImpl implements StaffProfileService {
 
     @Override
     public List<StaffProfileResponse> getAllProfiles() {
-        return staffProfileRepository.findByTenantIdAndIsActiveTrue(getCurrentTenantId())
-                .stream().map(this::mapToProfileResponse).toList();
+        return getAllProfiles(false);
+    }
+
+    @Override
+    public List<StaffProfileResponse> getAllProfiles(boolean equipmentOnly) {
+        Long tenantId = getCurrentTenantId();
+        List<StaffProfile> profiles = equipmentOnly
+                ? staffProfileRepository.findByTenantIdAndIsActiveTrueAndCanAccessEquipmentTrue(tenantId)
+                : staffProfileRepository.findByTenantIdAndIsActiveTrue(tenantId);
+        return profiles.stream().map(this::mapToProfileResponse).toList();
     }
 
     @Override
@@ -344,6 +357,8 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .salaryType(p.getSalaryType())
                 .monthlySalary(p.getMonthlySalary())
                 .isActive(p.getIsActive())
+                .canAccessVehicles(p.getCanAccessVehicles() != null ? p.getCanAccessVehicles() : true)
+                .canAccessEquipment(p.getCanAccessEquipment())
                 .createdAt(p.getCreatedAt())
                 .updatedAt(p.getUpdatedAt())
                 .build();

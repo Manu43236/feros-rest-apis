@@ -1,9 +1,11 @@
 package com.feros.api.dto.response;
 
+import com.feros.api.enums.ClientCategory;
 import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -16,6 +18,7 @@ public class ClientResponse {
     private String clientNumber;
     private String clientName;
 
+    private ClientCategory clientCategory;
     private Long clientTypeId;
     private String clientTypeName;
 
@@ -46,4 +49,5 @@ public class ClientResponse {
     private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private List<ClientDivisionResponse> divisions;
 }
