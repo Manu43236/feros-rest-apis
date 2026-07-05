@@ -751,7 +751,8 @@ public class EquipmentServiceImpl implements EquipmentService {
 
         record.setStatus(ServiceStatus.COMPLETED);
         record.setCompletedDate(completedDate);
-        if (completedHmr != null) record.setHmrAtService(completedHmr);
+        record.setCompletedHmr(completedHmr);
+        record.getTasks().forEach(t -> t.setStatus(com.feros.api.enums.ServiceTaskStatus.COMPLETED));
 
         // Recalculate total cost from tasks
         BigDecimal total = record.getTasks().stream()
@@ -901,6 +902,7 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .location(r.getLocation())
                 .serviceDate(r.getServiceDate())
                 .completedDate(r.getCompletedDate())
+                .completedHmr(r.getCompletedHmr())
                 .startedAt(r.getStartedAt())
                 .totalCost(r.getTotalCost())
                 .insuranceClaimNo(r.getInsuranceClaimNo())

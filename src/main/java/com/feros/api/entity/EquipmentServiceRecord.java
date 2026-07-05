@@ -73,6 +73,9 @@ public class EquipmentServiceRecord extends BaseEntity {
     @Column(name = "completed_date")
     private LocalDate completedDate;
 
+    @Column(name = "completed_hmr", precision = 10, scale = 2)
+    private BigDecimal completedHmr;
+
     @Column(name = "started_at")
     private LocalDateTime startedAt;
 

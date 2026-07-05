@@ -32,6 +32,7 @@ public class EquipmentServiceResponse {
     private String location;
     private LocalDate serviceDate;
     private LocalDate completedDate;
+    private BigDecimal completedHmr;
     private LocalDateTime startedAt;
     private BigDecimal totalCost;
     private String insuranceClaimNo;
