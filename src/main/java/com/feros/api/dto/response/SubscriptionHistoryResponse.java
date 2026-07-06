@@ -36,4 +36,5 @@ public class SubscriptionHistoryResponse {
     private String paymentRef;
     private String notes;
     private LocalDateTime createdAt;
+    private Long invoiceId; // null if no invoice generated for this history record
 }

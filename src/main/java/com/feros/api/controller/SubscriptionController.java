@@ -106,6 +106,14 @@ public class SubscriptionController {
                 subscriptionService.correctSubscription(tenantId, request)));
     }
 
+    @PostMapping("/{tenantId}/history/{historyId}/invoice")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<SubscriptionInvoiceResponse>> generateInvoice(
+            @PathVariable Long tenantId, @PathVariable Long historyId) {
+        return ResponseEntity.ok(ApiResponse.success("Invoice generated",
+                subscriptionService.generateInvoiceForHistory(tenantId, historyId)));
+    }
+
     // ─── Tenant self-service ──────────────────────────────────────────────────
 
     @GetMapping("/my")

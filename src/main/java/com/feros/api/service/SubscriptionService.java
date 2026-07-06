@@ -21,4 +21,5 @@ public interface SubscriptionService {
     byte[] generateInvoicePdf(Long tenantId, Long invoiceId);
     SubscriptionHistoryResponse getCurrentSubscription(Long tenantId);
     SubscriptionHistoryResponse correctSubscription(Long tenantId, CorrectSubscriptionRequest request);
+    SubscriptionInvoiceResponse generateInvoiceForHistory(Long tenantId, Long historyId);
 }

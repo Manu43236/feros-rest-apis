@@ -275,8 +275,34 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     public List<SubscriptionHistoryResponse> getHistory(Long tenantId) {
         Tenant tenant = getTenant(tenantId);
         return historyRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId).stream()
-                .map(h -> toHistoryResponse(h, tenant))
+                .map(h -> toHistoryResponseWithInvoice(h, tenant))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public SubscriptionInvoiceResponse generateInvoiceForHistory(Long tenantId, Long historyId) {
+        Tenant tenant = getTenant(tenantId);
+        SubscriptionHistory history = historyRepository.findById(historyId)
+                .filter(h -> h.getTenant().getId().equals(tenantId))
+                .orElseThrow(() -> new FerosException("History record not found", HttpStatus.NOT_FOUND));
+
+        if (invoiceRepository.findBySubscriptionHistoryId(historyId).isPresent()) {
+            throw new FerosException("Invoice already exists for this subscription record", HttpStatus.CONFLICT);
+        }
+
+        BigDecimal subAmount     = history.getAmount() != null ? history.getAmount() : BigDecimal.ZERO;
+        BigDecimal instCharges   = history.getInstallationCharges() != null ? history.getInstallationCharges() : BigDecimal.ZERO;
+        BigDecimal taxable       = subAmount.add(instCharges);
+        BigDecimal gstAmount     = taxable.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalAmount   = taxable.add(gstAmount);
+
+        createInvoice(history, tenant, history.getPlanName(), totalAmount, subAmount, gstAmount,
+                history.getPaymentRef(), history.getVehicleCount(), history.getPricePerVehicle(), instCharges);
+
+        SubscriptionInvoice invoice = invoiceRepository.findBySubscriptionHistoryId(historyId)
+                .orElseThrow(() -> new FerosException("Invoice creation failed", HttpStatus.INTERNAL_SERVER_ERROR));
+        return toInvoiceResponse(invoice, tenant);
     }
 
     @Override
@@ -495,6 +521,14 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .paymentRef(paymentRef)
                 .build();
         invoiceRepository.save(invoice);
+    }
+
+    private SubscriptionHistoryResponse toHistoryResponseWithInvoice(SubscriptionHistory h, Tenant tenant) {
+        Long invoiceId = invoiceRepository.findBySubscriptionHistoryId(h.getId())
+                .map(SubscriptionInvoice::getId).orElse(null);
+        SubscriptionHistoryResponse r = toHistoryResponse(h, tenant);
+        r.setInvoiceId(invoiceId);
+        return r;
     }
 
     private SubscriptionHistoryResponse toHistoryResponse(SubscriptionHistory h, Tenant tenant) {
