@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.dto.request.AssignDivisionRequest;
 import com.feros.api.dto.request.LeaseVehicleAssignmentRequest;
 import com.feros.api.dto.request.VehicleLeaseRequest;
 import com.feros.api.dto.response.LeaseBillingResponse;
@@ -39,6 +40,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     private final VehicleRepository vehicleRepository;
     private final StaffProfileRepository staffProfileRepository;
     private final VehicleStatusRepository vehicleStatusRepository;
+    private final ClientDivisionRepository clientDivisionRepository;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
 
@@ -214,6 +216,25 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
 
     @Override
     @Transactional
+    public LeaseVehicleAssignmentResponse assignDivision(Long leaseId, Long assignmentId, AssignDivisionRequest request) {
+        fetchLease(leaseId);
+        LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
+                .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
+
+        if (request.getDivisionId() == null) {
+            assignment.setDivisionId(null);
+            assignment.setDivisionName(null);
+        } else {
+            ClientDivision division = clientDivisionRepository.findById(request.getDivisionId())
+                    .orElseThrow(() -> new FerosException("Division not found", HttpStatus.NOT_FOUND));
+            assignment.setDivisionId(division.getId());
+            assignment.setDivisionName(division.getName());
+        }
+        return toAssignmentResponse(assignmentRepository.save(assignment));
+    }
+
+    @Override
+    @Transactional
     public LeaseVehicleAssignmentResponse closeVehicleAssignment(Long leaseId, Long assignmentId, BigDecimal odometerAtEnd) {
         fetchLease(leaseId);
         LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
@@ -325,6 +346,8 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .endDate(a.getEndDate())
                 .odometerAtStart(a.getOdometerAtStart())
                 .odometerAtEnd(a.getOdometerAtEnd())
+                .divisionId(a.getDivisionId())
+                .divisionName(a.getDivisionName())
                 .isActive(Boolean.TRUE.equals(a.getIsActive()))
                 .notes(a.getNotes())
                 .createdAt(a.getCreatedAt())

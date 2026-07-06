@@ -22,6 +22,8 @@ public class LeaseVehicleAssignmentResponse {
     private LocalDate endDate;
     private BigDecimal odometerAtStart;
     private BigDecimal odometerAtEnd;
+    private Long divisionId;
+    private String divisionName;
     private boolean isActive;
     private String notes;
     private LocalDateTime createdAt;

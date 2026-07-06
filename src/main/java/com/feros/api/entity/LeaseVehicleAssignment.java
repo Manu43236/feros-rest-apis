@@ -47,6 +47,12 @@ public class LeaseVehicleAssignment extends BaseEntity {
     @Column(name = "odometer_at_end")
     private BigDecimal odometerAtEnd;
 
+    @Column(name = "division_id")
+    private Long divisionId;
+
+    @Column(name = "division_name")
+    private String divisionName;
+
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
