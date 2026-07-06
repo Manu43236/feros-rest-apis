@@ -12,13 +12,12 @@ public class SubscriptionHistoryResponse {
     private Long id;
     private Long tenantId;
     private String companyName;
-    private Long planId;
     private String planName;
     private Integer vehicleCount;
     private BigDecimal pricePerVehicle;
     private Integer maxLorries;
     private Integer maxUsers;
-    // ─── Plan feature flags ───────────────────────────────────────────────────
+    // Feature flags — always true (all features included for all tenants)
     private Boolean hasFuelLogs;
     private Boolean hasMeterReadings;
     private Boolean hasVehicleServices;

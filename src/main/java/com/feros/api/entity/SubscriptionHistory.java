@@ -27,9 +27,9 @@ public class SubscriptionHistory {
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "plan_id")
-    private SubscriptionPlan plan;
+    // plan_id column kept in DB for historical data — no longer mapped in code
+    @Column(name = "plan_name")
+    private String planName;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

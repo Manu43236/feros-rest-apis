@@ -4,11 +4,9 @@ import com.feros.api.dto.request.ActivateSubscriptionRequest;
 import com.feros.api.dto.request.CorrectSubscriptionRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
-import com.feros.api.dto.request.UpgradeRequestRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.SubscriptionHistoryResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceResponse;
-import com.feros.api.dto.response.UpgradeRequestResponse;
 import com.feros.api.service.SubscriptionService;
 import com.feros.api.util.SecurityUtil;
 import jakarta.validation.Valid;
@@ -28,7 +26,7 @@ public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;
 
-    // ─── SUPER_ADMIN actions (tenant-specific) ────────────────────────────────
+    // ─── SUPER_ADMIN actions ──────────────────────────────────────────────────
 
     @PostMapping("/{tenantId}/activate")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
@@ -108,7 +106,7 @@ public class SubscriptionController {
                 subscriptionService.correctSubscription(tenantId, request)));
     }
 
-    // ─── Tenant self-service (ADMIN can view own subscription) ───────────────
+    // ─── Tenant self-service ──────────────────────────────────────────────────
 
     @GetMapping("/my")
     @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER', 'SERVICE_MANAGER', 'TECHNICIAN', 'STORE_KEEPER')")
@@ -145,30 +143,5 @@ public class SubscriptionController {
                         "inline; filename=\"subscription-invoice-" + invoiceId + ".pdf\"")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
-    }
-
-    // ─── Upgrade Requests ─────────────────────────────────────────────────────
-
-    @PostMapping("/upgrade-request")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OFFICE_STAFF')")
-    public ResponseEntity<ApiResponse<UpgradeRequestResponse>> submitUpgradeRequest(
-            @Valid @RequestBody UpgradeRequestRequest request) {
-        Long tenantId = SecurityUtil.getCurrentTenantId();
-        return ResponseEntity.ok(ApiResponse.success("Upgrade request submitted",
-                subscriptionService.submitUpgradeRequest(tenantId, request)));
-    }
-
-    @GetMapping("/upgrade-requests")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<ApiResponse<List<UpgradeRequestResponse>>> getUpgradeRequests() {
-        return ResponseEntity.ok(ApiResponse.success("Upgrade requests fetched",
-                subscriptionService.getUpgradeRequests()));
-    }
-
-    @PatchMapping("/upgrade-requests/{id}/dismiss")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> dismissUpgradeRequest(@PathVariable Long id) {
-        subscriptionService.dismissUpgradeRequest(id);
-        return ResponseEntity.ok(ApiResponse.success("Request dismissed", null));
     }
 }

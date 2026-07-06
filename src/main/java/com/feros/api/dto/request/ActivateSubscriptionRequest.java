@@ -12,12 +12,14 @@ import java.time.LocalDate;
 @Getter
 @Setter
 public class ActivateSubscriptionRequest {
-    @NotNull(message = "Plan ID is required")
-    private Long planId;
+
+    private String planName;           // free-text label (e.g. "Enterprise", "Custom")
 
     @NotNull(message = "Vehicle count is required")
     @Min(value = 1, message = "At least 1 vehicle required")
     private Integer vehicleCount;
+
+    private BigDecimal pricePerVehicle; // optional — used for invoice line; if null, amount must be provided
 
     @NotNull(message = "Billing cycle is required")
     private BillingCycle billingCycle;
@@ -25,7 +27,7 @@ public class ActivateSubscriptionRequest {
     @NotNull(message = "Start date is required")
     private LocalDate startDate;
 
-    private BigDecimal amount;    // optional override; auto-calculated if omitted
+    private BigDecimal amount;    // optional override; auto-calculated from pricePerVehicle if omitted
     private String paymentRef;
     private String notes;
 }
