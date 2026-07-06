@@ -14,7 +14,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 public class CorrectSubscriptionRequest {
 
-    private Long planId;                // optional — link to a plan (null = custom)
+    private String planName;            // optional — override plan label
 
     @Min(1)
     private Integer vehicleCount;       // optional — if null, keeps existing

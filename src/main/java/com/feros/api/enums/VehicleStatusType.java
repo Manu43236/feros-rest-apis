@@ -6,5 +6,6 @@ public enum VehicleStatusType {
     ON_TRIP,
     IN_REPAIR,
     BREAKDOWN,
+    ON_LEASE,
     OTHER
 }

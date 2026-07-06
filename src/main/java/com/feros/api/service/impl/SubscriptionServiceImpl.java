@@ -5,11 +5,8 @@ import com.feros.api.dto.request.ActivateSubscriptionRequest;
 import com.feros.api.dto.request.CorrectSubscriptionRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
-import com.feros.api.dto.request.UpgradeRequestRequest;
 import com.feros.api.dto.response.SubscriptionHistoryResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceResponse;
-import com.feros.api.dto.response.UpgradeRequestResponse;
-import com.feros.api.enums.UpgradeRequestStatus;
 import com.feros.api.entity.*;
 import com.feros.api.enums.BillingCycle;
 import com.feros.api.enums.NotificationType;
@@ -38,14 +35,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SubscriptionServiceImpl implements SubscriptionService {
 
-    private static final BigDecimal GST_RATE          = new BigDecimal("0.18");
-    private static final int        ANNUAL_MONTHS_PAID = 10; // pay 10, get 12 (2 months free)
+    private static final BigDecimal GST_RATE = new BigDecimal("0.18");
 
     private final TenantRepository tenantRepository;
-    private final SubscriptionPlanRepository planRepository;
     private final SubscriptionHistoryRepository historyRepository;
     private final SubscriptionInvoiceRepository invoiceRepository;
-    private final UpgradeRequestRepository upgradeRequestRepository;
     private final NotificationService notificationService;
     private final SubscriptionInvoicePdfService subscriptionInvoicePdfService;
 
@@ -55,28 +49,25 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     @Transactional
     public SubscriptionHistoryResponse activate(Long tenantId, ActivateSubscriptionRequest request) {
         Tenant tenant = getTenant(tenantId);
-        SubscriptionPlan plan = planRepository.findByIdAndIsActiveTrue(request.getPlanId())
-                .orElseThrow(() -> new FerosException("Plan not found or inactive", HttpStatus.NOT_FOUND));
 
         int vehicleCount = request.getVehicleCount();
-        boolean isFree   = plan.getPricePerVehicle() == null
-                           || plan.getPricePerVehicle().compareTo(BigDecimal.ZERO) == 0;
+        BigDecimal pricePerVehicle = request.getPricePerVehicle() != null
+                ? request.getPricePerVehicle()
+                : BigDecimal.ZERO;
 
-        // Calculate amounts
-        BigDecimal pricePerVehicle = isFree ? BigDecimal.ZERO : plan.getPricePerVehicle();
-        int planMinVehicles = plan.getMinVehicles() != null ? plan.getMinVehicles() : 0;
-        BigDecimal baseAmount      = calculateBaseAmount(request.getAmount(), pricePerVehicle, vehicleCount, request.getBillingCycle(), planMinVehicles);
-        BigDecimal gstAmount       = baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal totalAmount     = baseAmount.add(gstAmount);
+        BigDecimal baseAmount = calculateBaseAmount(request.getAmount(), pricePerVehicle, vehicleCount,
+                request.getBillingCycle());
+        BigDecimal gstAmount   = baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalAmount = baseAmount.add(gstAmount);
 
-        // End date: free = null (never expires), monthly = +1 month, annual = +12 months
-        LocalDate endDate = isFree ? null : calculateEndDate(request.getStartDate(), request.getBillingCycle());
+        LocalDate endDate = calculateEndDate(request.getStartDate(), request.getBillingCycle());
+        String planName   = request.getPlanName() != null ? request.getPlanName() : "Custom";
 
         SubscriptionHistory history = SubscriptionHistory.builder()
                 .tenant(tenant)
-                .plan(plan)
-                .status(isFree ? SubscriptionStatus.TRIAL : SubscriptionStatus.ACTIVE)
-                .billingCycle(isFree ? null : request.getBillingCycle())
+                .planName(planName)
+                .status(SubscriptionStatus.ACTIVE)
+                .billingCycle(request.getBillingCycle())
                 .vehicleCount(vehicleCount)
                 .pricePerVehicle(pricePerVehicle)
                 .startDate(request.getStartDate())
@@ -90,32 +81,21 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .build();
         history = historyRepository.save(history);
 
-        // Update tenant
-        tenant.setSubscriptionStatus(isFree ? SubscriptionStatus.TRIAL : SubscriptionStatus.ACTIVE);
+        tenant.setSubscriptionStatus(SubscriptionStatus.ACTIVE);
         tenant.setSubscriptionStartDate(request.getStartDate());
         tenant.setSubscriptionEndDate(endDate);
         tenantRepository.save(tenant);
 
-        // Invoice (skip for free plan)
-        if (!isFree) {
-            createInvoice(history, tenant, plan.getName(), totalAmount, baseAmount, gstAmount,
+        if (baseAmount.compareTo(BigDecimal.ZERO) > 0) {
+            createInvoice(history, tenant, planName, totalAmount, baseAmount, gstAmount,
                     request.getPaymentRef(), vehicleCount, pricePerVehicle);
         }
 
-        // Mark any PENDING upgrade request for this tenant as FULFILLED
-        upgradeRequestRepository.findFirstByTenant_IdAndStatusOrderByCreatedAtDesc(
-                tenantId, UpgradeRequestStatus.PENDING)
-                .ifPresent(ur -> {
-                    ur.setStatus(UpgradeRequestStatus.FULFILLED);
-                    upgradeRequestRepository.save(ur);
-                });
-
         notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.SUBSCRIPTION_ACTIVATED,
                 "Subscription Activated",
-                "Your " + plan.getName() + " plan has been activated"
-                + (endDate != null ? " until " + endDate : "") + ".");
+                "Your " + planName + " plan has been activated until " + endDate + ".");
 
-        return toHistoryResponse(history, tenant, plan.getName());
+        return toHistoryResponse(history, tenant);
     }
 
     // ─── Extend Trial ─────────────────────────────────────────────────────────
@@ -133,10 +113,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         tenant.setTrialEndDate(newEnd);
         tenantRepository.save(tenant);
 
-        SubscriptionPlan trialPlan = planRepository.findByNameIgnoreCase("Trial").orElse(null);
         SubscriptionHistory history = SubscriptionHistory.builder()
                 .tenant(tenant)
-                .plan(trialPlan)
+                .planName("Trial")
                 .status(SubscriptionStatus.TRIAL)
                 .startDate(tenant.getTrialStartDate() != null ? tenant.getTrialStartDate() : TimeUtil.today())
                 .endDate(newEnd)
@@ -148,7 +127,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.SUBSCRIPTION_ACTIVATED,
                 "Trial Extended", "Your trial has been extended to " + newEnd + ".");
 
-        return toHistoryResponse(history, tenant, "Trial");
+        return toHistoryResponse(history, tenant);
     }
 
     // ─── Extend / Renew ───────────────────────────────────────────────────────
@@ -158,43 +137,49 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     public SubscriptionHistoryResponse extendSubscription(Long tenantId, ExtendSubscriptionRequest request) {
         Tenant tenant = getTenant(tenantId);
 
-        // Close the current ACTIVE row as RENEWED
+        // Find the most recent ACTIVE or EXPIRED history row to renew from
         SubscriptionHistory previous = historyRepository
                 .findAllByTenantIdOrderByCreatedAtDesc(tenantId).stream()
-                .filter(h -> h.getStatus() == SubscriptionStatus.ACTIVE)
+                .filter(h -> h.getStatus() == SubscriptionStatus.ACTIVE
+                          || h.getStatus() == SubscriptionStatus.EXPIRED)
                 .findFirst()
-                .orElseThrow(() -> new FerosException("No active subscription found", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new FerosException("No active or expired subscription found to renew", HttpStatus.NOT_FOUND));
 
         previous.setStatus(SubscriptionStatus.RENEWED);
         historyRepository.save(previous);
 
-        SubscriptionPlan plan = previous.getPlan();
-
-        // Vehicle count: use new count from request or keep previous
+        // Vehicle count: new or keep previous
         int vehicleCount = request.getVehicleCount() != null
                 ? request.getVehicleCount()
                 : (previous.getVehicleCount() != null ? previous.getVehicleCount() : 1);
 
-        BigDecimal pricePerVehicle = previous.getPricePerVehicle() != null
-                ? previous.getPricePerVehicle()
-                : (plan != null && plan.getPricePerVehicle() != null ? plan.getPricePerVehicle() : BigDecimal.ZERO);
+        // Price per vehicle: new override > previous rate > 0
+        BigDecimal pricePerVehicle = request.getPricePerVehicle() != null
+                ? request.getPricePerVehicle()
+                : (previous.getPricePerVehicle() != null ? previous.getPricePerVehicle() : BigDecimal.ZERO);
 
-        // New end date: provided or auto-calculated from billing cycle
+        // Plan name: new override > previous
+        String planName = request.getPlanName() != null
+                ? request.getPlanName()
+                : (previous.getPlanName() != null ? previous.getPlanName() : "Custom");
+
+        // Billing cycle from previous
+        BillingCycle billingCycle = previous.getBillingCycle();
+
+        // End date: provided or auto-calculated
         LocalDate newEnd = request.getNewEndDate() != null
                 ? request.getNewEndDate()
-                : calculateEndDate(previous.getEndDate() != null ? previous.getEndDate() : TimeUtil.today(),
-                        previous.getBillingCycle());
+                : calculateEndDate(previous.getEndDate() != null ? previous.getEndDate() : TimeUtil.today(), billingCycle);
 
-        int extendMinVehicles = plan != null && plan.getMinVehicles() != null ? plan.getMinVehicles() : 0;
-        BigDecimal baseAmount  = calculateBaseAmount(request.getAmount(), pricePerVehicle, vehicleCount, previous.getBillingCycle(), extendMinVehicles);
+        BigDecimal baseAmount  = calculateBaseAmount(request.getAmount(), pricePerVehicle, vehicleCount, billingCycle);
         BigDecimal gstAmount   = baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
         BigDecimal totalAmount = baseAmount.add(gstAmount);
 
         SubscriptionHistory history = SubscriptionHistory.builder()
                 .tenant(tenant)
-                .plan(plan)
+                .planName(planName)
                 .status(SubscriptionStatus.ACTIVE)
-                .billingCycle(previous.getBillingCycle())
+                .billingCycle(billingCycle)
                 .vehicleCount(vehicleCount)
                 .pricePerVehicle(pricePerVehicle)
                 .startDate(previous.getEndDate() != null ? previous.getEndDate() : TimeUtil.today())
@@ -213,7 +198,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         tenantRepository.save(tenant);
 
         if (baseAmount.compareTo(BigDecimal.ZERO) > 0) {
-            String planName = plan != null ? plan.getName() : "-";
             createInvoice(history, tenant, planName, totalAmount, baseAmount, gstAmount,
                     request.getPaymentRef(), vehicleCount, pricePerVehicle);
         }
@@ -221,8 +205,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.SUBSCRIPTION_ACTIVATED,
                 "Subscription Renewed", "Your subscription has been renewed until " + newEnd + ".");
 
-        String planName = plan != null ? plan.getName() : "-";
-        return toHistoryResponse(history, tenant, planName);
+        return toHistoryResponse(history, tenant);
     }
 
     // ─── Suspend ──────────────────────────────────────────────────────────────
@@ -248,10 +231,10 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 "Subscription Suspended",
                 "Your subscription has been suspended. Reason: " + request.getNotes());
 
-        return toHistoryResponse(history, tenant, "-");
+        return toHistoryResponse(history, tenant);
     }
 
-    // ─── Reactivate ───────────────────────────────────────────────────────────
+    // ─── Reactivate (SUSPENDED → ACTIVE only) ────────────────────────────────
 
     @Override
     @Transactional
@@ -276,7 +259,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.SUBSCRIPTION_ACTIVATED,
                 "Subscription Reactivated", "Your subscription has been reactivated.");
 
-        return toHistoryResponse(history, tenant, "-");
+        return toHistoryResponse(history, tenant);
     }
 
     // ─── Queries ──────────────────────────────────────────────────────────────
@@ -285,7 +268,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     public List<SubscriptionHistoryResponse> getHistory(Long tenantId) {
         Tenant tenant = getTenant(tenantId);
         return historyRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId).stream()
-                .map(h -> toHistoryResponse(h, tenant, h.getPlan() != null ? h.getPlan().getName() : "-"))
+                .map(h -> toHistoryResponse(h, tenant))
                 .collect(Collectors.toList());
     }
 
@@ -301,14 +284,14 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     public SubscriptionInvoiceResponse getInvoiceById(Long tenantId, Long invoiceId) {
         Tenant tenant = getTenant(tenantId);
         SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
-                .orElseThrow(() -> new com.feros.api.exception.FerosException("Invoice not found", org.springframework.http.HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
         return toInvoiceResponse(invoice, tenant);
     }
 
     @Override
     public byte[] generateInvoicePdf(Long tenantId, Long invoiceId) {
         SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
-                .orElseThrow(() -> new com.feros.api.exception.FerosException("Invoice not found", org.springframework.http.HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
         return subscriptionInvoicePdfService.generate(invoice);
     }
 
@@ -317,8 +300,76 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         Tenant tenant = getTenant(tenantId);
         return historyRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId).stream()
                 .findFirst()
-                .map(h -> toHistoryResponse(h, tenant, h.getPlan() != null ? h.getPlan().getName() : "-"))
+                .map(h -> toHistoryResponse(h, tenant))
                 .orElse(null);
+    }
+
+    // ─── Correct ──────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public SubscriptionHistoryResponse correctSubscription(Long tenantId, CorrectSubscriptionRequest request) {
+        Tenant tenant = getTenant(tenantId);
+
+        SubscriptionHistory current = historyRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new FerosException("No subscription history to correct", HttpStatus.NOT_FOUND));
+
+        int vehicleCount = request.getVehicleCount() != null
+                ? request.getVehicleCount()
+                : (current.getVehicleCount() != null ? current.getVehicleCount() : 1);
+
+        BigDecimal pricePerVehicle = request.getPricePerVehicle() != null
+                ? request.getPricePerVehicle()
+                : (current.getPricePerVehicle() != null ? current.getPricePerVehicle() : BigDecimal.ZERO);
+
+        String planName = request.getPlanName() != null
+                ? request.getPlanName()
+                : (current.getPlanName() != null ? current.getPlanName() : "Custom");
+
+        BillingCycle billingCycle = current.getBillingCycle();
+        if (request.getBillingCycle() != null) {
+            try { billingCycle = BillingCycle.valueOf(request.getBillingCycle()); } catch (IllegalArgumentException ignored) {}
+        }
+
+        LocalDate endDate = request.getEndDate() != null ? request.getEndDate() : current.getEndDate();
+
+        BigDecimal baseAmount;
+        if (request.getAmount() != null) {
+            baseAmount = request.getAmount();
+        } else {
+            baseAmount = calculateBaseAmount(null, pricePerVehicle, vehicleCount, billingCycle);
+        }
+        BigDecimal gstAmount   = baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalAmount = baseAmount.add(gstAmount);
+
+        String paymentRef = request.getPaymentRef() != null ? request.getPaymentRef() : current.getPaymentRef();
+
+        SubscriptionHistory correction = SubscriptionHistory.builder()
+                .tenant(tenant)
+                .planName(planName)
+                .status(SubscriptionStatus.ACTIVE)
+                .billingCycle(billingCycle)
+                .vehicleCount(vehicleCount)
+                .pricePerVehicle(pricePerVehicle)
+                .startDate(current.getStartDate())
+                .endDate(endDate)
+                .amount(baseAmount)
+                .gstAmount(gstAmount)
+                .totalAmount(totalAmount)
+                .paymentRef(paymentRef)
+                .notes("[CORRECTION] " + request.getNotes())
+                .createdBy(SecurityUtil.getCurrentUserId())
+                .build();
+        correction = historyRepository.save(correction);
+
+        if (request.getEndDate() != null) {
+            tenant.setSubscriptionEndDate(endDate);
+            tenantRepository.save(tenant);
+        }
+
+        return toHistoryResponse(correction, tenant);
     }
 
     // ─── Scheduled Jobs ───────────────────────────────────────────────────────
@@ -328,7 +379,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     public void autoExpireSubscriptions() {
         LocalDate today = TimeUtil.today();
 
-        // Expire ACTIVE subscriptions
         for (SubscriptionHistory h : historyRepository.findExpiredActive(today)) {
             h.setStatus(SubscriptionStatus.EXPIRED);
             historyRepository.save(h);
@@ -341,7 +391,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             log.info("Auto-expired subscription for tenant {}", tenant.getId());
         }
 
-        // Expire TRIAL subscriptions
         for (SubscriptionHistory h : historyRepository.findExpiredTrials(today)) {
             h.setStatus(SubscriptionStatus.EXPIRED);
             historyRepository.save(h);
@@ -360,25 +409,21 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         LocalDate sevenDays = TimeUtil.today().plusDays(7);
         LocalDate tomorrow  = TimeUtil.today().plusDays(1);
 
-        // 7-day warning — ACTIVE
         historyRepository.findActiveExpiringOn(sevenDays).forEach(h ->
                 notificationService.sendToRoles(h.getTenant(), List.of(RoleName.ADMIN), NotificationType.TRIAL_ENDING,
                         "Subscription Expiring in 7 Days",
                         "Your subscription expires on " + h.getEndDate() + ". Please renew to avoid interruption."));
 
-        // 7-day warning — TRIAL
         historyRepository.findTrialsExpiringOn(sevenDays).forEach(h ->
                 notificationService.sendToRoles(h.getTenant(), List.of(RoleName.ADMIN), NotificationType.TRIAL_ENDING,
                         "Trial Ending in 7 Days",
                         "Your free trial expires on " + h.getEndDate() + ". Contact FEROS to activate a paid plan."));
 
-        // 1-day warning — ACTIVE
         historyRepository.findActiveExpiringOn(tomorrow).forEach(h ->
                 notificationService.sendToRoles(h.getTenant(), List.of(RoleName.ADMIN), NotificationType.TRIAL_ENDING,
                         "Subscription Expires Tomorrow",
                         "Your subscription expires tomorrow (" + h.getEndDate() + "). Renew now to avoid access loss."));
 
-        // 1-day warning — TRIAL
         historyRepository.findTrialsExpiringOn(tomorrow).forEach(h ->
                 notificationService.sendToRoles(h.getTenant(), List.of(RoleName.ADMIN), NotificationType.TRIAL_ENDING,
                         "Trial Expires Tomorrow",
@@ -392,34 +437,21 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
     }
 
-    /**
-     * Amount = vehicleCount × pricePerVehicle × months.
-     * 2-months-free (pay 10, get 12) applies only to plans with minVehicles >= 250 (Enterprise+).
-     * All other plans pay full 12 months for annual billing.
-     * If SA provides an explicit override amount, that is used directly.
-     */
     private BigDecimal calculateBaseAmount(BigDecimal override, BigDecimal pricePerVehicle,
-                                           int vehicleCount, BillingCycle cycle, int minVehicles) {
+                                           int vehicleCount, BillingCycle cycle) {
         if (override != null) return override;
         if (pricePerVehicle == null || pricePerVehicle.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO;
-        int months;
-        if (cycle == BillingCycle.YEARLY) {
-            months = minVehicles >= 250 ? ANNUAL_MONTHS_PAID : 12;
-        } else if (cycle == BillingCycle.SIX_MONTHS) {
-            months = 6;
-        } else if (cycle == BillingCycle.THREE_MONTHS) {
-            months = 3;
-        } else {
-            months = 1;
-        }
+        int months = switch (cycle != null ? cycle : BillingCycle.MONTHLY) {
+            case YEARLY       -> 12;
+            case SIX_MONTHS   -> 6;
+            case THREE_MONTHS -> 3;
+            default           -> 1;
+        };
         return pricePerVehicle.multiply(BigDecimal.valueOf(vehicleCount))
                 .multiply(BigDecimal.valueOf(months))
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
-    /**
-     * Monthly → +1 month, Annual → +12 months calendar access (paying for 10).
-     */
     private LocalDate calculateEndDate(LocalDate from, BillingCycle cycle) {
         if (cycle == null) return from.plusMonths(1);
         return switch (cycle) {
@@ -455,29 +487,27 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         invoiceRepository.save(invoice);
     }
 
-    private SubscriptionHistoryResponse toHistoryResponse(SubscriptionHistory h, Tenant tenant, String planName) {
-        SubscriptionPlan plan = h.getPlan();
+    private SubscriptionHistoryResponse toHistoryResponse(SubscriptionHistory h, Tenant tenant) {
+        String planName = h.getPlanName() != null ? h.getPlanName() : "-";
+
         return SubscriptionHistoryResponse.builder()
                 .id(h.getId())
                 .tenantId(tenant.getId())
                 .companyName(tenant.getCompanyName())
-                .planId(plan != null ? plan.getId() : null)
                 .planName(planName)
                 .vehicleCount(h.getVehicleCount())
                 .pricePerVehicle(h.getPricePerVehicle())
-                .maxLorries(h.getVehicleCount() != null ? h.getVehicleCount()
-                        : (plan != null && plan.getMaxVehicles() != null && plan.getMaxVehicles() > 0
-                                ? plan.getMaxVehicles() : -1))  // paid = vehicleCount, trial = plan max, unlimited = -1
-                .maxUsers(plan != null ? plan.getMaxUsers() : null)
-                // Feature flags — all true if no plan (backward compat)
-                .hasFuelLogs(plan == null || Boolean.TRUE.equals(plan.getHasFuelLogs()))
-                .hasMeterReadings(plan == null || Boolean.TRUE.equals(plan.getHasMeterReadings()))
-                .hasVehicleServices(plan == null || Boolean.TRUE.equals(plan.getHasVehicleServices()))
-                .hasAttendance(plan == null || Boolean.TRUE.equals(plan.getHasAttendance()))
-                .hasPayroll(plan == null || Boolean.TRUE.equals(plan.getHasPayroll()))
-                .hasInventory(plan == null || Boolean.TRUE.equals(plan.getHasInventory()))
-                .hasReports(plan == null || Boolean.TRUE.equals(plan.getHasReports()))
-                .hasCreditNotes(plan == null || Boolean.TRUE.equals(plan.getHasCreditNotes()))
+                .maxLorries(h.getVehicleCount() != null ? h.getVehicleCount() : -1)
+                .maxUsers(-1)  // unlimited — no plan-based user limits
+                // All features always included
+                .hasFuelLogs(true)
+                .hasMeterReadings(true)
+                .hasVehicleServices(true)
+                .hasAttendance(true)
+                .hasPayroll(true)
+                .hasInventory(true)
+                .hasReports(true)
+                .hasCreditNotes(true)
                 .status(h.getStatus())
                 .billingCycle(h.getBillingCycle())
                 .startDate(h.getStartDate())
@@ -488,178 +518,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .paymentRef(h.getPaymentRef())
                 .notes(h.getNotes())
                 .createdAt(h.getCreatedAt())
-                .build();
-    }
-
-    // ─── Correct ──────────────────────────────────────────────────────────────
-
-    @Override
-    @Transactional
-    public SubscriptionHistoryResponse correctSubscription(Long tenantId, CorrectSubscriptionRequest request) {
-        Tenant tenant = getTenant(tenantId);
-
-        SubscriptionHistory current = historyRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId)
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> new FerosException("No subscription history to correct", HttpStatus.NOT_FOUND));
-
-        // Resolve plan — use requested planId if provided, else keep current
-        SubscriptionPlan plan = current.getPlan();
-        if (request.getPlanId() != null) {
-            plan = planRepository.findById(request.getPlanId()).orElse(null);
-        }
-
-        // Resolve vehicle count
-        int vehicleCount = request.getVehicleCount() != null
-                ? request.getVehicleCount()
-                : (current.getVehicleCount() != null ? current.getVehicleCount() : 1);
-
-        // Resolve price per vehicle: request override > plan price > current price > 0
-        BigDecimal pricePerVehicle;
-        if (request.getPricePerVehicle() != null) {
-            pricePerVehicle = request.getPricePerVehicle();
-        } else if (plan != null && plan.getPricePerVehicle() != null) {
-            pricePerVehicle = plan.getPricePerVehicle();
-        } else {
-            pricePerVehicle = current.getPricePerVehicle() != null ? current.getPricePerVehicle() : BigDecimal.ZERO;
-        }
-
-        // Resolve billing cycle
-        BillingCycle billingCycle = current.getBillingCycle();
-        if (request.getBillingCycle() != null) {
-            try { billingCycle = BillingCycle.valueOf(request.getBillingCycle()); } catch (IllegalArgumentException ignored) {}
-        }
-
-        // Resolve end date
-        java.time.LocalDate endDate = request.getEndDate() != null ? request.getEndDate() : current.getEndDate();
-
-        // Resolve amount
-        BigDecimal baseAmount;
-        if (request.getAmount() != null) {
-            baseAmount = request.getAmount();
-        } else {
-            int planMin = plan != null && plan.getMinVehicles() != null ? plan.getMinVehicles() : 0;
-            baseAmount = calculateBaseAmount(null, pricePerVehicle, vehicleCount, billingCycle, planMin);
-        }
-        BigDecimal gstAmount   = baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal totalAmount = baseAmount.add(gstAmount);
-
-        String paymentRef = request.getPaymentRef() != null ? request.getPaymentRef() : current.getPaymentRef();
-
-        SubscriptionHistory correction = SubscriptionHistory.builder()
-                .tenant(tenant)
-                .plan(plan)
-                .status(SubscriptionStatus.ACTIVE)
-                .billingCycle(billingCycle)
-                .vehicleCount(vehicleCount)
-                .pricePerVehicle(pricePerVehicle)
-                .startDate(current.getStartDate())
-                .endDate(endDate)
-                .amount(baseAmount)
-                .gstAmount(gstAmount)
-                .totalAmount(totalAmount)
-                .paymentRef(paymentRef)
-                .notes("[CORRECTION] " + request.getNotes())
-                .createdBy(SecurityUtil.getCurrentUserId())
-                .build();
-        correction = historyRepository.save(correction);
-
-        // Update tenant subscription end date if expiry changed
-        if (request.getEndDate() != null) {
-            tenant.setSubscriptionEndDate(endDate);
-            tenantRepository.save(tenant);
-        }
-
-        String planName = plan != null ? plan.getName() : "-";
-        return toHistoryResponse(correction, tenant, planName);
-    }
-
-    // ─── Upgrade Requests ─────────────────────────────────────────────────────
-
-    @Override
-    @Transactional
-    public UpgradeRequestResponse submitUpgradeRequest(Long tenantId, UpgradeRequestRequest request) {
-        Tenant tenant = getTenant(tenantId);
-        SubscriptionPlan plan = planRepository.findById(request.getPlanId())
-                .orElseThrow(() -> new FerosException("Plan not found", HttpStatus.NOT_FOUND));
-
-        int months = (request.getBillingCycle() == BillingCycle.YEARLY)
-                ? ((plan.getMinVehicles() != null && plan.getMinVehicles() >= 250) ? ANNUAL_MONTHS_PAID : 12)
-                : 1;
-        BigDecimal base  = plan.getPricePerVehicle()
-                .multiply(BigDecimal.valueOf(request.getVehicleCount()))
-                .multiply(BigDecimal.valueOf(months))
-                .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal total = base.add(base.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP));
-
-        com.feros.api.entity.UpgradeRequest ur = com.feros.api.entity.UpgradeRequest.builder()
-                .tenant(tenant)
-                .plan(plan)
-                .vehicleCount(request.getVehicleCount())
-                .billingCycle(request.getBillingCycle())
-                .notes(request.getNotes())
-                .status(UpgradeRequestStatus.PENDING)
-                .createdAt(TimeUtil.nowIst())
-                .build();
-        ur = upgradeRequestRepository.save(ur);
-
-        // Confirm to tenant
-        notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.UPGRADE_REQUEST,
-                "Upgrade Request Received",
-                "Your request to upgrade to " + plan.getName() + " plan (" + request.getVehicleCount()
-                        + " vehicles) has been received. We'll contact you shortly.");
-
-        return toUpgradeRequestResponse(ur, plan, tenant.getCompanyName(), base, total);
-    }
-
-    @Override
-    public List<UpgradeRequestResponse> getUpgradeRequests() {
-        return upgradeRequestRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(ur -> {
-                    BigDecimal base = BigDecimal.ZERO, total = BigDecimal.ZERO;
-                    if (ur.getPlan() != null && ur.getPlan().getPricePerVehicle() != null && ur.getVehicleCount() != null) {
-                        int months = (ur.getBillingCycle() == BillingCycle.YEARLY)
-                                ? ((ur.getPlan().getMinVehicles() != null && ur.getPlan().getMinVehicles() >= 250) ? ANNUAL_MONTHS_PAID : 12)
-                                : 1;
-                        base  = ur.getPlan().getPricePerVehicle()
-                                .multiply(BigDecimal.valueOf(ur.getVehicleCount()))
-                                .multiply(BigDecimal.valueOf(months))
-                                .setScale(2, RoundingMode.HALF_UP);
-                        total = base.add(base.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP));
-                    }
-                    return toUpgradeRequestResponse(ur,
-                            ur.getPlan(),
-                            ur.getTenant().getCompanyName(), base, total);
-                })
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional
-    public void dismissUpgradeRequest(Long id) {
-        com.feros.api.entity.UpgradeRequest ur = upgradeRequestRepository.findById(id)
-                .orElseThrow(() -> new FerosException("Upgrade request not found", HttpStatus.NOT_FOUND));
-        ur.setStatus(UpgradeRequestStatus.DISMISSED);
-        upgradeRequestRepository.save(ur);
-    }
-
-    private UpgradeRequestResponse toUpgradeRequestResponse(
-            com.feros.api.entity.UpgradeRequest ur, SubscriptionPlan plan,
-            String companyName, BigDecimal base, BigDecimal total) {
-        return UpgradeRequestResponse.builder()
-                .id(ur.getId())
-                .tenantId(ur.getTenant().getId())
-                .companyName(companyName)
-                .planId(plan != null ? plan.getId() : null)
-                .planName(plan != null ? plan.getName() : null)
-                .pricePerVehicle(plan != null ? plan.getPricePerVehicle() : null)
-                .vehicleCount(ur.getVehicleCount())
-                .billingCycle(ur.getBillingCycle())
-                .estimatedBase(base)
-                .estimatedTotal(total)
-                .notes(ur.getNotes())
-                .status(ur.getStatus())
-                .createdAt(ur.getCreatedAt())
                 .build();
     }
 
