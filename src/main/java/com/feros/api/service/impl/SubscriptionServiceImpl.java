@@ -170,10 +170,14 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         // Billing cycle from previous
         BillingCycle billingCycle = previous.getBillingCycle();
 
-        // End date: provided or auto-calculated
+        // New period starts the day after the previous one ends — no overlap
+        LocalDate newStart = previous.getEndDate() != null
+                ? previous.getEndDate().plusDays(1) : TimeUtil.today();
+
+        // End date: provided or auto-calculated from the new start
         LocalDate newEnd = request.getNewEndDate() != null
                 ? request.getNewEndDate()
-                : calculateEndDate(previous.getEndDate() != null ? previous.getEndDate() : TimeUtil.today(), billingCycle);
+                : calculateEndDate(newStart, billingCycle);
 
         BigDecimal baseAmount  = calculateBaseAmount(request.getAmount(), pricePerVehicle, vehicleCount, billingCycle);
         BigDecimal gstAmount   = baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
@@ -186,7 +190,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .billingCycle(billingCycle)
                 .vehicleCount(vehicleCount)
                 .pricePerVehicle(pricePerVehicle)
-                .startDate(previous.getEndDate() != null ? previous.getEndDate() : TimeUtil.today())
+                .startDate(newStart)
                 .endDate(newEnd)
                 .amount(baseAmount)
                 .gstAmount(gstAmount)
