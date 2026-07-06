@@ -27,7 +27,8 @@ public class ActivateSubscriptionRequest {
     @NotNull(message = "Start date is required")
     private LocalDate startDate;
 
-    private BigDecimal amount;    // optional override; auto-calculated from pricePerVehicle if omitted
+    private BigDecimal amount;              // optional override; auto-calculated from pricePerVehicle if omitted
+    private BigDecimal installationCharges; // optional one-time setup/installation fee
     private String paymentRef;
     private String notes;
 }
