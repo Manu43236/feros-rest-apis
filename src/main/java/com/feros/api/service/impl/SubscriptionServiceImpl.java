@@ -43,7 +43,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final NotificationService notificationService;
     private final SubscriptionInvoicePdfService subscriptionInvoicePdfService;
 
-    // ─── Activate ─────────────────────────────────────────────────────────────
 
     @Override
     @Transactional
