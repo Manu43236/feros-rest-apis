@@ -18,6 +18,7 @@ public class SubscriptionInvoiceResponse {
     private LocalDate periodStart;
     private LocalDate periodEnd;
     private BigDecimal amount;
+    private BigDecimal installationCharges;
     private BigDecimal gstAmount;
     private BigDecimal totalAmount;
     private String paymentRef;

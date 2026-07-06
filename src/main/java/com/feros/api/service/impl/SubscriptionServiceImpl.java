@@ -55,10 +55,13 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 ? request.getPricePerVehicle()
                 : BigDecimal.ZERO;
 
-        BigDecimal baseAmount = calculateBaseAmount(request.getAmount(), pricePerVehicle, vehicleCount,
+        BigDecimal baseAmount          = calculateBaseAmount(request.getAmount(), pricePerVehicle, vehicleCount,
                 request.getBillingCycle());
-        BigDecimal gstAmount   = baseAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal totalAmount = baseAmount.add(gstAmount);
+        BigDecimal installationCharges = request.getInstallationCharges() != null
+                ? request.getInstallationCharges() : BigDecimal.ZERO;
+        BigDecimal taxableAmount = baseAmount.add(installationCharges);
+        BigDecimal gstAmount     = taxableAmount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalAmount   = taxableAmount.add(gstAmount);
 
         LocalDate endDate = calculateEndDate(request.getStartDate(), request.getBillingCycle());
         String planName   = request.getPlanName() != null ? request.getPlanName() : "Custom";
@@ -73,6 +76,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .startDate(request.getStartDate())
                 .endDate(endDate)
                 .amount(baseAmount)
+                .installationCharges(installationCharges.compareTo(BigDecimal.ZERO) > 0 ? installationCharges : null)
                 .gstAmount(gstAmount)
                 .totalAmount(totalAmount)
                 .paymentRef(request.getPaymentRef())
@@ -86,9 +90,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         tenant.setSubscriptionEndDate(endDate);
         tenantRepository.save(tenant);
 
-        if (baseAmount.compareTo(BigDecimal.ZERO) > 0) {
+        if (taxableAmount.compareTo(BigDecimal.ZERO) > 0) {
             createInvoice(history, tenant, planName, totalAmount, baseAmount, gstAmount,
-                    request.getPaymentRef(), vehicleCount, pricePerVehicle);
+                    request.getPaymentRef(), vehicleCount, pricePerVehicle, installationCharges);
         }
 
         notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.SUBSCRIPTION_ACTIVATED,
@@ -199,7 +203,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
         if (baseAmount.compareTo(BigDecimal.ZERO) > 0) {
             createInvoice(history, tenant, planName, totalAmount, baseAmount, gstAmount,
-                    request.getPaymentRef(), vehicleCount, pricePerVehicle);
+                    request.getPaymentRef(), vehicleCount, pricePerVehicle, BigDecimal.ZERO);
         }
 
         notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.SUBSCRIPTION_ACTIVATED,
@@ -464,7 +468,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
 
     private void createInvoice(SubscriptionHistory history, Tenant tenant, String planName,
                                 BigDecimal totalAmount, BigDecimal amount, BigDecimal gstAmount,
-                                String paymentRef, Integer vehicleCount, BigDecimal pricePerVehicle) {
+                                String paymentRef, Integer vehicleCount, BigDecimal pricePerVehicle,
+                                BigDecimal installationCharges) {
         String invoiceNumber = "INV_FEROS_SUB_"
                 + TimeUtil.nowIst()
                         .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
@@ -480,6 +485,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .periodStart(history.getStartDate())
                 .periodEnd(history.getEndDate())
                 .amount(amount)
+                .installationCharges(installationCharges != null && installationCharges.compareTo(BigDecimal.ZERO) > 0
+                        ? installationCharges : null)
                 .gstAmount(gstAmount)
                 .totalAmount(totalAmount)
                 .paymentRef(paymentRef)
@@ -534,6 +541,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .periodStart(i.getPeriodStart())
                 .periodEnd(i.getPeriodEnd())
                 .amount(i.getAmount())
+                .installationCharges(i.getInstallationCharges())
                 .gstAmount(i.getGstAmount())
                 .totalAmount(i.getTotalAmount())
                 .paymentRef(i.getPaymentRef())

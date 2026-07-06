@@ -60,6 +60,9 @@ public class SubscriptionHistory {
     @Column(name = "total_amount", precision = 10, scale = 2)
     private BigDecimal totalAmount;
 
+    @Column(name = "installation_charges", precision = 10, scale = 2)
+    private BigDecimal installationCharges;
+
     @Column(name = "payment_ref")
     private String paymentRef;
 
