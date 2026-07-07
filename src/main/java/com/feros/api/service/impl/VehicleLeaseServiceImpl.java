@@ -203,6 +203,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .endDate(request.getEndDate())
                 .odometerAtStart(request.getOdometerAtStart())
                 .notes(request.getNotes())
+                .isActive(true)
                 .build();
 
         // Mark vehicle as On Lease if lease is active
