@@ -13,4 +13,6 @@ public interface VehicleTyrePositionRepository extends JpaRepository<VehicleTyre
     Optional<VehicleTyrePosition> findByVehicleIdAndPositionCodeAndIsActiveTrue(Long vehicleId, String positionCode);
 
     boolean existsByVehicleIdAndIsActiveTrue(Long vehicleId);
+    boolean existsByVehicleId(Long vehicleId);
+    void deleteByVehicleId(Long vehicleId);
 }

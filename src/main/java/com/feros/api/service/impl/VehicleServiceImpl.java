@@ -1049,7 +1049,10 @@ public class VehicleServiceImpl implements VehicleService {
             throw new FerosException("Vehicle must have a type with tyre count set", HttpStatus.BAD_REQUEST);
 
         if (tyrePositionRepository.existsByVehicleIdAndIsActiveTrue(vehicleId))
-            throw new FerosException("Tyre positions already exist for this vehicle", HttpStatus.CONFLICT);
+            throw new FerosException("Tyre positions already exist for this vehicle. Use Manage Positions to edit them.", HttpStatus.CONFLICT);
+
+        // Remove any leftover inactive positions so the unique constraint doesn't block insert
+        tyrePositionRepository.deleteByVehicleId(vehicleId);
 
         autoCreateTyrePositions(vehicle, vehicle.getVehicleType().getTyreCount(), getCurrentTenant());
     }
