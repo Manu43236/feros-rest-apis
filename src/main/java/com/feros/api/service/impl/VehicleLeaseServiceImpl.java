@@ -340,7 +340,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         // Resolve driver name if own staff
         String driverName = null;
         if (request.getDriverStaffId() != null) {
-            StaffProfile driver = staffProfileRepository.findByIdAndTenantId(request.getDriverStaffId(), tenantId())
+            StaffProfile driver = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(request.getDriverStaffId(), tenantId())
                     .orElseThrow(() -> new FerosException("Driver not found", HttpStatus.NOT_FOUND));
             driverName = driver.getUser().getName();
         }
