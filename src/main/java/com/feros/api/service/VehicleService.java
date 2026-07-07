@@ -20,6 +20,7 @@ public interface VehicleService {
     void deleteVehicle(Long id);
     BulkTenantUploadResponse bulkUpload(MultipartFile file);
     int backfillTyrePositions();
+    void generateTyrePositions(Long vehicleId);
 
     VehicleResponse assignDriver(Long vehicleId, Long userId);
     VehicleResponse unassignDriver(Long vehicleId);

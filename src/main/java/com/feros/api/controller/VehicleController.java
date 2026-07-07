@@ -112,6 +112,13 @@ public class VehicleController {
                 "Cleaner unassigned successfully", vehicleService.unassignCleaner(id)));
     }
 
+    @PostMapping("/{id}/generate-tyre-positions")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<String>> generateTyrePositions(@PathVariable Long id) {
+        vehicleService.generateTyrePositions(id);
+        return ResponseEntity.ok(ApiResponse.success("Tyre positions generated successfully", null));
+    }
+
     @PostMapping("/backfill-tyre-positions")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<String>> backfillTyrePositions() {

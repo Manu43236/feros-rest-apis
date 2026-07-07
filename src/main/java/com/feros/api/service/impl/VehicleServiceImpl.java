@@ -1038,6 +1038,22 @@ public class VehicleServiceImpl implements VehicleService {
         return count;
     }
 
+    @Override
+    @Transactional
+    public void generateTyrePositions(Long vehicleId) {
+        Long tenantId = getCurrentTenantId();
+        Vehicle vehicle = vehicleRepository.findByIdAndTenantId(vehicleId, tenantId)
+                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+
+        if (vehicle.getVehicleType() == null || vehicle.getVehicleType().getTyreCount() == null)
+            throw new FerosException("Vehicle must have a type with tyre count set", HttpStatus.BAD_REQUEST);
+
+        if (tyrePositionRepository.existsByVehicleIdAndIsActiveTrue(vehicleId))
+            throw new FerosException("Tyre positions already exist for this vehicle", HttpStatus.CONFLICT);
+
+        autoCreateTyrePositions(vehicle, vehicle.getVehicleType().getTyreCount(), getCurrentTenant());
+    }
+
     // ── Auto-generate tyre positions based on vehicle type tyre count ──────────
     private void autoCreateTyrePositions(Vehicle vehicle, int tyreCount, Tenant tenant) {
         List<VehicleTyrePosition> positions = new ArrayList<>();
