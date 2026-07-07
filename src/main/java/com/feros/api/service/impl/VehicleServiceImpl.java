@@ -466,6 +466,7 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     @Override
+    @Transactional
     public BulkTenantUploadResponse bulkUpload(MultipartFile file) {
         int successCount = 0;
         int failureCount = 0;
