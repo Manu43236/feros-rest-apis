@@ -3,6 +3,7 @@ package com.feros.api.dto.request;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
@@ -17,6 +18,9 @@ public class LeaseSessionStartRequest {
 
     // Division — required when client has divisions, optional otherwise
     private Long divisionId;
+
+    // Odometer — optional, pre-filled on frontend from last session's odometerEnd
+    private BigDecimal odometerStart;
 
     private String notes;
 }

@@ -33,6 +33,6 @@ public interface VehicleLeaseService {
 
     // Sessions
     LeaseVehicleSessionResponse startSession(Long leaseId, Long assignmentId, LeaseSessionStartRequest request);
-    LeaseVehicleSessionResponse endSession(Long leaseId, Long assignmentId, LocalDateTime endTime, String notes);
+    LeaseVehicleSessionResponse endSession(Long leaseId, Long assignmentId, LocalDateTime endTime, BigDecimal odometerEnd, String notes);
     List<LeaseVehicleSessionResponse> getSessions(Long leaseId, Long assignmentId);
 }

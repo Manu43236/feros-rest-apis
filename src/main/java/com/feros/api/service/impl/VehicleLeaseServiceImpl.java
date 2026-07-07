@@ -355,12 +355,22 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
             divisionName = division.getName();
         }
 
+        // Odometer start: use request value → last session's odometerEnd → assignment's odometerAtStart
+        BigDecimal odometerStart = request.getOdometerStart();
+        if (odometerStart == null) {
+            odometerStart = sessionRepository
+                    .findFirstByAssignmentIdAndIsActiveFalseAndOdometerEndNotNullOrderByEndTimeDesc(assignmentId)
+                    .map(LeaseVehicleSession::getOdometerEnd)
+                    .orElse(assignment.getOdometerAtStart());
+        }
+
         LeaseVehicleSession session = LeaseVehicleSession.builder()
                 .assignment(assignment)
                 .driverStaffId(request.getDriverStaffId())
                 .driverName(driverName)
                 .divisionId(divisionId)
                 .divisionName(divisionName)
+                .odometerStart(odometerStart)
                 .startTime(startTime)
                 .isActive(true)
                 .notes(request.getNotes())
@@ -371,7 +381,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
 
     @Override
     @Transactional
-    public LeaseVehicleSessionResponse endSession(Long leaseId, Long assignmentId, LocalDateTime endTime, String notes) {
+    public LeaseVehicleSessionResponse endSession(Long leaseId, Long assignmentId, LocalDateTime endTime, BigDecimal odometerEnd, String notes) {
         fetchLease(leaseId);
         assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
                 .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
@@ -388,6 +398,11 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         session.setEndTime(end);
         session.setHoursWorked(computeHours(session.getStartTime(), end));
         session.setIsActive(false);
+        if (odometerEnd != null) {
+            session.setOdometerEnd(odometerEnd);
+            if (session.getOdometerStart() != null)
+                session.setKmDriven(odometerEnd.subtract(session.getOdometerStart()).max(BigDecimal.ZERO));
+        }
         if (notes != null) session.setNotes(notes);
 
         return toSessionResponse(sessionRepository.save(session));
@@ -431,6 +446,9 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .divisionName(s.getDivisionName())
                 .startTime(s.getStartTime())
                 .endTime(s.getEndTime())
+                .odometerStart(s.getOdometerStart())
+                .odometerEnd(s.getOdometerEnd())
+                .kmDriven(s.getKmDriven())
                 .hoursWorked(s.getHoursWorked())
                 .isActive(Boolean.TRUE.equals(s.getIsActive()))
                 .notes(s.getNotes())

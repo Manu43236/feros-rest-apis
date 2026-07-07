@@ -144,9 +144,11 @@ public class VehicleLeaseController {
             @RequestBody(required = false) Map<String, String> body) {
         LocalDateTime endTime = (body != null && body.containsKey("endTime"))
                 ? LocalDateTime.parse(body.get("endTime")) : null;
+        BigDecimal odometerEnd = (body != null && body.containsKey("odometerEnd"))
+                ? new BigDecimal(body.get("odometerEnd")) : null;
         String notes = body != null ? body.get("notes") : null;
         return ResponseEntity.ok(ApiResponse.success("Session ended",
-                vehicleLeaseService.endSession(id, assignmentId, endTime, notes)));
+                vehicleLeaseService.endSession(id, assignmentId, endTime, odometerEnd, notes)));
     }
 
     @GetMapping("/{id}/sessions")

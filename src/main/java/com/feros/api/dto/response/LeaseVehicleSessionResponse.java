@@ -19,6 +19,9 @@ public class LeaseVehicleSessionResponse {
     private String divisionName;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
+    private BigDecimal odometerStart;
+    private BigDecimal odometerEnd;
+    private BigDecimal kmDriven;
     private BigDecimal hoursWorked;
     private Boolean isActive;
     private String notes;

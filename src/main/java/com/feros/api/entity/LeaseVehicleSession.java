@@ -43,6 +43,17 @@ public class LeaseVehicleSession extends BaseEntity {
     @Column(name = "end_time")
     private LocalDateTime endTime;
 
+    // Odometer — optional, pre-filled from last session's odometerEnd
+    @Column(name = "odometer_start", precision = 10, scale = 2)
+    private BigDecimal odometerStart;
+
+    @Column(name = "odometer_end", precision = 10, scale = 2)
+    private BigDecimal odometerEnd;
+
+    // Computed on close: odometerEnd - odometerStart (if both present)
+    @Column(name = "km_driven", precision = 10, scale = 2)
+    private BigDecimal kmDriven;
+
     // Computed on close: Duration.between(startTime, endTime).toMinutes() / 60.0
     @Column(name = "hours_worked", precision = 8, scale = 2)
     private BigDecimal hoursWorked;

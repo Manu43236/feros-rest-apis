@@ -18,4 +18,7 @@ public interface LeaseVehicleSessionRepository extends JpaRepository<LeaseVehicl
 
     // Active session for one vehicle (max 1 at a time)
     Optional<LeaseVehicleSession> findByAssignmentIdAndIsActiveTrue(Long assignmentId);
+
+    // Most recent completed session with an odometer reading (for pre-fill)
+    Optional<LeaseVehicleSession> findFirstByAssignmentIdAndIsActiveFalseAndOdometerEndNotNullOrderByEndTimeDesc(Long assignmentId);
 }
