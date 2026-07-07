@@ -376,14 +376,25 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .notes(request.getNotes())
                 .build();
 
-        return toSessionResponse(sessionRepository.save(session));
+        LeaseVehicleSession saved = sessionRepository.save(session);
+
+        // Push odometerStart back to vehicle master
+        if (odometerStart != null) {
+            Vehicle v = assignment.getVehicle();
+            if (v.getCurrentOdometerReading() == null || odometerStart.compareTo(v.getCurrentOdometerReading()) > 0) {
+                v.setCurrentOdometerReading(odometerStart);
+                vehicleRepository.save(v);
+            }
+        }
+
+        return toSessionResponse(saved);
     }
 
     @Override
     @Transactional
     public LeaseVehicleSessionResponse endSession(Long leaseId, Long assignmentId, LocalDateTime endTime, BigDecimal odometerEnd, String notes) {
         fetchLease(leaseId);
-        assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
+        LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
                 .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
 
         LeaseVehicleSession session = sessionRepository.findByAssignmentIdAndIsActiveTrue(assignmentId)
@@ -402,6 +413,12 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
             session.setOdometerEnd(odometerEnd);
             if (session.getOdometerStart() != null)
                 session.setKmDriven(odometerEnd.subtract(session.getOdometerStart()).max(BigDecimal.ZERO));
+            // Push back to vehicle master
+            Vehicle v = assignment.getVehicle();
+            if (v.getCurrentOdometerReading() == null || odometerEnd.compareTo(v.getCurrentOdometerReading()) > 0) {
+                v.setCurrentOdometerReading(odometerEnd);
+                vehicleRepository.save(v);
+            }
         }
         if (notes != null) session.setNotes(notes);
 
