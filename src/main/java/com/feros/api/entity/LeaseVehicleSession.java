@@ -1,6 +1,5 @@
 package com.feros.api.entity;
 
-import com.feros.api.enums.LeaseSessionStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -24,23 +23,19 @@ public class LeaseVehicleSession extends BaseEntity {
     @JoinColumn(name = "assignment_id", nullable = false)
     private LeaseVehicleAssignment assignment;
 
-    // Driver — own staff (id + snapshotted name) or null for client's driver
+    // Driver — own staff (id + snapshotted name) or null = client's driver
     @Column(name = "driver_staff_id")
     private Long driverStaffId;
 
     @Column(name = "driver_name")
     private String driverName;
 
-    // Division — null when status is IDLE or BREAKDOWN
+    // Division — null when client has no divisions
     @Column(name = "division_id")
     private Long divisionId;
 
     @Column(name = "division_name")
     private String divisionName;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private LeaseSessionStatus status;
 
     @Column(name = "start_time", nullable = false)
     private LocalDateTime startTime;

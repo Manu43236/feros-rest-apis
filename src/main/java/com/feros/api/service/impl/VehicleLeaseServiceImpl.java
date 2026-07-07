@@ -9,7 +9,6 @@ import com.feros.api.dto.response.LeaseVehicleAssignmentResponse;
 import com.feros.api.dto.response.LeaseVehicleSessionResponse;
 import com.feros.api.dto.response.VehicleLeaseResponse;
 import com.feros.api.entity.*;
-import com.feros.api.enums.LeaseSessionStatus;
 import com.feros.api.enums.LeaseStatus;
 import com.feros.api.enums.RateType;
 import com.feros.api.enums.VehicleStatusType;
@@ -335,9 +334,6 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         if (startTime.isAfter(LocalDateTime.now()))
             throw new FerosException("Start time cannot be in the future", HttpStatus.BAD_REQUEST);
 
-        if (request.getStatus() == LeaseSessionStatus.WORKING && request.getDivisionId() == null)
-            throw new FerosException("Division is required for WORKING sessions", HttpStatus.BAD_REQUEST);
-
         // Close any currently active session
         closeActiveSession(assignmentId, startTime);
 
@@ -365,7 +361,6 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .driverName(driverName)
                 .divisionId(divisionId)
                 .divisionName(divisionName)
-                .status(request.getStatus())
                 .startTime(startTime)
                 .isActive(true)
                 .notes(request.getNotes())
@@ -434,7 +429,6 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .driverName(s.getDriverName())
                 .divisionId(s.getDivisionId())
                 .divisionName(s.getDivisionName())
-                .status(s.getStatus())
                 .startTime(s.getStartTime())
                 .endTime(s.getEndTime())
                 .hoursWorked(s.getHoursWorked())

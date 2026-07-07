@@ -1,6 +1,5 @@
 package com.feros.api.dto.response;
 
-import com.feros.api.enums.LeaseSessionStatus;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -18,7 +17,6 @@ public class LeaseVehicleSessionResponse {
     private String driverName;
     private Long divisionId;
     private String divisionName;
-    private LeaseSessionStatus status;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private BigDecimal hoursWorked;
