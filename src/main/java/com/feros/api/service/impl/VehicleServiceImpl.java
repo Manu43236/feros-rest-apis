@@ -515,7 +515,9 @@ public class VehicleServiceImpl implements VehicleService {
                     Vehicle.VehicleBuilder builder = Vehicle.builder()
                             .tenant(tenant)
                             .registrationNumber(regNum)
-                            .isActive(true);
+                            .isActive(true)
+                            .extraPayEnabled(false)
+                            .isIot(false);
 
                     // col 1: vehicleType
                     if (row.length > 1 && !row[1].isBlank())
