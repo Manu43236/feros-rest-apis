@@ -1,12 +1,15 @@
 package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.AssignDivisionRequest;
+import com.feros.api.dto.request.LeaseSessionStartRequest;
 import com.feros.api.dto.request.LeaseVehicleAssignmentRequest;
 import com.feros.api.dto.request.VehicleLeaseRequest;
 import com.feros.api.dto.response.LeaseBillingResponse;
 import com.feros.api.dto.response.LeaseVehicleAssignmentResponse;
+import com.feros.api.dto.response.LeaseVehicleSessionResponse;
 import com.feros.api.dto.response.VehicleLeaseResponse;
 import com.feros.api.entity.*;
+import com.feros.api.enums.LeaseSessionStatus;
 import com.feros.api.enums.LeaseStatus;
 import com.feros.api.enums.RateType;
 import com.feros.api.enums.VehicleStatusType;
@@ -24,7 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -35,6 +40,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
 
     private final VehicleLeaseRepository leaseRepository;
     private final LeaseVehicleAssignmentRepository assignmentRepository;
+    private final LeaseVehicleSessionRepository sessionRepository;
     private final TenantRepository tenantRepository;
     private final ClientRepository clientRepository;
     private final VehicleRepository vehicleRepository;
@@ -125,12 +131,14 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         validateStatusTransition(lease.getStatus(), newStatus);
         lease.setStatus(newStatus);
 
-        // On close: close all active vehicle assignments and revert their status
+        // On close: close all active vehicle assignments, their sessions, and revert vehicle status
         if (newStatus == LeaseStatus.CLOSED) {
             List<LeaseVehicleAssignment> active = assignmentRepository
                     .findByLeaseIdOrderByStartDateAsc(id)
                     .stream().filter(a -> Boolean.TRUE.equals(a.getIsActive())).collect(Collectors.toList());
+            LocalDateTime now = LocalDateTime.now();
             active.forEach(a -> {
+                closeActiveSession(a.getId(), now);
                 a.setIsActive(false);
                 a.setEndDate(LocalDate.now());
                 revertVehicleStatus(a.getVehicle());
@@ -241,6 +249,8 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
                 .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
 
+        closeActiveSession(assignmentId, LocalDateTime.now());
+
         assignment.setIsActive(false);
         assignment.setEndDate(LocalDate.now());
         assignment.setOdometerAtEnd(odometerAtEnd);
@@ -307,6 +317,131 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     private void revertVehicleStatus(Vehicle vehicle) {
         vehicleStatusRepository.findByStatusTypeAndIsActiveTrue(VehicleStatusType.AVAILABLE)
                 .ifPresent(vehicle::setCurrentStatus);
+    }
+
+    // ── Sessions ──────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public LeaseVehicleSessionResponse startSession(Long leaseId, Long assignmentId, LeaseSessionStartRequest request) {
+        fetchLease(leaseId);
+        LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
+                .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
+
+        if (!Boolean.TRUE.equals(assignment.getIsActive()))
+            throw new FerosException("Cannot start session on a closed assignment", HttpStatus.BAD_REQUEST);
+
+        LocalDateTime startTime = request.getStartTime() != null ? request.getStartTime() : LocalDateTime.now();
+        if (startTime.isAfter(LocalDateTime.now()))
+            throw new FerosException("Start time cannot be in the future", HttpStatus.BAD_REQUEST);
+
+        if (request.getStatus() == LeaseSessionStatus.WORKING && request.getDivisionId() == null)
+            throw new FerosException("Division is required for WORKING sessions", HttpStatus.BAD_REQUEST);
+
+        // Close any currently active session
+        closeActiveSession(assignmentId, startTime);
+
+        // Resolve driver name if own staff
+        String driverName = null;
+        if (request.getDriverStaffId() != null) {
+            StaffProfile driver = staffProfileRepository.findByIdAndTenantId(request.getDriverStaffId(), tenantId())
+                    .orElseThrow(() -> new FerosException("Driver not found", HttpStatus.NOT_FOUND));
+            driverName = driver.getUser().getName();
+        }
+
+        // Resolve division name
+        String divisionName = null;
+        Long divisionId = null;
+        if (request.getDivisionId() != null) {
+            ClientDivision division = clientDivisionRepository.findById(request.getDivisionId())
+                    .orElseThrow(() -> new FerosException("Division not found", HttpStatus.NOT_FOUND));
+            divisionId = division.getId();
+            divisionName = division.getName();
+        }
+
+        LeaseVehicleSession session = LeaseVehicleSession.builder()
+                .assignment(assignment)
+                .driverStaffId(request.getDriverStaffId())
+                .driverName(driverName)
+                .divisionId(divisionId)
+                .divisionName(divisionName)
+                .status(request.getStatus())
+                .startTime(startTime)
+                .isActive(true)
+                .notes(request.getNotes())
+                .build();
+
+        return toSessionResponse(sessionRepository.save(session));
+    }
+
+    @Override
+    @Transactional
+    public LeaseVehicleSessionResponse endSession(Long leaseId, Long assignmentId, LocalDateTime endTime, String notes) {
+        fetchLease(leaseId);
+        assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
+                .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
+
+        LeaseVehicleSession session = sessionRepository.findByAssignmentIdAndIsActiveTrue(assignmentId)
+                .orElseThrow(() -> new FerosException("No active session found for this vehicle", HttpStatus.NOT_FOUND));
+
+        LocalDateTime end = endTime != null ? endTime : LocalDateTime.now();
+        if (end.isAfter(LocalDateTime.now()))
+            throw new FerosException("End time cannot be in the future", HttpStatus.BAD_REQUEST);
+        if (end.isBefore(session.getStartTime()))
+            throw new FerosException("End time must be after start time", HttpStatus.BAD_REQUEST);
+
+        session.setEndTime(end);
+        session.setHoursWorked(computeHours(session.getStartTime(), end));
+        session.setIsActive(false);
+        if (notes != null) session.setNotes(notes);
+
+        return toSessionResponse(sessionRepository.save(session));
+    }
+
+    @Override
+    public List<LeaseVehicleSessionResponse> getSessions(Long leaseId, Long assignmentId) {
+        fetchLease(leaseId);
+        List<LeaseVehicleSession> sessions = assignmentId != null
+                ? sessionRepository.findByAssignmentIdOrderByStartTimeDesc(assignmentId)
+                : sessionRepository.findByAssignment_Lease_IdOrderByStartTimeDesc(leaseId);
+        return sessions.stream().map(this::toSessionResponse).collect(Collectors.toList());
+    }
+
+    // Close the active session for an assignment at the given time
+    private void closeActiveSession(Long assignmentId, LocalDateTime at) {
+        sessionRepository.findByAssignmentIdAndIsActiveTrue(assignmentId).ifPresent(s -> {
+            s.setEndTime(at);
+            s.setHoursWorked(computeHours(s.getStartTime(), at));
+            s.setIsActive(false);
+            sessionRepository.save(s);
+        });
+    }
+
+    private BigDecimal computeHours(LocalDateTime start, LocalDateTime end) {
+        long minutes = Duration.between(start, end).toMinutes();
+        return BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+    }
+
+    private LeaseVehicleSessionResponse toSessionResponse(LeaseVehicleSession s) {
+        String regNum = s.getAssignment().getVehicle().getRegistrationNumber();
+        Long vehicleId = s.getAssignment().getVehicle().getId();
+        return LeaseVehicleSessionResponse.builder()
+                .id(s.getId())
+                .assignmentId(s.getAssignment().getId())
+                .vehicleId(vehicleId)
+                .registrationNumber(regNum)
+                .driverStaffId(s.getDriverStaffId())
+                .driverName(s.getDriverName())
+                .divisionId(s.getDivisionId())
+                .divisionName(s.getDivisionName())
+                .status(s.getStatus())
+                .startTime(s.getStartTime())
+                .endTime(s.getEndTime())
+                .hoursWorked(s.getHoursWorked())
+                .isActive(Boolean.TRUE.equals(s.getIsActive()))
+                .notes(s.getNotes())
+                .createdAt(s.getCreatedAt())
+                .build();
     }
 
     private VehicleLeaseResponse toResponse(VehicleLease lease, long vehicleCount) {

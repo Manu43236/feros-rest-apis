@@ -1,11 +1,13 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.request.AssignDivisionRequest;
+import com.feros.api.dto.request.LeaseSessionStartRequest;
 import com.feros.api.dto.request.LeaseVehicleAssignmentRequest;
 import com.feros.api.dto.request.VehicleLeaseRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.LeaseBillingResponse;
 import com.feros.api.dto.response.LeaseVehicleAssignmentResponse;
+import com.feros.api.dto.response.LeaseVehicleSessionResponse;
 import com.feros.api.dto.response.VehicleLeaseResponse;
 import com.feros.api.enums.LeaseStatus;
 import com.feros.api.service.VehicleLeaseService;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -119,5 +122,39 @@ public class VehicleLeaseController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<LeaseBillingResponse>> getBilling(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Billing fetched", vehicleLeaseService.getBilling(id)));
+    }
+
+    // ── Sessions ──────────────────────────────────────────────────────────────
+
+    @PostMapping("/{id}/vehicles/{assignmentId}/sessions")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<LeaseVehicleSessionResponse>> startSession(
+            @PathVariable Long id,
+            @PathVariable Long assignmentId,
+            @Valid @RequestBody LeaseSessionStartRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Session started",
+                vehicleLeaseService.startSession(id, assignmentId, request)));
+    }
+
+    @PutMapping("/{id}/vehicles/{assignmentId}/sessions/end")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<LeaseVehicleSessionResponse>> endSession(
+            @PathVariable Long id,
+            @PathVariable Long assignmentId,
+            @RequestBody(required = false) Map<String, String> body) {
+        LocalDateTime endTime = (body != null && body.containsKey("endTime"))
+                ? LocalDateTime.parse(body.get("endTime")) : null;
+        String notes = body != null ? body.get("notes") : null;
+        return ResponseEntity.ok(ApiResponse.success("Session ended",
+                vehicleLeaseService.endSession(id, assignmentId, endTime, notes)));
+    }
+
+    @GetMapping("/{id}/sessions")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<LeaseVehicleSessionResponse>>> getSessions(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long assignmentId) {
+        return ResponseEntity.ok(ApiResponse.success("Sessions fetched",
+                vehicleLeaseService.getSessions(id, assignmentId)));
     }
 }
