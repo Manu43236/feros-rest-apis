@@ -22,6 +22,7 @@ public class LeaseVehicleAssignmentResponse {
     private LocalDate endDate;
     private BigDecimal odometerAtStart;
     private BigDecimal odometerAtEnd;
+    private BigDecimal vehicleCurrentOdometer; // vehicle master odometer — fallback for session pre-fill
     private Long divisionId;
     private String divisionName;
     private Boolean isActive;

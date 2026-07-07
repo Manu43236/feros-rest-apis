@@ -494,6 +494,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .endDate(a.getEndDate())
                 .odometerAtStart(a.getOdometerAtStart())
                 .odometerAtEnd(a.getOdometerAtEnd())
+                .vehicleCurrentOdometer(a.getVehicle().getCurrentOdometerReading())
                 .divisionId(a.getDivisionId())
                 .divisionName(a.getDivisionName())
                 .isActive(Boolean.TRUE.equals(a.getIsActive()))
