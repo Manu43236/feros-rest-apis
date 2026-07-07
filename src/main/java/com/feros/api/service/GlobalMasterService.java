@@ -47,6 +47,12 @@ public interface GlobalMasterService {
     MasterResponse updateFuelType(Long id, MasterRequest request);
     void deleteFuelType(Long id);
 
+    // Part Categories
+    List<MasterResponse> getAllPartCategories();
+    MasterResponse createPartCategory(MasterRequest request);
+    MasterResponse updatePartCategory(Long id, MasterRequest request);
+    void deletePartCategory(Long id);
+
     // Material Types
     MasterResponse createMaterialType(MaterialTypeRequest request);
     MasterResponse getMaterialTypeById(Long id);

@@ -25,6 +25,7 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
     private final VehicleBrandRepository vehicleBrandRepository;
     private final VehicleTypeRepository vehicleTypeRepository;
     private final FuelTypeRepository fuelTypeRepository;
+    private final PartCategoryRepository partCategoryRepository;
     private final MaterialTypeRepository materialTypeRepository;
     private final DocumentTypeRepository documentTypeRepository;
     private final AttendanceTypeRepository attendanceTypeRepository;
@@ -257,6 +258,36 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
                 .orElseThrow(() -> new FerosException("Fuel type not found", HttpStatus.NOT_FOUND));
         type.setIsActive(false);
         fuelTypeRepository.save(type);
+    }
+
+    // ===================== PART CATEGORIES =====================
+
+    @Override
+    public List<MasterResponse> getAllPartCategories() {
+        return partCategoryRepository.findAllByIsActiveTrue()
+                .stream().map(this::mapToMasterResponse).toList();
+    }
+
+    @Override
+    public MasterResponse createPartCategory(MasterRequest request) {
+        PartCategory category = PartCategory.builder().name(request.getName()).isActive(true).build();
+        return mapToMasterResponse(partCategoryRepository.save(category));
+    }
+
+    @Override
+    public MasterResponse updatePartCategory(Long id, MasterRequest request) {
+        PartCategory category = partCategoryRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Part category not found", HttpStatus.NOT_FOUND));
+        category.setName(request.getName());
+        return mapToMasterResponse(partCategoryRepository.save(category));
+    }
+
+    @Override
+    public void deletePartCategory(Long id) {
+        PartCategory category = partCategoryRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Part category not found", HttpStatus.NOT_FOUND));
+        category.setIsActive(false);
+        partCategoryRepository.save(category);
     }
 
     // ===================== MATERIAL TYPES =====================
@@ -611,6 +642,10 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
                     .isActive(e.getIsActive()).createdAt(e.getCreatedAt())
                     .updatedAt(e.getUpdatedAt()).build();
         if (entity instanceof FuelType e)
+            return MasterResponse.builder().id(e.getId()).name(e.getName())
+                    .isActive(e.getIsActive()).createdAt(e.getCreatedAt())
+                    .updatedAt(e.getUpdatedAt()).build();
+        if (entity instanceof PartCategory e)
             return MasterResponse.builder().id(e.getId()).name(e.getName())
                     .isActive(e.getIsActive()).createdAt(e.getCreatedAt())
                     .updatedAt(e.getUpdatedAt()).build();

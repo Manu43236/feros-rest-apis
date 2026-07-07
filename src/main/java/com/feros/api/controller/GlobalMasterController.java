@@ -208,6 +208,32 @@ public class GlobalMasterController {
         return ResponseEntity.ok(ApiResponse.success("Fuel type deleted successfully", null));
     }
 
+    // ===================== PART CATEGORIES =====================
+
+    @GetMapping("/part-categories")
+    public ResponseEntity<ApiResponse<List<MasterResponse>>> getAllPartCategories() {
+        return ResponseEntity.ok(ApiResponse.success("Part categories fetched successfully", globalMasterService.getAllPartCategories()));
+    }
+
+    @PostMapping("/part-categories")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<MasterResponse>> createPartCategory(@Valid @RequestBody MasterRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Part category created successfully", globalMasterService.createPartCategory(request)));
+    }
+
+    @PutMapping("/part-categories/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<MasterResponse>> updatePartCategory(@PathVariable Long id, @Valid @RequestBody MasterRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Part category updated successfully", globalMasterService.updatePartCategory(id, request)));
+    }
+
+    @DeleteMapping("/part-categories/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deletePartCategory(@PathVariable Long id) {
+        globalMasterService.deletePartCategory(id);
+        return ResponseEntity.ok(ApiResponse.success("Part category deleted successfully", null));
+    }
+
     // ===================== MATERIAL TYPES =====================
     @GetMapping("/material-types")
     public ResponseEntity<ApiResponse<List<MasterResponse>>> getAllMaterialTypes() {
