@@ -133,6 +133,7 @@ public class Vehicle extends BaseEntity {
     private Integer tyreRotationIntervalKm;
 
     // Extra pay for assigned driver
+    @Builder.Default
     @Column(name = "extra_pay_enabled")
     private Boolean extraPayEnabled = false;
 
@@ -151,6 +152,7 @@ public class Vehicle extends BaseEntity {
     @Column(name = "trip_scope")
     private TripScope tripScope;
 
+    @Builder.Default
     @Column(name = "is_iot")
     private Boolean isIot = false;
 
