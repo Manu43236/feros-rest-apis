@@ -265,6 +265,12 @@ public class InventoryServiceImpl implements InventoryService {
             sp = servicePartRepository.save(sp);
 
             // Deduct stock
+            if (inv.getQuantity() < request.getQuantityRequested()) {
+                throw new FerosException(
+                        "Insufficient stock. Only " + inv.getQuantity() + " " + part.getName()
+                                + " available. Enter a quantity \u2264 " + inv.getQuantity() + " or reject this request.",
+                        HttpStatus.BAD_REQUEST);
+            }
             inv.setQuantity(inv.getQuantity() - request.getQuantityRequested());
             inv.setLastUpdated(com.feros.api.util.TimeUtil.nowIst());
             inventoryRepository.save(inv);
@@ -339,8 +345,10 @@ public class InventoryServiceImpl implements InventoryService {
                     .orElseThrow(() -> new FerosException("No inventory record found for this part", HttpStatus.NOT_FOUND));
 
             if (inv.getQuantity() < qtyApproved) {
-                // Warn but allow (soft block)
-                // Stock will go negative — noted in transaction
+                throw new FerosException(
+                        "Insufficient stock. Only " + inv.getQuantity() + " " + sp.getSparePart().getName()
+                                + " available. Enter a quantity \u2264 " + inv.getQuantity() + " or reject this request.",
+                        HttpStatus.BAD_REQUEST);
             }
 
             sp.setStatus(ServicePartStatus.APPROVED);
@@ -694,6 +702,10 @@ public class InventoryServiceImpl implements InventoryService {
         if (task != null) {
             taskDisplayName = task.getTaskType() != null ? task.getTaskType().getName() : task.getCustomName();
         }
+        Integer availableStock = inventoryRepository
+                .findByTenantIdAndSparePartId(svc.getTenant().getId(), sp.getSparePart().getId())
+                .map(SparePartsInventory::getQuantity)
+                .orElse(0);
         return ServicePartResponse.builder()
                 .id(sp.getId())
                 .serviceId(svc.getId())
@@ -715,6 +727,7 @@ public class InventoryServiceImpl implements InventoryService {
                 .approvedByName(sp.getApprovedBy() != null ? sp.getApprovedBy().getName() : null)
                 .approvedAt(sp.getApprovedAt())
                 .createdAt(sp.getCreatedAt())
+                .availableStock(availableStock)
                 .build();
     }
 

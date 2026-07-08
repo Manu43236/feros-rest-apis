@@ -31,4 +31,5 @@ public class ServicePartResponse {
     private String approvedByName;
     private LocalDateTime approvedAt;
     private LocalDateTime createdAt;
+    private Integer availableStock;
 }
