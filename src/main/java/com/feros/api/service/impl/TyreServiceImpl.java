@@ -210,8 +210,19 @@ public class TyreServiceImpl implements TyreService {
         Tenant tenant = getTenant(tenantId);
         Vehicle vehicle = getVehicle(request.getVehicleId(), tenantId);
 
-        positionRepository.findByVehicleIdAndPositionCodeAndIsActiveTrue(vehicle.getId(), request.getPositionCode())
-                .ifPresent(p -> { throw new FerosException("Position code already exists for this vehicle", HttpStatus.CONFLICT); });
+        Optional<VehicleTyrePosition> existing = positionRepository
+                .findByVehicleIdAndPositionCode(vehicle.getId(), request.getPositionCode());
+
+        if (existing.isPresent()) {
+            VehicleTyrePosition pos = existing.get();
+            if (Boolean.TRUE.equals(pos.getIsActive()))
+                throw new FerosException("Position code already exists for this vehicle", HttpStatus.CONFLICT);
+            // Reactivate soft-deleted position
+            pos.setIsActive(true);
+            pos.setPositionType(request.getPositionType());
+            pos.setDisplayOrder(request.getDisplayOrder() != null ? request.getDisplayOrder() : pos.getDisplayOrder());
+            return toPositionResponse(positionRepository.save(pos), null);
+        }
 
         VehicleTyrePosition position = VehicleTyrePosition.builder()
                 .tenant(tenant)
