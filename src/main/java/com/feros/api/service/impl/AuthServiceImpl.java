@@ -120,6 +120,15 @@ public class AuthServiceImpl implements AuthService {
         String logoKey = user.getTenant() != null ? user.getTenant().getLogoUrl() : null;
         String logoUrl = logoKey != null ? s3Service.getPublicUrl(logoKey) : null;
 
+        // 7a. Hard block — DRIVER, CLEANER, TECHNICIAN cannot log in on web
+        if (DeviceType.WEB.equals(request.getDeviceType()) &&
+                (role.equals("DRIVER") || role.equals("CLEANER") || role.equals("TECHNICIAN") || role.equals("OPERATOR"))) {
+            throw new FerosException(
+                    "This role is not permitted to log in on the web platform.",
+                    HttpStatus.FORBIDDEN
+            );
+        }
+
         // 7b. Enforce login access RBAC (skip for SUPER_ADMIN and ADMIN)
         if (tenantId != null && !role.equals("SUPER_ADMIN") && !role.equals("ADMIN")) {
             try {
