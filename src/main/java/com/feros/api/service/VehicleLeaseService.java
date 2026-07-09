@@ -5,6 +5,7 @@ import com.feros.api.dto.request.LeaseSessionStartRequest;
 import com.feros.api.dto.request.LeaseVehicleAssignmentRequest;
 import com.feros.api.dto.request.VehicleLeaseRequest;
 import com.feros.api.dto.response.LeaseBillingResponse;
+import com.feros.api.dto.response.LeaseDailyLogResponse;
 import com.feros.api.dto.response.LeaseVehicleAssignmentResponse;
 import com.feros.api.dto.response.LeaseVehicleSessionResponse;
 import com.feros.api.dto.response.VehicleLeaseResponse;
@@ -35,4 +36,8 @@ public interface VehicleLeaseService {
     LeaseVehicleSessionResponse startSession(Long leaseId, Long assignmentId, LeaseSessionStartRequest request);
     LeaseVehicleSessionResponse endSession(Long leaseId, Long assignmentId, LocalDateTime endTime, BigDecimal odometerEnd, String notes);
     List<LeaseVehicleSessionResponse> getSessions(Long leaseId, Long assignmentId);
+
+    // Daily Logs
+    List<LeaseDailyLogResponse> getDailyLogs(Long leaseId);
+    LeaseDailyLogResponse createDailyLog(Long leaseId, Long assignmentId, LocalDate date);
 }

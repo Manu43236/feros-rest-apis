@@ -5,6 +5,7 @@ import com.feros.api.dto.request.LeaseSessionStartRequest;
 import com.feros.api.dto.request.LeaseVehicleAssignmentRequest;
 import com.feros.api.dto.request.VehicleLeaseRequest;
 import com.feros.api.dto.response.LeaseBillingResponse;
+import com.feros.api.dto.response.LeaseDailyLogResponse;
 import com.feros.api.dto.response.LeaseVehicleAssignmentResponse;
 import com.feros.api.dto.response.LeaseVehicleSessionResponse;
 import com.feros.api.dto.response.VehicleLeaseResponse;
@@ -12,6 +13,7 @@ import com.feros.api.entity.*;
 import com.feros.api.enums.LeaseStatus;
 import com.feros.api.enums.RateType;
 import com.feros.api.enums.VehicleStatusType;
+import com.feros.api.repository.LeaseDailyLogRepository;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.VehicleLeaseService;
@@ -40,6 +42,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     private final VehicleLeaseRepository leaseRepository;
     private final LeaseVehicleAssignmentRepository assignmentRepository;
     private final LeaseVehicleSessionRepository sessionRepository;
+    private final LeaseDailyLogRepository dailyLogRepository;
     private final TenantRepository tenantRepository;
     private final ClientRepository clientRepository;
     private final VehicleRepository vehicleRepository;
@@ -432,6 +435,75 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 ? sessionRepository.findByAssignmentIdOrderByStartTimeDesc(assignmentId)
                 : sessionRepository.findByAssignment_Lease_IdOrderByStartTimeDesc(leaseId);
         return sessions.stream().map(this::toSessionResponse).collect(Collectors.toList());
+    }
+
+    // ── Daily Logs ────────────────────────────────────────────────────────────
+
+    @Override
+    public List<LeaseDailyLogResponse> getDailyLogs(Long leaseId) {
+        fetchLease(leaseId);
+        return dailyLogRepository.findByLeaseIdOrderByLogDateDesc(leaseId)
+                .stream().map(this::toDailyLogResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public LeaseDailyLogResponse createDailyLog(Long leaseId, Long assignmentId, LocalDate date) {
+        fetchLease(leaseId);
+        LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
+                .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
+
+        if (date.isAfter(LocalDate.now()))
+            throw new FerosException("Cannot create daily log for a future date", HttpStatus.BAD_REQUEST);
+        if (dailyLogRepository.existsByAssignmentIdAndLogDate(assignmentId, date))
+            throw new FerosException("Daily log already exists for this vehicle on " + date, HttpStatus.CONFLICT);
+
+        List<LeaseVehicleSession> sessions = sessionRepository
+                .findByAssignmentIdAndIsActiveFalseAndStartTimeBetween(
+                        assignmentId, date.atStartOfDay(), date.plusDays(1).atStartOfDay());
+        if (sessions.isEmpty())
+            throw new FerosException("No completed sessions found for this vehicle on " + date, HttpStatus.BAD_REQUEST);
+
+        LeaseDailyLog log = dailyLogRepository.save(buildDailyLog(assignment, date, sessions, "MANUAL"));
+        return toDailyLogResponse(log);
+    }
+
+    private LeaseDailyLog buildDailyLog(LeaseVehicleAssignment assignment, LocalDate date,
+                                         List<LeaseVehicleSession> sessions, String source) {
+        BigDecimal totalHours = sessions.stream()
+                .map(s -> s.getHoursWorked() != null ? s.getHoursWorked() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal kmDriven = sessions.stream()
+                .map(s -> s.getKmDriven() != null ? s.getKmDriven() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        return LeaseDailyLog.builder()
+                .assignment(assignment)
+                .leaseId(assignment.getLease().getId())
+                .logDate(date)
+                .totalHours(totalHours.compareTo(BigDecimal.ZERO) > 0 ? totalHours : null)
+                .kmDriven(kmDriven.compareTo(BigDecimal.ZERO) > 0 ? kmDriven : null)
+                .sessionCount(sessions.size())
+                .source(source)
+                .build();
+    }
+
+    private LeaseDailyLogResponse toDailyLogResponse(LeaseDailyLog log) {
+        return LeaseDailyLogResponse.builder()
+                .id(log.getId())
+                .assignmentId(log.getAssignment().getId())
+                .leaseId(log.getLeaseId())
+                .logDate(log.getLogDate())
+                .registrationNumber(log.getAssignment().getVehicle().getRegistrationNumber())
+                .totalHours(log.getTotalHours())
+                .kmDriven(log.getKmDriven())
+                .sessionCount(log.getSessionCount())
+                .source(log.getSource())
+                .notes(log.getNotes())
+                .createdAt(log.getCreatedAt())
+                .build();
     }
 
     // Close the active session for an assignment at the given time

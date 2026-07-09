@@ -6,6 +6,7 @@ import com.feros.api.dto.request.LeaseVehicleAssignmentRequest;
 import com.feros.api.dto.request.VehicleLeaseRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.LeaseBillingResponse;
+import com.feros.api.dto.response.LeaseDailyLogResponse;
 import com.feros.api.dto.response.LeaseVehicleAssignmentResponse;
 import com.feros.api.dto.response.LeaseVehicleSessionResponse;
 import com.feros.api.dto.response.VehicleLeaseResponse;
@@ -158,5 +159,25 @@ public class VehicleLeaseController {
             @RequestParam(required = false) Long assignmentId) {
         return ResponseEntity.ok(ApiResponse.success("Sessions fetched",
                 vehicleLeaseService.getSessions(id, assignmentId)));
+    }
+
+    // ── Daily Logs ────────────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/daily-logs")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<LeaseDailyLogResponse>>> getDailyLogs(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Daily logs fetched",
+                vehicleLeaseService.getDailyLogs(id)));
+    }
+
+    @PostMapping("/{id}/vehicles/{assignmentId}/daily-logs")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<LeaseDailyLogResponse>> createDailyLog(
+            @PathVariable Long id,
+            @PathVariable Long assignmentId,
+            @RequestBody Map<String, String> body) {
+        LocalDate date = LocalDate.parse(body.get("date"));
+        return ResponseEntity.ok(ApiResponse.success("Daily log created",
+                vehicleLeaseService.createDailyLog(id, assignmentId, date)));
     }
 }

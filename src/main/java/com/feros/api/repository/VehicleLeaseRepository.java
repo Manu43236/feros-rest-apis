@@ -9,12 +9,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface VehicleLeaseRepository extends JpaRepository<VehicleLease, Long> {
 
     Optional<VehicleLease> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
+
+    List<VehicleLease> findByStatusAndIsActiveTrue(LeaseStatus status);
 
     @Query("""
         SELECT vl FROM VehicleLease vl
