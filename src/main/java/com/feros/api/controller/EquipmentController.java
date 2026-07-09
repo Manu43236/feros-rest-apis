@@ -33,20 +33,20 @@ public class EquipmentController {
     private final EquipmentService equipmentService;
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<EquipmentDashboardResponse>> getDashboard() {
         return ResponseEntity.ok(ApiResponse.success("Dashboard fetched", equipmentService.getDashboard()));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<EquipmentResponse>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success("Equipment fetched successfully",
                 equipmentService.getAllEquipment()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<EquipmentResponse>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Equipment fetched successfully",
                 equipmentService.getEquipmentById(id)));
@@ -79,14 +79,14 @@ public class EquipmentController {
     // ── Machine Detail ───────────────────────────────────────────────────────
 
     @GetMapping("/{id}/assignments")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<MachineAssignmentHistoryResponse>>> getMachineHistory(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Assignment history fetched",
                 equipmentService.getMachineAssignmentHistory(id)));
     }
 
     @GetMapping("/{id}/daily-logs")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<DailyLogResponse>>> getMachineLogs(
             @PathVariable Long id,
             @RequestParam(required = false) LocalDate from,
@@ -105,7 +105,7 @@ public class EquipmentController {
     // ── Fuel Logs ─────────────────────────────────────────────────────────────
 
     @GetMapping("/{id}/fuel-logs")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<EquipmentFuelLogResponse>>> getFuelLogs(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Fuel logs fetched", equipmentService.getFuelLogs(id)));
     }
@@ -134,7 +134,7 @@ public class EquipmentController {
     // ── Meter Readings ────────────────────────────────────────────────────────
 
     @GetMapping("/{id}/meter-readings")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<EquipmentMeterReadingResponse>>> getMeterReadings(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Meter readings fetched", equipmentService.getMeterReadings(id)));
     }
@@ -162,34 +162,34 @@ public class EquipmentController {
     // ── Service Records ───────────────────────────────────────────────────────
 
     @GetMapping("/{id}/services")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<EquipmentServiceResponse>>> getServices(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Services fetched", equipmentService.getServices(id)));
     }
 
     @PostMapping("/{id}/services")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<EquipmentServiceResponse>> createService(
             @PathVariable Long id, @Valid @RequestBody EquipmentServiceRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Service created", equipmentService.createService(id, request)));
     }
 
     @PutMapping("/{id}/services/{serviceId}")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<EquipmentServiceResponse>> updateService(
             @PathVariable Long id, @PathVariable Long serviceId, @Valid @RequestBody EquipmentServiceRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Service updated", equipmentService.updateService(id, serviceId, request)));
     }
 
     @PostMapping("/{id}/services/{serviceId}/start")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<EquipmentServiceResponse>> startService(
             @PathVariable Long id, @PathVariable Long serviceId) {
         return ResponseEntity.ok(ApiResponse.success("Service started", equipmentService.startService(id, serviceId)));
     }
 
     @PostMapping("/{id}/services/{serviceId}/complete")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<EquipmentServiceResponse>> completeService(
             @PathVariable Long id, @PathVariable Long serviceId,
             @org.springframework.web.bind.annotation.RequestBody(required = false) com.feros.api.dto.request.EquipmentServiceCompleteRequest request) {
@@ -197,7 +197,7 @@ public class EquipmentController {
     }
 
     @DeleteMapping("/{id}/services/{serviceId}")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> deleteService(@PathVariable Long id, @PathVariable Long serviceId) {
         equipmentService.deleteService(id, serviceId);
         return ResponseEntity.ok(ApiResponse.success("Service deleted", null));
