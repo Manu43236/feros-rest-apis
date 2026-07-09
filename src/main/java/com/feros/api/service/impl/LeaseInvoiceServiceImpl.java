@@ -49,6 +49,14 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
                 .orElseThrow(() -> new FerosException("Lease not found", HttpStatus.NOT_FOUND));
     }
 
+    // ── Get All ───────────────────────────────────────────────────────────────
+
+    @Override
+    public List<LeaseInvoiceResponse> getAll() {
+        return invoiceRepository.findByTenantIdOrderByCreatedAtDesc(tenantId())
+                .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
     // ── Prefill ───────────────────────────────────────────────────────────────
 
     @Override

@@ -23,6 +23,12 @@ public class LeaseInvoiceController {
 
     private final LeaseInvoiceService invoiceService;
 
+    @GetMapping("/api/v1/vehicle-leases/invoices")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<LeaseInvoiceResponse>>> getAll() {
+        return ResponseEntity.ok(ApiResponse.success("Invoices fetched", invoiceService.getAll()));
+    }
+
     @GetMapping("/api/v1/vehicle-leases/{leaseId}/invoices/prefill")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<List<LeaseInvoicePrefillResponse>>> prefill(

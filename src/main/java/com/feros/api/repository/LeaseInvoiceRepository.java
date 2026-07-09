@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface LeaseInvoiceRepository extends JpaRepository<LeaseInvoice, Long> {
+    List<LeaseInvoice> findByTenantIdOrderByCreatedAtDesc(Long tenantId);
     List<LeaseInvoice> findByLease_IdAndTenantIdOrderByCreatedAtDesc(Long leaseId, Long tenantId);
     Optional<LeaseInvoice> findByIdAndTenantId(Long id, Long tenantId);
 }

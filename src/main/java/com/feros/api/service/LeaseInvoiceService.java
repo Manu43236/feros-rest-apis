@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface LeaseInvoiceService {
+    List<LeaseInvoiceResponse> getAll();
     List<LeaseInvoicePrefillResponse> prefill(Long leaseId, LocalDate from, LocalDate to);
     LeaseInvoiceResponse create(Long leaseId, LeaseInvoiceRequest request);
     List<LeaseInvoiceResponse> getByLease(Long leaseId);
