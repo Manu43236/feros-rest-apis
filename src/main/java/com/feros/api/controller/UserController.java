@@ -115,4 +115,15 @@ public class UserController {
                 ApiResponse.success("Staff bulk upload completed", response)
         );
     }
+
+    @PostMapping("/staff-details-import")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<BulkTenantUploadResponse>> staffDetailsImport(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "tenantId", required = false) Long tenantId) {
+        BulkTenantUploadResponse response = userService.staffDetailsImport(file, tenantId);
+        return ResponseEntity.ok(
+                ApiResponse.success("Staff details import completed", response)
+        );
+    }
 }

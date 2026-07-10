@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStreamReader;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -413,6 +414,130 @@ public class UserServiceImpl implements UserService {
                 .failureCount(failureCount)
                 .errors(errors)
                 .build();
+    }
+
+    /**
+     * Import staff full details (bank / aadhar / nominee) with UPSERT by phone.
+     * Existing phone  -> update user name + profile fields (blank cells never overwrite).
+     * New phone       -> create user (auto PIN + number) + profile.
+     * CSV column order (14): name, role, bankName, branchName, accountNumber, ifscCode,
+     *   aadharNumber, aadharName, dateOfBirth, nomineeName, nomineeRelation,
+     *   nomineeDateOfBirth, nomineeAadharNumber, phone. Dates: yyyy-MM-dd.
+     */
+    @Override
+    @Transactional
+    public BulkTenantUploadResponse staffDetailsImport(MultipartFile file, Long tenantId) {
+        int successCount = 0, failureCount = 0, rowNum = 1;
+        List<String> errors = new ArrayList<>();
+
+        Long resolvedTenantId = resolveTenantId(tenantId);
+        EmploymentType defaultEmploymentType = employmentTypeRepository.findAllByIsActiveTrue()
+                .stream().findFirst().orElse(null);
+
+        try (CSVReader csvReader = new CSVReader(new InputStreamReader(file.getInputStream()))) {
+            csvReader.readNext(); // skip header
+            String[] row;
+            while ((row = csvReader.readNext()) != null) {
+                rowNum++;
+                try {
+                    String phone = cell(row, 13);
+                    String name  = cell(row, 0);
+                    String roleName = cell(row, 1);
+                    if (phone.isEmpty() || name.isEmpty() || roleName.isEmpty()) {
+                        errors.add("Row " + rowNum + ": name, phone and role are required");
+                        failureCount++;
+                        continue;
+                    }
+
+                    Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(resolvedTenantId)
+                            .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+
+                    User user = userRepository.findByPhone(phone).orElse(null);
+                    if (user == null) {
+                        RoleName role = RoleName.valueOf(roleName.toUpperCase());
+                        Role roleEntity = roleRepository.findByName(role)
+                                .orElseThrow(() -> new FerosException("Role not found: " + roleName, HttpStatus.NOT_FOUND));
+                        String rawPin = generatePin();
+                        user = userRepository.save(User.builder()
+                                .tenant(tenant)
+                                .userNumber(NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.USR))
+                                .name(name)
+                                .phone(phone)
+                                .pin(passwordEncoder.encode(rawPin))
+                                .plainPin(rawPin)
+                                .pinGeneratedAt(TimeUtil.nowIst())
+                                .isPinResetRequired(true)
+                                .isActive(true)
+                                .roles(new HashSet<>(Set.of(roleEntity)))
+                                .build());
+                    } else {
+                        user.setName(name); // name is required, always present
+                        userRepository.save(user);
+                    }
+
+                    StaffProfile profile = staffProfileRepository.findByUserId(user.getId()).orElse(null);
+                    if (profile == null) {
+                        if (defaultEmploymentType == null) {
+                            errors.add("Row " + rowNum + ": no employment type configured for new profile");
+                            failureCount++;
+                            continue;
+                        }
+                        profile = StaffProfile.builder()
+                                .user(user).tenant(tenant)
+                                .employmentType(defaultEmploymentType)
+                                .isActive(true).build();
+                    }
+
+                    // blank cells never overwrite
+                    applyIfPresent(cell(row, 2),  profile::setBankName);
+                    applyIfPresent(cell(row, 3),  profile::setBankBranchName);
+                    applyIfPresent(cell(row, 4),  profile::setAccountNumber);
+                    applyIfPresent(cell(row, 5),  profile::setIfscCode);
+                    applyIfPresent(cell(row, 6),  profile::setAadharNumber);
+                    applyIfPresent(cell(row, 7),  profile::setAadharName);
+                    applyIfPresent(cell(row, 7),  profile::setAccountHolderName); // aadhar name = account holder
+                    applyIfPresent(cell(row, 9),  profile::setNomineeName);
+                    applyIfPresent(cell(row, 10), profile::setNomineeRelation);
+                    applyIfPresent(cell(row, 12), profile::setNomineeAadharNumber);
+                    LocalDate dob = parseDate(cell(row, 8));
+                    if (dob != null) profile.setDateOfBirth(dob);
+                    LocalDate nomDob = parseDate(cell(row, 11));
+                    if (nomDob != null) profile.setNomineeDateOfBirth(nomDob);
+
+                    staffProfileRepository.save(profile);
+                    successCount++;
+                } catch (Exception e) {
+                    errors.add("Row " + rowNum + ": " + e.getMessage());
+                    failureCount++;
+                }
+            }
+        } catch (Exception e) {
+            throw new FerosException("Failed to parse CSV: " + e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+
+        return BulkTenantUploadResponse.builder()
+                .totalRows(rowNum - 1)
+                .successCount(successCount)
+                .failureCount(failureCount)
+                .errors(errors)
+                .build();
+    }
+
+    private static String cell(String[] row, int i) {
+        return (i < row.length && row[i] != null) ? row[i].trim() : "";
+    }
+
+    private static void applyIfPresent(String value, java.util.function.Consumer<String> setter) {
+        if (value != null && !value.isEmpty()) setter.accept(value);
+    }
+
+    private static LocalDate parseDate(String value) {
+        if (value == null || value.isEmpty()) return null;
+        try {
+            return LocalDate.parse(value); // ponytail: cleaned CSV is ISO yyyy-MM-dd; bad values just skip
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // Helper methods
