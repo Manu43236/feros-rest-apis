@@ -50,6 +50,10 @@ public interface EquipmentService {
     EquipmentServiceResponse completeService(Long equipmentId, Long serviceId, com.feros.api.dto.request.EquipmentServiceCompleteRequest request);
     void deleteService(Long equipmentId, Long serviceId);
 
+    // Service tasks — technician assignment + add task (parity with vehicles)
+    EquipmentServiceResponse assignTaskTechnician(Long equipmentId, Long serviceId, Long taskId, Long mechanicId);
+    EquipmentServiceResponse addTaskToService(Long equipmentId, Long serviceId, com.feros.api.dto.request.EquipmentServiceTaskRequest request);
+
     // Breakdowns
     List<com.feros.api.dto.response.EquipmentBreakdownResponse> getAllBreakdowns();
     List<com.feros.api.dto.response.EquipmentServiceResponse> getAllServices();

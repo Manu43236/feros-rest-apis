@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -23,4 +24,11 @@ public class EquipmentServiceTaskResponse {
     private ServiceTaskStatus status;
     private LocalDateTime startedAt;
     private LocalDateTime completedAt;
+
+    // Technician assignment + parts (parity with vehicles)
+    private Long assignedMechanicId;
+    private String assignedMechanicName;
+    private LocalDateTime mechanicStartedAt;
+    private LocalDateTime mechanicClosedAt;
+    private List<EquipmentServicePartResponse> parts;
 }

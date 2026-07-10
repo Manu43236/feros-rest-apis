@@ -50,4 +50,15 @@ public class EquipmentServiceTask extends BaseEntity {
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
+
+    // Technician assignment (shared TECHNICIAN pool with vehicles) — mirrors VehicleServiceTask.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_mechanic_id")
+    private User assignedMechanic;
+
+    @Column(name = "mechanic_started_at")
+    private LocalDateTime mechanicStartedAt;
+
+    @Column(name = "mechanic_closed_at")
+    private LocalDateTime mechanicClosedAt;
 }

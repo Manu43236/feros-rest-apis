@@ -13,8 +13,12 @@ import com.feros.api.dto.response.EquipmentMeterReadingResponse;
 import com.feros.api.dto.response.EquipmentResponse;
 import com.feros.api.dto.response.MachineAssignmentHistoryResponse;
 import com.feros.api.dto.response.MachineInvoiceItemResponse;
+import com.feros.api.dto.request.ServicePartRequest;
+import com.feros.api.dto.request.ServicePartApprovalRequest;
+import com.feros.api.dto.response.EquipmentServicePartResponse;
 import com.feros.api.enums.EquipmentWorkStatus;
 import com.feros.api.service.EquipmentService;
+import com.feros.api.service.EquipmentServicePartService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +35,7 @@ import java.util.Map;
 public class EquipmentController {
 
     private final EquipmentService equipmentService;
+    private final EquipmentServicePartService equipmentServicePartService;
 
     @GetMapping("/dashboard")
     @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
@@ -201,6 +206,64 @@ public class EquipmentController {
     public ResponseEntity<ApiResponse<Void>> deleteService(@PathVariable Long id, @PathVariable Long serviceId) {
         equipmentService.deleteService(id, serviceId);
         return ResponseEntity.ok(ApiResponse.success("Service deleted", null));
+    }
+
+    @PutMapping("/{id}/services/{serviceId}/tasks/{taskId}/assign")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<com.feros.api.dto.response.EquipmentServiceResponse>> assignTaskTechnician(
+            @PathVariable Long id, @PathVariable Long serviceId, @PathVariable Long taskId,
+            @Valid @RequestBody com.feros.api.dto.request.AssignMechanicRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Technician assigned",
+                equipmentService.assignTaskTechnician(id, serviceId, taskId, request.getMechanicId())));
+    }
+
+    @PostMapping("/{id}/services/{serviceId}/tasks")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<com.feros.api.dto.response.EquipmentServiceResponse>> addTaskToService(
+            @PathVariable Long id, @PathVariable Long serviceId,
+            @RequestBody com.feros.api.dto.request.EquipmentServiceTaskRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Task added",
+                equipmentService.addTaskToService(id, serviceId, request)));
+    }
+
+    // ── Service Parts (shared spare-parts inventory) ──────────────────────────
+
+    @PostMapping("/{id}/services/{serviceId}/parts")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<EquipmentServicePartResponse>> requestPart(
+            @PathVariable Long id, @PathVariable Long serviceId, @Valid @RequestBody ServicePartRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Part requested",
+                equipmentServicePartService.requestPart(id, serviceId, request)));
+    }
+
+    @GetMapping("/{id}/services/{serviceId}/parts")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<List<EquipmentServicePartResponse>>> getServiceParts(
+            @PathVariable Long id, @PathVariable Long serviceId) {
+        return ResponseEntity.ok(ApiResponse.success("Parts fetched",
+                equipmentServicePartService.getServiceParts(serviceId)));
+    }
+
+    @DeleteMapping("/service-parts/{partId}")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<Void>> removePart(@PathVariable Long partId) {
+        equipmentServicePartService.removePart(partId);
+        return ResponseEntity.ok(ApiResponse.success("Part removed", null));
+    }
+
+    @GetMapping("/service-parts/pending")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<List<EquipmentServicePartResponse>>> getPendingParts() {
+        return ResponseEntity.ok(ApiResponse.success("Pending parts fetched",
+                equipmentServicePartService.getPending()));
+    }
+
+    @PutMapping("/service-parts/{partId}/approve")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','STORE_KEEPER')")
+    public ResponseEntity<ApiResponse<EquipmentServicePartResponse>> approvePart(
+            @PathVariable Long partId, @Valid @RequestBody ServicePartApprovalRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Part updated",
+                equipmentServicePartService.approvePart(partId, request)));
     }
 
     // ── Breakdowns ────────────────────────────────────────────────────────────

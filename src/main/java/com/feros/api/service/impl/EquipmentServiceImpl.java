@@ -37,8 +37,12 @@ import com.feros.api.enums.WorkOrderStatus;
 import com.feros.api.repository.WorkOrderRepository;
 import com.feros.api.repository.EquipmentBreakdownRepository;
 import com.feros.api.repository.UserRepository;
+import com.feros.api.repository.EquipmentServiceTaskRepository;
+import com.feros.api.repository.EquipmentServicePartRepository;
+import com.feros.api.entity.EquipmentServicePart;
 import com.feros.api.dto.request.EquipmentBreakdownRequest;
 import com.feros.api.dto.response.EquipmentBreakdownResponse;
+import com.feros.api.dto.response.EquipmentServicePartResponse;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.EquipmentDailyLogRepository;
 import com.feros.api.repository.EquipmentFuelLogRepository;
@@ -86,6 +90,8 @@ public class EquipmentServiceImpl implements EquipmentService {
     private final EquipmentServiceTaskTypeRepository equipmentServiceTaskTypeRepository;
     private final EquipmentBreakdownRepository equipmentBreakdownRepository;
     private final UserRepository userRepository;
+    private final EquipmentServiceTaskRepository equipmentServiceTaskRepository;
+    private final EquipmentServicePartRepository equipmentServicePartRepository;
 
     private Long getTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -881,6 +887,71 @@ public class EquipmentServiceImpl implements EquipmentService {
 
     @Override
     @Transactional
+    public EquipmentServiceResponse assignTaskTechnician(Long equipmentId, Long serviceId, Long taskId, Long mechanicId) {
+        Long tenantId = getTenantId();
+        EquipmentServiceRecord record = equipmentServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+
+        EquipmentServiceTask task = record.getTasks().stream()
+                .filter(t -> t.getId().equals(taskId)).findFirst()
+                .orElseThrow(() -> new FerosException("Task not found", HttpStatus.NOT_FOUND));
+
+        if (task.getStatus() == ServiceTaskStatus.COMPLETED)
+            throw new FerosException("Cannot reassign a completed task", HttpStatus.BAD_REQUEST);
+
+        User mechanic = userRepository.findByIdAndIsActiveTrue(mechanicId)
+                .orElseThrow(() -> new FerosException("Technician not found", HttpStatus.NOT_FOUND));
+        if (mechanic.getTenant() == null || !mechanic.getTenant().getId().equals(tenantId))
+            throw new FerosException("Technician not found", HttpStatus.NOT_FOUND);
+
+        task.setAssignedMechanic(mechanic);
+        task.setStatus(ServiceTaskStatus.ASSIGNED);
+        equipmentServiceTaskRepository.save(task);
+
+        // Auto-start the service when the first task is assigned (mirror vehicles).
+        if (record.getStatus() == ServiceStatus.OPEN) {
+            record.setStatus(ServiceStatus.IN_PROGRESS);
+            record.setStartedAt(LocalDateTime.now());
+            equipmentServiceRepository.save(record);
+        }
+
+        return toServiceResponse(record);
+    }
+
+    @Override
+    @Transactional
+    public EquipmentServiceResponse addTaskToService(Long equipmentId, Long serviceId, EquipmentServiceTaskRequest request) {
+        Long tenantId = getTenantId();
+        EquipmentServiceRecord record = equipmentServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+
+        if (record.getStatus() == ServiceStatus.COMPLETED)
+            throw new FerosException("Cannot add tasks to a completed service", HttpStatus.BAD_REQUEST);
+
+        saveTasksOnRecord(record, java.util.List.of(request));
+        equipmentServiceRepository.save(record);
+        return toServiceResponse(record);
+    }
+
+    private EquipmentServicePartResponse toPartResponse(EquipmentServicePart p) {
+        return EquipmentServicePartResponse.builder()
+                .id(p.getId())
+                .taskId(p.getServiceTask() != null ? p.getServiceTask().getId() : null)
+                .sparePartId(p.getSparePart().getId())
+                .sparePartName(p.getSparePart().getName())
+                .quantityRequested(p.getQuantityRequested())
+                .quantityApproved(p.getQuantityApproved())
+                .status(p.getStatus())
+                .rejectionReason(p.getRejectionReason())
+                .requestedByName(p.getRequestedBy() != null ? p.getRequestedBy().getName() : null)
+                .createdAt(p.getCreatedAt())
+                .build();
+    }
+
+    @Override
+    @Transactional
     public EquipmentBreakdownResponse reportBreakdown(Long equipmentId, EquipmentBreakdownRequest request) {
         Long tenantId = getTenantId();
         Equipment eq = equipmentRepository.findByIdAndTenantId(equipmentId, tenantId)
@@ -1026,6 +1097,12 @@ public class EquipmentServiceImpl implements EquipmentService {
                     .status(t.getStatus())
                     .startedAt(t.getStartedAt())
                     .completedAt(t.getCompletedAt())
+                    .assignedMechanicId(t.getAssignedMechanic() != null ? t.getAssignedMechanic().getId() : null)
+                    .assignedMechanicName(t.getAssignedMechanic() != null ? t.getAssignedMechanic().getName() : null)
+                    .mechanicStartedAt(t.getMechanicStartedAt())
+                    .mechanicClosedAt(t.getMechanicClosedAt())
+                    .parts(equipmentServicePartRepository.findByServiceTaskId(t.getId()).stream()
+                            .map(this::toPartResponse).toList())
                     .build();
         }).toList();
 

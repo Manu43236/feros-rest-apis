@@ -20,7 +20,7 @@ public class EquipmentServiceTaskType extends BaseEntity {
     @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "is_active")
+    @Column(name = "is_active", columnDefinition = "TINYINT(1) DEFAULT 1")
     @Builder.Default
     private Boolean isActive = true;
 }
