@@ -866,6 +866,20 @@ public class EquipmentServiceImpl implements EquipmentService {
     }
 
     @Override
+    public List<EquipmentBreakdownResponse> getAllBreakdowns() {
+        return equipmentBreakdownRepository
+                .findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(getTenantId())
+                .stream().map(this::toBreakdownResponse).toList();
+    }
+
+    @Override
+    public List<EquipmentServiceResponse> getAllServices() {
+        return equipmentServiceRepository
+                .findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(getTenantId())
+                .stream().map(this::toServiceResponse).toList();
+    }
+
+    @Override
     @Transactional
     public EquipmentBreakdownResponse reportBreakdown(Long equipmentId, EquipmentBreakdownRequest request) {
         Long tenantId = getTenantId();
@@ -932,9 +946,12 @@ public class EquipmentServiceImpl implements EquipmentService {
     private EquipmentBreakdownResponse toBreakdownResponse(EquipmentBreakdown bd) {
         Equipment eq = bd.getEquipment();
         String identifier = eq.getRegistrationNumber() != null ? eq.getRegistrationNumber() : eq.getSerialNumber();
+        var model = eq.getEquipmentType().getModel();
+        String name = model.getMake().getName() + " " + model.getName();
         return EquipmentBreakdownResponse.builder()
                 .id(bd.getId())
                 .equipmentId(eq.getId())
+                .equipmentName(name)
                 .equipmentIdentifier(identifier)
                 .breakdownDate(bd.getBreakdownDate())
                 .location(bd.getLocation())
@@ -970,6 +987,8 @@ public class EquipmentServiceImpl implements EquipmentService {
     private EquipmentServiceResponse toServiceResponse(EquipmentServiceRecord r, BigDecimal currentHmr) {
         Equipment eq = r.getEquipment();
         String identifier = eq.getRegistrationNumber() != null ? eq.getRegistrationNumber() : eq.getSerialNumber();
+        var svcModel = eq.getEquipmentType().getModel();
+        String equipmentName = svcModel.getMake().getName() + " " + svcModel.getName();
 
         String displayStatus;
         if (r.getStatus() == ServiceStatus.COMPLETED) {
@@ -1013,6 +1032,7 @@ public class EquipmentServiceImpl implements EquipmentService {
         return EquipmentServiceResponse.builder()
                 .id(r.getId())
                 .equipmentId(eq.getId())
+                .equipmentName(equipmentName)
                 .equipmentIdentifier(identifier)
                 .serviceNumber(r.getServiceNumber())
                 .triggeredBy(r.getTriggeredBy())

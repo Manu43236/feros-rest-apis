@@ -19,6 +19,7 @@ import java.util.List;
 public class EquipmentServiceResponse {
     private Long id;
     private Long equipmentId;
+    private String equipmentName;
     private String equipmentIdentifier;
     private String serviceNumber;
     private ServiceTriggeredBy triggeredBy;

@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 public class EquipmentBreakdownResponse {
     private Long id;
     private Long equipmentId;
+    private String equipmentName;
     private String equipmentIdentifier;
     private LocalDateTime breakdownDate;
     private String location;

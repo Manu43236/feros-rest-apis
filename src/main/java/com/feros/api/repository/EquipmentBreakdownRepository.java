@@ -13,6 +13,9 @@ public interface EquipmentBreakdownRepository extends JpaRepository<EquipmentBre
 
     List<EquipmentBreakdown> findByEquipmentIdAndTenantIdAndIsActiveTrueOrderByCreatedAtDesc(Long equipmentId, Long tenantId);
 
+    // Fleet-wide — all breakdowns for the tenant (service-manager console).
+    List<EquipmentBreakdown> findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(Long tenantId);
+
     Optional<EquipmentBreakdown> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
 
     // A machine can have at most one open breakdown (REPORTED or IN_REPAIR) at a time.

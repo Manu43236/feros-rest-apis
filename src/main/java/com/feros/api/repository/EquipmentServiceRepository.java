@@ -11,4 +11,7 @@ import java.util.Optional;
 public interface EquipmentServiceRepository extends JpaRepository<EquipmentServiceRecord, Long> {
     List<EquipmentServiceRecord> findByEquipmentIdAndTenantIdAndIsActiveTrueOrderByCreatedAtDesc(Long equipmentId, Long tenantId);
     Optional<EquipmentServiceRecord> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
+
+    // Fleet-wide — all service records for the tenant (service-manager console).
+    List<EquipmentServiceRecord> findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(Long tenantId);
 }

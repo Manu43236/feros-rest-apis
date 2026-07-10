@@ -205,6 +205,19 @@ public class EquipmentController {
 
     // ── Breakdowns ────────────────────────────────────────────────────────────
 
+    // Fleet-wide — service-manager console.
+    @GetMapping("/breakdowns")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<List<com.feros.api.dto.response.EquipmentBreakdownResponse>>> getAllBreakdowns() {
+        return ResponseEntity.ok(ApiResponse.success("Breakdowns fetched", equipmentService.getAllBreakdowns()));
+    }
+
+    @GetMapping("/services")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<List<com.feros.api.dto.response.EquipmentServiceResponse>>> getAllServices() {
+        return ResponseEntity.ok(ApiResponse.success("Services fetched", equipmentService.getAllServices()));
+    }
+
     @GetMapping("/{id}/breakdowns")
     @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<com.feros.api.dto.response.EquipmentBreakdownResponse>>> getBreakdowns(@PathVariable Long id) {
