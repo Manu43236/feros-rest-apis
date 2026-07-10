@@ -15,6 +15,8 @@ import com.feros.api.dto.response.EquipmentServiceTaskResponse;
 import com.feros.api.dto.response.MachineAssignmentHistoryResponse;
 import com.feros.api.dto.response.MachineInvoiceItemResponse;
 import com.feros.api.entity.Equipment;
+import com.feros.api.entity.EquipmentBreakdown;
+import com.feros.api.entity.User;
 import com.feros.api.entity.EquipmentServiceRecord;
 import com.feros.api.entity.EquipmentServiceTask;
 import com.feros.api.entity.EquipmentDailyLog;
@@ -25,6 +27,7 @@ import com.feros.api.entity.MachineAssignment;
 import com.feros.api.entity.Tenant;
 import com.feros.api.entity.WorkOrder;
 import com.feros.api.entity.master.EquipmentType;
+import com.feros.api.enums.EquipmentBreakdownStatus;
 import com.feros.api.enums.EquipmentOwnershipType;
 import com.feros.api.enums.EquipmentWorkStatus;
 import com.feros.api.enums.ServicePayerType;
@@ -32,6 +35,10 @@ import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTaskStatus;
 import com.feros.api.enums.WorkOrderStatus;
 import com.feros.api.repository.WorkOrderRepository;
+import com.feros.api.repository.EquipmentBreakdownRepository;
+import com.feros.api.repository.UserRepository;
+import com.feros.api.dto.request.EquipmentBreakdownRequest;
+import com.feros.api.dto.response.EquipmentBreakdownResponse;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.EquipmentDailyLogRepository;
 import com.feros.api.repository.EquipmentFuelLogRepository;
@@ -77,6 +84,8 @@ public class EquipmentServiceImpl implements EquipmentService {
     private final EquipmentMeterReadingRepository meterReadingRepository;
     private final EquipmentServiceRepository equipmentServiceRepository;
     private final EquipmentServiceTaskTypeRepository equipmentServiceTaskTypeRepository;
+    private final EquipmentBreakdownRepository equipmentBreakdownRepository;
+    private final UserRepository userRepository;
 
     private Long getTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -727,6 +736,15 @@ public class EquipmentServiceImpl implements EquipmentService {
         eq.setWorkStatus(EquipmentWorkStatus.IN_REPAIR);
         equipmentRepository.save(eq);
 
+        // If this machine was reported broken down, the open breakdown is now being repaired.
+        equipmentBreakdownRepository
+                .findFirstByEquipmentIdAndTenantIdAndStatusInAndIsActiveTrue(
+                        eq.getId(), tenantId, List.of(EquipmentBreakdownStatus.REPORTED))
+                .ifPresent(bd -> {
+                    bd.setStatus(EquipmentBreakdownStatus.IN_REPAIR);
+                    equipmentBreakdownRepository.save(bd);
+                });
+
         return toServiceResponse(equipmentServiceRepository.save(record));
     }
 
@@ -773,6 +791,17 @@ public class EquipmentServiceImpl implements EquipmentService {
             eq.setWorkStatus(hasActiveAssignment ? EquipmentWorkStatus.ASSIGNED : EquipmentWorkStatus.AVAILABLE);
             equipmentRepository.save(eq);
         }
+
+        // Completing the service resolves any open breakdown on this machine.
+        equipmentBreakdownRepository
+                .findFirstByEquipmentIdAndTenantIdAndStatusInAndIsActiveTrue(
+                        eq.getId(), tenantId,
+                        List.of(EquipmentBreakdownStatus.REPORTED, EquipmentBreakdownStatus.IN_REPAIR))
+                .ifPresent(bd -> {
+                    bd.setStatus(EquipmentBreakdownStatus.RESOLVED);
+                    bd.setResolvedAt(LocalDateTime.now());
+                    equipmentBreakdownRepository.save(bd);
+                });
 
         equipmentServiceRepository.save(record);
 
@@ -824,6 +853,98 @@ public class EquipmentServiceImpl implements EquipmentService {
 
         record.setIsActive(false);
         equipmentServiceRepository.save(record);
+    }
+
+    // ── Breakdowns ────────────────────────────────────────────────────────────
+
+    @Override
+    public List<EquipmentBreakdownResponse> getBreakdowns(Long equipmentId) {
+        Long tenantId = getTenantId();
+        return equipmentBreakdownRepository
+                .findByEquipmentIdAndTenantIdAndIsActiveTrueOrderByCreatedAtDesc(equipmentId, tenantId)
+                .stream().map(this::toBreakdownResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public EquipmentBreakdownResponse reportBreakdown(Long equipmentId, EquipmentBreakdownRequest request) {
+        Long tenantId = getTenantId();
+        Equipment eq = equipmentRepository.findByIdAndTenantId(equipmentId, tenantId)
+                .orElseThrow(() -> new FerosException("Machine not found", HttpStatus.NOT_FOUND));
+
+        // A machine can only have one open breakdown at a time.
+        boolean alreadyOpen = equipmentBreakdownRepository
+                .findFirstByEquipmentIdAndTenantIdAndStatusInAndIsActiveTrue(
+                        equipmentId, tenantId,
+                        List.of(EquipmentBreakdownStatus.REPORTED, EquipmentBreakdownStatus.IN_REPAIR))
+                .isPresent();
+        if (alreadyOpen)
+            throw new FerosException("This machine already has an open breakdown", HttpStatus.CONFLICT);
+
+        User reporter = userRepository.findById(SecurityUtil.getCurrentUserId())
+                .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
+
+        EquipmentBreakdown bd = EquipmentBreakdown.builder()
+                .tenant(eq.getTenant())
+                .equipment(eq)
+                .breakdownDate(request.getBreakdownDate() != null ? request.getBreakdownDate() : LocalDateTime.now())
+                .location(request.getLocation())
+                .reason(request.getReason())
+                .notes(request.getNotes())
+                .status(EquipmentBreakdownStatus.REPORTED)
+                .reportedBy(reporter)
+                .build();
+        bd = equipmentBreakdownRepository.save(bd);
+
+        eq.setWorkStatus(EquipmentWorkStatus.BREAKDOWN);
+        equipmentRepository.save(eq);
+
+        return toBreakdownResponse(bd);
+    }
+
+    @Override
+    @Transactional
+    public EquipmentBreakdownResponse resolveBreakdown(Long equipmentId, Long breakdownId) {
+        Long tenantId = getTenantId();
+        EquipmentBreakdown bd = equipmentBreakdownRepository
+                .findByIdAndTenantIdAndIsActiveTrue(breakdownId, tenantId)
+                .orElseThrow(() -> new FerosException("Breakdown not found", HttpStatus.NOT_FOUND));
+
+        if (bd.getStatus() == EquipmentBreakdownStatus.RESOLVED)
+            throw new FerosException("Breakdown is already resolved", HttpStatus.BAD_REQUEST);
+
+        bd.setStatus(EquipmentBreakdownStatus.RESOLVED);
+        bd.setResolvedAt(LocalDateTime.now());
+        equipmentBreakdownRepository.save(bd);
+
+        Equipment eq = bd.getEquipment();
+        if (eq.getWorkStatus() == EquipmentWorkStatus.BREAKDOWN
+                || eq.getWorkStatus() == EquipmentWorkStatus.IN_REPAIR) {
+            boolean hasActiveAssignment = machineAssignmentRepository
+                    .existsByEquipmentIdAndIsActiveTrue(eq.getId());
+            eq.setWorkStatus(hasActiveAssignment ? EquipmentWorkStatus.ASSIGNED : EquipmentWorkStatus.AVAILABLE);
+            equipmentRepository.save(eq);
+        }
+
+        return toBreakdownResponse(bd);
+    }
+
+    private EquipmentBreakdownResponse toBreakdownResponse(EquipmentBreakdown bd) {
+        Equipment eq = bd.getEquipment();
+        String identifier = eq.getRegistrationNumber() != null ? eq.getRegistrationNumber() : eq.getSerialNumber();
+        return EquipmentBreakdownResponse.builder()
+                .id(bd.getId())
+                .equipmentId(eq.getId())
+                .equipmentIdentifier(identifier)
+                .breakdownDate(bd.getBreakdownDate())
+                .location(bd.getLocation())
+                .reason(bd.getReason())
+                .notes(bd.getNotes())
+                .status(bd.getStatus())
+                .reportedByName(bd.getReportedBy() != null ? bd.getReportedBy().getName() : null)
+                .resolvedAt(bd.getResolvedAt())
+                .createdAt(bd.getCreatedAt())
+                .build();
     }
 
     private void saveTasksOnRecord(EquipmentServiceRecord record, java.util.List<EquipmentServiceTaskRequest> taskRequests) {

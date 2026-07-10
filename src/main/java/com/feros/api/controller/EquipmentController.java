@@ -203,4 +203,26 @@ public class EquipmentController {
         return ResponseEntity.ok(ApiResponse.success("Service deleted", null));
     }
 
+    // ── Breakdowns ────────────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/breakdowns")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<List<com.feros.api.dto.response.EquipmentBreakdownResponse>>> getBreakdowns(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Breakdowns fetched", equipmentService.getBreakdowns(id)));
+    }
+
+    @PostMapping("/{id}/breakdowns")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<com.feros.api.dto.response.EquipmentBreakdownResponse>> reportBreakdown(
+            @PathVariable Long id, @Valid @RequestBody com.feros.api.dto.request.EquipmentBreakdownRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Breakdown reported", equipmentService.reportBreakdown(id, request)));
+    }
+
+    @PostMapping("/{id}/breakdowns/{breakdownId}/resolve")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<com.feros.api.dto.response.EquipmentBreakdownResponse>> resolveBreakdown(
+            @PathVariable Long id, @PathVariable Long breakdownId) {
+        return ResponseEntity.ok(ApiResponse.success("Breakdown resolved", equipmentService.resolveBreakdown(id, breakdownId)));
+    }
+
 }

@@ -49,4 +49,9 @@ public interface EquipmentService {
     EquipmentServiceResponse startService(Long equipmentId, Long serviceId);
     EquipmentServiceResponse completeService(Long equipmentId, Long serviceId, com.feros.api.dto.request.EquipmentServiceCompleteRequest request);
     void deleteService(Long equipmentId, Long serviceId);
+
+    // Breakdowns
+    List<com.feros.api.dto.response.EquipmentBreakdownResponse> getBreakdowns(Long equipmentId);
+    com.feros.api.dto.response.EquipmentBreakdownResponse reportBreakdown(Long equipmentId, com.feros.api.dto.request.EquipmentBreakdownRequest request);
+    com.feros.api.dto.response.EquipmentBreakdownResponse resolveBreakdown(Long equipmentId, Long breakdownId);
 }
