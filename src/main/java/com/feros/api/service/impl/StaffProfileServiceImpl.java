@@ -80,6 +80,13 @@ public class StaffProfileServiceImpl implements StaffProfileService {
         profile.setAccountNumber(request.getAccountNumber());
         profile.setIfscCode(request.getIfscCode());
         profile.setAccountHolderName(request.getAccountHolderName());
+        profile.setBankBranchName(request.getBankBranchName());
+        profile.setAadharNumber(request.getAadharNumber());
+        profile.setAadharName(request.getAadharName());
+        profile.setNomineeName(request.getNomineeName());
+        profile.setNomineeRelation(request.getNomineeRelation());
+        profile.setNomineeDateOfBirth(request.getNomineeDateOfBirth());
+        profile.setNomineeAadharNumber(request.getNomineeAadharNumber());
         profile.setLicenseNumber(request.getLicenseNumber());
         profile.setLicenseExpiryDate(request.getLicenseExpiryDate());
         profile.setProfilePhotoUrl(request.getProfilePhotoUrl());
@@ -348,6 +355,13 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .accountNumber(p.getAccountNumber())
                 .ifscCode(p.getIfscCode())
                 .accountHolderName(p.getAccountHolderName())
+                .bankBranchName(p.getBankBranchName())
+                .aadharNumber(p.getAadharNumber())
+                .aadharName(p.getAadharName())
+                .nomineeName(p.getNomineeName())
+                .nomineeRelation(p.getNomineeRelation())
+                .nomineeDateOfBirth(p.getNomineeDateOfBirth())
+                .nomineeAadharNumber(p.getNomineeAadharNumber())
                 .licenseNumber(p.getLicenseNumber())
                 .licenseExpiryDate(p.getLicenseExpiryDate())
                 .licenseExpired(p.getLicenseExpiryDate() != null &&

@@ -44,6 +44,15 @@ public class StaffProfileResponse {
     private String accountNumber;
     private String ifscCode;
     private String accountHolderName;
+    private String bankBranchName;
+
+    private String aadharNumber;
+    private String aadharName;
+
+    private String nomineeName;
+    private String nomineeRelation;
+    private LocalDate nomineeDateOfBirth;
+    private String nomineeAadharNumber;
 
     private String licenseNumber;
     private LocalDate licenseExpiryDate;

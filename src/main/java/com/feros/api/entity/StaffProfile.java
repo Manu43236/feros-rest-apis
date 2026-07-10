@@ -76,6 +76,27 @@ public class StaffProfile extends BaseEntity {
     @Column(name = "account_holder_name")
     private String accountHolderName;
 
+    @Column(name = "bank_branch_name")
+    private String bankBranchName;
+
+    @Column(name = "aadhar_number")
+    private String aadharNumber;
+
+    @Column(name = "aadhar_name")
+    private String aadharName;
+
+    @Column(name = "nominee_name")
+    private String nomineeName;
+
+    @Column(name = "nominee_relation")
+    private String nomineeRelation;
+
+    @Column(name = "nominee_date_of_birth")
+    private LocalDate nomineeDateOfBirth;
+
+    @Column(name = "nominee_aadhar_number")
+    private String nomineeAadharNumber;
+
     @Column(name = "license_number")
     private String licenseNumber;
 
