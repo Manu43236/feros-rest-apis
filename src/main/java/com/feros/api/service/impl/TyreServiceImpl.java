@@ -83,6 +83,8 @@ public class TyreServiceImpl implements TyreService {
                 .tyreLifeYears(request.getTyreLifeYears())
                 .expiryDate(expiryDate)
                 .maxLifetimeKm(request.getMaxLifetimeKm())
+                .supplierName(request.getSupplierName())
+                .invoiceNumber(request.getInvoiceNumber())
                 .notes(request.getNotes())
                 .isActive(true)
                 .build();
