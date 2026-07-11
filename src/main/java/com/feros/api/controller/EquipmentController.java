@@ -1,5 +1,7 @@
 package com.feros.api.controller;
 
+import com.feros.api.dto.request.EquipmentDocumentRequest;
+import com.feros.api.dto.response.EquipmentDocumentResponse;
 import com.feros.api.dto.request.EquipmentFuelLogRequest;
 import com.feros.api.dto.request.EquipmentServiceRequest;
 import com.feros.api.dto.request.EquipmentMeterReadingRequest;
@@ -164,6 +166,52 @@ public class EquipmentController {
         equipmentService.deleteMeterReading(id, readingId);
         return ResponseEntity.ok(ApiResponse.success("Meter reading deleted", null));
     }
+
+    // ── Documents (KAN-14) ────────────────────────────────────────────────────
+
+    @GetMapping("/documents/expiring")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<EquipmentDocumentResponse>>> getExpiringDocuments(
+            @RequestParam(defaultValue = "30") int days) {
+        return ResponseEntity.ok(ApiResponse.success("Expiring documents fetched",
+                equipmentService.getExpiringDocuments(days)));
+    }
+
+    @GetMapping("/{id}/documents")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<EquipmentDocumentResponse>>> getDocuments(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Documents fetched", equipmentService.getDocuments(id)));
+    }
+
+    @PostMapping("/{id}/documents")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<EquipmentDocumentResponse>> addDocument(
+            @PathVariable Long id, @RequestBody EquipmentDocumentRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Document added", equipmentService.addDocument(id, request)));
+    }
+
+    @PutMapping("/{id}/documents/{docId}")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<EquipmentDocumentResponse>> updateDocument(
+            @PathVariable Long id, @PathVariable Long docId, @RequestBody EquipmentDocumentRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Document updated", equipmentService.updateDocument(id, docId, request)));
+    }
+
+    @PutMapping("/{id}/documents/{docId}/verify")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<EquipmentDocumentResponse>> verifyDocument(
+            @PathVariable Long id, @PathVariable Long docId, @RequestBody Map<String, Boolean> body) {
+        boolean verified = Boolean.TRUE.equals(body.get("verified"));
+        return ResponseEntity.ok(ApiResponse.success("Document verified", equipmentService.verifyDocument(id, docId, verified)));
+    }
+
+    @DeleteMapping("/{id}/documents/{docId}")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<Void>> deleteDocument(@PathVariable Long id, @PathVariable Long docId) {
+        equipmentService.deleteDocument(id, docId);
+        return ResponseEntity.ok(ApiResponse.success("Document deleted", null));
+    }
+
     // ── Service Records ───────────────────────────────────────────────────────
 
     @GetMapping("/{id}/services")

@@ -72,4 +72,9 @@ public class MachineAssignment extends BaseEntity {
 
     @Column(name = "rate_amount", precision = 12, scale = 2)
     private BigDecimal rateAmount;
+
+    // Optional attachment deployed on this machine line (nullable). Rate flows to billing (E7).
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "attachment_id")
+    private EquipmentAttachment attachment;
 }

@@ -42,6 +42,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     private final MachineWorkEntryRepository workEntryRepository;
     private final ClientDivisionRepository clientDivisionRepository;
     private final DailyLogDivisionRepository dailyLogDivisionRepository;
+    private final EquipmentAttachmentRepository attachmentRepository;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
 
@@ -422,6 +423,21 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .build();
     }
 
+    @Override
+    @Transactional
+    public MachineAssignmentResponse setAttachment(Long workOrderId, Long assignmentId, Long attachmentId) {
+        MachineAssignment assignment = machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
+                .orElseThrow(() -> new FerosException("Machine assignment not found", HttpStatus.NOT_FOUND));
+        if (attachmentId == null) {
+            assignment.setAttachment(null);
+        } else {
+            EquipmentAttachment attachment = attachmentRepository.findByIdAndTenantId(attachmentId, tenantId())
+                    .orElseThrow(() -> new FerosException("Attachment not found", HttpStatus.NOT_FOUND));
+            assignment.setAttachment(attachment);
+        }
+        return toAssignmentResponse(machineAssignmentRepository.save(assignment));
+    }
+
     private MachineAssignmentResponse toAssignmentResponse(MachineAssignment a) {
         Equipment eq = a.getEquipment();
         return MachineAssignmentResponse.builder()
@@ -448,6 +464,11 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .divisionName(a.getDivisionName())
                 .rateType(a.getRateType())
                 .rateAmount(a.getRateAmount())
+                .attachmentId(a.getAttachment() != null ? a.getAttachment().getId() : null)
+                .attachmentName(a.getAttachment() != null ? a.getAttachment().getName() : null)
+                .attachmentType(a.getAttachment() != null ? a.getAttachment().getType() : null)
+                .attachmentRate(a.getAttachment() != null ? a.getAttachment().getDefaultRate() : null)
+                .attachmentRateUnit(a.getAttachment() != null ? a.getAttachment().getRateUnit() : null)
                 .build();
     }
 

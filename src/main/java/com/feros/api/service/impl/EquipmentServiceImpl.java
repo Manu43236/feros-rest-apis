@@ -56,6 +56,12 @@ import com.feros.api.repository.MachineAssignmentRepository;
 import com.feros.api.repository.SubscriptionHistoryRepository;
 import com.feros.api.repository.TenantRepository;
 import com.feros.api.repository.VehicleRepository;
+import com.feros.api.entity.EquipmentDocument;
+import com.feros.api.entity.master.DocumentType;
+import com.feros.api.repository.EquipmentDocumentRepository;
+import com.feros.api.repository.DocumentTypeRepository;
+import com.feros.api.dto.request.EquipmentDocumentRequest;
+import com.feros.api.dto.response.EquipmentDocumentResponse;
 import com.feros.api.service.EquipmentService;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -92,6 +98,8 @@ public class EquipmentServiceImpl implements EquipmentService {
     private final UserRepository userRepository;
     private final EquipmentServiceTaskRepository equipmentServiceTaskRepository;
     private final EquipmentServicePartRepository equipmentServicePartRepository;
+    private final EquipmentDocumentRepository equipmentDocumentRepository;
+    private final DocumentTypeRepository documentTypeRepository;
 
     private Long getTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -414,6 +422,120 @@ public class EquipmentServiceImpl implements EquipmentService {
         EquipmentFuelLog log = fuelLogRepository.findByIdAndTenantId(logId, getTenantId())
                 .orElseThrow(() -> new FerosException("Fuel log not found", HttpStatus.NOT_FOUND));
         fuelLogRepository.delete(log);
+    }
+
+    // ── Documents (KAN-14) ────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EquipmentDocumentResponse> getDocuments(Long equipmentId) {
+        Long tenantId = getTenantId();
+        findByIdAndTenant(equipmentId);
+        return equipmentDocumentRepository
+                .findByEquipmentIdAndTenantIdAndIsActiveTrueOrderByExpiryDateAsc(equipmentId, tenantId)
+                .stream().map(this::toDocumentResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public EquipmentDocumentResponse addDocument(Long equipmentId, EquipmentDocumentRequest req) {
+        Long tenantId = getTenantId();
+        Equipment eq = findByIdAndTenant(equipmentId);
+        DocumentType type = findDocumentType(req.getDocumentTypeId());
+        EquipmentDocument doc = EquipmentDocument.builder()
+                .tenant(getTenant(tenantId))
+                .equipment(eq)
+                .documentType(type)
+                .documentNumber(req.getDocumentNumber())
+                .issueDate(req.getIssueDate())
+                .expiryDate(req.getExpiryDate())
+                .issuerName(req.getIssuerName())
+                .fileUrl(req.getFileUrl())
+                .isVerified(req.getIsVerified() != null && req.getIsVerified())
+                .cost(req.getCost())
+                .paidOn(req.getPaidOn())
+                .remarks(req.getRemarks())
+                .isActive(true)
+                .build();
+        return toDocumentResponse(equipmentDocumentRepository.save(doc));
+    }
+
+    @Override
+    @Transactional
+    public EquipmentDocumentResponse updateDocument(Long equipmentId, Long docId, EquipmentDocumentRequest req) {
+        findByIdAndTenant(equipmentId);
+        EquipmentDocument doc = findDocument(docId);
+        doc.setDocumentType(findDocumentType(req.getDocumentTypeId()));
+        doc.setDocumentNumber(req.getDocumentNumber());
+        doc.setIssueDate(req.getIssueDate());
+        doc.setExpiryDate(req.getExpiryDate());
+        doc.setIssuerName(req.getIssuerName());
+        doc.setFileUrl(req.getFileUrl());
+        if (req.getIsVerified() != null) doc.setIsVerified(req.getIsVerified());
+        doc.setCost(req.getCost());
+        doc.setPaidOn(req.getPaidOn());
+        doc.setRemarks(req.getRemarks());
+        return toDocumentResponse(equipmentDocumentRepository.save(doc));
+    }
+
+    @Override
+    @Transactional
+    public EquipmentDocumentResponse verifyDocument(Long equipmentId, Long docId, boolean verified) {
+        findByIdAndTenant(equipmentId);
+        EquipmentDocument doc = findDocument(docId);
+        doc.setIsVerified(verified);
+        return toDocumentResponse(equipmentDocumentRepository.save(doc));
+    }
+
+    @Override
+    @Transactional
+    public void deleteDocument(Long equipmentId, Long docId) {
+        findByIdAndTenant(equipmentId);
+        EquipmentDocument doc = findDocument(docId);
+        doc.setIsActive(false); // soft-delete, keep history
+        equipmentDocumentRepository.save(doc);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EquipmentDocumentResponse> getExpiringDocuments(int days) {
+        LocalDate cutoff = LocalDate.now().plusDays(days);
+        return equipmentDocumentRepository
+                .findByTenantIdAndIsActiveTrueAndExpiryDateLessThanEqualOrderByExpiryDateAsc(getTenantId(), cutoff)
+                .stream().map(this::toDocumentResponse).toList();
+    }
+
+    private DocumentType findDocumentType(Long id) {
+        return documentTypeRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Document type not found", HttpStatus.NOT_FOUND));
+    }
+
+    private EquipmentDocument findDocument(Long docId) {
+        return equipmentDocumentRepository.findByIdAndTenantId(docId, getTenantId())
+                .orElseThrow(() -> new FerosException("Document not found", HttpStatus.NOT_FOUND));
+    }
+
+    private EquipmentDocumentResponse toDocumentResponse(EquipmentDocument d) {
+        Equipment eq = d.getEquipment();
+        return EquipmentDocumentResponse.builder()
+                .id(d.getId())
+                .equipmentId(eq.getId())
+                .serialNumber(eq.getSerialNumber())
+                .registrationNumber(eq.getRegistrationNumber())
+                .documentTypeId(d.getDocumentType() != null ? d.getDocumentType().getId() : null)
+                .documentTypeName(d.getDocumentType() != null ? d.getDocumentType().getName() : null)
+                .documentNumber(d.getDocumentNumber())
+                .issueDate(d.getIssueDate())
+                .expiryDate(d.getExpiryDate())
+                .issuerName(d.getIssuerName())
+                .fileUrl(d.getFileUrl())
+                .isVerified(d.getIsVerified())
+                .cost(d.getCost())
+                .paidOn(d.getPaidOn())
+                .remarks(d.getRemarks())
+                .createdAt(d.getCreatedAt())
+                .updatedAt(d.getUpdatedAt())
+                .build();
     }
 
     // ── Meter Readings ────────────────────────────────────────────────────────

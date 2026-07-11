@@ -92,6 +92,16 @@ public class WorkOrderController {
         return ResponseEntity.ok(ApiResponse.success("Operator assigned", workOrderService.assignOperator(id, assignmentId, request)));
     }
 
+    @PutMapping("/{id}/machines/{assignmentId}/attachment")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<MachineAssignmentResponse>> setAttachment(
+            @PathVariable Long id,
+            @PathVariable Long assignmentId,
+            @RequestBody com.feros.api.dto.request.SetAttachmentRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Attachment updated",
+                workOrderService.setAttachment(id, assignmentId, request.getAttachmentId())));
+    }
+
     @PostMapping("/{id}/machines/{assignmentId}/start")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<com.feros.api.dto.response.WorkEntryResponse>> startWork(

@@ -54,6 +54,14 @@ public interface EquipmentService {
     EquipmentServiceResponse assignTaskTechnician(Long equipmentId, Long serviceId, Long taskId, Long mechanicId);
     EquipmentServiceResponse addTaskToService(Long equipmentId, Long serviceId, com.feros.api.dto.request.EquipmentServiceTaskRequest request);
 
+    // Documents (KAN-14) — mirrors vehicle documents
+    List<com.feros.api.dto.response.EquipmentDocumentResponse> getDocuments(Long equipmentId);
+    com.feros.api.dto.response.EquipmentDocumentResponse addDocument(Long equipmentId, com.feros.api.dto.request.EquipmentDocumentRequest request);
+    com.feros.api.dto.response.EquipmentDocumentResponse updateDocument(Long equipmentId, Long docId, com.feros.api.dto.request.EquipmentDocumentRequest request);
+    com.feros.api.dto.response.EquipmentDocumentResponse verifyDocument(Long equipmentId, Long docId, boolean verified);
+    void deleteDocument(Long equipmentId, Long docId);
+    List<com.feros.api.dto.response.EquipmentDocumentResponse> getExpiringDocuments(int days);
+
     // Breakdowns
     List<com.feros.api.dto.response.EquipmentBreakdownResponse> getAllBreakdowns();
     List<com.feros.api.dto.response.EquipmentServiceResponse> getAllServices();

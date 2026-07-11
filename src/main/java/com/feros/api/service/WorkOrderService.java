@@ -41,6 +41,9 @@ public interface WorkOrderService {
 
     MachineAssignmentResponse assignDivision(Long workOrderId, Long assignmentId, AssignDivisionRequest request);
 
+    // Attachment link on a machine line (KAN-13). attachmentId null clears it.
+    MachineAssignmentResponse setAttachment(Long workOrderId, Long assignmentId, Long attachmentId);
+
     WorkEntryResponse startWork(Long workOrderId, Long assignmentId, StartWorkEntryRequest request);
 
     WorkEntryResponse stopWork(Long workOrderId, Long assignmentId, StopWorkEntryRequest request);
