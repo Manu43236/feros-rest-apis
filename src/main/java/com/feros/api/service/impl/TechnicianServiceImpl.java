@@ -66,6 +66,7 @@ public class TechnicianServiceImpl implements TechnicianService {
                             .breakdownId(vs.getBreakdown() != null ? vs.getBreakdown().getId() : null)
                             .breakdownType(vs.getBreakdown() != null
                                     ? vs.getBreakdown().getBreakdownType().name() : null)
+                            .breakdownReason(vs.getBreakdown() != null ? vs.getBreakdown().getReason() : null)
                             .tasks(taskItems)
                             .build();
                 })
@@ -160,6 +161,7 @@ public class TechnicianServiceImpl implements TechnicianService {
                 .breakdownId(vs.getBreakdown() != null ? vs.getBreakdown().getId() : null)
                 .breakdownType(vs.getBreakdown() != null
                         ? vs.getBreakdown().getBreakdownType().name() : null)
+                .breakdownReason(vs.getBreakdown() != null ? vs.getBreakdown().getReason() : null)
                 .tasks(myTasks)
                 .build();
     }

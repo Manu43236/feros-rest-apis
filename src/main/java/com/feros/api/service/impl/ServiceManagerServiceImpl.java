@@ -86,6 +86,8 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
                             .vehicleId(bd.getVehicle().getId())
                             .vehicleRegistrationNumber(bd.getVehicle().getRegistrationNumber())
                             .breakdownType(bd.getBreakdownType())
+                            .reason(bd.getReason())
+                            .notes(bd.getNotes())
                             .location(bd.getLocation())
                             .breakdownStatus(bd.getStatus())
                             .breakdownDate(bd.getBreakdownDate())

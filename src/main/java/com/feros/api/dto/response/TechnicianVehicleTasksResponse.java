@@ -26,6 +26,7 @@ public class TechnicianVehicleTasksResponse {
     // breakdown info (populated when triggered by breakdown)
     private Long breakdownId;
     private String breakdownType;
+    private String breakdownReason;   // supervisor's breakdown description
     private List<TechnicianTaskItem> tasks;
 
     @Getter

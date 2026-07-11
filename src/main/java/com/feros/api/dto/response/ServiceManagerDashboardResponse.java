@@ -32,6 +32,8 @@ public class ServiceManagerDashboardResponse {
         private Long vehicleId;
         private String vehicleRegistrationNumber;
         private BreakdownType breakdownType;
+        private String reason;   // supervisor's breakdown description
+        private String notes;
         private String location;
         private BreakdownStatus breakdownStatus;
         private LocalDateTime breakdownDate;
