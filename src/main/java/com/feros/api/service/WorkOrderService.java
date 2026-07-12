@@ -17,6 +17,7 @@ import com.feros.api.dto.response.WorkEntryResponse;
 import com.feros.api.dto.response.WorkOrderDetailResponse;
 import com.feros.api.dto.response.WorkOrderResponse;
 import com.feros.api.dto.response.WoAmendmentResponse;
+import com.feros.api.dto.response.DieselSummaryResponse;
 import com.feros.api.enums.AssignmentEndReason;
 import com.feros.api.enums.WorkOrderStatus;
 import org.springframework.data.domain.Page;
@@ -77,4 +78,7 @@ public interface WorkOrderService {
     // KAN-21 Condition surveys
     List<MachineConditionSurveyResponse> getSurveys(Long workOrderId, Long assignmentId);
     MachineConditionSurveyResponse createSurvey(Long workOrderId, Long assignmentId, MachineConditionSurveyRequest request);
+
+    // E6 KAN-32 Diesel reconciliation
+    List<DieselSummaryResponse> getDieselSummary(Long workOrderId);
 }

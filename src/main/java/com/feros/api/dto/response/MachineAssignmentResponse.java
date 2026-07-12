@@ -2,10 +2,10 @@ package com.feros.api.dto.response;
 
 import com.feros.api.enums.AssignmentEndReason;
 import com.feros.api.enums.AttachmentType;
+import com.feros.api.enums.DieselBillingMode;
 import com.feros.api.enums.HireType;
 import com.feros.api.enums.HireRateUnit;
 import com.feros.api.enums.OperatorType;
-import com.feros.api.enums.ProviderSide;
 import com.feros.api.enums.RateType;
 import lombok.Builder;
 import lombok.Getter;
@@ -47,10 +47,13 @@ public class MachineAssignmentResponse {
     private HireType hireType;
     private BigDecimal guaranteedHours;
     private BigDecimal overtimeRate;
-    private ProviderSide dieselByWhom;
+    private DieselBillingMode dieselBillingMode;
+    private BigDecimal dieselRatePerLitre;
     // KAN-18 on/off-hire dates
     private LocalDate onHireDate;
     private LocalDate offHireDate;
     // KAN-20 swap back-link
     private Long swappedFromAssignmentId;
+    // KAN-30 per-assignment last HMR (null for brand-new / just-swapped assignment)
+    private BigDecimal lastLogEndHourMeter;
 }

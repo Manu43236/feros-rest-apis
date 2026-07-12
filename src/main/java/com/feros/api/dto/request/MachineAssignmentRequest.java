@@ -1,7 +1,7 @@
 package com.feros.api.dto.request;
 
+import com.feros.api.enums.DieselBillingMode;
 import com.feros.api.enums.HireType;
-import com.feros.api.enums.ProviderSide;
 import com.feros.api.enums.RateType;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -27,7 +27,8 @@ public class MachineAssignmentRequest {
     private HireType hireType;
     private BigDecimal guaranteedHours;
     private BigDecimal overtimeRate;
-    private ProviderSide dieselByWhom;
+    private DieselBillingMode dieselBillingMode;
+    private BigDecimal dieselRatePerLitre;
 
     // KAN-18 actual on/off-hire dates
     private LocalDate onHireDate;

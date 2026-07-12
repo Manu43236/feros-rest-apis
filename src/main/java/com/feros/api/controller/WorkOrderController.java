@@ -246,4 +246,11 @@ public class WorkOrderController {
             @Valid @RequestBody MachineConditionSurveyRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Survey recorded", workOrderService.createSurvey(id, assignmentId, request)));
     }
+
+    // E6 KAN-32 Diesel reconciliation
+    @GetMapping("/{id}/diesel-summary")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<DieselSummaryResponse>>> getDieselSummary(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Diesel summary fetched", workOrderService.getDieselSummary(id)));
+    }
 }

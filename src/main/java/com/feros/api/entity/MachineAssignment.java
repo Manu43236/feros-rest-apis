@@ -1,9 +1,9 @@
 package com.feros.api.entity;
 
 import com.feros.api.enums.AssignmentEndReason;
+import com.feros.api.enums.DieselBillingMode;
 import com.feros.api.enums.HireType;
 import com.feros.api.enums.OperatorType;
-import com.feros.api.enums.ProviderSide;
 import com.feros.api.enums.RateType;
 import jakarta.persistence.*;
 
@@ -92,8 +92,11 @@ public class MachineAssignment extends BaseEntity {
     private BigDecimal overtimeRate;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "diesel_by_whom")
-    private ProviderSide dieselByWhom;
+    @Column(name = "diesel_billing_mode")
+    private DieselBillingMode dieselBillingMode;
+
+    @Column(name = "diesel_rate_per_litre", precision = 10, scale = 2)
+    private BigDecimal dieselRatePerLitre;
 
     // KAN-18 actual on/off-hire dates (may differ from startDate/endDate)
     @Column(name = "on_hire_date")

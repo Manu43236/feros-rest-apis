@@ -227,7 +227,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                         .hireType(req.getHireType())
                         .guaranteedHours(req.getGuaranteedHours())
                         .overtimeRate(req.getOvertimeRate())
-                        .dieselByWhom(req.getDieselByWhom())
+                        .dieselBillingMode(req.getDieselBillingMode())
+                        .dieselRatePerLitre(req.getDieselRatePerLitre())
                         .onHireDate(req.getOnHireDate())
                         .offHireDate(req.getOffHireDate())
                         .build());
@@ -536,10 +537,14 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .hireType(a.getHireType())
                 .guaranteedHours(a.getGuaranteedHours())
                 .overtimeRate(a.getOvertimeRate())
-                .dieselByWhom(a.getDieselByWhom())
+                .dieselBillingMode(a.getDieselBillingMode())
+                .dieselRatePerLitre(a.getDieselRatePerLitre())
                 .onHireDate(a.getOnHireDate())
                 .offHireDate(a.getOffHireDate())
                 .swappedFromAssignmentId(a.getSwappedFromAssignmentId())
+                .lastLogEndHourMeter(
+                        dailyLogRepository.findTopByMachineAssignmentIdOrderByLogDateDescIdDesc(a.getId())
+                                .map(EquipmentDailyLog::getEndHourMeter).orElse(null))
                 .build();
     }
 
@@ -907,7 +912,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .hireType(old.getHireType())
                 .guaranteedHours(old.getGuaranteedHours())
                 .overtimeRate(old.getOvertimeRate())
-                .dieselByWhom(old.getDieselByWhom())
+                .dieselBillingMode(old.getDieselBillingMode())
+                .dieselRatePerLitre(old.getDieselRatePerLitre())
                 .onHireDate(req.getEffectiveDate())
                 .divisionId(old.getDivisionId())
                 .divisionName(old.getDivisionName())
@@ -962,6 +968,40 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .surveyedBy(req.getSurveyedBy())
                 .build());
         return toSurveyResponse(survey);
+    }
+
+    @Override
+    public List<DieselSummaryResponse> getDieselSummary(Long workOrderId) {
+        if (!workOrderRepository.existsByIdAndTenantId(workOrderId, tenantId()))
+            throw new FerosException("Work order not found", HttpStatus.NOT_FOUND);
+
+        List<MachineAssignment> assignments = machineAssignmentRepository.findByWorkOrderIdOrderByStartDateAsc(workOrderId);
+        List<EquipmentDailyLog> allLogs = dailyLogRepository.findByWorkOrderIdOrderByLogDateAscIdAsc(workOrderId);
+
+        Map<Long, BigDecimal> litresByAssignment = allLogs.stream()
+                .filter(l -> l.getFuelConsumed() != null)
+                .collect(Collectors.groupingBy(
+                        l -> l.getMachineAssignment().getId(),
+                        Collectors.reducing(BigDecimal.ZERO, EquipmentDailyLog::getFuelConsumed, BigDecimal::add)));
+
+        return assignments.stream().map(a -> {
+            var eq = a.getEquipment();
+            String name = eq.getSerialNumber() != null ? eq.getSerialNumber() : eq.getEquipmentType().getName();
+            BigDecimal litres = litresByAssignment.getOrDefault(a.getId(), BigDecimal.ZERO);
+            DieselBillingMode mode = a.getDieselBillingMode();
+            BigDecimal billable = (mode == DieselBillingMode.BILLED_PER_LITRE && a.getDieselRatePerLitre() != null)
+                    ? litres.multiply(a.getDieselRatePerLitre()).setScale(2, java.math.RoundingMode.HALF_UP)
+                    : null;
+            return DieselSummaryResponse.builder()
+                    .assignmentId(a.getId())
+                    .machineName(name)
+                    .dieselBillingMode(mode)
+                    .dieselRatePerLitre(a.getDieselRatePerLitre())
+                    .totalLitres(litres.compareTo(BigDecimal.ZERO) == 0 ? null : litres)
+                    .billableAmount(billable)
+                    .reimbursable(mode == DieselBillingMode.REIMBURSED_AT_ACTUALS)
+                    .build();
+        }).collect(Collectors.toList());
     }
 
     private MachineConditionSurveyResponse toSurveyResponse(MachineConditionSurvey s) {
