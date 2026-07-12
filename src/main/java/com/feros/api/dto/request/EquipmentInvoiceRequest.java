@@ -1,5 +1,6 @@
 package com.feros.api.dto.request;
 
+import com.feros.api.enums.GstType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -23,6 +24,9 @@ public class EquipmentInvoiceRequest {
     private LocalDate billingPeriodEnd;
 
     private BigDecimal taxPercent;
+    private GstType gstType;
+    private BigDecimal retentionPercent;
+    private BigDecimal tdsPercent;
     private String notes;
 
     @Valid

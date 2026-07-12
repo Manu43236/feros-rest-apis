@@ -1,6 +1,7 @@
 package com.feros.api.service;
 
 import com.feros.api.dto.request.EquipmentInvoiceRequest;
+import com.feros.api.dto.response.EquipmentInvoiceCalcResult;
 import com.feros.api.dto.response.EquipmentInvoicePrefillResponse;
 import com.feros.api.dto.response.EquipmentInvoiceResponse;
 import com.feros.api.enums.EquipmentInvoiceStatus;
@@ -28,4 +29,6 @@ public interface EquipmentInvoiceService {
 
     List<EquipmentInvoicePrefillResponse> prefill(Long woId, LocalDate from, LocalDate to);
     List<EquipmentInvoicePrefillResponse> prefillByClient(Long clientId, LocalDate from, LocalDate to);
+
+    List<EquipmentInvoiceCalcResult> calculate(Long woId, LocalDate from, LocalDate to);
 }

@@ -1,5 +1,5 @@
 package com.feros.api.enums;
 
 public enum DailyLogStatus {
-    WORKING, BREAKDOWN, NO_MACHINE, IDLE
+    WORKING, STANDBY, BREAKDOWN, NO_MACHINE, IDLE
 }

@@ -1,6 +1,7 @@
 package com.feros.api.entity;
 
 import com.feros.api.enums.EquipmentInvoiceStatus;
+import com.feros.api.enums.GstType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -67,6 +68,16 @@ public class EquipmentInvoice extends BaseEntity {
 
     @Column(name = "total_amount", precision = 14, scale = 2)
     private BigDecimal totalAmount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "gst_type")
+    private GstType gstType;
+
+    @Column(name = "retention_percent", precision = 5, scale = 2)
+    private BigDecimal retentionPercent;
+
+    @Column(name = "tds_percent", precision = 5, scale = 2)
+    private BigDecimal tdsPercent;
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;

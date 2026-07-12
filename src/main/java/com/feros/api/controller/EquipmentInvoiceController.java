@@ -2,6 +2,7 @@ package com.feros.api.controller;
 
 import com.feros.api.dto.request.EquipmentInvoiceRequest;
 import com.feros.api.dto.response.ApiResponse;
+import com.feros.api.dto.response.EquipmentInvoiceCalcResult;
 import com.feros.api.dto.response.EquipmentInvoicePrefillResponse;
 import com.feros.api.dto.response.EquipmentInvoiceResponse;
 import com.feros.api.enums.EquipmentInvoiceStatus;
@@ -23,6 +24,18 @@ import java.util.Map;
 public class EquipmentInvoiceController {
 
     private final EquipmentInvoiceService invoiceService;
+
+    // ── Calculate (E7 billing engine) ──────────────────────────────────────────
+
+    @GetMapping("/api/v1/work-orders/{woId}/equipment-invoices/calculate")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<EquipmentInvoiceCalcResult>>> calculate(
+            @PathVariable Long woId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success("Billing calculated",
+                invoiceService.calculate(woId, from, to)));
+    }
 
     // ── Prefill (must be before /{woId}/equipment-invoices to avoid path clash) ─
 

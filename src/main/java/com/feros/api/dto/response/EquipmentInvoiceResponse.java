@@ -1,6 +1,7 @@
 package com.feros.api.dto.response;
 
 import com.feros.api.enums.EquipmentInvoiceStatus;
+import com.feros.api.enums.GstType;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -27,6 +28,9 @@ public class EquipmentInvoiceResponse {
     private BigDecimal taxPercent;
     private BigDecimal taxAmount;
     private BigDecimal totalAmount;
+    private GstType gstType;
+    private BigDecimal retentionPercent;
+    private BigDecimal tdsPercent;
     private String notes;
     private List<EquipmentInvoiceItemResponse> items;
     private LocalDateTime createdAt;

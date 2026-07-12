@@ -2,13 +2,16 @@ package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.EquipmentInvoiceItemRequest;
 import com.feros.api.dto.request.EquipmentInvoiceRequest;
+import com.feros.api.dto.response.EquipmentInvoiceCalcResult;
 import com.feros.api.dto.response.EquipmentInvoiceItemResponse;
 import com.feros.api.dto.response.EquipmentInvoicePrefillResponse;
 import com.feros.api.dto.response.EquipmentInvoiceResponse;
 import com.feros.api.entity.*;
+import com.feros.api.enums.DailyLogStatus;
 import com.feros.api.enums.EquipmentInvoiceItemType;
 import com.feros.api.enums.EquipmentInvoiceStatus;
-import com.feros.api.enums.DailyLogStatus;
+import com.feros.api.enums.IdleAttribution;
+import com.feros.api.enums.RateType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.EquipmentDailyLogRepository;
 import com.feros.api.repository.EquipmentInvoiceRepository;
@@ -79,6 +82,9 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
                 .billingPeriodStart(req.getBillingPeriodStart())
                 .billingPeriodEnd(req.getBillingPeriodEnd())
                 .taxPercent(req.getTaxPercent() != null ? req.getTaxPercent() : BigDecimal.ZERO)
+                .gstType(req.getGstType())
+                .retentionPercent(req.getRetentionPercent())
+                .tdsPercent(req.getTdsPercent())
                 .notes(req.getNotes())
                 .build();
 
@@ -108,6 +114,9 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
                 .billingPeriodStart(req.getBillingPeriodStart())
                 .billingPeriodEnd(req.getBillingPeriodEnd())
                 .taxPercent(req.getTaxPercent() != null ? req.getTaxPercent() : BigDecimal.ZERO)
+                .gstType(req.getGstType())
+                .retentionPercent(req.getRetentionPercent())
+                .tdsPercent(req.getTdsPercent())
                 .notes(req.getNotes())
                 .build();
 
@@ -153,6 +162,9 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
         invoice.setBillingPeriodStart(req.getBillingPeriodStart());
         invoice.setBillingPeriodEnd(req.getBillingPeriodEnd());
         invoice.setTaxPercent(req.getTaxPercent() != null ? req.getTaxPercent() : BigDecimal.ZERO);
+        invoice.setGstType(req.getGstType());
+        invoice.setRetentionPercent(req.getRetentionPercent());
+        invoice.setTdsPercent(req.getTdsPercent());
         invoice.setNotes(req.getNotes());
 
         invoice.getItems().clear();
@@ -332,6 +344,115 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
         return BigDecimal.valueOf(days).divide(BigDecimal.valueOf(30), 2, RoundingMode.HALF_UP);
     }
 
+    // ── Billing Engine (E7) ────────────────────────────────────────────────────
+
+    @Override
+    public List<EquipmentInvoiceCalcResult> calculate(Long woId, LocalDate from, LocalDate to) {
+        WorkOrder wo = workOrder(woId);
+        List<MachineAssignment> assignments = assignmentRepository.findByWorkOrderIdOrderByStartDateAsc(woId);
+        if (assignments.isEmpty()) return List.of();
+
+        List<Long> assignmentIds = assignments.stream().map(MachineAssignment::getId).toList();
+        List<EquipmentDailyLog> logs = from != null && to != null
+                ? dailyLogRepository.findByMachineAssignmentIdInAndLogDateBetween(assignmentIds, from, to)
+                : dailyLogRepository.findByMachineAssignmentIdIn(assignmentIds);
+
+        Map<Long, List<EquipmentDailyLog>> logsByAssignment = logs.stream()
+                .collect(Collectors.groupingBy(l -> l.getMachineAssignment().getId()));
+
+        List<EquipmentInvoiceCalcResult> results = new ArrayList<>();
+        for (MachineAssignment a : assignments) {
+            List<EquipmentDailyLog> aLogs = logsByAssignment.getOrDefault(a.getId(), List.of());
+            if (aLogs.isEmpty()) continue;
+
+            RateType rateType = a.getRateType() != null ? a.getRateType() : RateType.HOURLY;
+            BigDecimal baseRate = a.getRateAmount() != null ? a.getRateAmount() : BigDecimal.ZERO;
+            BigDecimal guaranteed = a.getGuaranteedHours() != null ? a.getGuaranteedHours() : BigDecimal.ZERO;
+            BigDecimal otRate = a.getOvertimeRate() != null ? a.getOvertimeRate() : BigDecimal.ZERO;
+            BigDecimal standbyRate = baseRate.multiply(new BigDecimal("0.5")).setScale(2, RoundingMode.HALF_UP);
+
+            BigDecimal workingHours = BigDecimal.ZERO;
+            BigDecimal standbyHours = BigDecimal.ZERO;
+            BigDecimal idleClientHours = BigDecimal.ZERO;
+            int workingDays = 0;
+            int standbyDays = 0;
+
+            for (EquipmentDailyLog log : aLogs) {
+                BigDecimal hrs = log.getHoursWorked() != null ? log.getHoursWorked() : BigDecimal.ZERO;
+                if (log.getStatus() == DailyLogStatus.WORKING) {
+                    workingHours = workingHours.add(hrs);
+                    workingDays++;
+                } else if (log.getStatus() == DailyLogStatus.STANDBY) {
+                    standbyHours = standbyHours.add(hrs);
+                    standbyDays++;
+                } else if (log.getStatus() == DailyLogStatus.IDLE
+                        && log.getIdleAttribution() == IdleAttribution.CLIENT_FAULT) {
+                    idleClientHours = idleClientHours.add(hrs);
+                    workingDays++; // counts as billable day
+                }
+            }
+
+            BigDecimal baseAmount;
+            BigDecimal otHours = BigDecimal.ZERO;
+            BigDecimal otAmount = BigDecimal.ZERO;
+            BigDecimal standbyAmount = standbyHours.multiply(standbyRate).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal billedBaseHours;
+
+            if (rateType == RateType.HOURLY) {
+                BigDecimal billable = workingHours.add(idleClientHours);
+                billedBaseHours = billable.compareTo(guaranteed) < 0 ? guaranteed : billable;
+                if (workingHours.compareTo(guaranteed) > 0) {
+                    otHours = workingHours.subtract(guaranteed);
+                    billedBaseHours = guaranteed.add(idleClientHours);
+                    if (billedBaseHours.compareTo(guaranteed) < 0) billedBaseHours = guaranteed;
+                }
+                BigDecimal regularHours = billedBaseHours.subtract(otHours);
+                baseAmount = regularHours.multiply(baseRate).setScale(2, RoundingMode.HALF_UP);
+                otAmount = otHours.multiply(otRate).setScale(2, RoundingMode.HALF_UP);
+
+            } else if (rateType == RateType.DAILY_SHIFT) {
+                billedBaseHours = BigDecimal.valueOf(workingDays);
+                baseAmount = BigDecimal.valueOf(workingDays).multiply(baseRate).setScale(2, RoundingMode.HALF_UP);
+
+            } else { // MONTHLY
+                BigDecimal periodMonths = computePeriodMonths(from, to, wo);
+                billedBaseHours = periodMonths;
+                baseAmount = periodMonths.multiply(baseRate).setScale(2, RoundingMode.HALF_UP);
+                if (workingHours.compareTo(guaranteed) > 0) {
+                    otHours = workingHours.subtract(guaranteed);
+                    otAmount = otHours.multiply(otRate).setScale(2, RoundingMode.HALF_UP);
+                }
+            }
+
+            BigDecimal totalAmount = baseAmount.add(otAmount).add(standbyAmount);
+
+            Equipment eq = a.getEquipment();
+            results.add(EquipmentInvoiceCalcResult.builder()
+                    .machineAssignmentId(a.getId())
+                    .serialNumber(eq.getSerialNumber())
+                    .equipmentTypeName(eq.getEquipmentType().getName())
+                    .woNumber(wo.getWoNumber())
+                    .rateType(rateType)
+                    .workingHours(workingHours)
+                    .standbyHours(standbyHours)
+                    .idleClientHours(idleClientHours)
+                    .guaranteedHours(guaranteed.compareTo(BigDecimal.ZERO) > 0 ? guaranteed : null)
+                    .billedBaseHours(billedBaseHours)
+                    .otHours(otHours)
+                    .workingDays(workingDays)
+                    .standbyDays(standbyDays)
+                    .baseRate(baseRate)
+                    .baseAmount(baseAmount)
+                    .otRate(otRate.compareTo(BigDecimal.ZERO) > 0 ? otRate : null)
+                    .otAmount(otAmount)
+                    .standbyRate(standbyRate)
+                    .standbyAmount(standbyAmount)
+                    .totalAmount(totalAmount)
+                    .build());
+        }
+        return results;
+    }
+
     private EquipmentInvoiceResponse toResponse(EquipmentInvoice inv) {
         List<EquipmentInvoiceItemResponse> items = inv.getItems().stream()
                 .map(i -> EquipmentInvoiceItemResponse.builder()
@@ -368,6 +489,9 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
                 .taxPercent(inv.getTaxPercent())
                 .taxAmount(inv.getTaxAmount())
                 .totalAmount(inv.getTotalAmount())
+                .gstType(inv.getGstType())
+                .retentionPercent(inv.getRetentionPercent())
+                .tdsPercent(inv.getTdsPercent())
                 .notes(inv.getNotes())
                 .items(items)
                 .createdAt(inv.getCreatedAt())
