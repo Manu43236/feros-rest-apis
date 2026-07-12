@@ -1,5 +1,7 @@
 package com.feros.api.dto.request;
 
+import com.feros.api.enums.HireType;
+import com.feros.api.enums.ProviderSide;
 import com.feros.api.enums.RateType;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -17,7 +19,17 @@ public class MachineAssignmentRequest {
 
     private LocalDate startDate; // defaults to today if null
 
-    // Optional per-machine rate — overrides WO rate for invoicing
+    // Per-machine rate — overrides WO rate for invoicing
     private RateType rateType;
     private BigDecimal rateAmount;
+
+    // KAN-17 per-machine billing terms
+    private HireType hireType;
+    private BigDecimal guaranteedHours;
+    private BigDecimal overtimeRate;
+    private ProviderSide dieselByWhom;
+
+    // KAN-18 actual on/off-hire dates
+    private LocalDate onHireDate;
+    private LocalDate offHireDate;
 }

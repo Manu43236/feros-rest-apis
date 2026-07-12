@@ -3,8 +3,12 @@ package com.feros.api.controller;
 import com.feros.api.dto.request.AssignDivisionRequest;
 import com.feros.api.dto.request.DailyLogRequest;
 import com.feros.api.dto.request.MachineAssignmentRequest;
+import com.feros.api.dto.request.MachineConditionSurveyRequest;
+import com.feros.api.dto.request.SwapMachineRequest;
+import com.feros.api.dto.request.WoAmendmentRequest;
 import com.feros.api.dto.request.WorkOrderRequest;
 import com.feros.api.dto.response.*;
+import com.feros.api.util.SecurityUtil;
 import com.feros.api.enums.AssignmentEndReason;
 import com.feros.api.enums.WorkOrderStatus;
 import com.feros.api.service.WorkOrderService;
@@ -196,5 +200,50 @@ public class WorkOrderController {
             @PathVariable Long id, @PathVariable Long logId) {
         workOrderService.deleteLog(id, logId);
         return ResponseEntity.ok(ApiResponse.success("Log deleted", null));
+    }
+
+    // ── KAN-19 Amendments ─────────────────────────────────────────────────────
+
+    @GetMapping("/{id}/amendments")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<WoAmendmentResponse>>> getAmendments(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Amendments fetched", workOrderService.getAmendments(id)));
+    }
+
+    @PostMapping("/{id}/amendments")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<WoAmendmentResponse>> createAmendment(
+            @PathVariable Long id, @Valid @RequestBody WoAmendmentRequest request) {
+        String createdBy = String.valueOf(SecurityUtil.getCurrentUserId());
+        return ResponseEntity.ok(ApiResponse.success("Amendment recorded", workOrderService.createAmendment(id, request, createdBy)));
+    }
+
+    // ── KAN-20 Machine Swap ───────────────────────────────────────────────────
+
+    @PostMapping("/{id}/machines/{assignmentId}/swap")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<MachineAssignmentResponse>> swapMachine(
+            @PathVariable Long id,
+            @PathVariable Long assignmentId,
+            @Valid @RequestBody SwapMachineRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Machine swapped", workOrderService.swapMachine(id, assignmentId, request)));
+    }
+
+    // ── KAN-21 Condition Surveys ──────────────────────────────────────────────
+
+    @GetMapping("/{id}/machines/{assignmentId}/surveys")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<MachineConditionSurveyResponse>>> getSurveys(
+            @PathVariable Long id, @PathVariable Long assignmentId) {
+        return ResponseEntity.ok(ApiResponse.success("Surveys fetched", workOrderService.getSurveys(id, assignmentId)));
+    }
+
+    @PostMapping("/{id}/machines/{assignmentId}/surveys")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<MachineConditionSurveyResponse>> createSurvey(
+            @PathVariable Long id,
+            @PathVariable Long assignmentId,
+            @Valid @RequestBody MachineConditionSurveyRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Survey recorded", workOrderService.createSurvey(id, assignmentId, request)));
     }
 }

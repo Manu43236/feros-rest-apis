@@ -27,4 +27,18 @@ public class WorkOrderResponse {
     private long machineCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // KAN-16 commercial T&C
+    private Integer paymentTermsDays;
+    private BigDecimal gstPercent;
+    private BigDecimal retentionPercent;
+    private BigDecimal tdsPercent;
+    private Integer billingCycleMonths;
+    private ProviderSide operatorByWhom;
+    private ProviderSide dieselByWhom;
+    private Integer workingHoursPerDay;
+    private Boolean sundayWorking;
+    private BigDecimal overtimeRateMultiplier;
+    private String escalationClause;
+    private String penaltyClause;
 }

@@ -1,7 +1,9 @@
 package com.feros.api.entity;
 
 import com.feros.api.enums.AssignmentEndReason;
+import com.feros.api.enums.HireType;
 import com.feros.api.enums.OperatorType;
+import com.feros.api.enums.ProviderSide;
 import com.feros.api.enums.RateType;
 import jakarta.persistence.*;
 
@@ -77,4 +79,30 @@ public class MachineAssignment extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "attachment_id")
     private EquipmentAttachment attachment;
+
+    // KAN-17 per-machine billing terms
+    @Enumerated(EnumType.STRING)
+    @Column(name = "hire_type")
+    private HireType hireType;
+
+    @Column(name = "guaranteed_hours", precision = 8, scale = 2)
+    private BigDecimal guaranteedHours;
+
+    @Column(name = "overtime_rate", precision = 12, scale = 2)
+    private BigDecimal overtimeRate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "diesel_by_whom")
+    private ProviderSide dieselByWhom;
+
+    // KAN-18 actual on/off-hire dates (may differ from startDate/endDate)
+    @Column(name = "on_hire_date")
+    private LocalDate onHireDate;
+
+    @Column(name = "off_hire_date")
+    private LocalDate offHireDate;
+
+    // KAN-20 machine swap back-link (nullable — set when this line replaced another)
+    @Column(name = "swapped_from_assignment_id")
+    private Long swappedFromAssignmentId;
 }

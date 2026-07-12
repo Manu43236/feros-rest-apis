@@ -4,6 +4,9 @@ import com.feros.api.dto.request.AssignDivisionRequest;
 import com.feros.api.dto.request.DailyLogDivisionRequest;
 import com.feros.api.dto.request.DailyLogRequest;
 import com.feros.api.dto.request.MachineAssignmentRequest;
+import com.feros.api.dto.request.MachineConditionSurveyRequest;
+import com.feros.api.dto.request.SwapMachineRequest;
+import com.feros.api.dto.request.WoAmendmentRequest;
 import com.feros.api.dto.request.WorkOrderRequest;
 import com.feros.api.dto.response.*;
 import com.feros.api.entity.*;
@@ -43,6 +46,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     private final ClientDivisionRepository clientDivisionRepository;
     private final DailyLogDivisionRepository dailyLogDivisionRepository;
     private final EquipmentAttachmentRepository attachmentRepository;
+    private final WoAmendmentRepository woAmendmentRepository;
+    private final MachineConditionSurveyRepository conditionSurveyRepository;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
 
@@ -104,7 +109,19 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .startDate(req.getStartDate())
                 .endDate(req.getEndDate())
                 .parentWoId(req.getParentWoId())
-                .notes(req.getNotes());
+                .notes(req.getNotes())
+                .paymentTermsDays(req.getPaymentTermsDays())
+                .gstPercent(req.getGstPercent())
+                .retentionPercent(req.getRetentionPercent())
+                .tdsPercent(req.getTdsPercent())
+                .billingCycleMonths(req.getBillingCycleMonths())
+                .operatorByWhom(req.getOperatorByWhom())
+                .dieselByWhom(req.getDieselByWhom())
+                .workingHoursPerDay(req.getWorkingHoursPerDay())
+                .sundayWorking(req.getSundayWorking())
+                .overtimeRateMultiplier(req.getOvertimeRateMultiplier())
+                .escalationClause(req.getEscalationClause())
+                .penaltyClause(req.getPenaltyClause());
 
         WorkOrder saved = workOrderRepository.save(builder.build());
         return toResponse(saved, 0);
@@ -129,6 +146,18 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         wo.setStartDate(req.getStartDate());
         wo.setEndDate(req.getEndDate());
         wo.setNotes(req.getNotes());
+        wo.setPaymentTermsDays(req.getPaymentTermsDays());
+        wo.setGstPercent(req.getGstPercent());
+        wo.setRetentionPercent(req.getRetentionPercent());
+        wo.setTdsPercent(req.getTdsPercent());
+        wo.setBillingCycleMonths(req.getBillingCycleMonths());
+        wo.setOperatorByWhom(req.getOperatorByWhom());
+        wo.setDieselByWhom(req.getDieselByWhom());
+        wo.setWorkingHoursPerDay(req.getWorkingHoursPerDay());
+        wo.setSundayWorking(req.getSundayWorking());
+        wo.setOvertimeRateMultiplier(req.getOvertimeRateMultiplier());
+        wo.setEscalationClause(req.getEscalationClause());
+        wo.setPenaltyClause(req.getPenaltyClause());
 
         return toResponse(workOrderRepository.save(wo), machineAssignmentRepository.countByWorkOrderId(id));
     }
@@ -193,6 +222,12 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                         .startDate(req.getStartDate() != null ? req.getStartDate() : LocalDate.now())
                         .rateType(req.getRateType())
                         .rateAmount(req.getRateAmount())
+                        .hireType(req.getHireType())
+                        .guaranteedHours(req.getGuaranteedHours())
+                        .overtimeRate(req.getOvertimeRate())
+                        .dieselByWhom(req.getDieselByWhom())
+                        .onHireDate(req.getOnHireDate())
+                        .offHireDate(req.getOffHireDate())
                         .build());
 
         equipment.setWorkStatus(EquipmentWorkStatus.ASSIGNED);
@@ -420,6 +455,18 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .machineCount(machineCount)
                 .createdAt(wo.getCreatedAt())
                 .updatedAt(wo.getUpdatedAt())
+                .paymentTermsDays(wo.getPaymentTermsDays())
+                .gstPercent(wo.getGstPercent())
+                .retentionPercent(wo.getRetentionPercent())
+                .tdsPercent(wo.getTdsPercent())
+                .billingCycleMonths(wo.getBillingCycleMonths())
+                .operatorByWhom(wo.getOperatorByWhom())
+                .dieselByWhom(wo.getDieselByWhom())
+                .workingHoursPerDay(wo.getWorkingHoursPerDay())
+                .sundayWorking(wo.getSundayWorking())
+                .overtimeRateMultiplier(wo.getOvertimeRateMultiplier())
+                .escalationClause(wo.getEscalationClause())
+                .penaltyClause(wo.getPenaltyClause())
                 .build();
     }
 
@@ -469,6 +516,13 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .attachmentType(a.getAttachment() != null ? a.getAttachment().getType() : null)
                 .attachmentRate(a.getAttachment() != null ? a.getAttachment().getDefaultRate() : null)
                 .attachmentRateUnit(a.getAttachment() != null ? a.getAttachment().getRateUnit() : null)
+                .hireType(a.getHireType())
+                .guaranteedHours(a.getGuaranteedHours())
+                .overtimeRate(a.getOvertimeRate())
+                .dieselByWhom(a.getDieselByWhom())
+                .onHireDate(a.getOnHireDate())
+                .offHireDate(a.getOffHireDate())
+                .swappedFromAssignmentId(a.getSwappedFromAssignmentId())
                 .build();
     }
 
@@ -754,5 +808,158 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         if (start == null || end == null) return null;
         BigDecimal diff = end.subtract(start);
         return diff.compareTo(BigDecimal.ZERO) >= 0 ? diff.setScale(2, RoundingMode.HALF_UP) : null;
+    }
+
+    // ── KAN-19 Amendments ─────────────────────────────────────────────────────
+
+    @Override
+    public List<WoAmendmentResponse> getAmendments(Long workOrderId) {
+        fetchWo(workOrderId);
+        return woAmendmentRepository.findByWorkOrderIdOrderByEffectiveDateDesc(workOrderId)
+                .stream().map(this::toAmendmentResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public WoAmendmentResponse createAmendment(Long workOrderId, WoAmendmentRequest req, String createdBy) {
+        WorkOrder wo = fetchWo(workOrderId);
+        WoAmendment amendment = woAmendmentRepository.save(WoAmendment.builder()
+                .workOrder(wo)
+                .amendmentType(req.getAmendmentType())
+                .effectiveDate(req.getEffectiveDate())
+                .oldValue(req.getOldValue())
+                .newValue(req.getNewValue())
+                .reason(req.getReason())
+                .createdBy(createdBy)
+                .build());
+        return toAmendmentResponse(amendment);
+    }
+
+    private WoAmendmentResponse toAmendmentResponse(WoAmendment a) {
+        return WoAmendmentResponse.builder()
+                .id(a.getId())
+                .workOrderId(a.getWorkOrder().getId())
+                .amendmentType(a.getAmendmentType())
+                .effectiveDate(a.getEffectiveDate())
+                .oldValue(a.getOldValue())
+                .newValue(a.getNewValue())
+                .reason(a.getReason())
+                .createdBy(a.getCreatedBy())
+                .createdAt(a.getCreatedAt())
+                .build();
+    }
+
+    // ── KAN-20 Machine Swap ───────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public MachineAssignmentResponse swapMachine(Long workOrderId, Long assignmentId, SwapMachineRequest req) {
+        WorkOrder wo = fetchWo(workOrderId);
+        MachineAssignment old = machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
+                .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
+        if (!old.getIsActive())
+            throw new FerosException("Assignment is already closed", HttpStatus.BAD_REQUEST);
+
+        Equipment newEquipment = equipmentRepository.findByIdAndTenantId(req.getNewEquipmentId(), tenantId())
+                .orElseThrow(() -> new FerosException("Equipment not found", HttpStatus.NOT_FOUND));
+        if (machineAssignmentRepository.existsByEquipmentIdAndIsActiveTrue(newEquipment.getId()))
+            throw new FerosException("Replacement machine is already assigned to another work order", HttpStatus.CONFLICT);
+
+        // Close old assignment
+        old.setEndDate(req.getEffectiveDate());
+        old.setEndReason(AssignmentEndReason.BREAKDOWN_REPLACED);
+        old.setIsActive(false);
+        machineAssignmentRepository.save(old);
+        old.getEquipment().setWorkStatus(EquipmentWorkStatus.AVAILABLE);
+        equipmentRepository.save(old.getEquipment());
+
+        // Create new assignment carrying over terms from old
+        MachineAssignment replacement = machineAssignmentRepository.save(MachineAssignment.builder()
+                .workOrder(wo)
+                .equipment(newEquipment)
+                .startDate(req.getEffectiveDate())
+                .rateType(old.getRateType())
+                .rateAmount(old.getRateAmount())
+                .hireType(old.getHireType())
+                .guaranteedHours(old.getGuaranteedHours())
+                .overtimeRate(old.getOvertimeRate())
+                .dieselByWhom(old.getDieselByWhom())
+                .onHireDate(req.getEffectiveDate())
+                .divisionId(old.getDivisionId())
+                .divisionName(old.getDivisionName())
+                .swappedFromAssignmentId(old.getId())
+                .build());
+
+        newEquipment.setWorkStatus(EquipmentWorkStatus.ASSIGNED);
+        equipmentRepository.save(newEquipment);
+
+        // Log amendment
+        woAmendmentRepository.save(WoAmendment.builder()
+                .workOrder(wo)
+                .amendmentType(AmendmentType.MACHINE_SWAP)
+                .effectiveDate(req.getEffectiveDate())
+                .oldValue("assignmentId=" + old.getId() + ",equipmentId=" + old.getEquipment().getId())
+                .newValue("assignmentId=" + replacement.getId() + ",equipmentId=" + newEquipment.getId())
+                .reason(req.getReason())
+                .createdBy(String.valueOf(SecurityUtil.getCurrentUserId()))
+                .build());
+
+        return toAssignmentResponse(replacement);
+    }
+
+    // ── KAN-21 Condition Surveys ──────────────────────────────────────────────
+
+    @Override
+    public List<MachineConditionSurveyResponse> getSurveys(Long workOrderId, Long assignmentId) {
+        machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
+                .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
+        return conditionSurveyRepository
+                .findByMachineAssignmentIdAndIsActiveTrueOrderBySurveyDateDesc(assignmentId)
+                .stream().map(this::toSurveyResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public MachineConditionSurveyResponse createSurvey(Long workOrderId, Long assignmentId, MachineConditionSurveyRequest req) {
+        MachineAssignment assignment = machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
+                .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
+
+        String photosJson = req.getPhotos() != null && !req.getPhotos().isEmpty()
+                ? "[" + req.getPhotos().stream().map(p -> "\"" + p + "\"").collect(Collectors.joining(",")) + "]"
+                : null;
+
+        MachineConditionSurvey survey = conditionSurveyRepository.save(MachineConditionSurvey.builder()
+                .machineAssignment(assignment)
+                .surveyType(req.getSurveyType())
+                .surveyDate(req.getSurveyDate())
+                .hmrAtSurvey(req.getHmrAtSurvey())
+                .conditionNotes(req.getConditionNotes())
+                .photos(photosJson)
+                .surveyedBy(req.getSurveyedBy())
+                .build());
+        return toSurveyResponse(survey);
+    }
+
+    private MachineConditionSurveyResponse toSurveyResponse(MachineConditionSurvey s) {
+        List<String> photos = null;
+        if (s.getPhotos() != null && !s.getPhotos().isBlank()) {
+            // Parse simple JSON array of strings produced by createSurvey
+            String raw = s.getPhotos().trim().replaceAll("^\\[|]$", "");
+            photos = raw.isBlank() ? List.of()
+                    : java.util.Arrays.stream(raw.split(","))
+                            .map(p -> p.trim().replaceAll("^\"|\"$", ""))
+                            .collect(Collectors.toList());
+        }
+        return MachineConditionSurveyResponse.builder()
+                .id(s.getId())
+                .machineAssignmentId(s.getMachineAssignment().getId())
+                .surveyType(s.getSurveyType())
+                .surveyDate(s.getSurveyDate())
+                .hmrAtSurvey(s.getHmrAtSurvey())
+                .conditionNotes(s.getConditionNotes())
+                .photos(photos)
+                .surveyedBy(s.getSurveyedBy())
+                .createdAt(s.getCreatedAt())
+                .build();
     }
 }

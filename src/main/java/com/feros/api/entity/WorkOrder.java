@@ -6,6 +6,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "work_orders")
@@ -60,4 +61,43 @@ public class WorkOrder extends BaseEntity {
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
+
+    // KAN-16 commercial T&C
+    @Column(name = "payment_terms_days")
+    private Integer paymentTermsDays;
+
+    @Column(name = "gst_percent", precision = 5, scale = 2)
+    private BigDecimal gstPercent;
+
+    @Column(name = "retention_percent", precision = 5, scale = 2)
+    private BigDecimal retentionPercent;
+
+    @Column(name = "tds_percent", precision = 5, scale = 2)
+    private BigDecimal tdsPercent;
+
+    @Column(name = "billing_cycle_months")
+    private Integer billingCycleMonths;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "operator_by_whom")
+    private ProviderSide operatorByWhom;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "diesel_by_whom")
+    private ProviderSide dieselByWhom;
+
+    @Column(name = "working_hours_per_day")
+    private Integer workingHoursPerDay;
+
+    @Column(name = "sunday_working")
+    private Boolean sundayWorking;
+
+    @Column(name = "overtime_rate_multiplier", precision = 5, scale = 2)
+    private BigDecimal overtimeRateMultiplier;
+
+    @Column(name = "escalation_clause", columnDefinition = "TEXT")
+    private String escalationClause;
+
+    @Column(name = "penalty_clause", columnDefinition = "TEXT")
+    private String penaltyClause;
 }

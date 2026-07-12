@@ -2,8 +2,10 @@ package com.feros.api.dto.response;
 
 import com.feros.api.enums.AssignmentEndReason;
 import com.feros.api.enums.AttachmentType;
+import com.feros.api.enums.HireType;
 import com.feros.api.enums.HireRateUnit;
 import com.feros.api.enums.OperatorType;
+import com.feros.api.enums.ProviderSide;
 import com.feros.api.enums.RateType;
 import lombok.Builder;
 import lombok.Getter;
@@ -35,10 +37,20 @@ public class MachineAssignmentResponse {
     private String divisionName;
     private RateType rateType;
     private BigDecimal rateAmount;
-    // Optional attachment deployed on this machine line (KAN-13)
+    // Attachment (KAN-13)
     private Long attachmentId;
     private String attachmentName;
     private AttachmentType attachmentType;
     private BigDecimal attachmentRate;
     private HireRateUnit attachmentRateUnit;
+    // KAN-17 per-machine billing terms
+    private HireType hireType;
+    private BigDecimal guaranteedHours;
+    private BigDecimal overtimeRate;
+    private ProviderSide dieselByWhom;
+    // KAN-18 on/off-hire dates
+    private LocalDate onHireDate;
+    private LocalDate offHireDate;
+    // KAN-20 swap back-link
+    private Long swappedFromAssignmentId;
 }
