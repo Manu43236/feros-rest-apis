@@ -100,4 +100,8 @@ public class WorkOrder extends BaseEntity {
 
     @Column(name = "penalty_clause", columnDefinition = "TEXT")
     private String penaltyClause;
+
+    // E5 KAN-28 — breakdown SLA threshold; exceeded → penalty flag on service record
+    @Column(name = "breakdown_penalty_threshold_hours")
+    private Integer breakdownPenaltyThresholdHours;
 }

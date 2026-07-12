@@ -42,4 +42,7 @@ public class EquipmentServiceRequest {
     private Boolean isEscalated;
 
     private List<EquipmentServiceTaskRequest> tasks;
+
+    // E5 KAN-27 — link to the daily log entry that logged the breakdown
+    private Long breakdownLogId;
 }

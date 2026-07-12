@@ -18,6 +18,9 @@ public class TechnicianVehicleTasksResponse {
 
     private Long vehicleId;
     private String vehicleRegistrationNumber;
+    // E5 KAN-29 — asset-agnostic fields
+    private String assetType;  // VEHICLE or MACHINE
+    private String assetName;  // reg number for vehicle, serial/type for machine
     private Long serviceId;
     private String serviceNumber;
     private ServiceTriggeredBy triggeredBy;

@@ -121,7 +121,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .sundayWorking(req.getSundayWorking())
                 .overtimeRateMultiplier(req.getOvertimeRateMultiplier())
                 .escalationClause(req.getEscalationClause())
-                .penaltyClause(req.getPenaltyClause());
+                .penaltyClause(req.getPenaltyClause())
+                .breakdownPenaltyThresholdHours(req.getBreakdownPenaltyThresholdHours());
 
         WorkOrder saved = workOrderRepository.save(builder.build());
         return toResponse(saved, 0);
@@ -158,6 +159,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         wo.setOvertimeRateMultiplier(req.getOvertimeRateMultiplier());
         wo.setEscalationClause(req.getEscalationClause());
         wo.setPenaltyClause(req.getPenaltyClause());
+        wo.setBreakdownPenaltyThresholdHours(req.getBreakdownPenaltyThresholdHours());
 
         return toResponse(workOrderRepository.save(wo), machineAssignmentRepository.countByWorkOrderId(id));
     }
@@ -481,6 +483,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .overtimeRateMultiplier(wo.getOvertimeRateMultiplier())
                 .escalationClause(wo.getEscalationClause())
                 .penaltyClause(wo.getPenaltyClause())
+                .breakdownPenaltyThresholdHours(wo.getBreakdownPenaltyThresholdHours())
                 .build();
     }
 

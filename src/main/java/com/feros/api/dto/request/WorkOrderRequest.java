@@ -40,4 +40,6 @@ public class WorkOrderRequest {
     private BigDecimal overtimeRateMultiplier;
     private String escalationClause;
     private String penaltyClause;
+    // E5 KAN-28
+    private Integer breakdownPenaltyThresholdHours;
 }

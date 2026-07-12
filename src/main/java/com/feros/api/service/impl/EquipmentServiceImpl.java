@@ -30,6 +30,7 @@ import com.feros.api.entity.master.EquipmentType;
 import com.feros.api.enums.EquipmentBreakdownStatus;
 import com.feros.api.enums.EquipmentOwnershipType;
 import com.feros.api.enums.EquipmentWorkStatus;
+import com.feros.api.enums.IdleAttribution;
 import com.feros.api.enums.ServicePayerType;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTaskStatus;
@@ -326,12 +327,19 @@ public class EquipmentServiceImpl implements EquipmentService {
                         .startHourMeter(log.getStartHourMeter())
                         .endHourMeter(log.getEndHourMeter())
                         .hoursWorked(log.getHoursWorked())
+                        .workingHours(log.getWorkingHours())
+                        .idleHours(log.getIdleHours())
+                        .standbyHours(log.getStandbyHours())
+                        .breakdownHours(log.getBreakdownHours())
+                        .idleAttribution(log.getIdleAttribution())
+                        .idleReason(log.getIdleReason())
+                        .signedSlipPhotoUrl(log.getSignedSlipPhotoUrl())
                         .fuelConsumed(log.getFuelConsumed())
                         .notes(log.getNotes())
                         .source(log.getSource())
                         .serialNumber(serialNumber)
                         .equipmentTypeName(typeName)
-                        .divisions(List.of()) // ponytail: not needed for machine-scope tabs
+                        .divisions(List.of())
                         .createdAt(log.getCreatedAt())
                         .updatedAt(log.getUpdatedAt())
                         .build())
@@ -787,6 +795,11 @@ public class EquipmentServiceImpl implements EquipmentService {
         Equipment eq = equipmentRepository.findByIdAndTenantId(equipmentId, tenantId)
                 .orElseThrow(() -> new FerosException("Equipment not found", HttpStatus.NOT_FOUND));
 
+        // E5 KAN-27 — resolve breakdown log before building entity (avoids lambda capture)
+        EquipmentDailyLog breakdownLog = request.getBreakdownLogId() != null
+                ? dailyLogRepository.findById(request.getBreakdownLogId()).orElse(null)
+                : null;
+
         EquipmentServiceRecord record = EquipmentServiceRecord.builder()
                 .tenant(tenant)
                 .equipment(eq)
@@ -806,6 +819,8 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .certificateNumber(request.getCertificateNumber())
                 .certificateValidUntil(request.getCertificateValidUntil())
                 .isEscalated(Boolean.TRUE.equals(request.getIsEscalated()))
+                .breakdownLog(breakdownLog)
+                .workOrderId(breakdownLog != null ? breakdownLog.getWorkOrderId() : null)
                 .build();
 
         record = equipmentServiceRepository.save(record);
@@ -839,6 +854,13 @@ public class EquipmentServiceImpl implements EquipmentService {
         record.setCertificateNumber(request.getCertificateNumber());
         record.setCertificateValidUntil(request.getCertificateValidUntil());
         record.setIsEscalated(Boolean.TRUE.equals(request.getIsEscalated()));
+
+        // E5 KAN-27 — update breakdown log link (no lambda to avoid effectively-final issue)
+        EquipmentDailyLog updBreakdownLog = request.getBreakdownLogId() != null
+                ? dailyLogRepository.findById(request.getBreakdownLogId()).orElse(null)
+                : null;
+        record.setBreakdownLog(updBreakdownLog);
+        record.setWorkOrderId(updBreakdownLog != null ? updBreakdownLog.getWorkOrderId() : null);
 
         record.getTasks().clear();
         saveTasksOnRecord(record, request.getTasks());
@@ -904,6 +926,20 @@ public class EquipmentServiceImpl implements EquipmentService {
         record.setCompletedDate(completedDate);
         record.setCompletedHmr(completedHmr);
         record.getTasks().forEach(t -> t.setStatus(com.feros.api.enums.ServiceTaskStatus.COMPLETED));
+
+        // E5 KAN-28 — compute downtime and flag penalty
+        if (record.getBreakdownLog() != null && record.getWorkOrderId() != null) {
+            long days = java.time.temporal.ChronoUnit.DAYS.between(
+                    record.getBreakdownLog().getLogDate(), completedDate);
+            BigDecimal downtimeHrs = BigDecimal.valueOf(days * 24L);
+            record.setDowntimeHours(downtimeHrs);
+            workOrderRepository.findById(record.getWorkOrderId()).ifPresent(wo -> {
+                if (wo.getBreakdownPenaltyThresholdHours() != null) {
+                    record.setPenaltyTriggered(
+                            downtimeHrs.compareTo(BigDecimal.valueOf(wo.getBreakdownPenaltyThresholdHours())) > 0);
+                }
+            });
+        }
 
         // Recalculate total cost from tasks
         BigDecimal total = record.getTasks().stream()
@@ -1258,6 +1294,11 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .tasks(taskResponses)
                 .createdAt(r.getCreatedAt())
                 .updatedAt(r.getUpdatedAt())
+                .breakdownLogId(r.getBreakdownLog() != null ? r.getBreakdownLog().getId() : null)
+                .breakdownLogDate(r.getBreakdownLog() != null ? r.getBreakdownLog().getLogDate() : null)
+                .breakdownHoursOnLog(r.getBreakdownLog() != null ? r.getBreakdownLog().getBreakdownHours() : null)
+                .downtimeHours(r.getDowntimeHours())
+                .penaltyTriggered(r.getPenaltyTriggered())
                 .build();
     }
 

@@ -111,4 +111,19 @@ public class EquipmentServiceRecord extends BaseEntity {
     @OneToMany(mappedBy = "serviceRecord", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default
     private List<EquipmentServiceTask> tasks = new ArrayList<>();
+
+    // E5 KAN-27 — breakdown log link
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "breakdown_log_id")
+    private EquipmentDailyLog breakdownLog;
+
+    @Column(name = "work_order_id")
+    private Long workOrderId;
+
+    // E5 KAN-28 — downtime clock + penalty flag
+    @Column(name = "downtime_hours", precision = 10, scale = 2)
+    private BigDecimal downtimeHours;
+
+    @Column(name = "penalty_triggered")
+    private Boolean penaltyTriggered;
 }

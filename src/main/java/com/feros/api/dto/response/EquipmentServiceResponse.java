@@ -46,4 +46,11 @@ public class EquipmentServiceResponse {
     private List<EquipmentServiceTaskResponse> tasks;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    // E5 KAN-27
+    private Long breakdownLogId;
+    private LocalDate breakdownLogDate;
+    private BigDecimal breakdownHoursOnLog;
+    // E5 KAN-28
+    private BigDecimal downtimeHours;
+    private Boolean penaltyTriggered;
 }
