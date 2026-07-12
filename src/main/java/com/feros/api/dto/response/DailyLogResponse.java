@@ -1,6 +1,7 @@
 package com.feros.api.dto.response;
 
 import com.feros.api.enums.DailyLogStatus;
+import com.feros.api.enums.IdleAttribution;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -31,4 +32,14 @@ public class DailyLogResponse {
     private List<DailyLogDivisionResponse> divisions;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    // E4 — hour breakdown
+    private BigDecimal workingHours;
+    private BigDecimal idleHours;
+    private BigDecimal standbyHours;
+    private BigDecimal breakdownHours;
+    // E4 — idle attribution
+    private IdleAttribution idleAttribution;
+    private String idleReason;
+    // E4 — client-signed slip photo
+    private String signedSlipPhotoUrl;
 }

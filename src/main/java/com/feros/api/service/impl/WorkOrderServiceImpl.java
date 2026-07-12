@@ -312,6 +312,13 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                         .hoursWorked(totalHours)
                         .fuelConsumed(req.getFuelConsumed())
                         .notes(req.getNotes())
+                        .workingHours(req.getWorkingHours())
+                        .idleHours(req.getIdleHours())
+                        .standbyHours(req.getStandbyHours())
+                        .breakdownHours(req.getBreakdownHours())
+                        .idleAttribution(req.getIdleAttribution())
+                        .idleReason(req.getIdleReason())
+                        .signedSlipPhotoUrl(req.getSignedSlipPhotoUrl())
                         .build());
 
         saveDivisions(log, divReqs);
@@ -355,6 +362,13 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         log.setHoursWorked(totalHours);
         log.setFuelConsumed(req.getFuelConsumed());
         log.setNotes(req.getNotes());
+        log.setWorkingHours(req.getWorkingHours());
+        log.setIdleHours(req.getIdleHours());
+        log.setStandbyHours(req.getStandbyHours());
+        log.setBreakdownHours(req.getBreakdownHours());
+        log.setIdleAttribution(req.getIdleAttribution());
+        log.setIdleReason(req.getIdleReason());
+        log.setSignedSlipPhotoUrl(req.getSignedSlipPhotoUrl());
         log.getDivisions().clear();
         dailyLogRepository.save(log);
 
@@ -793,6 +807,13 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .divisions(divResponses)
                 .createdAt(l.getCreatedAt())
                 .updatedAt(l.getUpdatedAt())
+                .workingHours(l.getWorkingHours())
+                .idleHours(l.getIdleHours())
+                .standbyHours(l.getStandbyHours())
+                .breakdownHours(l.getBreakdownHours())
+                .idleAttribution(l.getIdleAttribution())
+                .idleReason(l.getIdleReason())
+                .signedSlipPhotoUrl(l.getSignedSlipPhotoUrl())
                 .build();
     }
 

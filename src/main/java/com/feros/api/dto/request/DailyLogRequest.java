@@ -1,6 +1,7 @@
 package com.feros.api.dto.request;
 
 import com.feros.api.enums.DailyLogStatus;
+import com.feros.api.enums.IdleAttribution;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
@@ -27,4 +28,17 @@ public class DailyLogRequest {
 
     // Each division line: division + HMR range + notes
     private List<DailyLogDivisionRequest> divisions;
+
+    // E4 — hour breakdown
+    private BigDecimal workingHours;
+    private BigDecimal idleHours;
+    private BigDecimal standbyHours;
+    private BigDecimal breakdownHours;
+
+    // E4 — idle attribution
+    private IdleAttribution idleAttribution;
+    private String idleReason;
+
+    // E4 — client-signed slip photo
+    private String signedSlipPhotoUrl;
 }

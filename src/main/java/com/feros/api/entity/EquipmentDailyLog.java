@@ -1,6 +1,7 @@
 package com.feros.api.entity;
 
 import com.feros.api.enums.DailyLogStatus;
+import com.feros.api.enums.IdleAttribution;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -58,6 +59,31 @@ public class EquipmentDailyLog extends BaseEntity {
     @Column(name = "source", nullable = false)
     @Builder.Default
     private String source = "MANUAL";
+
+    // E4 — hour breakdown
+    @Column(name = "working_hours", precision = 10, scale = 2)
+    private BigDecimal workingHours;
+
+    @Column(name = "idle_hours", precision = 10, scale = 2)
+    private BigDecimal idleHours;
+
+    @Column(name = "standby_hours", precision = 10, scale = 2)
+    private BigDecimal standbyHours;
+
+    @Column(name = "breakdown_hours", precision = 10, scale = 2)
+    private BigDecimal breakdownHours;
+
+    // E4 — idle attribution (CLIENT_FAULT = billable idle; OUR_BREAKDOWN = not billable)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "idle_attribution")
+    private IdleAttribution idleAttribution;
+
+    @Column(name = "idle_reason")
+    private String idleReason;
+
+    // E4 — client-signed slip photo URL (proof of billing)
+    @Column(name = "signed_slip_photo_url")
+    private String signedSlipPhotoUrl;
 
     @OneToMany(mappedBy = "dailyLog", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
