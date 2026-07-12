@@ -55,6 +55,7 @@ public class EquipmentResponse {
     private BigDecimal currentMeterReading;
     private EquipmentWorkStatus workStatus;
     private Boolean isActive;
+    private BigDecimal monthlyDepreciation;
     private String notes;
 
     private LocalDateTime createdAt;

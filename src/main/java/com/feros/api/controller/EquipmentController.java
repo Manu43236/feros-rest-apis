@@ -19,6 +19,7 @@ import com.feros.api.dto.request.ServicePartRequest;
 import com.feros.api.dto.request.ServicePartApprovalRequest;
 import com.feros.api.dto.response.EquipmentServicePartResponse;
 import com.feros.api.enums.EquipmentWorkStatus;
+import com.feros.api.service.EquipmentAnalyticsService;
 import com.feros.api.service.EquipmentService;
 import com.feros.api.service.EquipmentServicePartService;
 import jakarta.validation.Valid;
@@ -38,6 +39,7 @@ public class EquipmentController {
 
     private final EquipmentService equipmentService;
     private final EquipmentServicePartService equipmentServicePartService;
+    private final EquipmentAnalyticsService analyticsService;
 
     @GetMapping("/dashboard")
     @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR')")
@@ -347,6 +349,14 @@ public class EquipmentController {
     public ResponseEntity<ApiResponse<com.feros.api.dto.response.EquipmentBreakdownResponse>> resolveBreakdown(
             @PathVariable Long id, @PathVariable Long breakdownId) {
         return ResponseEntity.ok(ApiResponse.success("Breakdown resolved", equipmentService.resolveBreakdown(id, breakdownId)));
+    }
+
+    @GetMapping("/analytics")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<com.feros.api.dto.response.EquipmentAnalyticsResponse>> getAnalytics(
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success("Analytics fetched", analyticsService.getAnalytics(from, to)));
     }
 
 }

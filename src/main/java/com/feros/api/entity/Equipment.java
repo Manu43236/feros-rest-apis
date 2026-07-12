@@ -108,6 +108,9 @@ public class Equipment extends BaseEntity {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "monthly_depreciation", precision = 10, scale = 2)
+    private BigDecimal monthlyDepreciation;
+
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 }

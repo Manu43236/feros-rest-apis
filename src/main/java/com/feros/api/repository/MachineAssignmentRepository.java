@@ -20,4 +20,6 @@ public interface MachineAssignmentRepository extends JpaRepository<MachineAssign
     // Machine detail — JOIN FETCH workOrder + client to avoid N+1
     @Query("SELECT a FROM MachineAssignment a JOIN FETCH a.workOrder wo JOIN FETCH wo.client WHERE a.equipment.id = :equipmentId AND wo.tenant.id = :tenantId ORDER BY a.startDate DESC")
     List<MachineAssignment> findHistoryByEquipmentId(@Param("equipmentId") Long equipmentId, @Param("tenantId") Long tenantId);
+
+    List<MachineAssignment> findByEquipment_IdAndWorkOrder_Tenant_Id(Long equipmentId, Long tenantId);
 }

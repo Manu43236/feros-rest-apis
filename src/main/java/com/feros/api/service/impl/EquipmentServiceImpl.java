@@ -193,6 +193,7 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .currentMeterReading(request.getCurrentMeterReading())
                 .workStatus(EquipmentWorkStatus.AVAILABLE)
                 .isActive(true)
+                .monthlyDepreciation(request.getMonthlyDepreciation())
                 .notes(request.getNotes())
                 .build();
 
@@ -231,6 +232,7 @@ public class EquipmentServiceImpl implements EquipmentService {
         equipment.setFuelTankCapacity(request.getFuelTankCapacity());
         equipment.setOwnershipType(request.getOwnershipType());
         equipment.setCurrentMeterReading(request.getCurrentMeterReading());
+        equipment.setMonthlyDepreciation(request.getMonthlyDepreciation());
         equipment.setNotes(request.getNotes());
         if (request.getIsActive() != null) equipment.setIsActive(request.getIsActive());
         if (request.getWorkStatus() != null) equipment.setWorkStatus(request.getWorkStatus());
@@ -768,6 +770,7 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .currentMeterReading(e.getCurrentMeterReading())
                 .workStatus(e.getWorkStatus())
                 .isActive(e.getIsActive())
+                .monthlyDepreciation(e.getMonthlyDepreciation())
                 .notes(e.getNotes())
                 .createdAt(e.getCreatedAt())
                 .updatedAt(e.getUpdatedAt())
