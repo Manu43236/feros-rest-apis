@@ -36,8 +36,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -117,27 +119,53 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<UserResponse> getAllUsers(Boolean hasAttendanceToday) {
+        List<User> users;
         if (SecurityUtil.isSuperAdmin()) {
-            return userRepository.findAll()
-                    .stream()
-                    .map(u -> mapToResponse(u, null))
-                    .toList();
-        }
-        Long tenantId = SecurityUtil.getCurrentTenantId();
-        List<User> users = userRepository.findAllByTenantId(tenantId);
+            users = userRepository.findAll();
+        } else {
+            Long tenantId = SecurityUtil.getCurrentTenantId();
+            users = userRepository.findAllByTenantId(tenantId);
 
-        if (Boolean.TRUE.equals(hasAttendanceToday)) {
-            List<AttendanceApprovalStatus> validStatuses = List.of(
-                    AttendanceApprovalStatus.PENDING, AttendanceApprovalStatus.APPROVED);
-            List<Long> presentUserIds = attendanceRepository.findUserIdsWithAttendanceOnDate(
-                    tenantId, TimeUtil.today(), validStatuses);
-            users = users.stream()
-                    .filter(u -> presentUserIds.contains(u.getId()))
-                    .toList();
+            if (Boolean.TRUE.equals(hasAttendanceToday)) {
+                List<AttendanceApprovalStatus> validStatuses = List.of(
+                        AttendanceApprovalStatus.PENDING, AttendanceApprovalStatus.APPROVED);
+                List<Long> presentUserIds = attendanceRepository.findUserIdsWithAttendanceOnDate(
+                        tenantId, TimeUtil.today(), validStatuses);
+                users = users.stream()
+                        .filter(u -> presentUserIds.contains(u.getId()))
+                        .toList();
+            }
         }
+
+        if (users.isEmpty()) return List.of();
+
+        // Bulk-load all 3 datasets in 3 queries instead of 3 per user
+        List<Long> userIds = users.stream().map(User::getId).toList();
+
+        List<StaffAllocationStatus> activeStatuses = List.of(
+                StaffAllocationStatus.ALLOCATED, StaffAllocationStatus.IN_TRANSIT);
+
+        Map<Long, Long> completedCounts = orderStaffAllocationRepository
+                .countCompletedByUserIds(userIds, StaffAllocationStatus.COMPLETED)
+                .stream()
+                .collect(Collectors.toMap(r -> (Long) r[0], r -> (Long) r[1]));
+
+        Map<Long, com.feros.api.entity.OrderStaffAllocation> activeAllocByUser =
+                orderStaffAllocationRepository
+                        .findActiveAllocationsByUserIds(userIds, activeStatuses)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                sa -> sa.getUser().getId(),
+                                sa -> sa,
+                                (a, b) -> a)); // keep first (ordered DESC)
+
+        Map<Long, StaffProfile> profileByUser = staffProfileRepository
+                .findByUserIdIn(userIds)
+                .stream()
+                .collect(Collectors.toMap(p -> p.getUser().getId(), p -> p));
 
         return users.stream()
-                .map(u -> mapToResponse(u, null))
+                .map(u -> mapToResponseBulk(u, completedCounts, activeAllocByUser, profileByUser))
                 .toList();
     }
 
@@ -716,6 +744,61 @@ public class UserServiceImpl implements UserService {
         });
 
         return response;
-        
+    }
+
+    private UserResponse mapToResponseBulk(
+            User user,
+            Map<Long, Long> completedCounts,
+            Map<Long, com.feros.api.entity.OrderStaffAllocation> activeAllocByUser,
+            Map<Long, StaffProfile> profileByUser) {
+
+        String pinToReturn = user.getPlainPin();
+        UserResponse response = UserResponse.builder()
+                .id(user.getId())
+                .userNumber(user.getUserNumber())
+                .name(user.getName())
+                .phone(user.getPhone())
+                .role(user.getRoles().stream().map(Role::getName).findFirst().orElse(null))
+                .tenantId(user.getTenant() != null ? user.getTenant().getId() : null)
+                .companyName(user.getTenant() != null ? user.getTenant().getCompanyName() : "FEROS")
+                .isActive(user.getIsActive())
+                .isPinResetRequired(user.getIsPinResetRequired())
+                .generatedPin(pinToReturn)
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .build();
+
+        response.setCompletedTripsCount(completedCounts.getOrDefault(user.getId(), 0L));
+
+        com.feros.api.entity.OrderStaffAllocation activeAlloc = activeAllocByUser.get(user.getId());
+        if (activeAlloc != null) {
+            response.setIsAssigned(true);
+            response.setActiveOrderNumber(activeAlloc.getOrder().getOrderNumber());
+        } else {
+            response.setIsAssigned(false);
+        }
+
+        StaffProfile profile = profileByUser.get(user.getId());
+        if (profile != null) {
+            response.setDesignationName(profile.getDesignation() != null ? profile.getDesignation().getName() : null);
+            response.setEmploymentType(profile.getEmploymentType() != null ? profile.getEmploymentType().getName() : null);
+            response.setDateOfBirth(profile.getDateOfBirth());
+            response.setJoiningDate(profile.getJoiningDate());
+            response.setAddress(profile.getAddress());
+            response.setCity(profile.getCity() != null ? profile.getCity().getName() : null);
+            response.setState(profile.getState() != null ? profile.getState().getName() : null);
+            response.setPincode(profile.getPincode());
+            response.setEmergencyContactName(profile.getEmergencyContactName());
+            response.setEmergencyContactPhone(profile.getEmergencyContactPhone());
+            response.setBankName(profile.getBankName());
+            response.setAccountNumber(profile.getAccountNumber());
+            response.setIfscCode(profile.getIfscCode());
+            response.setAccountHolderName(profile.getAccountHolderName());
+            response.setLicenseNumber(profile.getLicenseNumber());
+            response.setLicenseExpiryDate(profile.getLicenseExpiryDate());
+            response.setProfilePhotoUrl(profile.getProfilePhotoUrl());
+        }
+
+        return response;
     }
 }

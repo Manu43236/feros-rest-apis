@@ -49,6 +49,20 @@ public interface OrderStaffAllocationRepository extends JpaRepository<OrderStaff
     List<OrderStaffAllocation> findActiveAllocationsForUser(@Param("userId") Long userId,
                                                              @Param("activeStatuses") List<com.feros.api.enums.StaffAllocationStatus> activeStatuses);
 
+    // Bulk variants — avoid N+1 in getAllUsers
+    @Query("SELECT sa.user.id, COUNT(sa) FROM OrderStaffAllocation sa " +
+           "WHERE sa.user.id IN :userIds AND sa.allocationStatus = :status AND sa.isActive = true " +
+           "GROUP BY sa.user.id")
+    List<Object[]> countCompletedByUserIds(@Param("userIds") List<Long> userIds,
+                                            @Param("status") com.feros.api.enums.StaffAllocationStatus status);
+
+    @Query("SELECT sa FROM OrderStaffAllocation sa " +
+           "WHERE sa.user.id IN :userIds AND sa.isActive = true " +
+           "AND sa.allocationStatus IN :activeStatuses " +
+           "ORDER BY sa.createdAt DESC")
+    List<OrderStaffAllocation> findActiveAllocationsByUserIds(@Param("userIds") List<Long> userIds,
+                                                               @Param("activeStatuses") List<com.feros.api.enums.StaffAllocationStatus> activeStatuses);
+
     @Query("SELECT sa FROM OrderStaffAllocation sa WHERE sa.tenant.id = :tenantId AND sa.isActive = true " +
            "AND sa.expectedStartDate BETWEEN :from AND :to ORDER BY sa.expectedStartDate DESC")
     List<OrderStaffAllocation> findByTenantIdAndDateRange(@Param("tenantId") Long tenantId,
