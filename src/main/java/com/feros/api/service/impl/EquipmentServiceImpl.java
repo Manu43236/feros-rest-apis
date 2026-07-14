@@ -1130,6 +1130,10 @@ public class EquipmentServiceImpl implements EquipmentService {
         User reporter = userRepository.findById(SecurityUtil.getCurrentUserId())
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
 
+        // Auto-link to active WO if this machine is currently assigned
+        WorkOrder linkedWo = machineAssignmentRepository.findFirstByEquipmentIdAndIsActiveTrue(eq.getId())
+                .map(MachineAssignment::getWorkOrder).orElse(null);
+
         EquipmentBreakdown bd = EquipmentBreakdown.builder()
                 .tenant(eq.getTenant())
                 .equipment(eq)
@@ -1139,7 +1143,9 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .notes(request.getNotes())
                 .status(EquipmentBreakdownStatus.REPORTED)
                 .reportedBy(reporter)
+                .workOrder(linkedWo)
                 .build();
+
         bd = equipmentBreakdownRepository.save(bd);
 
         eq.setWorkStatus(EquipmentWorkStatus.BREAKDOWN);
@@ -1193,6 +1199,8 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .reportedByName(bd.getReportedBy() != null ? bd.getReportedBy().getName() : null)
                 .resolvedAt(bd.getResolvedAt())
                 .createdAt(bd.getCreatedAt())
+                .workOrderId(bd.getWorkOrder() != null ? bd.getWorkOrder().getId() : null)
+                .workOrderNumber(bd.getWorkOrder() != null ? bd.getWorkOrder().getWoNumber() : null)
                 .build();
     }
 

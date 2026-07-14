@@ -3,6 +3,7 @@ package com.feros.api.dto.response;
 import com.feros.api.enums.AssignmentEndReason;
 import com.feros.api.enums.AttachmentType;
 import com.feros.api.enums.DieselBillingMode;
+import com.feros.api.enums.EquipmentWorkStatus;
 import com.feros.api.enums.HireType;
 import com.feros.api.enums.HireRateUnit;
 import com.feros.api.enums.OperatorType;
@@ -12,6 +13,7 @@ import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Builder
@@ -56,4 +58,8 @@ public class MachineAssignmentResponse {
     private Long swappedFromAssignmentId;
     // KAN-30 per-assignment last HMR (null for brand-new / just-swapped assignment)
     private BigDecimal lastLogEndHourMeter;
+    // Live machine health — for WO breakdown awareness
+    private EquipmentWorkStatus machineWorkStatus;
+    private LocalDateTime activeBreakdownSince;
+    private Long activeBreakdownId;
 }

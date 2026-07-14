@@ -42,6 +42,10 @@ public class EquipmentBreakdown extends BaseEntity {
     private EquipmentBreakdownStatus status = EquipmentBreakdownStatus.REPORTED;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "work_order_id")
+    private WorkOrder workOrder;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reported_by", nullable = false)
     private User reportedBy;
 

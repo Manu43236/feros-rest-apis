@@ -23,4 +23,6 @@ public class EquipmentBreakdownResponse {
     private String reportedByName;
     private LocalDateTime resolvedAt;
     private LocalDateTime createdAt;
+    private Long workOrderId;
+    private String workOrderNumber;
 }

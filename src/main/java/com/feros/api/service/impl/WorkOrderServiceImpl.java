@@ -48,6 +48,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     private final EquipmentAttachmentRepository attachmentRepository;
     private final WoAmendmentRepository woAmendmentRepository;
     private final MachineConditionSurveyRepository conditionSurveyRepository;
+    private final EquipmentBreakdownRepository equipmentBreakdownRepository;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
 
@@ -505,6 +506,12 @@ public class WorkOrderServiceImpl implements WorkOrderService {
 
     private MachineAssignmentResponse toAssignmentResponse(MachineAssignment a) {
         Equipment eq = a.getEquipment();
+        var openBreakdown = equipmentBreakdownRepository
+                .findFirstByEquipmentIdAndTenantIdAndStatusInAndIsActiveTrue(
+                        eq.getId(), tenantId(),
+                        List.of(com.feros.api.enums.EquipmentBreakdownStatus.REPORTED,
+                                com.feros.api.enums.EquipmentBreakdownStatus.IN_REPAIR))
+                .orElse(null);
         return MachineAssignmentResponse.builder()
                 .id(a.getId())
                 .workOrderId(a.getWorkOrder().getId())
@@ -545,6 +552,9 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .lastLogEndHourMeter(
                         dailyLogRepository.findTopByMachineAssignmentIdOrderByLogDateDescIdDesc(a.getId())
                                 .map(EquipmentDailyLog::getEndHourMeter).orElse(null))
+                .machineWorkStatus(eq.getWorkStatus())
+                .activeBreakdownSince(openBreakdown != null ? openBreakdown.getBreakdownDate() : null)
+                .activeBreakdownId(openBreakdown != null ? openBreakdown.getId() : null)
                 .build();
     }
 
