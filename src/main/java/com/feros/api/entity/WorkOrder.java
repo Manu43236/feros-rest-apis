@@ -104,4 +104,15 @@ public class WorkOrder extends BaseEntity {
     // E5 KAN-28 — breakdown SLA threshold; exceeded → penalty flag on service record
     @Column(name = "breakdown_penalty_threshold_hours")
     private Integer breakdownPenaltyThresholdHours;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "work_order_type", nullable = false)
+    @Builder.Default
+    private WorkOrderType workOrderType = WorkOrderType.RENTAL;
+
+    @Column(name = "agreed_job_amount", precision = 12, scale = 2)
+    private BigDecimal agreedJobAmount;
+
+    @Column(name = "job_description", columnDefinition = "TEXT")
+    private String jobDescription;
 }

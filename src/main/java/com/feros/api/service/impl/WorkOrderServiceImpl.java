@@ -123,7 +123,10 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .overtimeRateMultiplier(req.getOvertimeRateMultiplier())
                 .escalationClause(req.getEscalationClause())
                 .penaltyClause(req.getPenaltyClause())
-                .breakdownPenaltyThresholdHours(req.getBreakdownPenaltyThresholdHours());
+                .breakdownPenaltyThresholdHours(req.getBreakdownPenaltyThresholdHours())
+                .workOrderType(req.getWorkOrderType() != null ? req.getWorkOrderType() : com.feros.api.enums.WorkOrderType.RENTAL)
+                .agreedJobAmount(req.getAgreedJobAmount())
+                .jobDescription(req.getJobDescription());
 
         WorkOrder saved = workOrderRepository.save(builder.build());
         return toResponse(saved, 0);
@@ -161,6 +164,9 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         wo.setEscalationClause(req.getEscalationClause());
         wo.setPenaltyClause(req.getPenaltyClause());
         wo.setBreakdownPenaltyThresholdHours(req.getBreakdownPenaltyThresholdHours());
+        if (req.getWorkOrderType() != null) wo.setWorkOrderType(req.getWorkOrderType());
+        wo.setAgreedJobAmount(req.getAgreedJobAmount());
+        wo.setJobDescription(req.getJobDescription());
 
         return toResponse(workOrderRepository.save(wo), machineAssignmentRepository.countByWorkOrderId(id));
     }
@@ -486,6 +492,9 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .escalationClause(wo.getEscalationClause())
                 .penaltyClause(wo.getPenaltyClause())
                 .breakdownPenaltyThresholdHours(wo.getBreakdownPenaltyThresholdHours())
+                .workOrderType(wo.getWorkOrderType())
+                .agreedJobAmount(wo.getAgreedJobAmount())
+                .jobDescription(wo.getJobDescription())
                 .build();
     }
 

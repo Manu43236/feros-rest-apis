@@ -349,6 +349,20 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
     @Override
     public List<EquipmentInvoiceCalcResult> calculate(Long woId, LocalDate from, LocalDate to) {
         WorkOrder wo = workOrder(woId);
+
+        // JOB-type WOs have a fixed agreed amount — no hourly calculation
+        if (wo.getWorkOrderType() == com.feros.api.enums.WorkOrderType.JOB) {
+            if (wo.getAgreedJobAmount() == null) return List.of();
+            return List.of(EquipmentInvoiceCalcResult.builder()
+                    .machineAssignmentId(null)
+                    .equipmentTypeName(wo.getJobDescription() != null ? wo.getJobDescription() : "Job Contract")
+                    .baseAmount(wo.getAgreedJobAmount())
+                    .otAmount(BigDecimal.ZERO)
+                    .standbyAmount(BigDecimal.ZERO)
+                    .totalAmount(wo.getAgreedJobAmount())
+                    .build());
+        }
+
         List<MachineAssignment> assignments = assignmentRepository.findByWorkOrderIdOrderByStartDateAsc(woId);
         if (assignments.isEmpty()) return List.of();
 

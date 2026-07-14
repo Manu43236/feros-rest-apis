@@ -43,4 +43,8 @@ public class WorkOrderResponse {
     private String penaltyClause;
     // E5 KAN-28
     private Integer breakdownPenaltyThresholdHours;
+
+    private WorkOrderType workOrderType;
+    private BigDecimal agreedJobAmount;
+    private String jobDescription;
 }

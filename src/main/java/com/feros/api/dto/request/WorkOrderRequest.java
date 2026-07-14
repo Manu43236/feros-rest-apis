@@ -1,6 +1,7 @@
 package com.feros.api.dto.request;
 
 import com.feros.api.enums.ProviderSide;
+import com.feros.api.enums.WorkOrderType;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
@@ -42,4 +43,8 @@ public class WorkOrderRequest {
     private String penaltyClause;
     // E5 KAN-28
     private Integer breakdownPenaltyThresholdHours;
+
+    private WorkOrderType workOrderType;
+    private BigDecimal agreedJobAmount;
+    private String jobDescription;
 }
