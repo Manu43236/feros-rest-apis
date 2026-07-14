@@ -104,6 +104,12 @@ public class LrServiceImpl implements LrService {
         Order order = allocation.getOrder();
         Vehicle vehicle = allocation.getVehicle();
 
+        if (vehicle.getCapacityInTons() == null) {
+            throw new FerosException(
+                "Vehicle " + vehicle.getRegistrationNumber() + " does not have a capacity set. Please update the vehicle details before creating an LR.",
+                HttpStatus.BAD_REQUEST);
+        }
+
         Lr lr = Lr.builder()
                 .tenant(tenant)
                 .lrNumber(generateLrNumber(tenant))
