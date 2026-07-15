@@ -158,7 +158,13 @@ public class LrServiceImpl implements LrService {
     @Override
     public Page<LrResponse> getAllLrs(int page, int size, String search, LrStatus status) {
         Long tenantId = getCurrentTenantId();
+        String role = SecurityUtil.getCurrentRole();
         Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+        if ("DRIVER".equals(role) || "CLEANER".equals(role)) {
+            Long userId = SecurityUtil.getCurrentUserId();
+            return lrRepository.findByTenantIdAndDriverUserIdPaged(tenantId, userId, pageable)
+                    .map(this::mapToLrResponse);
+        }
         String searchParam = (search != null && !search.isBlank()) ? search.trim() : null;
         return lrRepository.findAllPaged(tenantId, status, searchParam, pageable)
                 .map(this::mapToLrResponse);
