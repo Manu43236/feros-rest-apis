@@ -42,7 +42,7 @@ public class VehicleBreakdownController {
 
     // Get breakdown record for a specific allocation
     @GetMapping("/orders/{orderId}/vehicle-allocations/{allocationId}/breakdown")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR','DRIVER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR','DRIVER','CLEANER')")
     public ResponseEntity<ApiResponse<BreakdownResponse>> getBreakdown(
             @PathVariable Long orderId,
             @PathVariable Long allocationId) {
