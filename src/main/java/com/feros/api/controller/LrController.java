@@ -49,7 +49,7 @@ public class LrController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER')")
     public ResponseEntity<ApiResponse<LrResponse>> getLrById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 "LR fetched successfully", lrService.getLrById(id)));
