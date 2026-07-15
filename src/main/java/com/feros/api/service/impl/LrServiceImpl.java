@@ -503,7 +503,8 @@ public class LrServiceImpl implements LrService {
 
     // ===================== MAPPERS =====================
     private LrResponse mapToLrResponse(Lr lr) {
-        Vehicle vehicle = lr.getVehicleAllocation().getVehicle();
+        var allocation = lr.getVehicleAllocation();
+        Vehicle vehicle = allocation != null ? allocation.getVehicle() : null;
         Long invoiceId     = invoiceLrRepository.findInvoiceIdByLrId(lr.getId()).orElse(null);
         String invoiceNumber = invoiceLrRepository.findInvoiceNumberByLrId(lr.getId()).orElse(null);
         return LrResponse.builder()
@@ -512,10 +513,10 @@ public class LrServiceImpl implements LrService {
                 .lrNumber(lr.getLrNumber())
                 .orderId(lr.getOrder().getId())
                 .orderNumber(lr.getOrder().getOrderNumber())
-                .vehicleAllocationId(lr.getVehicleAllocation().getId())
-                .vehicleId(vehicle.getId())
-                .vehicleRegistrationNumber(vehicle.getRegistrationNumber())
-                .vehicleTypeName(vehicle.getVehicleType() != null ?
+                .vehicleAllocationId(allocation != null ? allocation.getId() : null)
+                .vehicleId(vehicle != null ? vehicle.getId() : null)
+                .vehicleRegistrationNumber(vehicle != null ? vehicle.getRegistrationNumber() : null)
+                .vehicleTypeName(vehicle != null && vehicle.getVehicleType() != null ?
                         vehicle.getVehicleType().getName() : null)
                 .clientId(lr.getOrder().getClient().getId())
                 .clientName(lr.getOrder().getClient().getClientName())
@@ -535,7 +536,7 @@ public class LrServiceImpl implements LrService {
                 .isOverloaded(lr.getIsOverloaded())
                 .loadedAt(lr.getLoadedAt())
                 .deliveredAt(lr.getDeliveredAt())
-                .currentVehicleOdometer(vehicle.getCurrentOdometerReading())
+                .currentVehicleOdometer(vehicle != null ? vehicle.getCurrentOdometerReading() : null)
                 .startOdometer(vehicleMeterReadingRepository
                         .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
                                 lr.getId(), MeterReadingType.TRIP_START)
