@@ -15,6 +15,7 @@ import com.feros.api.enums.NotificationType;
 import com.feros.api.enums.RoleName;
 import com.feros.api.enums.TripExpenseStatus;
 import com.feros.api.exception.FerosException;
+import com.feros.api.entity.StaffProfile;
 import com.feros.api.repository.*;
 import com.feros.api.service.NotificationService;
 import com.feros.api.service.TripExpenseService;
@@ -42,6 +43,7 @@ public class TripExpenseServiceImpl implements TripExpenseService {
     private final TenantRepository tenantRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
     private final UserRepository userRepository;
+    private final StaffProfileRepository staffProfileRepository;
     private final NotificationService notificationService;
 
     private Tenant getCurrentTenant() {
@@ -133,11 +135,19 @@ public class TripExpenseServiceImpl implements TripExpenseService {
                     .build();
         }).collect(Collectors.toList());
 
+        User driver = lr.getDriver();
+        StaffProfile driverProfile = driver != null
+                ? staffProfileRepository.findByUserIdAndIsActiveTrue(driver.getId()).orElse(null)
+                : null;
+
         return TripExpenseResponse.builder()
                 .id(expense.getId())
                 .lrId(lr.getId())
                 .lrNumber(lr.getLrNumber())
-                .driverName(lr.getDriver() != null ? lr.getDriver().getName() : null)
+                .driverName(driver != null ? driver.getName() : null)
+                .driverBankName(driverProfile != null ? driverProfile.getBankName() : null)
+                .driverAccountNumber(driverProfile != null ? driverProfile.getAccountNumber() : null)
+                .driverIfscCode(driverProfile != null ? driverProfile.getIfscCode() : null)
                 .cleanerName(lr.getCleaner() != null ? lr.getCleaner().getName() : null)
                 .advanceAmount(expense.getAdvanceAmount())
                 .tripDays(expense.getTripDays())
@@ -156,6 +166,7 @@ public class TripExpenseServiceImpl implements TripExpenseService {
                 .approvedAt(expense.getApprovedAt())
                 .settlementAmount(expense.getSettlementAmount())
                 .settlementNote(expense.getSettlementNote())
+                .paymentMode(expense.getPaymentMode())
                 .settledByName(expense.getSettledBy() != null ? expense.getSettledBy().getName() : null)
                 .settledAt(expense.getSettledAt())
                 .rejectedByName(expense.getRejectedBy() != null ? expense.getRejectedBy().getName() : null)
@@ -382,6 +393,7 @@ public class TripExpenseServiceImpl implements TripExpenseService {
 
         expense.setSettlementAmount(request.getSettlementAmount());
         expense.setSettlementNote(request.getSettlementNote());
+        expense.setPaymentMode(request.getPaymentMode());
         expense.setSettledBy(currentUser);
         expense.setSettledAt(TimeUtil.nowIst());
         expense.setStatus(TripExpenseStatus.SETTLED);

@@ -1,5 +1,6 @@
 package com.feros.api.dto.response;
 
+import com.feros.api.enums.PaymentMode;
 import com.feros.api.enums.TripExpenseStatus;
 import lombok.Builder;
 import lombok.Getter;
@@ -39,8 +40,13 @@ public class TripExpenseResponse {
     private LocalDateTime approvedAt;
     private BigDecimal settlementAmount;
     private String settlementNote;
+    private PaymentMode paymentMode;
     private String settledByName;
     private LocalDateTime settledAt;
+
+    private String driverBankName;
+    private String driverAccountNumber;
+    private String driverIfscCode;
     private String rejectedByName;
     private LocalDateTime rejectedAt;
     private String rejectionReason;

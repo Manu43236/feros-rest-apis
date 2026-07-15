@@ -1,5 +1,6 @@
 package com.feros.api.dto.request;
 
+import com.feros.api.enums.PaymentMode;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -10,4 +11,5 @@ import java.math.BigDecimal;
 public class TripExpenseSettleRequest {
     private BigDecimal settlementAmount;
     private String settlementNote;
+    private PaymentMode paymentMode;
 }

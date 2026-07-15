@@ -1,5 +1,6 @@
 package com.feros.api.entity;
 
+import com.feros.api.enums.PaymentMode;
 import com.feros.api.enums.TripExpenseStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -76,6 +77,10 @@ public class LrTripExpense extends BaseEntity {
 
     @Column(name = "settlement_note", columnDefinition = "TEXT")
     private String settlementNote;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_mode")
+    private PaymentMode paymentMode;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "settled_by_id")
