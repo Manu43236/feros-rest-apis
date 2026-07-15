@@ -51,7 +51,18 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
     @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true AND l.isOverloaded = true AND l.lrDate BETWEEN :from AND :to ORDER BY l.lrDate DESC")
     List<Lr> findOverloadedByTenantIdAndDateRange(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 
-    @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true AND (l.driver.id = :userId OR l.cleaner.id = :userId) ORDER BY l.id DESC")
+    @Query("""
+            SELECT DISTINCT l FROM Lr l
+            WHERE l.tenant.id = :tenantId
+            AND l.isActive = true
+            AND EXISTS (
+                SELECT sa FROM OrderStaffAllocation sa
+                WHERE sa.vehicleAllocation.id = l.vehicleAllocation.id
+                AND sa.user.id = :userId
+                AND sa.isActive = true
+            )
+            ORDER BY l.id DESC
+            """)
     List<Lr> findByTenantIdAndDriverUserId(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
 
     @Query("SELECT l FROM Lr l WHERE l.vehicleAllocation.vehicle.id = :vehicleId AND l.isActive = true AND l.lrStatus NOT IN :excludedStatuses")
