@@ -35,7 +35,8 @@ public final class NumberUtil {
         EINV,   // Equipment Invoice
         ESVC,   // Equipment Service
         LSE,    // Vehicle Lease
-        LSEINV  // Lease Invoice
+        LSEINV, // Lease Invoice
+        SINV    // Service Invoice (vehicle maintenance)
     }
 
     /**

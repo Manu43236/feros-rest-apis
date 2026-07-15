@@ -64,6 +64,8 @@ import com.feros.api.repository.DocumentTypeRepository;
 import com.feros.api.dto.request.EquipmentDocumentRequest;
 import com.feros.api.dto.response.EquipmentDocumentResponse;
 import com.feros.api.service.EquipmentService;
+import com.feros.api.service.NumberGeneratorService;
+import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -101,6 +103,7 @@ public class EquipmentServiceImpl implements EquipmentService {
     private final EquipmentServicePartRepository equipmentServicePartRepository;
     private final EquipmentDocumentRepository equipmentDocumentRepository;
     private final DocumentTypeRepository documentTypeRepository;
+    private final NumberGeneratorService numberGenerator;
 
     private Long getTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -806,7 +809,7 @@ public class EquipmentServiceImpl implements EquipmentService {
         EquipmentServiceRecord record = EquipmentServiceRecord.builder()
                 .tenant(tenant)
                 .equipment(eq)
-                .serviceNumber(com.feros.api.util.NumberUtil.generate(tenant.getPrefix(), tenantId, com.feros.api.util.NumberUtil.Type.ESVC))
+                .serviceNumber(numberGenerator.generateFY(tenantId, NumberUtil.Type.ESVC))
                 .triggeredBy(request.getTriggeredBy())
                 .serviceType(request.getServiceType())
                 .payerType(request.getPayerType() != null ? request.getPayerType() : ServicePayerType.OWN_EXPENSE)
@@ -983,7 +986,7 @@ public class EquipmentServiceImpl implements EquipmentService {
             EquipmentServiceRecord next = EquipmentServiceRecord.builder()
                     .tenant(tenant)
                     .equipment(eq)
-                    .serviceNumber(com.feros.api.util.NumberUtil.generate(tenant.getPrefix(), tenantId, com.feros.api.util.NumberUtil.Type.ESVC))
+                    .serviceNumber(numberGenerator.generateFY(tenantId, NumberUtil.Type.ESVC))
                     .triggeredBy(record.getTriggeredBy())
                     .serviceType(record.getServiceType())
                     .payerType(record.getPayerType())

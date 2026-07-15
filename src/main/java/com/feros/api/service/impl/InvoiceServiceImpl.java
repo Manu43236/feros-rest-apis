@@ -16,6 +16,7 @@ import com.feros.api.exception.FerosException;
 import com.feros.api.entity.master.TenantSettings;
 import com.feros.api.repository.*;
 import com.feros.api.service.InvoiceService;
+import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.S3Service;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
@@ -48,6 +49,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final UserRepository userRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
     private final S3Service s3Service;
+    private final NumberGeneratorService numberGenerator;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -64,7 +66,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     }
 
     private String generateInvoiceNumber(Tenant tenant) {
-        return NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.INV);
+        return numberGenerator.generateFY(tenant.getId(), NumberUtil.Type.INV);
     }
 
     @Override

@@ -16,6 +16,7 @@ import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.repository.LeaseDailyLogRepository;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
+import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.VehicleLeaseService;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
@@ -49,6 +50,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     private final StaffProfileRepository staffProfileRepository;
     private final VehicleStatusRepository vehicleStatusRepository;
     private final ClientDivisionRepository clientDivisionRepository;
+    private final NumberGeneratorService numberGenerator;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
 
@@ -89,7 +91,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
 
         VehicleLease lease = VehicleLease.builder()
                 .tenant(t)
-                .leaseNumber(NumberUtil.generate(t.getPrefix(), t.getId(), NumberUtil.Type.LSE))
+                .leaseNumber(numberGenerator.generateFY(t.getId(), NumberUtil.Type.LSE))
                 .client(client)
                 .site(request.getSite())
                 .startDate(request.getStartDate())

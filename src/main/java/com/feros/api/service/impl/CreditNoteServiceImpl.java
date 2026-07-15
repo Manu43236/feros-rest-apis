@@ -7,6 +7,7 @@ import com.feros.api.enums.CreditNoteStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.CreditNoteService;
+import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class CreditNoteServiceImpl implements CreditNoteService {
     private final InvoiceRepository invoiceRepository;
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
+    private final NumberGeneratorService numberGenerator;
 
     @Override
     public CreditNoteResponse create(CreditNoteRequest request) {
@@ -40,7 +42,7 @@ public class CreditNoteServiceImpl implements CreditNoteService {
 
         InvoiceCreditNote.InvoiceCreditNoteBuilder builder = InvoiceCreditNote.builder()
                 .tenant(tenant)
-                .creditNoteNumber(NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.CN))
+                .creditNoteNumber(numberGenerator.generateFY(tenant.getId(), NumberUtil.Type.CN))
                 .client(client)
                 .creditNoteDate(request.getCreditNoteDate())
                 .amount(request.getAmount())

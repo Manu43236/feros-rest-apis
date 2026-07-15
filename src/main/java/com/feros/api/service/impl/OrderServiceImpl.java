@@ -25,6 +25,7 @@ import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.repository.LrRepository;
 import com.feros.api.service.NotificationService;
+import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.OrderService;
 import com.feros.api.enums.NotificationType;
 import com.feros.api.util.NumberUtil;
@@ -62,6 +63,7 @@ public class OrderServiceImpl implements OrderService {
     private final LrRepository lrRepository;
     private final AttendanceRepository attendanceRepository;
     private final NotificationService notificationService;
+    private final NumberGeneratorService numberGenerator;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -101,7 +103,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private String generateOrderNumber(Tenant tenant) {
-        return NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.ORD);
+        return numberGenerator.generateFY(tenant.getId(), NumberUtil.Type.ORD);
     }
 
     @Override

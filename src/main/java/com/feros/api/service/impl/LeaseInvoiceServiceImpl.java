@@ -14,6 +14,7 @@ import com.feros.api.repository.LeaseVehicleAssignmentRepository;
 import com.feros.api.repository.TenantRepository;
 import com.feros.api.repository.VehicleLeaseRepository;
 import com.feros.api.service.LeaseInvoiceService;
+import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
     private final VehicleLeaseRepository leaseRepository;
     private final LeaseVehicleAssignmentRepository assignmentRepository;
     private final TenantRepository tenantRepository;
+    private final NumberGeneratorService numberGenerator;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
 
@@ -108,7 +110,7 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
                 .tenant(t)
                 .lease(lease)
                 .client(lease.getClient())
-                .invoiceNumber(NumberUtil.generate(t.getPrefix(), t.getId(), NumberUtil.Type.LSEINV))
+                .invoiceNumber(numberGenerator.generateFY(t.getId(), NumberUtil.Type.LSEINV))
                 .invoiceDate(req.getInvoiceDate())
                 .dueDate(req.getDueDate())
                 .billingPeriodStart(req.getBillingPeriodStart())

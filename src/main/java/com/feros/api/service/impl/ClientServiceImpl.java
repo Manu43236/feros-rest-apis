@@ -12,6 +12,7 @@ import com.feros.api.enums.ClientCategory;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.ClientService;
+import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import com.opencsv.CSVReader;
@@ -40,6 +41,7 @@ public class ClientServiceImpl implements ClientService {
     private final StateRepository stateRepository;
     private final PaymentTermsRepository paymentTermsRepository;
     private final ClientDivisionRepository clientDivisionRepository;
+    private final NumberGeneratorService numberGenerator;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -60,7 +62,7 @@ public class ClientServiceImpl implements ClientService {
 
         Client client = Client.builder()
                 .tenant(tenant)
-                .clientNumber(NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.CLNT))
+                .clientNumber(numberGenerator.generateSequential(tenant.getId(), NumberUtil.Type.CLNT))
                 .clientName(request.getClientName())
                 .clientCategory(request.getClientCategory() != null ? request.getClientCategory() : ClientCategory.COMPANY)
                 .clientType(clientType)
@@ -221,7 +223,7 @@ public class ClientServiceImpl implements ClientService {
 
                     Client.ClientBuilder builder = Client.builder()
                             .tenant(tenant)
-                            .clientNumber(NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.CLNT))
+                            .clientNumber(numberGenerator.generateSequential(tenant.getId(), NumberUtil.Type.CLNT))
                             .clientName(row[0].trim())
                             .clientType(clientType)
                             .phone(phone)

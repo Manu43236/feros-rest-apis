@@ -24,6 +24,7 @@ import com.feros.api.entity.ServicePart;
 import com.feros.api.entity.SparePartsTransaction;
 import com.feros.api.entity.User;
 import com.feros.api.repository.*;
+import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.VehicleMaintenanceService;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
@@ -34,7 +35,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +56,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     private final ServicePartRepository servicePartRepository;
     private final SparePartsTransactionRepository sparePartsTransactionRepository;
     private final UserRepository userRepository;
+    private final NumberGeneratorService numberGenerator;
 
     @Override
     @Transactional
@@ -90,7 +91,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
         VehicleService vs = VehicleService.builder()
                 .tenant(tenant)
                 .vehicle(vehicle)
-                .serviceNumber(NumberUtil.generate(tenant.getPrefix(), tenantId, NumberUtil.Type.SVC))
+                .serviceNumber(numberGenerator.generateFY(tenantId, NumberUtil.Type.SVC))
                 .triggeredBy(request.getTriggeredBy())
                 .breakdown(breakdown)
                 .serviceType(request.getServiceType())
@@ -380,11 +381,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     private void createServiceInvoice(VehicleService vs, CompleteServiceRequest request) {
         boolean isInternal = vs.getServiceType() == VehicleServiceType.INTERNAL;
 
-        String prefix = vs.getTenant().getPrefix() != null && !vs.getTenant().getPrefix().isBlank()
-                ? vs.getTenant().getPrefix().trim().toUpperCase()
-                : "T" + vs.getTenant().getId();
-        String invoiceNumber = prefix + "_SERVICEINV_" +
-                TimeUtil.nowIst().format(DateTimeFormatter.ofPattern("ddMMyyHHmmssSSS"));
+        String invoiceNumber = numberGenerator.generateFY(vs.getTenant().getId(), NumberUtil.Type.SINV);
 
         ServiceInvoice.ServiceInvoiceBuilder builder = ServiceInvoice.builder()
                 .tenant(vs.getTenant())

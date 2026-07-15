@@ -19,6 +19,7 @@ import com.feros.api.exception.FerosException;
 import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.repository.*;
 import com.feros.api.service.NotificationService;
+import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.UserService;
 import com.feros.api.enums.NotificationType;
 import com.feros.api.util.NumberUtil;
@@ -56,6 +57,7 @@ public class UserServiceImpl implements UserService {
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final NotificationService notificationService;
     private final AttendanceRepository attendanceRepository;
+    private final NumberGeneratorService numberGenerator;
 
     @Override
     @Transactional
@@ -87,7 +89,7 @@ public class UserServiceImpl implements UserService {
         // 6. Create user
         User user = User.builder()
                 .tenant(tenant)
-                .userNumber(NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.USR))
+                .userNumber(numberGenerator.generateSequential(tenant.getId(), NumberUtil.Type.USR))
                 .name(request.getName())
                 .phone(request.getPhone())
                 .pin(hashedPin)
@@ -307,7 +309,7 @@ public class UserServiceImpl implements UserService {
 
                     User user = User.builder()
                             .tenant(tenant)
-                            .userNumber(NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.USR))
+                            .userNumber(numberGenerator.generateSequential(tenant.getId(), NumberUtil.Type.USR))
                             .name(name)
                             .phone(phone)
                             .pin(hashedPin)
@@ -390,7 +392,7 @@ public class UserServiceImpl implements UserService {
                     String rawPin = generatePin();
                     User user = User.builder()
                             .tenant(tenant)
-                            .userNumber(NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.USR))
+                            .userNumber(numberGenerator.generateSequential(tenant.getId(), NumberUtil.Type.USR))
                             .name(name)
                             .phone(phone)
                             .pin(passwordEncoder.encode(rawPin))
@@ -488,7 +490,7 @@ public class UserServiceImpl implements UserService {
                         String rawPin = generatePin();
                         user = userRepository.save(User.builder()
                                 .tenant(tenant)
-                                .userNumber(NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.USR))
+                                .userNumber(numberGenerator.generateSequential(tenant.getId(), NumberUtil.Type.USR))
                                 .name(name)
                                 .phone(phone)
                                 .pin(passwordEncoder.encode(rawPin))

@@ -16,6 +16,7 @@ import com.feros.api.enums.RoleName;
 import com.feros.api.repository.*;
 import com.feros.api.service.InventoryService;
 import com.feros.api.service.NotificationService;
+import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import com.opencsv.CSVReader;
@@ -47,6 +48,7 @@ public class InventoryServiceImpl implements InventoryService {
     private final UserRepository userRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
     private final NotificationService notificationService;
+    private final NumberGeneratorService numberGenerator;
 
     private Long getTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -69,7 +71,7 @@ public class InventoryServiceImpl implements InventoryService {
     @Transactional
     public SparePartResponse createSparePart(SparePartRequest request) {
         Tenant tenant = getTenant();
-        String partNumber = NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.PART);
+        String partNumber = numberGenerator.generateSequential(tenant.getId(), NumberUtil.Type.PART);
         SparePart part = SparePart.builder()
                 .tenant(tenant)
                 .name(request.getName())
@@ -572,7 +574,7 @@ public class InventoryServiceImpl implements InventoryService {
                         try { minStock = Integer.parseInt(row[3].trim()); }
                         catch (NumberFormatException e) { errors.add("Row " + rowNum + ": Invalid min stock level"); failureCount++; continue; }
                     }
-                    String partNumber = NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.PART);
+                    String partNumber = numberGenerator.generateSequential(tenant.getId(), NumberUtil.Type.PART);
                     SparePart part = SparePart.builder()
                             .tenant(tenant).name(name)
                             .partNumber(partNumber)

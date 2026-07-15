@@ -46,6 +46,7 @@ class PayrollCalculationTest {
     @Mock private VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     @Mock private NotificationService notificationService;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private NumberGeneratorService numberGenerator;
 
     private PayrollServiceImpl payrollService;
 
@@ -58,7 +59,7 @@ class PayrollCalculationTest {
             payrollRepository, payrollDeductionRepository, salaryAdvanceRepository,
             tenantRepository, userRepository, attendanceRepository,
             deductionTypeRepository, staffProfileRepository,
-            vehicleStaffAssignmentRepository, notificationService, transactionManager
+            vehicleStaffAssignmentRepository, notificationService, transactionManager, numberGenerator
         );
 
         // Set up a valid security context for every test

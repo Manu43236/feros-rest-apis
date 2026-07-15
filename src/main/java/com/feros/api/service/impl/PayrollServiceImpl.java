@@ -18,7 +18,9 @@ import com.feros.api.entity.StaffProfile;
 import com.feros.api.entity.VehicleStaffAssignment;
 import com.feros.api.repository.*;
 import com.feros.api.service.NotificationService;
+import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.PayrollService;
+import com.feros.api.util.NumberUtil;
 import com.feros.api.enums.NotificationType;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +60,7 @@ public class PayrollServiceImpl implements PayrollService {
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final NotificationService notificationService;
     private final PlatformTransactionManager transactionManager;
+    private final NumberGeneratorService numberGenerator;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -281,6 +284,7 @@ public class PayrollServiceImpl implements PayrollService {
 
         Payroll payroll = Payroll.builder()
                 .tenant(getCurrentTenant())
+                .referenceNumber(numberGenerator.generateMonthly(getCurrentTenantId(), NumberUtil.Type.PR))
                 .user(user)
                 .payCycleStartDate(request.getPayCycleStartDate())
                 .payCycleEndDate(request.getPayCycleEndDate())

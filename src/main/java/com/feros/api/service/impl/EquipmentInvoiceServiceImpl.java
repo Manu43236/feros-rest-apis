@@ -20,6 +20,7 @@ import com.feros.api.repository.ClientRepository;
 import com.feros.api.repository.TenantRepository;
 import com.feros.api.repository.WorkOrderRepository;
 import com.feros.api.service.EquipmentInvoiceService;
+import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +50,7 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
     private final EquipmentDailyLogRepository dailyLogRepository;
     private final TenantRepository tenantRepository;
     private final ClientRepository clientRepository;
+    private final NumberGeneratorService numberGenerator;
 
     private Long tenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -76,7 +78,7 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
                 .tenant(t)
                 .workOrder(wo)
                 .client(wo.getClient())
-                .invoiceNumber(NumberUtil.generate(t.getPrefix(), t.getId(), NumberUtil.Type.EINV))
+                .invoiceNumber(numberGenerator.generateFY(t.getId(), NumberUtil.Type.EINV))
                 .invoiceDate(req.getInvoiceDate())
                 .dueDate(req.getDueDate())
                 .billingPeriodStart(req.getBillingPeriodStart())
@@ -108,7 +110,7 @@ public class EquipmentInvoiceServiceImpl implements EquipmentInvoiceService {
                 .tenant(t)
                 .workOrder(null)
                 .client(client)
-                .invoiceNumber(NumberUtil.generate(t.getPrefix(), t.getId(), NumberUtil.Type.EINV))
+                .invoiceNumber(numberGenerator.generateFY(t.getId(), NumberUtil.Type.EINV))
                 .invoiceDate(req.getInvoiceDate())
                 .dueDate(req.getDueDate())
                 .billingPeriodStart(req.getBillingPeriodStart())

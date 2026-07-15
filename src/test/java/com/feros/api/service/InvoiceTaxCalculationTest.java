@@ -42,6 +42,7 @@ class InvoiceTaxCalculationTest {
     @Mock private UserRepository userRepository;
     @Mock private TenantSettingsRepository tenantSettingsRepository;
     @Mock private S3Service s3Service;
+    @Mock private NumberGeneratorService numberGenerator;
 
     private InvoiceServiceImpl invoiceService;
 
@@ -54,7 +55,7 @@ class InvoiceTaxCalculationTest {
             invoiceRepository, invoiceLrRepository, invoicePaymentRepository,
             tenantRepository, clientRepository, lrRepository,
             lrChargeRepository, lrCheckpostRepository, userRepository,
-            tenantSettingsRepository, s3Service
+            tenantSettingsRepository, s3Service, numberGenerator
         );
 
         UserPrincipal principal = new UserPrincipal(USER_ID, TENANT_ID, "9999999999", "ADMIN");

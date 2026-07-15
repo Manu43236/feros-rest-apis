@@ -13,6 +13,7 @@ import com.feros.api.entity.*;
 import com.feros.api.enums.*;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
+import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.WorkOrderService;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
@@ -49,6 +50,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     private final WoAmendmentRepository woAmendmentRepository;
     private final MachineConditionSurveyRepository conditionSurveyRepository;
     private final EquipmentBreakdownRepository equipmentBreakdownRepository;
+    private final NumberGeneratorService numberGenerator;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
 
@@ -102,7 +104,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
 
         WorkOrder.WorkOrderBuilder builder = WorkOrder.builder()
                 .tenant(t)
-                .woNumber(NumberUtil.generate(t.getPrefix(), t.getId(), NumberUtil.Type.WO))
+                .woNumber(numberGenerator.generateFY(t.getId(), NumberUtil.Type.WO))
                 .client(client)
                 .site(req.getSite())
                 .mobilizationCharge(req.getMobilizationCharge())

@@ -19,6 +19,7 @@ import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.LrService;
 import com.feros.api.service.NotificationService;
+import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.enums.NotificationType;
 import com.feros.api.enums.RoleName;
 import com.feros.api.entity.VehicleMeterReading;
@@ -57,6 +58,7 @@ public class LrServiceImpl implements LrService {
     private final AttendanceRepository attendanceRepository;
     private final NotificationService notificationService;
     private final InvoiceLrRepository invoiceLrRepository;
+    private final NumberGeneratorService numberGenerator;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -81,7 +83,7 @@ public class LrServiceImpl implements LrService {
     }
 
     private String generateLrNumber(Tenant tenant) {
-        return NumberUtil.generate(tenant.getPrefix(), tenant.getId(), NumberUtil.Type.LR);
+        return numberGenerator.generateFY(tenant.getId(), NumberUtil.Type.LR);
     }
 
     @Override
