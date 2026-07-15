@@ -63,10 +63,20 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
                     AND sa.isActive = true
                 )
                 OR (
-                    (l.driver.id = :userId OR l.cleaner.id = :userId)
+                    l.driver.id = :userId
                     AND NOT EXISTS (
                         SELECT sa2 FROM OrderStaffAllocation sa2
                         WHERE sa2.vehicleAllocation.id = l.vehicleAllocation.id
+                        AND sa2.role.name = com.feros.api.enums.RoleName.DRIVER
+                        AND sa2.isActive = true
+                    )
+                )
+                OR (
+                    l.cleaner.id = :userId
+                    AND NOT EXISTS (
+                        SELECT sa2 FROM OrderStaffAllocation sa2
+                        WHERE sa2.vehicleAllocation.id = l.vehicleAllocation.id
+                        AND sa2.role.name = com.feros.api.enums.RoleName.CLEANER
                         AND sa2.isActive = true
                     )
                 )
@@ -87,10 +97,20 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
                     AND sa.isActive = true
                 )
                 OR (
-                    (l.driver.id = :userId OR l.cleaner.id = :userId)
+                    l.driver.id = :userId
                     AND NOT EXISTS (
                         SELECT sa2 FROM OrderStaffAllocation sa2
                         WHERE sa2.vehicleAllocation.id = l.vehicleAllocation.id
+                        AND sa2.role.name = com.feros.api.enums.RoleName.DRIVER
+                        AND sa2.isActive = true
+                    )
+                )
+                OR (
+                    l.cleaner.id = :userId
+                    AND NOT EXISTS (
+                        SELECT sa2 FROM OrderStaffAllocation sa2
+                        WHERE sa2.vehicleAllocation.id = l.vehicleAllocation.id
+                        AND sa2.role.name = com.feros.api.enums.RoleName.CLEANER
                         AND sa2.isActive = true
                     )
                 )
