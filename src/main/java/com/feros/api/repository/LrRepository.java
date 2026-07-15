@@ -62,7 +62,14 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
                     AND sa.user.id = :userId
                     AND sa.isActive = true
                 )
-                OR l.cleaner.id = :userId
+                OR (
+                    (l.driver.id = :userId OR l.cleaner.id = :userId)
+                    AND NOT EXISTS (
+                        SELECT sa2 FROM OrderStaffAllocation sa2
+                        WHERE sa2.vehicleAllocation.id = l.vehicleAllocation.id
+                        AND sa2.isActive = true
+                    )
+                )
             )
             ORDER BY l.id DESC
             """)
@@ -79,7 +86,14 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
                     AND sa.user.id = :userId
                     AND sa.isActive = true
                 )
-                OR l.cleaner.id = :userId
+                OR (
+                    (l.driver.id = :userId OR l.cleaner.id = :userId)
+                    AND NOT EXISTS (
+                        SELECT sa2 FROM OrderStaffAllocation sa2
+                        WHERE sa2.vehicleAllocation.id = l.vehicleAllocation.id
+                        AND sa2.isActive = true
+                    )
+                )
             )
             """)
     Page<Lr> findByTenantIdAndDriverUserIdPaged(@Param("tenantId") Long tenantId, @Param("userId") Long userId, Pageable pageable);
