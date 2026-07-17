@@ -13,8 +13,11 @@ import com.feros.api.enums.OrderStatus;
 
 import java.util.List;
 import com.feros.api.service.OrderService;
+import com.feros.api.service.impl.OrderPdfService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -26,7 +29,8 @@ import org.springframework.data.domain.Page;
 @RequiredArgsConstructor
 public class OrderController {
 
-    private final OrderService orderService;
+    private final OrderService    orderService;
+    private final OrderPdfService orderPdfService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER')")
@@ -122,6 +126,19 @@ public class OrderController {
     public ResponseEntity<ApiResponse<OrderResponse>> forceDeliverOrder(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Order marked as delivered", orderService.forceDeliverOrder(id)));
+    }
+
+    @GetMapping(value = "/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<byte[]> getOrderPdf(@PathVariable Long id,
+            @RequestParam(defaultValue = "FEROS") String companyName) {
+        OrderResponse order = orderService.getOrderById(id);
+        byte[] pdf = orderPdfService.generatePdf(order, companyName);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=\"ORDER-" + order.getOrderNumber() + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @GetMapping("/vehicle-allocation-history")
