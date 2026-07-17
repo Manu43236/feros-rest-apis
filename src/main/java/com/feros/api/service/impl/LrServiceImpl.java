@@ -156,6 +156,7 @@ public class LrServiceImpl implements LrService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public Page<LrResponse> getAllLrs(int page, int size, String search, LrStatus status) {
         Long tenantId = getCurrentTenantId();
         String role = SecurityUtil.getCurrentRole();
