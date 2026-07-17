@@ -16,14 +16,7 @@ import java.util.Optional;
 public interface LrRepository extends JpaRepository<Lr, Long> {
     List<Lr> findByTenantIdAndIsActiveTrue(Long tenantId);
 
-    @Query(value = "SELECT DISTINCT l FROM Lr l " +
-           "LEFT JOIN FETCH l.startedBy sb LEFT JOIN FETCH sb.roles " +
-           "LEFT JOIN FETCH l.completedBy cb LEFT JOIN FETCH cb.roles " +
-           "WHERE l.tenant.id = :tenantId AND l.isActive = true " +
-           "AND (:status IS NULL OR l.lrStatus = :status) " +
-           "AND (:search IS NULL OR LOWER(l.lrNumber) LIKE LOWER(CONCAT('%',:search,'%')) " +
-           "OR LOWER(l.vehicleAllocation.vehicle.registrationNumber) LIKE LOWER(CONCAT('%',:search,'%')))",
-           countQuery = "SELECT COUNT(l) FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true " +
+    @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true " +
            "AND (:status IS NULL OR l.lrStatus = :status) " +
            "AND (:search IS NULL OR LOWER(l.lrNumber) LIKE LOWER(CONCAT('%',:search,'%')) " +
            "OR LOWER(l.vehicleAllocation.vehicle.registrationNumber) LIKE LOWER(CONCAT('%',:search,'%')))")

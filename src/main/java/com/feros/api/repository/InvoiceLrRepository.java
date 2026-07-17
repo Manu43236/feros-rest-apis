@@ -29,8 +29,8 @@ public interface InvoiceLrRepository extends JpaRepository<InvoiceLr, Long> {
     List<InvoiceLr> findByTenantIdAndLrDateRange(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 
     @Query("SELECT il.invoice.id FROM InvoiceLr il WHERE il.lr.id = :lrId AND il.isActive = true")
-    java.util.Optional<Long> findInvoiceIdByLrId(@Param("lrId") Long lrId);
+    List<Long> findInvoiceIdsByLrId(@Param("lrId") Long lrId);
 
     @Query("SELECT il.invoice.invoiceNumber FROM InvoiceLr il WHERE il.lr.id = :lrId AND il.isActive = true")
-    java.util.Optional<String> findInvoiceNumberByLrId(@Param("lrId") Long lrId);
+    List<String> findInvoiceNumbersByLrId(@Param("lrId") Long lrId);
 }

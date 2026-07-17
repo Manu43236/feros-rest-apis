@@ -512,8 +512,8 @@ public class LrServiceImpl implements LrService {
     private LrResponse mapToLrResponse(Lr lr) {
         var allocation = lr.getVehicleAllocation();
         Vehicle vehicle = allocation != null ? allocation.getVehicle() : null;
-        Long invoiceId     = invoiceLrRepository.findInvoiceIdByLrId(lr.getId()).orElse(null);
-        String invoiceNumber = invoiceLrRepository.findInvoiceNumberByLrId(lr.getId()).orElse(null);
+        Long invoiceId     = invoiceLrRepository.findInvoiceIdsByLrId(lr.getId()).stream().findFirst().orElse(null);
+        String invoiceNumber = invoiceLrRepository.findInvoiceNumbersByLrId(lr.getId()).stream().findFirst().orElse(null);
         return LrResponse.builder()
                 .id(lr.getId())
                 .tenantId(lr.getTenant().getId())
