@@ -182,6 +182,12 @@ public class UserServiceImpl implements UserService {
         user.setName(request.getName());
         user.setPhone(request.getPhone());
 
+        if (request.getRole() != null) {
+            Role role = roleRepository.findByName(request.getRole())
+                    .orElseThrow(() -> new FerosException("Role not found", HttpStatus.NOT_FOUND));
+            user.setRoles(new HashSet<>(Set.of(role)));
+        }
+
         User updated = userRepository.save(user);
 
         if (isStaffRole(request.getRole())) {
