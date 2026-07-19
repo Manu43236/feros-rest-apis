@@ -80,8 +80,10 @@ public class VehicleResponse {
     // Vehicle-level staff assignment
     private Long currentDriverId;
     private String currentDriverName;
+    private String currentDriverPhone;
     private Long currentCleanerId;
     private String currentCleanerName;
+    private String currentCleanerPhone;
 
     // Date-based assignment info (populated when ?date= param is provided)
     private Boolean isAssigned;
