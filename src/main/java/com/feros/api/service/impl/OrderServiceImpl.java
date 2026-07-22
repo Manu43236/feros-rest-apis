@@ -900,9 +900,21 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private VehicleAllocationResponse mapToVehicleAllocationResponse(OrderVehicleAllocation a) {
-        List<StaffAllocationResponse> staffAllocations = staffAllocationRepository
-                .findByVehicleAllocationIdAndIsActiveTrue(a.getId())
-                .stream().map(this::mapToStaffAllocationResponse).toList();
+        List<OrderStaffAllocation> rawStaff = staffAllocationRepository
+                .findByVehicleAllocationIdAndIsActiveTrue(a.getId());
+
+        List<StaffAllocationResponse> staffAllocations = rawStaff.stream()
+                .map(this::mapToStaffAllocationResponse).toList();
+
+        User allocatedDriver = rawStaff.stream()
+                .filter(s -> s.getRole().getName() == RoleName.DRIVER)
+                .map(OrderStaffAllocation::getUser)
+                .findFirst().orElse(null);
+
+        User allocatedCleaner = rawStaff.stream()
+                .filter(s -> s.getRole().getName() == RoleName.CLEANER)
+                .map(OrderStaffAllocation::getUser)
+                .findFirst().orElse(null);
 
         return VehicleAllocationResponse.builder()
                 .id(a.getId())
@@ -919,12 +931,12 @@ public class OrderServiceImpl implements OrderService {
                 .remarks(a.getRemarks())
                 .allocatedById(a.getAllocatedBy() != null ? a.getAllocatedBy().getId() : null)
                 .allocatedByName(a.getAllocatedBy() != null ? a.getAllocatedBy().getName() : null)
-                .currentDriverId(a.getVehicle().getCurrentDriver() != null ? a.getVehicle().getCurrentDriver().getId() : null)
-                .currentDriverName(a.getVehicle().getCurrentDriver() != null ? a.getVehicle().getCurrentDriver().getName() : null)
-                .currentDriverPhone(a.getVehicle().getCurrentDriver() != null ? a.getVehicle().getCurrentDriver().getPhone() : null)
-                .currentCleanerId(a.getVehicle().getCurrentCleaner() != null ? a.getVehicle().getCurrentCleaner().getId() : null)
-                .currentCleanerName(a.getVehicle().getCurrentCleaner() != null ? a.getVehicle().getCurrentCleaner().getName() : null)
-                .currentCleanerPhone(a.getVehicle().getCurrentCleaner() != null ? a.getVehicle().getCurrentCleaner().getPhone() : null)
+                .currentDriverId(allocatedDriver != null ? allocatedDriver.getId() : null)
+                .currentDriverName(allocatedDriver != null ? allocatedDriver.getName() : null)
+                .currentDriverPhone(allocatedDriver != null ? allocatedDriver.getPhone() : null)
+                .currentCleanerId(allocatedCleaner != null ? allocatedCleaner.getId() : null)
+                .currentCleanerName(allocatedCleaner != null ? allocatedCleaner.getName() : null)
+                .currentCleanerPhone(allocatedCleaner != null ? allocatedCleaner.getPhone() : null)
                 .staffAllocations(staffAllocations)
                 .createdAt(a.getCreatedAt())
                 .updatedAt(a.getUpdatedAt())
