@@ -34,6 +34,23 @@ public interface PayrollRepository extends JpaRepository<Payroll, Long> {
 
     boolean existsByUserIdAndTenantIdAndPayCycleStartDateAndIsActiveTrue(
             Long userId, Long tenantId, LocalDate startDate);
+
+    @Query("""
+        SELECT CASE WHEN COUNT(p) > 0 THEN true ELSE false END
+        FROM Payroll p
+        WHERE p.user.id = :userId
+          AND p.tenant.id = :tenantId
+          AND p.payCycleStartDate = :startDate
+          AND p.payrollStatus IN (com.feros.api.enums.PayrollStatus.DRAFT, com.feros.api.enums.PayrollStatus.PAID)
+          AND p.isActive = true
+    """)
+    boolean existsActiveNonCancelledPayroll(
+            @Param("userId") Long userId,
+            @Param("tenantId") Long tenantId,
+            @Param("startDate") LocalDate startDate);
+
+    Optional<Payroll> findByUserIdAndTenantIdAndPayCycleStartDateAndPayrollStatus(
+            Long userId, Long tenantId, LocalDate startDate, com.feros.api.enums.PayrollStatus status);
     @Query("SELECT p FROM Payroll p WHERE p.tenant.id = :tenantId AND p.isActive = true AND p.payCycleStartDate >= :from AND p.payCycleEndDate <= :to ORDER BY p.payCycleStartDate DESC")
     List<Payroll> findByTenantIdAndDateRange(@Param("tenantId") Long tenantId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }

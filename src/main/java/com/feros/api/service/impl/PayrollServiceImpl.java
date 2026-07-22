@@ -143,11 +143,20 @@ public class PayrollServiceImpl implements PayrollService {
     private PayrollResponse generatePayrollCore(GeneratePayrollRequest request) {
         Long tenantId = getCurrentTenantId();
 
-        if (payrollRepository.existsByUserIdAndTenantIdAndPayCycleStartDateAndIsActiveTrue(
+        if (payrollRepository.existsActiveNonCancelledPayroll(
                 request.getUserId(), tenantId, request.getPayCycleStartDate())) {
             throw new FerosException("Payroll already generated for this user and pay cycle",
                     HttpStatus.CONFLICT);
         }
+
+        // If a cancelled payroll exists for this period, wipe it so there's no DB conflict
+        payrollRepository.findByUserIdAndTenantIdAndPayCycleStartDateAndPayrollStatus(
+                request.getUserId(), tenantId, request.getPayCycleStartDate(), PayrollStatus.CANCELLED)
+                .ifPresent(cancelled -> {
+                    payrollDeductionRepository.findByPayrollIdAndIsActiveTrue(cancelled.getId())
+                            .forEach(d -> { d.setIsActive(false); payrollDeductionRepository.save(d); });
+                    payrollRepository.delete(cancelled);
+                });
 
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
