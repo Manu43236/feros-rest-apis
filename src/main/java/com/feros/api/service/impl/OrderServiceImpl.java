@@ -918,7 +918,8 @@ public class OrderServiceImpl implements OrderService {
 
         // fallback to LR snapshot when no staff allocation exists (legacy orders)
         if (allocatedDriver == null || allocatedCleaner == null) {
-            Lr lr = lrRepository.findByVehicleAllocationId(a.getId()).orElse(null);
+            List<Lr> lrs = lrRepository.findAllByVehicleAllocationId(a.getId());
+            Lr lr = lrs.isEmpty() ? null : lrs.get(0);
             if (lr != null) {
                 if (allocatedDriver == null) allocatedDriver = lr.getDriver();
                 if (allocatedCleaner == null) allocatedCleaner = lr.getCleaner();
