@@ -26,6 +26,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,6 +45,7 @@ class PayrollCalculationTest {
     @Mock private DeductionTypeRepository deductionTypeRepository;
     @Mock private StaffProfileRepository staffProfileRepository;
     @Mock private VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    @Mock private TenantHolidayRepository tenantHolidayRepository;
     @Mock private NotificationService notificationService;
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private NumberGeneratorService numberGenerator;
@@ -59,7 +61,8 @@ class PayrollCalculationTest {
             payrollRepository, payrollDeductionRepository, salaryAdvanceRepository,
             tenantRepository, userRepository, attendanceRepository,
             deductionTypeRepository, staffProfileRepository,
-            vehicleStaffAssignmentRepository, notificationService, transactionManager, numberGenerator
+            vehicleStaffAssignmentRepository, tenantHolidayRepository,
+            notificationService, transactionManager, numberGenerator
         );
 
         // Set up a valid security context for every test
@@ -79,7 +82,7 @@ class PayrollCalculationTest {
     // ─── DAILY salary ────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("Daily salary: basicPay = dailyRate × (present + halfDay×0.5 + leave)")
+    @DisplayName("Daily salary: basicPay = dailyRate × (present + halfDay×0.5); leave days are unpaid")
     void generatePayroll_dailySalary_calculatesBasicPayCorrectly() {
         stubCommonDeps(SalaryType.DAILY, null, new BigDecimal("500.00"));
         stubAttendance(20, 2, 1, 0);   // present=20, half=2, leave=1, absent=0
@@ -89,10 +92,11 @@ class PayrollCalculationTest {
         payrollService.generatePayroll(req);
 
         Payroll saved = captureFirstSave();
-        // effectiveDays = 20 + 2×0.5 + 1 = 22  →  basicPay = 500 × 22 = 11000
-        assertThat(saved.getBasicPay()).isEqualByComparingTo("11000.00");
+        // effectiveDays = 20 + 2×0.5 = 21 (leave not paid for daily workers)
+        // basicPay = 500 × 21 = 10500
+        assertThat(saved.getBasicPay()).isEqualByComparingTo("10500.00");
         assertThat(saved.getOvertimePay()).isEqualByComparingTo("0.00");
-        assertThat(saved.getGrossPay()).isEqualByComparingTo("11000.00");
+        assertThat(saved.getGrossPay()).isEqualByComparingTo("10500.00");
     }
 
     @Test
@@ -193,6 +197,9 @@ class PayrollCalculationTest {
 
         when(vehicleStaffAssignmentRepository.findOverlappingByUser(
             anyLong(), anyLong(), any(), any())).thenReturn(List.of());
+
+        when(tenantHolidayRepository.findHolidayDatesBetween(anyLong(), any(), any()))
+            .thenReturn(Set.of());
 
         Tenant tenant = new Tenant();
         tenant.setId(TENANT_ID);
