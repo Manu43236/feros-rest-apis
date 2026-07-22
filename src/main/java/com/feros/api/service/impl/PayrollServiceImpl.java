@@ -155,14 +155,14 @@ public class PayrollServiceImpl implements PayrollService {
         }
 
         // Case 3: overlapping pay cycle for the same user
-        if (payrollRepository.countOverlappingPayrolls(
+        payrollRepository.findOverlappingPayroll(
                 request.getUserId(), tenantId,
                 request.getPayCycleStartDate(), request.getPayCycleEndDate(),
-                List.of(PayrollStatus.DRAFT, PayrollStatus.PAID)) > 0) {
-            throw new FerosException(
-                "Payroll already exists for this user covering part of this date range",
-                HttpStatus.CONFLICT);
-        }
+                List.of(PayrollStatus.DRAFT, PayrollStatus.PAID))
+                .ifPresent(existing -> { throw new FerosException(
+                    "Payroll already exists for this user from "
+                        + existing.getPayCycleStartDate() + " to " + existing.getPayCycleEndDate(),
+                    HttpStatus.CONFLICT); });
 
         // If a cancelled payroll exists for this period, remove it so a fresh one can be inserted
         payrollRepository.findByUserIdAndTenantIdAndPayCycleStartDateAndPayrollStatus(

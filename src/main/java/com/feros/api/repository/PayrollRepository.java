@@ -42,7 +42,7 @@ public interface PayrollRepository extends JpaRepository<Payroll, Long> {
             Long userId, Long tenantId, LocalDate startDate, com.feros.api.enums.PayrollStatus status);
 
     @Query("""
-        SELECT COUNT(p) FROM Payroll p
+        SELECT p FROM Payroll p
         WHERE p.user.id = :userId
           AND p.tenant.id = :tenantId
           AND p.isActive = true
@@ -50,7 +50,7 @@ public interface PayrollRepository extends JpaRepository<Payroll, Long> {
           AND p.payCycleStartDate <= :endDate
           AND p.payCycleEndDate >= :startDate
     """)
-    long countOverlappingPayrolls(
+    Optional<Payroll> findOverlappingPayroll(
             @Param("userId") Long userId,
             @Param("tenantId") Long tenantId,
             @Param("startDate") LocalDate startDate,
