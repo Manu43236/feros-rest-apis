@@ -143,11 +143,25 @@ public class PayrollServiceImpl implements PayrollService {
     private PayrollResponse generatePayrollCore(GeneratePayrollRequest request) {
         Long tenantId = getCurrentTenantId();
 
-        if (payrollRepository.existsByUserIdAndTenantIdAndPayCycleStartDateAndPayrollStatusInAndIsActiveTrue(
-                request.getUserId(), tenantId, request.getPayCycleStartDate(),
-                List.of(PayrollStatus.DRAFT, PayrollStatus.PAID))) {
-            throw new FerosException("Payroll already generated for this user and pay cycle",
-                    HttpStatus.CONFLICT);
+        // Case 2: end date before start date
+        if (request.getPayCycleEndDate().isBefore(request.getPayCycleStartDate())) {
+            throw new FerosException("Pay cycle end date cannot be before start date", HttpStatus.BAD_REQUEST);
+        }
+
+        // Case 1: start date is in a fully future month
+        java.time.YearMonth currentMonth = java.time.YearMonth.now(java.time.ZoneId.of("Asia/Kolkata"));
+        if (java.time.YearMonth.from(request.getPayCycleStartDate()).isAfter(currentMonth)) {
+            throw new FerosException("Cannot generate payroll for a future month", HttpStatus.BAD_REQUEST);
+        }
+
+        // Case 3: overlapping pay cycle for the same user
+        if (payrollRepository.countOverlappingPayrolls(
+                request.getUserId(), tenantId,
+                request.getPayCycleStartDate(), request.getPayCycleEndDate(),
+                List.of(PayrollStatus.DRAFT, PayrollStatus.PAID)) > 0) {
+            throw new FerosException(
+                "Payroll already exists for this user covering part of this date range",
+                HttpStatus.CONFLICT);
         }
 
         // If a cancelled payroll exists for this period, remove it so a fresh one can be inserted
