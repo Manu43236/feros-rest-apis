@@ -8,4 +8,5 @@ import java.util.List;
 @Repository
 public interface DeductionTypeRepository extends JpaRepository<DeductionType, Long> {
     List<DeductionType> findAllByIsActiveTrue();
+    java.util.Optional<DeductionType> findByNameIgnoreCaseAndIsActiveTrue(String name);
 }

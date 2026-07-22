@@ -2,6 +2,7 @@ package com.feros.api.controller;
 
 import com.feros.api.dto.request.*;
 import com.feros.api.dto.response.ApiResponse;
+import com.feros.api.dto.response.HolidayResponse;
 import com.feros.api.dto.response.TenantMasterResponse;
 import com.feros.api.dto.request.RbacLoginAccessRequest;
 import com.feros.api.dto.response.RbacLoginAccessResponse;
@@ -290,6 +291,35 @@ public class TenantMasterController {
             @RequestBody RbacLoginAccessRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Login access config saved",
                 tenantMasterService.saveLoginAccess(request)));
+    }
+
+    // ===================== HOLIDAYS =====================
+
+    @PostMapping("/holidays")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<HolidayResponse>> createHoliday(@Valid @RequestBody HolidayRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Holiday added", tenantMasterService.createHoliday(request)));
+    }
+
+    @GetMapping("/holidays")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<HolidayResponse>>> getHolidays(
+            @RequestParam(required = false) Integer year) {
+        return ResponseEntity.ok(ApiResponse.success("Holidays fetched", tenantMasterService.getHolidays(year)));
+    }
+
+    @PutMapping("/holidays/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<HolidayResponse>> updateHoliday(
+            @PathVariable Long id, @Valid @RequestBody HolidayRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Holiday updated", tenantMasterService.updateHoliday(id, request)));
+    }
+
+    @DeleteMapping("/holidays/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteHoliday(@PathVariable Long id) {
+        tenantMasterService.deleteHoliday(id);
+        return ResponseEntity.ok(ApiResponse.success("Holiday deleted", null));
     }
 
 }

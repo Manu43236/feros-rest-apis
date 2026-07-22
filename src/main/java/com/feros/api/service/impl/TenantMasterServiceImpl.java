@@ -1,11 +1,14 @@
 package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.*;
+import com.feros.api.dto.response.HolidayResponse;
 import com.feros.api.dto.response.RbacLoginAccessResponse;
 import com.feros.api.entity.RbacLoginAccess;
+import com.feros.api.entity.TenantHoliday;
 import com.feros.api.enums.DeviceType;
 import com.feros.api.enums.RoleName;
 import com.feros.api.repository.RbacLoginAccessRepository;
+import com.feros.api.repository.TenantHolidayRepository;
 import org.springframework.transaction.annotation.Transactional;
 import com.feros.api.dto.response.TenantMasterResponse;
 import com.feros.api.entity.Designation;
@@ -19,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,6 +40,7 @@ public class TenantMasterServiceImpl implements TenantMasterService {
     private final TenantSettingsRepository tenantSettingsRepository;
     private final RbacLoginAccessRepository rbacLoginAccessRepository;
     private final CityRepository cityRepository;
+    private final TenantHolidayRepository holidayRepository;
 
     private Tenant getCurrentTenant() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
@@ -162,6 +167,7 @@ public class TenantMasterServiceImpl implements TenantMasterService {
             d.setName(request.getName());
             d.setRoleType(request.getRoleType());
             d.setPayPerDay(request.getPayPerDay());
+            d.setMonthlyLeaveQuota(request.getMonthlyLeaveQuota() != null ? request.getMonthlyLeaveQuota() : 0);
             d.setIsActive(true);
             return mapDesignation(designationRepository.save(d));
         }
@@ -170,6 +176,7 @@ public class TenantMasterServiceImpl implements TenantMasterService {
                 .tenant(tenant).name(request.getName())
                 .roleType(request.getRoleType())
                 .payPerDay(request.getPayPerDay())
+                .monthlyLeaveQuota(request.getMonthlyLeaveQuota() != null ? request.getMonthlyLeaveQuota() : 0)
                 .isActive(true).build();
         return mapDesignation(designationRepository.save(designation));
     }
@@ -193,6 +200,7 @@ public class TenantMasterServiceImpl implements TenantMasterService {
         designation.setName(request.getName());
         designation.setRoleType(request.getRoleType());
         designation.setPayPerDay(request.getPayPerDay());
+        designation.setMonthlyLeaveQuota(request.getMonthlyLeaveQuota() != null ? request.getMonthlyLeaveQuota() : 0);
         return mapDesignation(designationRepository.save(designation));
     }
 
@@ -386,8 +394,18 @@ public class TenantMasterServiceImpl implements TenantMasterService {
         return TenantMasterResponse.builder().id(d.getId())
                 .tenantId(d.getTenant().getId()).name(d.getName())
                 .roleType(d.getRoleType()).payPerDay(d.getPayPerDay())
+                .monthlyLeaveQuota(d.getMonthlyLeaveQuota())
                 .isActive(d.getIsActive())
                 .createdAt(d.getCreatedAt()).updatedAt(d.getUpdatedAt()).build();
+    }
+
+    private HolidayResponse mapHoliday(TenantHoliday h) {
+        return HolidayResponse.builder().id(h.getId())
+                .tenantId(h.getTenant().getId())
+                .holidayDate(h.getHolidayDate())
+                .holidayName(h.getHolidayName())
+                .isActive(h.getIsActive())
+                .createdAt(h.getCreatedAt()).updatedAt(h.getUpdatedAt()).build();
     }
 
     private TenantMasterResponse mapChargeType(ChargeType c) {
@@ -473,5 +491,56 @@ public class TenantMasterServiceImpl implements TenantMasterService {
         }
         rbacLoginAccessRepository.saveAll(toSave);
         return getLoginAccess();
+    }
+
+    // ===================== HOLIDAYS =====================
+
+    @Override
+    @Transactional
+    public HolidayResponse createHoliday(HolidayRequest request) {
+        Long tenantId = getCurrentTenantId();
+        if (holidayRepository.existsByTenantIdAndHolidayDateAndIsActiveTrue(tenantId, request.getHolidayDate())) {
+            throw new FerosException("A holiday already exists on " + request.getHolidayDate(), HttpStatus.CONFLICT);
+        }
+        TenantHoliday holiday = TenantHoliday.builder()
+                .tenant(getCurrentTenant())
+                .holidayDate(request.getHolidayDate())
+                .holidayName(request.getHolidayName())
+                .isActive(true).build();
+        return mapHoliday(holidayRepository.save(holiday));
+    }
+
+    @Override
+    public List<HolidayResponse> getHolidays(Integer year) {
+        Long tenantId = getCurrentTenantId();
+        List<TenantHoliday> holidays = (year != null)
+                ? holidayRepository.findByTenantIdAndYear(tenantId, year)
+                : holidayRepository.findByTenantIdAndIsActiveTrueOrderByHolidayDateAsc(tenantId);
+        return holidays.stream().map(this::mapHoliday).toList();
+    }
+
+    @Override
+    @Transactional
+    public HolidayResponse updateHoliday(Long id, HolidayRequest request) {
+        Long tenantId = getCurrentTenantId();
+        TenantHoliday holiday = holidayRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new FerosException("Holiday not found", HttpStatus.NOT_FOUND));
+        // Check date conflict only if date changed
+        if (!holiday.getHolidayDate().equals(request.getHolidayDate())
+                && holidayRepository.existsByTenantIdAndHolidayDateAndIsActiveTrue(tenantId, request.getHolidayDate())) {
+            throw new FerosException("A holiday already exists on " + request.getHolidayDate(), HttpStatus.CONFLICT);
+        }
+        holiday.setHolidayDate(request.getHolidayDate());
+        holiday.setHolidayName(request.getHolidayName());
+        return mapHoliday(holidayRepository.save(holiday));
+    }
+
+    @Override
+    @Transactional
+    public void deleteHoliday(Long id) {
+        TenantHoliday holiday = holidayRepository.findByIdAndTenantId(id, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Holiday not found", HttpStatus.NOT_FOUND));
+        holiday.setIsActive(false);
+        holidayRepository.save(holiday);
     }
 }

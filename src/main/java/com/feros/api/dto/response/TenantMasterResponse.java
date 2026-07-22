@@ -33,8 +33,9 @@ public class TenantMasterResponse {
     // Designation fields
     private RoleName roleType;
 
-    // Designation — pay rate
+    // Designation — pay rate + leave quota
     private BigDecimal payPerDay;
+    private Integer monthlyLeaveQuota;
 
     // PaymentTerms fields
     private Integer creditDays;

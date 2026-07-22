@@ -15,8 +15,10 @@ import com.feros.api.entity.master.DeductionType;
 import com.feros.api.enums.PayrollStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.entity.StaffProfile;
+import com.feros.api.entity.TenantHoliday;
 import com.feros.api.entity.VehicleStaffAssignment;
 import com.feros.api.repository.*;
+import com.feros.api.repository.TenantHolidayRepository;
 import com.feros.api.service.NotificationService;
 import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.PayrollService;
@@ -58,6 +60,7 @@ public class PayrollServiceImpl implements PayrollService {
     private final DeductionTypeRepository deductionTypeRepository;
     private final StaffProfileRepository staffProfileRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    private final TenantHolidayRepository tenantHolidayRepository;
     private final NotificationService notificationService;
     private final PlatformTransactionManager transactionManager;
     private final NumberGeneratorService numberGenerator;
@@ -123,14 +126,14 @@ public class PayrollServiceImpl implements PayrollService {
     }
 
     /**
-     * Count working days (calendar days minus Sundays) in a given month.
+     * Count working days (calendar days minus Sundays minus tenant holidays) in a range.
      * Used as the denominator for monthly LOP deduction.
      */
-    private int countWorkingDaysInMonth(LocalDate start, LocalDate end) {
+    private int countWorkingDaysInMonth(LocalDate start, LocalDate end, java.util.Set<LocalDate> holidays) {
         int workingDays = 0;
         LocalDate date = start;
         while (!date.isAfter(end)) {
-            if (date.getDayOfWeek() != DayOfWeek.SUNDAY) {
+            if (date.getDayOfWeek() != DayOfWeek.SUNDAY && !holidays.contains(date)) {
                 workingDays++;
             }
             date = date.plusDays(1);
@@ -184,6 +187,9 @@ public class PayrollServiceImpl implements PayrollService {
 
         SalaryType salaryType = profile.getSalaryType() != null ? profile.getSalaryType() : SalaryType.DAILY;
 
+        java.util.Set<LocalDate> holidays = tenantHolidayRepository.findHolidayDatesBetween(
+                tenantId, request.getPayCycleStartDate(), request.getPayCycleEndDate());
+
         List<com.feros.api.entity.Attendance> attendanceList = attendanceRepository
                 .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrue(
                         request.getUserId(), tenantId,
@@ -222,11 +228,17 @@ public class PayrollServiceImpl implements PayrollService {
                 resolvedMonthlySalary = profile.getMonthlySalary();
             }
 
-            int workingDays = countWorkingDaysInMonth(request.getPayCycleStartDate(), request.getPayCycleEndDate());
+            int workingDays = countWorkingDaysInMonth(request.getPayCycleStartDate(), request.getPayCycleEndDate(), holidays);
             if (workingDays == 0) workingDays = 1;
 
+            int leaveQuota = (profile.getDesignation() != null && profile.getDesignation().getMonthlyLeaveQuota() != null)
+                    ? profile.getDesignation().getMonthlyLeaveQuota() : 0;
+            int paidLeaves = Math.min(leaveDays, leaveQuota);
+            int unpaidLeaves = leaveDays - paidLeaves;
+
             BigDecimal lopDays = BigDecimal.valueOf(absentDays)
-                    .add(BigDecimal.valueOf(halfDays).multiply(new BigDecimal("0.5")));
+                    .add(BigDecimal.valueOf(halfDays).multiply(new BigDecimal("0.5")))
+                    .add(BigDecimal.valueOf(unpaidLeaves));
 
             BigDecimal perDayRate = resolvedMonthlySalary
                     .divide(BigDecimal.valueOf(workingDays), 4, RoundingMode.HALF_UP);
@@ -247,9 +259,9 @@ public class PayrollServiceImpl implements PayrollService {
                 resolvedDailyRate = profile.getDesignation().getPayPerDay();
             }
 
+            // Daily wage: only present + half days are paid; leave = absent = no pay
             BigDecimal effectiveDays = BigDecimal.valueOf(presentDays)
-                    .add(BigDecimal.valueOf(halfDays).multiply(new BigDecimal("0.5")))
-                    .add(BigDecimal.valueOf(leaveDays));
+                    .add(BigDecimal.valueOf(halfDays).multiply(new BigDecimal("0.5")));
 
             basicPay = resolvedDailyRate
                     .multiply(effectiveDays)
@@ -261,7 +273,7 @@ public class PayrollServiceImpl implements PayrollService {
                 request.getOvertimeHours().compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal dailyRateForOt = resolvedDailyRate;
             if (dailyRateForOt == null && resolvedMonthlySalary != null) {
-                int wd = countWorkingDaysInMonth(request.getPayCycleStartDate(), request.getPayCycleEndDate());
+                int wd = countWorkingDaysInMonth(request.getPayCycleStartDate(), request.getPayCycleEndDate(), holidays);
                 dailyRateForOt = resolvedMonthlySalary.divide(BigDecimal.valueOf(wd == 0 ? 1 : wd), 4, RoundingMode.HALF_UP);
             }
             if (dailyRateForOt != null) {
@@ -341,6 +353,21 @@ public class PayrollServiceImpl implements PayrollService {
         Payroll savedPayroll = payrollRepository.save(payroll);
 
         BigDecimal totalDeductions = BigDecimal.ZERO;
+
+        // Auto Professional Tax — compute from tenant state, add if > 0 and deduction type exists
+        Tenant currentTenant = getCurrentTenant();
+        BigDecimal ptAmount = com.feros.api.util.ProfessionalTaxUtil.compute(currentTenant.getState(), grossPay);
+        if (ptAmount.compareTo(BigDecimal.ZERO) > 0) {
+            var ptTypeOpt = deductionTypeRepository.findByNameIgnoreCaseAndIsActiveTrue("Professional Tax");
+            if (ptTypeOpt.isPresent()) {
+                payrollDeductionRepository.save(PayrollDeduction.builder()
+                        .tenant(currentTenant).payroll(savedPayroll)
+                        .deductionType(ptTypeOpt.get()).amount(ptAmount)
+                        .remarks("Auto-calculated").isActive(true).build());
+                totalDeductions = totalDeductions.add(ptAmount);
+            }
+        }
+
         if (request.getDeductions() != null) {
             for (GeneratePayrollRequest.DeductionItem item : request.getDeductions()) {
                 DeductionType deductionType = deductionTypeRepository
@@ -428,6 +455,9 @@ public class PayrollServiceImpl implements PayrollService {
 
         SalaryType salaryType = payroll.getSalaryType();
 
+        java.util.Set<LocalDate> holidays = tenantHolidayRepository.findHolidayDatesBetween(
+                tenantId, payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
+
         // Use request values if provided, otherwise keep existing
         BigDecimal newDailyRate      = request.getDailyRate()      != null ? request.getDailyRate()      : payroll.getDailyRate();
         BigDecimal newMonthlySalary  = request.getMonthlySalary()  != null ? request.getMonthlySalary()  : payroll.getMonthlySalary();
@@ -440,11 +470,12 @@ public class PayrollServiceImpl implements PayrollService {
             if (newMonthlySalary == null) {
                 throw new FerosException("Monthly salary is required", HttpStatus.BAD_REQUEST);
             }
-            int workingDays = countWorkingDaysInMonth(payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
+            int workingDays = countWorkingDaysInMonth(payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate(), holidays);
             if (workingDays == 0) workingDays = 1;
 
             BigDecimal lopDays = BigDecimal.valueOf(payroll.getAbsentDays())
-                    .add(BigDecimal.valueOf(payroll.getHalfDays()).multiply(new BigDecimal("0.5")));
+                    .add(BigDecimal.valueOf(payroll.getHalfDays()).multiply(new BigDecimal("0.5")))
+                    .add(BigDecimal.valueOf(Math.max(0, payroll.getLeaveDays())));
             BigDecimal perDayRate = newMonthlySalary.divide(BigDecimal.valueOf(workingDays), 4, RoundingMode.HALF_UP);
             BigDecimal lopDeduction = perDayRate.multiply(lopDays).setScale(2, RoundingMode.HALF_UP);
             basicPay = newMonthlySalary.subtract(lopDeduction).setScale(2, RoundingMode.HALF_UP);
@@ -452,9 +483,9 @@ public class PayrollServiceImpl implements PayrollService {
             if (newDailyRate == null) {
                 throw new FerosException("Daily rate is required", HttpStatus.BAD_REQUEST);
             }
+            // Daily wage: only present + half days are paid; leave = absent = no pay
             BigDecimal effectiveDays = BigDecimal.valueOf(payroll.getPresentDays())
-                    .add(BigDecimal.valueOf(payroll.getHalfDays()).multiply(new BigDecimal("0.5")))
-                    .add(BigDecimal.valueOf(payroll.getLeaveDays()));
+                    .add(BigDecimal.valueOf(payroll.getHalfDays()).multiply(new BigDecimal("0.5")));
             basicPay = newDailyRate.multiply(effectiveDays).setScale(2, RoundingMode.HALF_UP);
         }
 
@@ -463,7 +494,7 @@ public class PayrollServiceImpl implements PayrollService {
         if (newOvertimeHours != null && newOvertimeHours.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal dailyRateForOt = newDailyRate;
             if (dailyRateForOt == null && newMonthlySalary != null) {
-                int wd = countWorkingDaysInMonth(payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
+                int wd = countWorkingDaysInMonth(payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate(), holidays);
                 dailyRateForOt = newMonthlySalary.divide(BigDecimal.valueOf(wd == 0 ? 1 : wd), 4, RoundingMode.HALF_UP);
             }
             if (dailyRateForOt != null) {

@@ -34,6 +34,10 @@ public class Designation extends BaseEntity {
     @Column(name = "pay_per_day")
     private BigDecimal payPerDay;
 
+    @Builder.Default
+    @Column(name = "monthly_leave_quota")
+    private Integer monthlyLeaveQuota = 0;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 }

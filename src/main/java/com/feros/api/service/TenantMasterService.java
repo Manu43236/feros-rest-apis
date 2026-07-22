@@ -1,6 +1,7 @@
 package com.feros.api.service;
 
 import com.feros.api.dto.request.*;
+import com.feros.api.dto.response.HolidayResponse;
 import com.feros.api.dto.response.RbacLoginAccessResponse;
 import com.feros.api.dto.response.TenantMasterResponse;
 import java.util.List;
@@ -52,6 +53,12 @@ public interface TenantMasterService {
     // Tenant Settings
     TenantMasterResponse createOrUpdateSettings(TenantSettingsRequest request);
     TenantMasterResponse getSettings();
+
+    // Holidays
+    HolidayResponse createHoliday(HolidayRequest request);
+    List<HolidayResponse> getHolidays(Integer year);
+    HolidayResponse updateHoliday(Long id, HolidayRequest request);
+    void deleteHoliday(Long id);
 
     // RBAC — Login Access
     RbacLoginAccessResponse getLoginAccess();

@@ -18,4 +18,6 @@ public class DesignationRequest {
     private RoleName roleType;
 
     private BigDecimal payPerDay;
+
+    private Integer monthlyLeaveQuota;
 }
