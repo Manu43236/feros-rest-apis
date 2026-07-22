@@ -204,6 +204,9 @@ public class PayrollServiceImpl implements PayrollService {
             else if (typeName.contains("leave"))
                 leaveDays++;
         }
+        // Days with no attendance record at all are treated as absent
+        int markedDays = presentDays + absentDays + halfDays + leaveDays;
+        absentDays += Math.max(0, totalDays - markedDays);
 
         BigDecimal basicPay;
         BigDecimal resolvedDailyRate = null;
