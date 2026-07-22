@@ -916,6 +916,15 @@ public class OrderServiceImpl implements OrderService {
                 .map(OrderStaffAllocation::getUser)
                 .findFirst().orElse(null);
 
+        // fallback to LR snapshot when no staff allocation exists (legacy orders)
+        if (allocatedDriver == null || allocatedCleaner == null) {
+            Lr lr = lrRepository.findByVehicleAllocationId(a.getId()).orElse(null);
+            if (lr != null) {
+                if (allocatedDriver == null) allocatedDriver = lr.getDriver();
+                if (allocatedCleaner == null) allocatedCleaner = lr.getCleaner();
+            }
+        }
+
         return VehicleAllocationResponse.builder()
                 .id(a.getId())
                 .vehicleId(a.getVehicle().getId())
