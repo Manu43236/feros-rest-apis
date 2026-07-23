@@ -61,6 +61,7 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
                     WHERE sa.vehicleAllocation.id = l.vehicleAllocation.id
                     AND sa.user.id = :userId
                     AND sa.isActive = true
+                    AND sa.allocationStatus <> com.feros.api.enums.StaffAllocationStatus.CANCELLED
                 )
                 OR (
                     l.driver.id = :userId
@@ -69,6 +70,7 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
                         WHERE sa2.vehicleAllocation.id = l.vehicleAllocation.id
                         AND sa2.role.name = com.feros.api.enums.RoleName.DRIVER
                         AND sa2.isActive = true
+                        AND sa2.allocationStatus <> com.feros.api.enums.StaffAllocationStatus.CANCELLED
                     )
                 )
                 OR (
@@ -78,6 +80,7 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
                         WHERE sa2.vehicleAllocation.id = l.vehicleAllocation.id
                         AND sa2.role.name = com.feros.api.enums.RoleName.CLEANER
                         AND sa2.isActive = true
+                        AND sa2.allocationStatus <> com.feros.api.enums.StaffAllocationStatus.CANCELLED
                     )
                 )
             )
@@ -95,6 +98,7 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
                     WHERE sa.vehicleAllocation.id = l.vehicleAllocation.id
                     AND sa.user.id = :userId
                     AND sa.isActive = true
+                    AND sa.allocationStatus <> com.feros.api.enums.StaffAllocationStatus.CANCELLED
                 )
                 OR (
                     l.driver.id = :userId
@@ -103,6 +107,7 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
                         WHERE sa2.vehicleAllocation.id = l.vehicleAllocation.id
                         AND sa2.role.name = com.feros.api.enums.RoleName.DRIVER
                         AND sa2.isActive = true
+                        AND sa2.allocationStatus <> com.feros.api.enums.StaffAllocationStatus.CANCELLED
                     )
                 )
                 OR (
@@ -112,6 +117,7 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
                         WHERE sa2.vehicleAllocation.id = l.vehicleAllocation.id
                         AND sa2.role.name = com.feros.api.enums.RoleName.CLEANER
                         AND sa2.isActive = true
+                        AND sa2.allocationStatus <> com.feros.api.enums.StaffAllocationStatus.CANCELLED
                     )
                 )
             )
