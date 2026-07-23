@@ -678,6 +678,18 @@ public class OrderServiceImpl implements OrderService {
         if (currentlyAssigned)
             throw new FerosException("This " + role.getName().name().toLowerCase() + " is currently assigned to another order and is not available.", HttpStatus.CONFLICT);
 
+        // Cancel any existing active allocation of the same role for this vehicle (swap scenario)
+        RoleName incomingRole = role.getName();
+        staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(request.getVehicleAllocationId())
+                .stream()
+                .filter(sa -> sa.getRole().getName() == incomingRole)
+                .forEach(sa -> {
+                    sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
+                    sa.setActualEndDate(TimeUtil.today());
+                    sa.setIsActive(false);
+                    staffAllocationRepository.save(sa);
+                });
+
         OrderStaffAllocation staffAllocation = OrderStaffAllocation.builder()
                 .tenant(tenantRepository.findByIdAndIsActiveTrue(tenantId).orElseThrow())
                 .order(order)
@@ -922,7 +934,13 @@ public class OrderServiceImpl implements OrderService {
         List<OrderStaffAllocation> rawStaff = staffAllocationRepository
                 .findByVehicleAllocationIdAndIsActiveTrue(a.getId());
 
+        List<OrderStaffAllocation> allStaff = staffAllocationRepository
+                .findAllByVehicleAllocationIdOrderByCreatedAtDesc(a.getId());
+
         List<StaffAllocationResponse> staffAllocations = rawStaff.stream()
+                .map(this::mapToStaffAllocationResponse).toList();
+
+        List<StaffAllocationResponse> staffHistory = allStaff.stream()
                 .map(this::mapToStaffAllocationResponse).toList();
 
         User allocatedDriver = rawStaff.stream()
@@ -967,6 +985,7 @@ public class OrderServiceImpl implements OrderService {
                 .currentCleanerName(allocatedCleaner != null ? allocatedCleaner.getName() : null)
                 .currentCleanerPhone(allocatedCleaner != null ? allocatedCleaner.getPhone() : null)
                 .staffAllocations(staffAllocations)
+                .staffHistory(staffHistory)
                 .createdAt(a.getCreatedAt())
                 .updatedAt(a.getUpdatedAt())
                 .build();
@@ -977,6 +996,7 @@ public class OrderServiceImpl implements OrderService {
                 .id(s.getId())
                 .userId(s.getUser().getId())
                 .userName(s.getUser().getName())
+                .userPhone(s.getUser().getPhone())
                 .roleName(s.getRole().getName().name())
                 .expectedStartDate(s.getExpectedStartDate())
                 .expectedEndDate(s.getExpectedEndDate())

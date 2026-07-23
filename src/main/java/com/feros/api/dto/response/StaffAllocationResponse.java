@@ -15,6 +15,7 @@ public class StaffAllocationResponse {
     private Long id;
     private Long userId;
     private String userName;
+    private String userPhone;
     private String roleName;
     private LocalDate expectedStartDate;
     private LocalDate expectedEndDate;

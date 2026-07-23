@@ -34,6 +34,7 @@ public class VehicleAllocationResponse {
     private String currentCleanerName;
     private String currentCleanerPhone;
     private List<StaffAllocationResponse> staffAllocations;
+    private List<StaffAllocationResponse> staffHistory;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

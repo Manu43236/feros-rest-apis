@@ -14,6 +14,7 @@ import java.util.Optional;
 @Repository
 public interface OrderStaffAllocationRepository extends JpaRepository<OrderStaffAllocation, Long> {
     List<OrderStaffAllocation> findByVehicleAllocationIdAndIsActiveTrue(Long vehicleAllocationId);
+    List<OrderStaffAllocation> findAllByVehicleAllocationIdOrderByCreatedAtDesc(Long vehicleAllocationId);
     boolean existsByVehicleAllocationIdAndUserIdAndIsActiveTrue(Long vehicleAllocationId, Long userId);
     long countByUserIdAndAllocationStatusAndIsActiveTrue(Long userId, com.feros.api.enums.StaffAllocationStatus status);
     Optional<OrderStaffAllocation> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
