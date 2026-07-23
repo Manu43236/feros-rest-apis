@@ -682,11 +682,11 @@ public class OrderServiceImpl implements OrderService {
         RoleName incomingRole = role.getName();
         staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(request.getVehicleAllocationId())
                 .stream()
-                .filter(sa -> sa.getRole().getName() == incomingRole)
+                .filter(sa -> sa.getRole().getName() == incomingRole
+                           && sa.getAllocationStatus() != StaffAllocationStatus.CANCELLED)
                 .forEach(sa -> {
                     sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
                     sa.setActualEndDate(TimeUtil.today());
-                    sa.setIsActive(false);
                     staffAllocationRepository.save(sa);
                 });
 
