@@ -95,4 +95,11 @@ public class VehicleResponse {
     private TripScope tripScope;
 
     private Boolean isIot;
+
+    // Active IN_TRANSIT trip info (for confirmation popups on reassign)
+    private Boolean isInTransit;
+    private Long activeLrId;
+    private String activeLrNumber;
+    private Long activeOrderId;
+    private String activeOrderNumber;
 }

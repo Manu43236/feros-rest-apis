@@ -716,6 +716,7 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     private VehicleResponse mapToResponse(Vehicle v) {
+        var activeLr = lrRepository.findInTransitLrByVehicleId(v.getId()).orElse(null);
         return VehicleResponse.builder()
                 .id(v.getId())
                 .tenantId(v.getTenant().getId())
@@ -775,6 +776,11 @@ public class VehicleServiceImpl implements VehicleService {
                     vehicleImageRepository.findByVehicleIdAndTenantIdAndIsActiveTrue(v.getId(), v.getTenant().getId())
                         .stream().findFirst().map(VehicleImage::getImageUrl).orElse(null)
                 )
+                .isInTransit(activeLr != null)
+                .activeLrId(activeLr != null ? activeLr.getId() : null)
+                .activeLrNumber(activeLr != null ? activeLr.getLrNumber() : null)
+                .activeOrderId(activeLr != null ? activeLr.getOrder().getId() : null)
+                .activeOrderNumber(activeLr != null ? activeLr.getOrder().getOrderNumber() : null)
                 .build();
     }
 
@@ -880,6 +886,9 @@ public class VehicleServiceImpl implements VehicleService {
         Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(vehicleId, tenantId)
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
 
+        if (lrRepository.existsInTransitLrForVehicle(vehicleId))
+            throw new FerosException("Cannot remove driver — vehicle is on an active trip. Swap the driver instead.", HttpStatus.CONFLICT);
+
         // Close open assignment
         if (vehicle.getCurrentDriver() != null) {
             User actor = userRepository.findById(SecurityUtil.getCurrentUserId())
@@ -947,6 +956,8 @@ public class VehicleServiceImpl implements VehicleService {
                 .assignedBy(assignedBy)
                 .build());
 
+        User oldCleaner = vehicle.getCurrentCleaner();
+
         vehicle.setCurrentCleaner(cleaner);
         vehicleRepository.save(vehicle);
 
@@ -955,6 +966,45 @@ public class VehicleServiceImpl implements VehicleService {
                 vehicleId, List.of(LrStatus.DELIVERED, LrStatus.CANCELLED));
         activeLrs.forEach(lr -> lr.setCleaner(cleaner));
         if (!activeLrs.isEmpty()) lrRepository.saveAll(activeLrs);
+
+        // Sync OrderStaffAllocations: cancel old cleaner's, create new cleaner's
+        if (!activeLrs.isEmpty()) {
+            Role cleanerRole = cleaner.getRoles().stream()
+                    .filter(r -> r.getName() == RoleName.CLEANER)
+                    .findFirst()
+                    .orElseThrow(() -> new FerosException("Cleaner role not found", HttpStatus.INTERNAL_SERVER_ERROR));
+
+            for (Lr lr : activeLrs) {
+                OrderVehicleAllocation vAlloc = lr.getVehicleAllocation();
+                if (vAlloc == null) continue;
+
+                if (oldCleaner != null) {
+                    orderStaffAllocationRepository
+                            .findByVehicleAllocationIdAndIsActiveTrue(vAlloc.getId())
+                            .stream()
+                            .filter(sa -> sa.getUser().getId().equals(oldCleaner.getId()))
+                            .forEach(sa -> {
+                                sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
+                                sa.setActualEndDate(TimeUtil.today());
+                                sa.setIsActive(false);
+                                orderStaffAllocationRepository.save(sa);
+                            });
+                }
+
+                StaffAllocationStatus newStatus = lr.getLrStatus() == LrStatus.IN_TRANSIT
+                        ? StaffAllocationStatus.IN_TRANSIT : StaffAllocationStatus.ALLOCATED;
+                orderStaffAllocationRepository.save(OrderStaffAllocation.builder()
+                        .tenant(vehicle.getTenant())
+                        .order(vAlloc.getOrder())
+                        .vehicleAllocation(vAlloc)
+                        .user(cleaner)
+                        .role(cleanerRole)
+                        .allocationStatus(newStatus)
+                        .actualStartDate(TimeUtil.today())
+                        .allocatedBy(assignedBy)
+                        .build());
+            }
+        }
 
         return mapToResponse(vehicle);
     }
@@ -965,6 +1015,9 @@ public class VehicleServiceImpl implements VehicleService {
         Long tenantId = getCurrentTenantId();
         Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(vehicleId, tenantId)
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+
+        if (lrRepository.existsInTransitLrForVehicle(vehicleId))
+            throw new FerosException("Cannot remove cleaner — vehicle is on an active trip. Swap the cleaner instead.", HttpStatus.CONFLICT);
 
         // Close open assignment
         if (vehicle.getCurrentCleaner() != null) {

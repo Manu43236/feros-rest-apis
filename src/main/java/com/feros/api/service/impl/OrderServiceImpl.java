@@ -693,7 +693,7 @@ public class OrderServiceImpl implements OrderService {
 
         OrderStaffAllocation saved = staffAllocationRepository.save(staffAllocation);
 
-        // Sync vehicle-level staff assignment
+        // Sync vehicle-level and LR-level staff assignment
         Vehicle vehicle = vehicleAllocation.getVehicle();
         RoleName roleName = role.getName();
         if (roleName == RoleName.DRIVER) {
@@ -703,6 +703,12 @@ public class OrderServiceImpl implements OrderService {
             vehicle.setCurrentCleaner(user);
             vehicleRepository.save(vehicle);
         }
+
+        lrRepository.findByVehicleAllocationId(request.getVehicleAllocationId()).ifPresent(lr -> {
+            if (roleName == RoleName.DRIVER) lr.setDriver(user);
+            else if (roleName == RoleName.CLEANER) lr.setCleaner(user);
+            lrRepository.save(lr);
+        });
 
         String vehicleReg = vehicleAllocation.getVehicle().getRegistrationNumber();
         String destination = order.getDestinationCity().getName();
@@ -745,7 +751,20 @@ public class OrderServiceImpl implements OrderService {
         allocation.setIsActive(false);
         staffAllocationRepository.save(allocation);
 
-        String vehicleReg = allocation.getVehicleAllocation().getVehicle().getRegistrationNumber();
+        // Sync vehicle-level assignment
+        Vehicle vehicle = allocation.getVehicleAllocation().getVehicle();
+        RoleName roleName = allocation.getRole().getName();
+        if (roleName == RoleName.DRIVER && allocation.getUser().getId().equals(
+                vehicle.getCurrentDriver() != null ? vehicle.getCurrentDriver().getId() : null)) {
+            vehicle.setCurrentDriver(null);
+            vehicleRepository.save(vehicle);
+        } else if (roleName == RoleName.CLEANER && allocation.getUser().getId().equals(
+                vehicle.getCurrentCleaner() != null ? vehicle.getCurrentCleaner().getId() : null)) {
+            vehicle.setCurrentCleaner(null);
+            vehicleRepository.save(vehicle);
+        }
+
+        String vehicleReg = vehicle.getRegistrationNumber();
         notificationService.sendToUser(allocation.getTenant(), allocation.getUser(), NotificationType.TRIP_UNASSIGNED,
                 "Trip Unassigned",
                 "You have been removed from vehicle " + vehicleReg + " (Order: " + allocation.getOrder().getOrderNumber() + ")");
