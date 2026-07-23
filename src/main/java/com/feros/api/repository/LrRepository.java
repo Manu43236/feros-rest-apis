@@ -125,4 +125,9 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
            "WHERE l.vehicleAllocation.vehicle.id = :vehicleId AND l.isActive = true " +
            "AND l.lrStatus = com.feros.api.enums.LrStatus.IN_TRANSIT")
     boolean existsInTransitLrForVehicle(@Param("vehicleId") Long vehicleId);
+
+    @Query("SELECT CASE WHEN COUNT(l) > 0 THEN true ELSE false END FROM Lr l " +
+           "WHERE l.driver.id = :userId AND l.tenant.id = :tenantId AND l.isActive = true " +
+           "AND l.lrStatus = com.feros.api.enums.LrStatus.IN_TRANSIT")
+    boolean existsInTransitLrForDriver(@Param("userId") Long userId, @Param("tenantId") Long tenantId);
 }

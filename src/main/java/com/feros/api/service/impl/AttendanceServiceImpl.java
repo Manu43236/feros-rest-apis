@@ -547,6 +547,10 @@ public class AttendanceServiceImpl implements AttendanceService {
             throw new FerosException("Already marked out for today", HttpStatus.CONFLICT);
         }
 
+        if (lrRepository.existsInTransitLrForDriver(userId, tenantId)) {
+            throw new FerosException("You have an active trip in progress. Complete the trip before marking out.", HttpStatus.BAD_REQUEST);
+        }
+
         attendance.setMarkedOutAt(TimeUtil.nowIst());
         AttendanceResponse response = mapToResponse(attendanceRepository.save(attendance));
 
