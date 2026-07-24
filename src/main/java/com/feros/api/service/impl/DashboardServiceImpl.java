@@ -296,7 +296,7 @@ public class DashboardServiceImpl implements DashboardService {
         // ── Vehicle-level assignment (no order) ───────────────────────────────
         DriverDashboardResponse.AssignedVehicle assignedVehicle = null;
         if (activeTrip == null && upcoming.isEmpty() && assignedOrder == null) {
-            var vehicleOpt = vehicleRepository.findAssignedVehicleByStaffUserId(userId);
+            var vehicleOpt = vehicleRepository.findAssignedVehiclesByStaffUserId(userId).stream().findFirst();
             if (vehicleOpt.isPresent()) {
                 com.feros.api.entity.Vehicle v = vehicleOpt.get();
                 assignedVehicle = DriverDashboardResponse.AssignedVehicle.builder()

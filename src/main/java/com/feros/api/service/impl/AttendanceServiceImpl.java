@@ -463,7 +463,7 @@ public class AttendanceServiceImpl implements AttendanceService {
         Double dutyHours = null;
         boolean canUndoOut = false;
 
-        if (a.getMarkedOutAt() != null) {
+        if (a.getMarkedOutAt() != null && a.getMarkedAt() != null) {
             long totalMinutes = Duration.between(a.getMarkedAt(), a.getMarkedOutAt()).toMinutes();
             dutyHours  = Math.round(totalMinutes / 6.0) / 10.0; // 1 decimal place
             dutyLabel  = dutyHours + " hrs";
@@ -494,8 +494,8 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .approvedById(a.getApprovedBy() != null ? a.getApprovedBy().getId() : null)
                 .approvedByName(a.getApprovedBy() != null ? a.getApprovedBy().getName() : null)
                 .approvedAt(a.getApprovedAt())
-                .assignedVehicleNumber(vehicleRepository.findAssignedVehicleByStaffUserId(a.getUser().getId())
-                        .map(v -> v.getRegistrationNumber()).orElse(null))
+                .assignedVehicleNumber(vehicleRepository.findAssignedVehiclesByStaffUserId(a.getUser().getId())
+                        .stream().findFirst().map(v -> v.getRegistrationNumber()).orElse(null))
                 .selfieUrl(a.getSelfieUrl() != null ? s3Service.getPublicUrl(a.getSelfieUrl()) : null)
                 .latitude(a.getLatitude())
                 .longitude(a.getLongitude())
@@ -584,7 +584,7 @@ public class AttendanceServiceImpl implements AttendanceService {
         AttendanceResponse response = mapToResponse(attendanceRepository.save(attendance));
 
         // Auto-unassign from vehicle on mark-out
-        vehicleRepository.findAssignedVehicleByStaffUserId(userId).ifPresent(vehicle -> {
+        vehicleRepository.findAssignedVehiclesByStaffUserId(userId).stream().findFirst().ifPresent(vehicle -> {
             vehicleStaffAssignmentRepository
                     .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(userId, tenantId)
                     .ifPresent(a -> {
