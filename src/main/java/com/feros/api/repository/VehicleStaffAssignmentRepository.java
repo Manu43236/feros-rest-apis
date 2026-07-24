@@ -45,6 +45,9 @@ public interface VehicleStaffAssignmentRepository extends JpaRepository<VehicleS
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
 
+    Optional<VehicleStaffAssignment> findTopByUserIdAndTenantIdAndAssignedToAndIsActiveTrueOrderByCreatedAtDesc(
+            Long userId, Long tenantId, java.time.LocalDate assignedTo);
+
     @Query("SELECT a FROM VehicleStaffAssignment a " +
            "LEFT JOIN FETCH a.vehicle LEFT JOIN FETCH a.user " +
            "LEFT JOIN FETCH a.assignedBy LEFT JOIN FETCH a.unassignedBy " +

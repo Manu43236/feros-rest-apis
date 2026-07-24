@@ -622,7 +622,24 @@ public class AttendanceServiceImpl implements AttendanceService {
         }
 
         attendance.setMarkedOutAt(null);
-        return mapToResponse(attendanceRepository.save(attendance));
+        AttendanceResponse response = mapToResponse(attendanceRepository.save(attendance));
+
+        // Re-assign to vehicle — reverse the auto-unassign that happened on mark-out
+        vehicleStaffAssignmentRepository
+                .findTopByUserIdAndTenantIdAndAssignedToAndIsActiveTrueOrderByCreatedAtDesc(
+                        userId, tenantId, TimeUtil.today())
+                .ifPresent(vsa -> {
+                    vsa.setAssignedTo(null);
+                    vehicleStaffAssignmentRepository.save(vsa);
+                    Vehicle v = vsa.getVehicle();
+                    boolean isDriver = vsa.getUser().getRoles().stream()
+                            .anyMatch(r -> r.getName() == RoleName.DRIVER);
+                    if (isDriver) v.setCurrentDriver(vsa.getUser());
+                    else v.setCurrentCleaner(vsa.getUser());
+                    vehicleRepository.save(v);
+                });
+
+        return response;
     }
 
     private TripProofResponse mapToTripProofResponse(TripProof p) {
