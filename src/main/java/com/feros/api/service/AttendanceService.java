@@ -25,6 +25,10 @@ public interface AttendanceService {
 
     AttendanceResponse updateAttendance(Long id, AttendanceRequest request);
 
+    void deleteAttendance(Long id);
+
+    void clearSignOut(Long id);
+
     AttendanceResponse approveAttendance(Long id);
 
     AttendanceResponse rejectAttendance(Long id);

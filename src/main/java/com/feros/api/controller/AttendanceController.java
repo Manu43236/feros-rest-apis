@@ -166,12 +166,26 @@ public class AttendanceController {
     }
 
     @PutMapping("/attendance/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> updateAttendance(
             @PathVariable Long id, @Valid @RequestBody AttendanceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Attendance updated successfully",
                 attendanceService.updateAttendance(id, request)));
+    }
+
+    @DeleteMapping("/attendance/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<Void>> deleteAttendance(@PathVariable Long id) {
+        attendanceService.deleteAttendance(id);
+        return ResponseEntity.ok(ApiResponse.success("Attendance deleted successfully", null));
+    }
+
+    @DeleteMapping("/attendance/{id}/sign-out")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<Void>> clearSignOut(@PathVariable Long id) {
+        attendanceService.clearSignOut(id);
+        return ResponseEntity.ok(ApiResponse.success("Sign-out time cleared", null));
     }
 
     // ===================== TRIP PROOFS =====================

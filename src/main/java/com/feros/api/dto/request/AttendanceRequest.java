@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -22,4 +23,8 @@ public class AttendanceRequest {
     private Long leaveTypeId;
     private String leaveReason;
     private String remarks;
+
+    // Admin correction fields — optional, only used in PUT /attendance/{id}
+    private LocalDateTime signInTime;
+    private LocalDateTime signOutTime;
 }

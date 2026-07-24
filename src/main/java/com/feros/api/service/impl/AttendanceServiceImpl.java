@@ -357,7 +357,16 @@ public class AttendanceServiceImpl implements AttendanceService {
         attendance.setLeaveReason(request.getLeaveReason());
         attendance.setRemarks(request.getRemarks());
         attendance.setMarkedBy(getCurrentUser());
-        attendance.setMarkedAt(TimeUtil.nowIst());
+
+        if (request.getSignInTime() != null) {
+            attendance.setMarkedAt(request.getSignInTime());
+        }
+        if (request.getSignOutTime() != null) {
+            if (request.getSignInTime() != null && request.getSignOutTime().isBefore(request.getSignInTime())) {
+                throw new FerosException("Sign-out time cannot be before sign-in time", HttpStatus.BAD_REQUEST);
+            }
+            attendance.setMarkedOutAt(request.getSignOutTime());
+        }
 
         if (request.getLeaveTypeId() != null) {
             LeaveType leaveType = leaveTypeRepository.findById(request.getLeaveTypeId())
@@ -369,6 +378,26 @@ public class AttendanceServiceImpl implements AttendanceService {
         }
 
         return mapToResponse(attendanceRepository.save(attendance));
+    }
+
+    @Override
+    @Transactional
+    public void deleteAttendance(Long id) {
+        Attendance attendance = attendanceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Attendance not found", HttpStatus.NOT_FOUND));
+        attendance.setIsActive(false);
+        attendanceRepository.save(attendance);
+    }
+
+    @Override
+    @Transactional
+    public void clearSignOut(Long id) {
+        Attendance attendance = attendanceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Attendance not found", HttpStatus.NOT_FOUND));
+        attendance.setMarkedOutAt(null);
+        attendanceRepository.save(attendance);
     }
 
     @Override
