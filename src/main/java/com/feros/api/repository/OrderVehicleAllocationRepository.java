@@ -66,4 +66,9 @@ public interface OrderVehicleAllocationRepository extends JpaRepository<OrderVeh
            "AND ova.allocationStatus IN ('ALLOCATED', 'LR_CREATED', 'IN_TRANSIT') " +
            "ORDER BY ova.createdAt DESC")
     Optional<OrderVehicleAllocation> findCurrentActiveAllocationForVehicle(@Param("vehicleId") Long vehicleId);
+
+    @Query("SELECT ova FROM OrderVehicleAllocation ova WHERE ova.vehicle.id = :vehicleId AND ova.isActive = true " +
+           "AND ova.allocationStatus NOT IN ('DELIVERED', 'CANCELLED') " +
+           "ORDER BY ova.createdAt DESC")
+    List<OrderVehicleAllocation> findAllActiveAllocationsForVehicle(@Param("vehicleId") Long vehicleId);
 }

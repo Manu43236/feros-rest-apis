@@ -17,6 +17,7 @@ import com.feros.api.entity.master.*;
 import com.feros.api.enums.RoleName;
 import com.feros.api.enums.BreakdownStatus;
 import com.feros.api.enums.TyrePositionType;
+import com.feros.api.enums.VehicleAllocationStatus;
 import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.entity.Lr;
@@ -836,16 +837,14 @@ public class VehicleServiceImpl implements VehicleService {
         if (!activeLrs.isEmpty()) lrRepository.saveAll(activeLrs);
 
         // Sync OrderStaffAllocations: cancel old driver's, create new driver's
-        if (!activeLrs.isEmpty()) {
+        List<OrderVehicleAllocation> activeVAllocs = allocationRepository.findAllActiveAllocationsForVehicle(vehicleId);
+        if (!activeVAllocs.isEmpty()) {
             Role driverRole = driver.getRoles().stream()
                     .filter(r -> r.getName() == RoleName.DRIVER)
                     .findFirst()
                     .orElseThrow(() -> new FerosException("Driver role not found", HttpStatus.INTERNAL_SERVER_ERROR));
 
-            for (Lr lr : activeLrs) {
-                OrderVehicleAllocation vAlloc = lr.getVehicleAllocation();
-                if (vAlloc == null) continue;
-
+            for (OrderVehicleAllocation vAlloc : activeVAllocs) {
                 // Cancel old driver's allocation for this vehicle allocation
                 if (oldDriver != null) {
                     orderStaffAllocationRepository
@@ -861,7 +860,7 @@ public class VehicleServiceImpl implements VehicleService {
                 }
 
                 // Create new allocation for the replacement driver
-                StaffAllocationStatus newStatus = lr.getLrStatus() == LrStatus.IN_TRANSIT
+                StaffAllocationStatus newStatus = vAlloc.getAllocationStatus() == VehicleAllocationStatus.IN_TRANSIT
                         ? StaffAllocationStatus.IN_TRANSIT : StaffAllocationStatus.ALLOCATED;
                 orderStaffAllocationRepository.save(OrderStaffAllocation.builder()
                         .tenant(vehicle.getTenant())
@@ -916,10 +915,8 @@ public class VehicleServiceImpl implements VehicleService {
         if (!activeLrs.isEmpty()) lrRepository.saveAll(activeLrs);
 
         // Cancel OrderStaffAllocation for the old driver
-        if (oldDriver != null && !activeLrs.isEmpty()) {
-            for (Lr lr : activeLrs) {
-                OrderVehicleAllocation vAlloc = lr.getVehicleAllocation();
-                if (vAlloc == null) continue;
+        if (oldDriver != null) {
+            for (OrderVehicleAllocation vAlloc : allocationRepository.findAllActiveAllocationsForVehicle(vehicleId)) {
                 orderStaffAllocationRepository
                         .findByVehicleAllocationIdAndIsActiveTrue(vAlloc.getId())
                         .stream()
@@ -988,16 +985,14 @@ public class VehicleServiceImpl implements VehicleService {
         if (!activeLrs.isEmpty()) lrRepository.saveAll(activeLrs);
 
         // Sync OrderStaffAllocations: cancel old cleaner's, create new cleaner's
-        if (!activeLrs.isEmpty()) {
+        List<OrderVehicleAllocation> activeVAllocs = allocationRepository.findAllActiveAllocationsForVehicle(vehicleId);
+        if (!activeVAllocs.isEmpty()) {
             Role cleanerRole = cleaner.getRoles().stream()
                     .filter(r -> r.getName() == RoleName.CLEANER)
                     .findFirst()
                     .orElseThrow(() -> new FerosException("Cleaner role not found", HttpStatus.INTERNAL_SERVER_ERROR));
 
-            for (Lr lr : activeLrs) {
-                OrderVehicleAllocation vAlloc = lr.getVehicleAllocation();
-                if (vAlloc == null) continue;
-
+            for (OrderVehicleAllocation vAlloc : activeVAllocs) {
                 if (oldCleaner != null) {
                     orderStaffAllocationRepository
                             .findByVehicleAllocationIdAndIsActiveTrue(vAlloc.getId())
@@ -1011,7 +1006,7 @@ public class VehicleServiceImpl implements VehicleService {
                             });
                 }
 
-                StaffAllocationStatus newStatus = lr.getLrStatus() == LrStatus.IN_TRANSIT
+                StaffAllocationStatus newStatus = vAlloc.getAllocationStatus() == VehicleAllocationStatus.IN_TRANSIT
                         ? StaffAllocationStatus.IN_TRANSIT : StaffAllocationStatus.ALLOCATED;
                 orderStaffAllocationRepository.save(OrderStaffAllocation.builder()
                         .tenant(vehicle.getTenant())
@@ -1066,10 +1061,8 @@ public class VehicleServiceImpl implements VehicleService {
         if (!activeLrs.isEmpty()) lrRepository.saveAll(activeLrs);
 
         // Cancel OrderStaffAllocation for the old cleaner
-        if (oldCleaner != null && !activeLrs.isEmpty()) {
-            for (Lr lr : activeLrs) {
-                OrderVehicleAllocation vAlloc = lr.getVehicleAllocation();
-                if (vAlloc == null) continue;
+        if (oldCleaner != null) {
+            for (OrderVehicleAllocation vAlloc : allocationRepository.findAllActiveAllocationsForVehicle(vehicleId)) {
                 orderStaffAllocationRepository
                         .findByVehicleAllocationIdAndIsActiveTrue(vAlloc.getId())
                         .stream()
