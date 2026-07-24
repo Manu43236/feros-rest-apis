@@ -938,18 +938,21 @@ public class OrderServiceImpl implements OrderService {
                 .findAllByVehicleAllocationIdOrderByCreatedAtDesc(a.getId());
 
         List<StaffAllocationResponse> staffAllocations = rawStaff.stream()
+                .filter(s -> s.getAllocationStatus() != StaffAllocationStatus.CANCELLED)
                 .map(this::mapToStaffAllocationResponse).toList();
 
         List<StaffAllocationResponse> staffHistory = allStaff.stream()
                 .map(this::mapToStaffAllocationResponse).toList();
 
         User allocatedDriver = rawStaff.stream()
-                .filter(s -> s.getRole().getName() == RoleName.DRIVER)
+                .filter(s -> s.getAllocationStatus() != StaffAllocationStatus.CANCELLED
+                          && s.getRole().getName() == RoleName.DRIVER)
                 .map(OrderStaffAllocation::getUser)
                 .findFirst().orElse(null);
 
         User allocatedCleaner = rawStaff.stream()
-                .filter(s -> s.getRole().getName() == RoleName.CLEANER)
+                .filter(s -> s.getAllocationStatus() != StaffAllocationStatus.CANCELLED
+                          && s.getRole().getName() == RoleName.CLEANER)
                 .map(OrderStaffAllocation::getUser)
                 .findFirst().orElse(null);
 

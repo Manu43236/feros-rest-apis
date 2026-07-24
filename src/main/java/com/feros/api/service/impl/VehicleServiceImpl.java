@@ -851,11 +851,11 @@ public class VehicleServiceImpl implements VehicleService {
                     orderStaffAllocationRepository
                             .findByVehicleAllocationIdAndIsActiveTrue(vAlloc.getId())
                             .stream()
-                            .filter(sa -> sa.getUser().getId().equals(oldDriver.getId()))
+                            .filter(sa -> sa.getUser().getId().equals(oldDriver.getId())
+                                       && sa.getAllocationStatus() != StaffAllocationStatus.CANCELLED)
                             .forEach(sa -> {
                                 sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
                                 sa.setActualEndDate(TimeUtil.today());
-                                sa.setIsActive(false);
                                 orderStaffAllocationRepository.save(sa);
                             });
                 }
@@ -904,6 +904,8 @@ public class VehicleServiceImpl implements VehicleService {
                     });
         }
 
+        User oldDriver = vehicle.getCurrentDriver();
+
         vehicle.setCurrentDriver(null);
         vehicleRepository.save(vehicle);
 
@@ -912,6 +914,24 @@ public class VehicleServiceImpl implements VehicleService {
                 vehicleId, List.of(LrStatus.DELIVERED, LrStatus.CANCELLED));
         activeLrs.forEach(lr -> lr.setDriver(null));
         if (!activeLrs.isEmpty()) lrRepository.saveAll(activeLrs);
+
+        // Cancel OrderStaffAllocation for the old driver
+        if (oldDriver != null && !activeLrs.isEmpty()) {
+            for (Lr lr : activeLrs) {
+                OrderVehicleAllocation vAlloc = lr.getVehicleAllocation();
+                if (vAlloc == null) continue;
+                orderStaffAllocationRepository
+                        .findByVehicleAllocationIdAndIsActiveTrue(vAlloc.getId())
+                        .stream()
+                        .filter(sa -> sa.getUser().getId().equals(oldDriver.getId())
+                                   && sa.getAllocationStatus() != StaffAllocationStatus.CANCELLED)
+                        .forEach(sa -> {
+                            sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
+                            sa.setActualEndDate(TimeUtil.today());
+                            orderStaffAllocationRepository.save(sa);
+                        });
+            }
+        }
 
         return mapToResponse(vehicle);
     }
@@ -982,11 +1002,11 @@ public class VehicleServiceImpl implements VehicleService {
                     orderStaffAllocationRepository
                             .findByVehicleAllocationIdAndIsActiveTrue(vAlloc.getId())
                             .stream()
-                            .filter(sa -> sa.getUser().getId().equals(oldCleaner.getId()))
+                            .filter(sa -> sa.getUser().getId().equals(oldCleaner.getId())
+                                       && sa.getAllocationStatus() != StaffAllocationStatus.CANCELLED)
                             .forEach(sa -> {
                                 sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
                                 sa.setActualEndDate(TimeUtil.today());
-                                sa.setIsActive(false);
                                 orderStaffAllocationRepository.save(sa);
                             });
                 }
@@ -1034,6 +1054,8 @@ public class VehicleServiceImpl implements VehicleService {
                     });
         }
 
+        User oldCleaner = vehicle.getCurrentCleaner();
+
         vehicle.setCurrentCleaner(null);
         vehicleRepository.save(vehicle);
 
@@ -1042,6 +1064,24 @@ public class VehicleServiceImpl implements VehicleService {
                 vehicleId, List.of(LrStatus.DELIVERED, LrStatus.CANCELLED));
         activeLrs.forEach(lr -> lr.setCleaner(null));
         if (!activeLrs.isEmpty()) lrRepository.saveAll(activeLrs);
+
+        // Cancel OrderStaffAllocation for the old cleaner
+        if (oldCleaner != null && !activeLrs.isEmpty()) {
+            for (Lr lr : activeLrs) {
+                OrderVehicleAllocation vAlloc = lr.getVehicleAllocation();
+                if (vAlloc == null) continue;
+                orderStaffAllocationRepository
+                        .findByVehicleAllocationIdAndIsActiveTrue(vAlloc.getId())
+                        .stream()
+                        .filter(sa -> sa.getUser().getId().equals(oldCleaner.getId())
+                                   && sa.getAllocationStatus() != StaffAllocationStatus.CANCELLED)
+                        .forEach(sa -> {
+                            sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
+                            sa.setActualEndDate(TimeUtil.today());
+                            orderStaffAllocationRepository.save(sa);
+                        });
+            }
+        }
 
         return mapToResponse(vehicle);
     }
