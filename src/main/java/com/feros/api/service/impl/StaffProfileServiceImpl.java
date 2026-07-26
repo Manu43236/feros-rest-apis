@@ -5,6 +5,7 @@ import com.feros.api.dto.request.DocumentRequest;
 import com.feros.api.dto.request.StaffProfileRequest;
 import com.feros.api.dto.request.UpdateDocumentRequest;
 import com.feros.api.dto.response.DocumentResponse;
+import com.feros.api.dto.response.DriverDocsResponse;
 import com.feros.api.dto.response.StaffProfileResponse;
 import com.feros.api.dto.response.VehicleImageResponse;
 import com.feros.api.entity.*;
@@ -277,6 +278,16 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .orElseThrow(() -> new FerosException("Document not found", HttpStatus.NOT_FOUND));
         doc.setIsActive(false);
         vehicleDocumentRepository.save(doc);
+    }
+
+    // ===================== DRIVER DOCS (mobile) =====================
+    @Override
+    @Transactional(readOnly = true)
+    public DriverDocsResponse getDriverDocs(Long vehicleId) {
+        Long userId   = SecurityUtil.getCurrentUserId();
+        List<DocumentResponse> myDocs      = getStaffDocuments(userId);
+        List<DocumentResponse> vehicleDocs = vehicleId != null ? getVehicleDocuments(vehicleId) : List.of();
+        return new DriverDocsResponse(myDocs, vehicleDocs);
     }
 
     // ===================== VEHICLE IMAGES =====================

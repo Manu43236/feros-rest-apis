@@ -4,6 +4,7 @@ import com.feros.api.dto.request.DocumentRequest;
 import com.feros.api.dto.request.StaffProfileRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.DocumentResponse;
+import com.feros.api.dto.response.DriverDocsResponse;
 import com.feros.api.dto.response.StaffProfileResponse;
 import com.feros.api.dto.response.VehicleImageResponse;
 import com.feros.api.service.StaffProfileService;
@@ -123,6 +124,15 @@ public class StaffProfileController {
             @PathVariable Long documentId) {
         staffProfileService.deleteVehicleDocument(documentId);
         return ResponseEntity.ok(ApiResponse.success("Document deleted successfully", null));
+    }
+
+    // ===================== DRIVER / CLEANER DOCS (mobile) =====================
+    @GetMapping("/driver/my-docs")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<DriverDocsResponse>> getDriverDocs(
+            @RequestParam(required = false) Long vehicleId) {
+        return ResponseEntity.ok(ApiResponse.success("Docs fetched",
+                staffProfileService.getDriverDocs(vehicleId)));
     }
 
     // ===================== VEHICLE IMAGES =====================
