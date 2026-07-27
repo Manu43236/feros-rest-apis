@@ -19,6 +19,7 @@ public class InvoiceLrResponse {
     private Long orderId;
     private String orderNumber;
     private String vehicleRegistrationNumber;
+    private String materialTypeName;
     private BigDecimal billingWeight;    // weight used for billing (MT)
     private String freightRateType;     // PER_TON / PER_TRIP / PER_KM
     private BigDecimal freightRate;     // rate per unit
