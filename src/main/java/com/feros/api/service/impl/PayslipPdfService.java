@@ -230,6 +230,7 @@ public class PayslipPdfService {
                                     payroll.getUser().getId(), tenantId,
                                     payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
 
+                    doc.newPage();
                     doc.add(sectionLabel("DAILY EARNINGS ANNEXURE"));
 
                     PdfPTable annexure = new PdfPTable(new float[]{1.5f, 1.8f, 1.8f, 1.8f, 1.8f});
