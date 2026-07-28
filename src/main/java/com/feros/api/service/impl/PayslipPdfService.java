@@ -1,15 +1,13 @@
 package com.feros.api.service.impl;
 
-import com.feros.api.entity.Attendance;
 import com.feros.api.entity.Payroll;
 import com.feros.api.entity.PayrollDeduction;
 import com.feros.api.entity.StaffProfile;
-import com.feros.api.entity.VehicleStaffAssignment;
 import com.feros.api.exception.FerosException;
-import com.feros.api.repository.AttendanceRepository;
 import com.feros.api.repository.PayrollDeductionRepository;
 import com.feros.api.repository.PayrollRepository;
 import com.feros.api.repository.StaffProfileRepository;
+import com.feros.api.repository.AttendanceRepository;
 import com.feros.api.repository.VehicleStaffAssignmentRepository;
 import com.feros.api.util.SecurityUtil;
 import com.lowagie.text.*;
@@ -22,7 +20,6 @@ import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -36,22 +33,30 @@ public class PayslipPdfService {
     private final AttendanceRepository attendanceRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
 
-    private static final Color NAVY    = new Color(15, 33, 55);
-    private static final Color GRAY    = new Color(90, 105, 120);
-    private static final Color SUCCESS = new Color(21, 128, 61);
-    private static final Color DANGER  = new Color(185, 28, 28);
-    private static final Color LIGHT   = new Color(245, 247, 250);
+    private static final Color NAVY       = new Color(15, 33, 55);
+    private static final Color NAVY_LIGHT = new Color(30, 58, 95);
+    private static final Color ACCENT     = new Color(37, 99, 235);
+    private static final Color SUCCESS    = new Color(21, 128, 61);
+    private static final Color DANGER     = new Color(185, 28, 28);
+    private static final Color MUTED      = new Color(107, 114, 128);
+    private static final Color BORDER     = new Color(226, 232, 240);
+    private static final Color SURFACE    = new Color(248, 250, 252);
+    private static final Color AMBER      = new Color(180, 83, 9);
+    private static final Color AMBER_BG   = new Color(254, 243, 199);
 
-    private static final DateTimeFormatter DATE_FMT  = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+    private static final Font F_COMPANY  = new Font(Font.HELVETICA, 18, Font.BOLD,   Color.WHITE);
+    private static final Font F_SUBTITLE = new Font(Font.HELVETICA,  9, Font.NORMAL, new Color(180, 210, 255));
+    private static final Font F_REF      = new Font(Font.HELVETICA,  8, Font.NORMAL, new Color(180, 210, 255));
+    private static final Font F_SECTION  = new Font(Font.HELVETICA,  8, Font.BOLD,   NAVY);
+    private static final Font F_LABEL    = new Font(Font.HELVETICA,  7, Font.NORMAL, MUTED);
+    private static final Font F_VALUE    = new Font(Font.HELVETICA,  9, Font.BOLD,   Color.BLACK);
+    private static final Font F_BODY     = new Font(Font.HELVETICA,  9, Font.NORMAL, Color.BLACK);
+    private static final Font F_NET      = new Font(Font.HELVETICA, 14, Font.BOLD,   Color.WHITE);
+    private static final Font F_NET_LBL  = new Font(Font.HELVETICA,  8, Font.NORMAL, new Color(180, 210, 255));
+    private static final Font F_SMALL    = new Font(Font.HELVETICA,  7, Font.NORMAL, MUTED);
+
+    private static final DateTimeFormatter DATE_FMT  = DateTimeFormatter.ofPattern("dd MMM yyyy");
     private static final DateTimeFormatter MONTH_FMT = DateTimeFormatter.ofPattern("MMMM yyyy");
-
-    private static final Font FONT_HEADER   = new Font(Font.HELVETICA, 20, Font.BOLD, Color.WHITE);
-    private static final Font FONT_SUBTITLE = new Font(Font.HELVETICA, 10, Font.NORMAL, new Color(180, 200, 230));
-    private static final Font FONT_SECTION  = new Font(Font.HELVETICA, 9, Font.BOLD, NAVY);
-    private static final Font FONT_BODY     = new Font(Font.HELVETICA, 9, Font.NORMAL, Color.BLACK);
-    private static final Font FONT_BOLD     = new Font(Font.HELVETICA, 9, Font.BOLD, Color.BLACK);
-    private static final Font FONT_GRAY     = new Font(Font.HELVETICA, 8, Font.NORMAL, GRAY);
-    private static final Font FONT_NET      = new Font(Font.HELVETICA, 13, Font.BOLD, Color.WHITE);
 
     public byte[] generate(Long payrollId) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
@@ -59,208 +64,186 @@ public class PayslipPdfService {
         Payroll payroll = payrollRepository.findByIdAndTenantIdAndIsActiveTrue(payrollId, tenantId)
                 .orElseThrow(() -> new FerosException("Payroll not found", HttpStatus.NOT_FOUND));
 
-
-
-        List<PayrollDeduction> deductions = payrollDeductionRepository
-                .findByPayrollIdAndIsActiveTrue(payrollId);
+        List<PayrollDeduction> deductions = payrollDeductionRepository.findByPayrollIdAndIsActiveTrue(payrollId);
 
         StaffProfile profile = staffProfileRepository
                 .findByUserIdAndTenantIdAndIsActiveTrue(payroll.getUser().getId(), tenantId)
                 .orElse(null);
 
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            Document doc = new Document(PageSize.A4, 40, 40, 40, 40);
+            Document doc = new Document(PageSize.A4, 40, 40, 36, 36);
             PdfWriter.getInstance(doc, baos);
             doc.open();
 
-            var tenant = payroll.getTenant();
-            var user   = payroll.getUser();
-            String companyName = tenant.getCompanyName() != null ? tenant.getCompanyName().toUpperCase() : "FEROS";
-            String periodLabel = payroll.getPayCycleStartDate().format(MONTH_FMT);
+            String companyName = payroll.getTenant().getCompanyName() != null
+                    ? payroll.getTenant().getCompanyName().toUpperCase() : "FEROS";
+            String periodLabel  = payroll.getPayCycleStartDate().format(MONTH_FMT);
+            String designation  = (profile != null && profile.getDesignation() != null)
+                    ? profile.getDesignation().getName() : "—";
+            String role = payroll.getUser().getRoles().stream().findFirst()
+                    .map(r -> r.getName().name().replace("_", " ")).orElse("—");
+            boolean isDraft    = "DRAFT".equals(payroll.getPayrollStatus().name());
+            boolean isMonthly  = payroll.getSalaryType() != null
+                    && "MONTHLY".equals(payroll.getSalaryType().name());
 
-            // ── Header banner ────────────────────────────────────────────────
-            PdfPTable header = new PdfPTable(1);
+            // ── Header ───────────────────────────────────────────────────────
+            PdfPTable header = new PdfPTable(new float[]{3f, 1f});
             header.setWidthPercentage(100);
-            PdfPCell hCell = new PdfPCell();
-            hCell.setBackgroundColor(NAVY);
-            hCell.setPadding(16);
-            hCell.setBorder(Rectangle.NO_BORDER);
-            hCell.addElement(new Phrase(companyName, FONT_HEADER));
-            hCell.addElement(new Phrase("Payslip — " + periodLabel, FONT_SUBTITLE));
-            header.addCell(hCell);
+            header.setSpacingAfter(12);
+
+            PdfPCell hLeft = blankCell(NAVY, Element.ALIGN_LEFT);
+            hLeft.setPadding(16);
+            hLeft.addElement(new Phrase(companyName, F_COMPANY));
+            hLeft.addElement(new Phrase("Payslip  •  " + periodLabel, F_SUBTITLE));
+            header.addCell(hLeft);
+
+            PdfPCell hRight = blankCell(NAVY, Element.ALIGN_RIGHT);
+            hRight.setPadding(16);
+            hRight.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            Paragraph refP = new Paragraph(payroll.getReferenceNumber() != null ? payroll.getReferenceNumber() : "", F_REF);
+            refP.setAlignment(Element.ALIGN_RIGHT);
+            Color statusColor = isDraft ? AMBER_BG : new Color(134, 239, 172);
+            Paragraph statusP = new Paragraph(payroll.getPayrollStatus().name(),
+                    new Font(Font.HELVETICA, 8, Font.BOLD, statusColor));
+            statusP.setAlignment(Element.ALIGN_RIGHT);
+            hRight.addElement(refP);
+            hRight.addElement(statusP);
+            header.addCell(hRight);
             doc.add(header);
-            doc.add(Chunk.NEWLINE);
 
             // ── Employee info ────────────────────────────────────────────────
-            doc.add(sectionTitle("EMPLOYEE DETAILS"));
-            PdfPTable empTable = new PdfPTable(new float[]{1, 1});
-            empTable.setWidthPercentage(100);
-            addMetaCell(empTable, "Name", user.getName());
-            addMetaCell(empTable, "Phone", user.getPhone());
-
-            String role = user.getRoles().stream().findFirst()
-                    .map(r -> r.getName().name().replace("_", " ")).orElse("—");
-            addMetaCell(empTable, "Role", role);
-
-            String designation = (profile != null && profile.getDesignation() != null)
-                    ? profile.getDesignation().getName() : "—";
-            addMetaCell(empTable, "Designation", designation);
-
-            addMetaCell(empTable, "Pay Period",
-                    payroll.getPayCycleStartDate().format(DATE_FMT) + " to " + payroll.getPayCycleEndDate().format(DATE_FMT));
-            addMetaCell(empTable, "Payment Date",
-                    payroll.getPaymentDate() != null ? payroll.getPaymentDate().format(DATE_FMT) : "—");
-            addMetaCell(empTable, "Payment Mode",
-                    payroll.getPaymentMode() != null ? payroll.getPaymentMode().name() : "—");
-            addMetaCell(empTable, "Reference No",
+            doc.add(sectionLabel("EMPLOYEE INFORMATION"));
+            PdfPTable emp = new PdfPTable(new float[]{1f, 1f, 1f, 1f});
+            emp.setWidthPercentage(100);
+            emp.setSpacingAfter(10);
+            addInfoCell(emp, "Name",        payroll.getUser().getName());
+            addInfoCell(emp, "Designation", designation);
+            addInfoCell(emp, "Pay Period",
+                    payroll.getPayCycleStartDate().format(DATE_FMT)
+                            + " - " + payroll.getPayCycleEndDate().format(DATE_FMT));
+            addInfoCell(emp, "Payment Date",
+                    payroll.getPaymentDate() != null ? payroll.getPaymentDate().format(DATE_FMT) : "Pending");
+            addInfoCell(emp, "Phone",       payroll.getUser().getPhone());
+            addInfoCell(emp, "Role",        role);
+            addInfoCell(emp, "Mode",
+                    payroll.getPaymentMode() != null ? payroll.getPaymentMode().name() : "Pending");
+            addInfoCell(emp, "Reference",
                     payroll.getReferenceNumber() != null ? payroll.getReferenceNumber() : "—");
-            doc.add(empTable);
-            doc.add(Chunk.NEWLINE);
+            doc.add(emp);
 
-            // ── Attendance summary ───────────────────────────────────────────
-            doc.add(sectionTitle("ATTENDANCE SUMMARY"));
-            PdfPTable attTable = new PdfPTable(new float[]{1, 1, 1, 1, 1});
-            attTable.setWidthPercentage(100);
-            addAttHeader(attTable, "Total Days", "Present", "Absent", "Half Days", "Leave Days");
-            addAttRow(attTable,
-                    str(payroll.getTotalDays()),
-                    str(payroll.getPresentDays()),
-                    str(payroll.getAbsentDays()),
-                    str(payroll.getHalfDays()),
-                    str(payroll.getLeaveDays()));
-            doc.add(attTable);
-            doc.add(Chunk.NEWLINE);
+            // ── Attendance tiles ─────────────────────────────────────────────
+            doc.add(sectionLabel("ATTENDANCE SUMMARY"));
+            PdfPTable att = new PdfPTable(5);
+            att.setWidthPercentage(100);
+            att.setSpacingAfter(12);
+            addAttTile(att, str(payroll.getTotalDays()),   "Total Days",  SURFACE, NAVY);
+            addAttTile(att, str(payroll.getPresentDays()), "Present",     new Color(219, 234, 254), ACCENT);
+            addAttTile(att, str(payroll.getHalfDays()),    "Half Days",   AMBER_BG, AMBER);
+            addAttTile(att, str(payroll.getAbsentDays()),  "Absent",
+                    payroll.getAbsentDays() > 0 ? new Color(254, 226, 226) : SURFACE,
+                    payroll.getAbsentDays() > 0 ? DANGER : MUTED);
+            addAttTile(att, str(payroll.getLeaveDays()),   "Leave",       SURFACE, MUTED);
+            doc.add(att);
 
-            // ── Earnings ────────────────────────────────────────────────────
-            boolean isMonthly = payroll.getSalaryType() != null
-                    && payroll.getSalaryType().name().equals("MONTHLY");
+            // ── Earnings + Deductions ────────────────────────────────────────
+            doc.add(sectionLabel("PAY SUMMARY"));
+            PdfPTable payTable = new PdfPTable(new float[]{1f, 0.04f, 1f});
+            payTable.setWidthPercentage(100);
+            payTable.setSpacingAfter(12);
 
-            String designationLabel;
+            // -- Earnings inner table --
+            PdfPTable earningsT = new PdfPTable(new float[]{3f, 1.5f});
+            earningsT.setWidthPercentage(100);
+            addInnerHeader(earningsT, "EARNINGS", "Amount (Rs.)");
+
+            String basicDesc;
             if (isMonthly) {
-                designationLabel = "Monthly Salary  (₹" + fmt(payroll.getMonthlySalary()) + "/month)";
+                basicDesc = "Basic Salary";
             } else {
-                designationLabel = (profile != null && profile.getDesignation() != null)
-                        ? profile.getDesignation().getName() + "  (₹" + fmt(payroll.getDailyRate()) + "/day)"
-                        : "₹" + fmt(payroll.getDailyRate()) + "/day";
+                int hd = payroll.getHalfDays();
+                int pd = payroll.getPresentDays();
+                basicDesc = hd > 0
+                        ? "Basic Pay (" + pd + " days + " + hd + " half day" + (hd > 1 ? "s" : "") + " @ Rs." + fmt(payroll.getDailyRate()) + ")"
+                        : "Basic Pay (" + pd + " days @ Rs." + fmt(payroll.getDailyRate()) + ")";
             }
+            addInnerRow(earningsT, basicDesc, fmt(payroll.getBasicPay()));
 
-            doc.add(sectionTitle("EARNINGS"));
-            PdfPTable earnings = new PdfPTable(new float[]{3, 1.5f});
-            earnings.setWidthPercentage(100);
-            addEarningsHeader(earnings);
-            addAmountRow(earnings, "Basic Pay  — " + designationLabel,
-                    payroll.getBasicPay(), false, false);
-            if (payroll.getOvertimeHours().compareTo(BigDecimal.ZERO) > 0) {
-                addAmountRow(earnings, "Overtime Pay  (" + payroll.getOvertimeHours() + " hrs)",
-                        payroll.getOvertimePay(), false, false);
+            if (payroll.getOvertimePay() != null && payroll.getOvertimePay().compareTo(BigDecimal.ZERO) > 0)
+                addInnerRow(earningsT, "Overtime (" + payroll.getOvertimeHours() + " hrs)", fmt(payroll.getOvertimePay()));
+            if (payroll.getTripBonus() != null && payroll.getTripBonus().compareTo(BigDecimal.ZERO) > 0)
+                addInnerRow(earningsT, "Trip Bonus", fmt(payroll.getTripBonus()));
+            if (payroll.getVehicleExtraPay() != null && payroll.getVehicleExtraPay().compareTo(BigDecimal.ZERO) > 0)
+                addInnerRow(earningsT, "Vehicle Allowance", fmt(payroll.getVehicleExtraPay()));
+
+            addInnerTotal(earningsT, "GROSS PAY", fmt(payroll.getGrossPay()), SUCCESS);
+
+            PdfPCell earningsCell = new PdfPCell();
+            earningsCell.setBorder(Rectangle.BOX);
+            earningsCell.setBorderColor(BORDER);
+            earningsCell.setPadding(0);
+            earningsCell.addElement(earningsT);
+            payTable.addCell(earningsCell);
+
+            // gap column
+            PdfPCell gap = blankCell(Color.WHITE, Element.ALIGN_LEFT);
+            gap.setBorder(Rectangle.NO_BORDER);
+            payTable.addCell(gap);
+
+            // -- Deductions inner table --
+            PdfPTable deductionsT = new PdfPTable(new float[]{3f, 1.5f});
+            deductionsT.setWidthPercentage(100);
+            addInnerHeader(deductionsT, "DEDUCTIONS", "Amount (Rs.)");
+
+            if (deductions.isEmpty()) {
+                addInnerRow(deductionsT, "No deductions this period", "—");
+            } else {
+                for (PayrollDeduction d : deductions)
+                    addInnerRow(deductionsT, d.getDeductionType().getName(), fmt(d.getAmount()));
             }
-            if (payroll.getTripBonus().compareTo(BigDecimal.ZERO) > 0) {
-                addAmountRow(earnings, "Trip Bonus", payroll.getTripBonus(), false, false);
-            }
-            if (payroll.getVehicleExtraPay() != null
-                    && payroll.getVehicleExtraPay().compareTo(BigDecimal.ZERO) > 0) {
-                addAmountRow(earnings, "Vehicle Extra Pay", payroll.getVehicleExtraPay(), false, false);
-            }
-            addAmountRow(earnings, "Gross Pay", payroll.getGrossPay(), true, false);
-            doc.add(earnings);
-            doc.add(Chunk.NEWLINE);
+            addInnerTotal(deductionsT, "TOTAL DEDUCTIONS", fmt(payroll.getTotalDeductions()), DANGER);
 
-            // ── Per-day annexure (daily-rate employees only) ─────────────────
-            if (!isMonthly) try {
-                List<Attendance> attendanceList = attendanceRepository
-                        .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrueOrderByAttendanceDateDesc(
-                                user.getId(), tenantId,
-                                payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
-
-                List<Attendance> presentDaysList = attendanceList.stream()
-                        .filter(a -> a.getAttendanceType().getName().toLowerCase().contains("present"))
-                        .sorted(java.util.Comparator.comparing(Attendance::getAttendanceDate))
-                        .toList();
-
-                if (!presentDaysList.isEmpty()) {
-                    List<VehicleStaffAssignment> assignments = vehicleStaffAssignmentRepository
-                            .findOverlappingByUser(user.getId(), tenantId,
-                                    payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
-
-                    doc.add(sectionTitle("DAILY EARNINGS ANNEXURE"));
-                    PdfPTable annexure = new PdfPTable(new float[]{1.5f, 2f, 2f, 2f, 2f});
-                    annexure.setWidthPercentage(100);
-                    addAnnexureHeader(annexure, "Date", "Vehicle No.", "Designation Pay", "Vehicle Pay", "Day Total");
-
-                    BigDecimal designationPayPerDay = payroll.getDailyRate();
-
-                    for (Attendance att : presentDaysList) {
-                        LocalDate date = att.getAttendanceDate();
-                        boolean isHalfDay = att.getAttendanceType().getName().toLowerCase().contains("half");
-                        BigDecimal dayFactor = isHalfDay ? new BigDecimal("0.5") : BigDecimal.ONE;
-                        BigDecimal desPay = designationPayPerDay.multiply(dayFactor).setScale(2, RoundingMode.HALF_UP);
-
-                        // Find vehicle assignment for this day
-                        String vehicleNo = "—";
-                        BigDecimal vehPay = BigDecimal.ZERO;
-                        for (VehicleStaffAssignment a : assignments) {
-                            if (!date.isBefore(a.getAssignedFrom())
-                                    && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo()))
-                                    && Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
-                                    && a.getVehicle().getExtraPayPerDay() != null) {
-                                vehicleNo = a.getVehicle().getRegistrationNumber();
-                                vehPay = a.getVehicle().getExtraPayPerDay().multiply(dayFactor).setScale(2, RoundingMode.HALF_UP);
-                                break;
-                            }
-                        }
-
-                        BigDecimal dayTotal = desPay.add(vehPay);
-                        addAnnexureRow(annexure,
-                                date.format(DATE_FMT),
-                                vehicleNo,
-                                "₹" + fmt(desPay),
-                                vehPay.compareTo(BigDecimal.ZERO) > 0 ? "₹" + fmt(vehPay) : "—",
-                                "₹" + fmt(dayTotal));
-                    }
-                    doc.add(annexure);
-                    doc.add(Chunk.NEWLINE);
-                }
-            } catch (Exception ignored) {
-                // annexure is non-fatal
-            }
-
-            // ── Deductions ───────────────────────────────────────────────────
-            if (!deductions.isEmpty()) {
-                doc.add(sectionTitle("DEDUCTIONS"));
-                PdfPTable dedTable = new PdfPTable(new float[]{3, 1.5f});
-                dedTable.setWidthPercentage(100);
-                addEarningsHeader(dedTable);
-                for (PayrollDeduction d : deductions) {
-                    addAmountRow(dedTable, d.getDeductionType().getName(), d.getAmount(), false, true);
-                }
-                addAmountRow(dedTable, "Total Deductions", payroll.getTotalDeductions(), true, true);
-                doc.add(dedTable);
-                doc.add(Chunk.NEWLINE);
-            }
+            PdfPCell deductionsCell = new PdfPCell();
+            deductionsCell.setBorder(Rectangle.BOX);
+            deductionsCell.setBorderColor(BORDER);
+            deductionsCell.setPadding(0);
+            deductionsCell.addElement(deductionsT);
+            payTable.addCell(deductionsCell);
+            doc.add(payTable);
 
             // ── Net Pay banner ───────────────────────────────────────────────
-            PdfPTable netBanner = new PdfPTable(1);
-            netBanner.setWidthPercentage(100);
-            PdfPCell netCell = new PdfPCell();
-            netCell.setBackgroundColor(new Color(21, 128, 61));
-            netCell.setPadding(14);
-            netCell.setBorder(Rectangle.NO_BORDER);
-            netCell.setHorizontalAlignment(Element.ALIGN_CENTER);
-            netCell.addElement(new Phrase("NET PAY:  ₹" + fmt(payroll.getNetPay()), FONT_NET));
-            netBanner.addCell(netCell);
-            doc.add(netBanner);
+            PdfPTable net = new PdfPTable(new float[]{1f, 1.2f});
+            net.setWidthPercentage(100);
+            net.setSpacingAfter(14);
+
+            PdfPCell netLabel = blankCell(NAVY_LIGHT, Element.ALIGN_RIGHT);
+            netLabel.setPadding(14);
+            netLabel.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            Paragraph netLblP = new Paragraph("NET PAY", F_NET_LBL);
+            netLblP.setAlignment(Element.ALIGN_RIGHT);
+            netLabel.addElement(netLblP);
+            net.addCell(netLabel);
+
+            PdfPCell netAmt = blankCell(NAVY, Element.ALIGN_RIGHT);
+            netAmt.setPadding(14);
+            netAmt.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            Paragraph netAmtP = new Paragraph("Rs. " + fmt(payroll.getNetPay()), F_NET);
+            netAmtP.setAlignment(Element.ALIGN_RIGHT);
+            netAmt.addElement(netAmtP);
+            net.addCell(netAmt);
+            doc.add(net);
 
             // ── Remarks ──────────────────────────────────────────────────────
             if (payroll.getRemarks() != null && !payroll.getRemarks().isBlank()) {
-                doc.add(Chunk.NEWLINE);
-                doc.add(sectionTitle("REMARKS"));
-                doc.add(new Paragraph(payroll.getRemarks(), FONT_BODY));
+                doc.add(sectionLabel("REMARKS"));
+                Paragraph rem = new Paragraph(payroll.getRemarks(), F_BODY);
+                rem.setSpacingAfter(10);
+                doc.add(rem);
             }
 
             // ── Footer ───────────────────────────────────────────────────────
-            doc.add(Chunk.NEWLINE);
             Paragraph footer = new Paragraph(
-                    "This is a system-generated payslip. — FEROS Fleet Management", FONT_GRAY);
+                    "This is a computer-generated payslip and does not require a signature.  •  FEROS Fleet Management",
+                    F_SMALL);
             footer.setAlignment(Element.ALIGN_CENTER);
             doc.add(footer);
 
@@ -273,103 +256,91 @@ public class PayslipPdfService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private void addMetaCell(PdfPTable table, String label, String value) {
+    private PdfPCell blankCell(Color bg, int hAlign) {
+        PdfPCell c = new PdfPCell();
+        c.setBackgroundColor(bg);
+        c.setBorder(Rectangle.NO_BORDER);
+        c.setHorizontalAlignment(hAlign);
+        return c;
+    }
+
+    private void addInfoCell(PdfPTable table, String label, String value) {
         PdfPCell cell = new PdfPCell();
         cell.setBorder(Rectangle.BOTTOM);
-        cell.setBorderColor(new Color(220, 228, 240));
-        cell.setPadding(6);
-        cell.addElement(new Phrase(label, FONT_GRAY));
-        cell.addElement(new Phrase(value != null ? value : "—", FONT_BOLD));
+        cell.setBorderColor(BORDER);
+        cell.setPadding(7);
+        cell.addElement(new Phrase(label, F_LABEL));
+        cell.addElement(new Phrase(value != null ? value : "—", F_VALUE));
         table.addCell(cell);
     }
 
-    private void addAttHeader(PdfPTable table, String... headers) {
-        for (String h : headers) {
-            PdfPCell cell = new PdfPCell(new Phrase(h, new Font(Font.HELVETICA, 9, Font.BOLD, Color.WHITE)));
-            cell.setBackgroundColor(NAVY);
-            cell.setPadding(6);
-            cell.setBorder(Rectangle.NO_BORDER);
-            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-            table.addCell(cell);
-        }
+    private void addAttTile(PdfPTable table, String number, String label, Color bg, Color fg) {
+        PdfPCell cell = new PdfPCell();
+        cell.setBackgroundColor(bg);
+        cell.setBorder(Rectangle.BOX);
+        cell.setBorderColor(BORDER);
+        cell.setPadding(10);
+        Paragraph num = new Paragraph(number, new Font(Font.HELVETICA, 16, Font.BOLD, fg));
+        num.setAlignment(Element.ALIGN_CENTER);
+        Paragraph lbl = new Paragraph(label, new Font(Font.HELVETICA, 7, Font.NORMAL, fg));
+        lbl.setAlignment(Element.ALIGN_CENTER);
+        cell.addElement(num);
+        cell.addElement(lbl);
+        table.addCell(cell);
     }
 
-    private void addAttRow(PdfPTable table, String... vals) {
-        for (String v : vals) {
-            PdfPCell cell = new PdfPCell(new Phrase(v, FONT_BOLD));
-            cell.setPadding(6);
-            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-            cell.setBackgroundColor(LIGHT);
-            cell.setBorderColor(new Color(220, 228, 240));
-            table.addCell(cell);
-        }
-    }
-
-    private void addEarningsHeader(PdfPTable table) {
-        PdfPCell c1 = new PdfPCell(new Phrase("Description", new Font(Font.HELVETICA, 9, Font.BOLD, Color.WHITE)));
-        c1.setBackgroundColor(NAVY); c1.setPadding(6); c1.setBorder(Rectangle.NO_BORDER);
-        PdfPCell c2 = new PdfPCell(new Phrase("Amount (₹)", new Font(Font.HELVETICA, 9, Font.BOLD, Color.WHITE)));
-        c2.setBackgroundColor(NAVY); c2.setPadding(6); c2.setBorder(Rectangle.NO_BORDER);
+    private void addInnerHeader(PdfPTable table, String left, String right) {
+        PdfPCell c1 = new PdfPCell(new Phrase(left, new Font(Font.HELVETICA, 8, Font.BOLD, Color.WHITE)));
+        c1.setBackgroundColor(NAVY); c1.setPadding(7); c1.setBorder(Rectangle.NO_BORDER);
+        PdfPCell c2 = new PdfPCell(new Phrase(right, new Font(Font.HELVETICA, 8, Font.BOLD, Color.WHITE)));
+        c2.setBackgroundColor(NAVY); c2.setPadding(7); c2.setBorder(Rectangle.NO_BORDER);
         c2.setHorizontalAlignment(Element.ALIGN_RIGHT);
         table.addCell(c1);
         table.addCell(c2);
     }
 
-    private void addAmountRow(PdfPTable table, String label, BigDecimal amount, boolean highlight, boolean isDeduction) {
-        Color labelColor = highlight ? NAVY : Color.BLACK;
-        int labelStyle  = highlight ? Font.BOLD : Font.NORMAL;
-        Color amtColor  = highlight ? (isDeduction ? DANGER : SUCCESS) : Color.BLACK;
-        int amtStyle    = highlight ? Font.BOLD : Font.NORMAL;
+    private void addInnerRow(PdfPTable table, String label, String amount) {
+        PdfPCell lc = new PdfPCell(new Phrase(label, F_BODY));
+        lc.setPadding(7);
+        lc.setBorderWidthBottom(0.5f); lc.setBorderColor(BORDER);
+        lc.setBorderWidthTop(0); lc.setBorderWidthLeft(0); lc.setBorderWidthRight(0);
 
-        PdfPCell lc = new PdfPCell(new Phrase(label, new Font(Font.HELVETICA, 9, labelStyle, labelColor)));
-        lc.setPadding(6);
-        lc.setBorder(highlight ? Rectangle.TOP : Rectangle.BOTTOM);
-        lc.setBorderColor(new Color(220, 228, 240));
-
-        PdfPCell vc = new PdfPCell(new Phrase("₹" + fmt(amount), new Font(Font.HELVETICA, 9, amtStyle, amtColor)));
-        vc.setPadding(6);
+        PdfPCell vc = new PdfPCell(new Phrase(amount, F_BODY));
+        vc.setPadding(7);
         vc.setHorizontalAlignment(Element.ALIGN_RIGHT);
-        vc.setBorder(highlight ? Rectangle.TOP : Rectangle.BOTTOM);
-        vc.setBorderColor(new Color(220, 228, 240));
+        vc.setBorderWidthBottom(0.5f); vc.setBorderColor(BORDER);
+        vc.setBorderWidthTop(0); vc.setBorderWidthLeft(0); vc.setBorderWidthRight(0);
 
         table.addCell(lc);
         table.addCell(vc);
     }
 
-    private void addAnnexureHeader(PdfPTable table, String... headers) {
-        for (String h : headers) {
-            PdfPCell cell = new PdfPCell(new Phrase(h, new Font(Font.HELVETICA, 8, Font.BOLD, Color.WHITE)));
-            cell.setBackgroundColor(GRAY);
-            cell.setPadding(5);
-            cell.setBorder(Rectangle.NO_BORDER);
-            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-            table.addCell(cell);
-        }
+    private void addInnerTotal(PdfPTable table, String label, String amount, Color amtColor) {
+        PdfPCell lc = new PdfPCell(new Phrase(label, new Font(Font.HELVETICA, 9, Font.BOLD, NAVY)));
+        lc.setPadding(8); lc.setBackgroundColor(SURFACE);
+        lc.setBorderWidthTop(1f); lc.setBorderColor(BORDER);
+        lc.setBorderWidthBottom(0); lc.setBorderWidthLeft(0); lc.setBorderWidthRight(0);
+
+        PdfPCell vc = new PdfPCell(new Phrase(amount, new Font(Font.HELVETICA, 9, Font.BOLD, amtColor)));
+        vc.setPadding(8); vc.setBackgroundColor(SURFACE);
+        vc.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        vc.setBorderWidthTop(1f); vc.setBorderColor(BORDER);
+        vc.setBorderWidthBottom(0); vc.setBorderWidthLeft(0); vc.setBorderWidthRight(0);
+
+        table.addCell(lc);
+        table.addCell(vc);
     }
 
-    private void addAnnexureRow(PdfPTable table, String date, String vehicle, String desPay, String vehPay, String total) {
-        String[] vals = {date, vehicle, desPay, vehPay, total};
-        for (int i = 0; i < vals.length; i++) {
-            PdfPCell cell = new PdfPCell(new Phrase(vals[i], FONT_BODY));
-            cell.setPadding(5);
-            cell.setHorizontalAlignment(i == 0 ? Element.ALIGN_LEFT : Element.ALIGN_CENTER);
-            cell.setBorderColor(new Color(220, 228, 240));
-            table.addCell(cell);
-        }
-    }
-
-    private Paragraph sectionTitle(String title) {
-        Paragraph p = new Paragraph(title, FONT_SECTION);
-        p.setSpacingBefore(4);
-        p.setSpacingAfter(6);
+    private Paragraph sectionLabel(String title) {
+        Paragraph p = new Paragraph(title, F_SECTION);
+        p.setSpacingBefore(2);
+        p.setSpacingAfter(5);
         return p;
     }
 
     private String fmt(BigDecimal val) {
-        return val != null ? val.setScale(2, RoundingMode.HALF_UP).toPlainString() : "0.00";
+        return val != null ? String.format("%,.2f", val.setScale(2, RoundingMode.HALF_UP)) : "0.00";
     }
 
-    private String str(Integer val) {
-        return val != null ? String.valueOf(val) : "0";
-    }
+    private String str(Integer val) { return val != null ? String.valueOf(val) : "0"; }
 }
