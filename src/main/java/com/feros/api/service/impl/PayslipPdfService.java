@@ -115,7 +115,7 @@ public class PayslipPdfService {
             doc.add(sectionLabel("EMPLOYEE INFORMATION"));
             PdfPTable emp = new PdfPTable(new float[]{1f, 1f, 1f, 1f});
             emp.setWidthPercentage(100);
-            emp.setSpacingAfter(10);
+            emp.setSpacingAfter(6);
             addInfoCell(emp, "Name",        payroll.getUser().getName());
             addInfoCell(emp, "Designation", designation);
             addInfoCell(emp, "Pay Period",
@@ -135,7 +135,7 @@ public class PayslipPdfService {
             doc.add(sectionLabel("ATTENDANCE SUMMARY"));
             PdfPTable att = new PdfPTable(5);
             att.setWidthPercentage(100);
-            att.setSpacingAfter(12);
+            att.setSpacingAfter(6);
             addAttTile(att, str(payroll.getTotalDays()),   "Total Days",  SURFACE, NAVY);
             addAttTile(att, str(payroll.getPresentDays()), "Present",     new Color(219, 234, 254), ACCENT);
             addAttTile(att, str(payroll.getHalfDays()),    "Half Days",   AMBER_BG, AMBER);
@@ -149,7 +149,7 @@ public class PayslipPdfService {
             doc.add(sectionLabel("PAY SUMMARY"));
             PdfPTable payTable = new PdfPTable(new float[]{1f, 0.04f, 1f});
             payTable.setWidthPercentage(100);
-            payTable.setSpacingAfter(12);
+            payTable.setSpacingAfter(6);
 
             // -- Earnings inner table --
             PdfPTable earningsT = new PdfPTable(new float[]{3f, 1.5f});
@@ -212,12 +212,11 @@ public class PayslipPdfService {
 
             // ── Daily Earnings Annexure (daily-rate only) ────────────────────
             if (!isMonthly) try {
-                List<com.feros.api.entity.Attendance> attendanceList = attendanceRepository
+                List<com.feros.api.entity.Attendance> workedDays = attendanceRepository
                         .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrueOrderByAttendanceDateDesc(
                                 payroll.getUser().getId(), tenantId,
-                                payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
-
-                List<com.feros.api.entity.Attendance> workedDays = attendanceList.stream()
+                                payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate())
+                        .stream()
                         .filter(a -> {
                             String t = a.getAttendanceType().getName().toLowerCase();
                             return t.contains("present") || t.contains("half");
@@ -231,22 +230,11 @@ public class PayslipPdfService {
                                     payroll.getUser().getId(), tenantId,
                                     payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
 
-                    // Only show vehicle columns if at least one day has vehicle extra pay
-                    boolean hasVehiclePay = payroll.getVehicleExtraPay() != null
-                            && payroll.getVehicleExtraPay().compareTo(BigDecimal.ZERO) > 0;
-
                     doc.add(sectionLabel("DAILY EARNINGS ANNEXURE"));
 
-                    PdfPTable annexure;
-                    if (hasVehiclePay) {
-                        annexure = new PdfPTable(new float[]{1.4f, 1.8f, 1.8f, 1.8f, 1.8f});
-                        annexure.setWidthPercentage(100);
-                        addAnnexureHeader(annexure, "Date", "Vehicle No.", "Designation Pay", "Vehicle Pay", "Day Total");
-                    } else {
-                        annexure = new PdfPTable(new float[]{1.4f, 2.5f, 2.5f});
-                        annexure.setWidthPercentage(100);
-                        addAnnexureHeader(annexure, "Date", "Designation Pay", "Day Total");
-                    }
+                    PdfPTable annexure = new PdfPTable(new float[]{1.5f, 1.8f, 1.8f, 1.8f, 1.8f});
+                    annexure.setWidthPercentage(100);
+                    addAnnexureHeader(annexure, "Date", "Vehicle No.", "Designation Pay", "Vehicle Pay", "Day Total");
 
                     for (com.feros.api.entity.Attendance record : workedDays) {
                         java.time.LocalDate date = record.getAttendanceDate();
@@ -254,29 +242,29 @@ public class PayslipPdfService {
                         BigDecimal factor = isHalf ? new BigDecimal("0.5") : BigDecimal.ONE;
                         BigDecimal desPay = payroll.getDailyRate().multiply(factor).setScale(2, RoundingMode.HALF_UP);
 
-                        if (hasVehiclePay) {
-                            String vehicleNo = "—";
-                            BigDecimal vehPay = BigDecimal.ZERO;
-                            for (com.feros.api.entity.VehicleStaffAssignment a : assignments) {
-                                if (!date.isBefore(a.getAssignedFrom())
-                                        && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo()))
-                                        && Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
+                        String vehicleNo = "—";
+                        BigDecimal vehPay = BigDecimal.ZERO;
+                        for (com.feros.api.entity.VehicleStaffAssignment a : assignments) {
+                            if (!date.isBefore(a.getAssignedFrom())
+                                    && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo()))) {
+                                vehicleNo = a.getVehicle().getRegistrationNumber();
+                                if (Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
                                         && a.getVehicle().getExtraPayPerDay() != null) {
-                                    vehicleNo = a.getVehicle().getRegistrationNumber();
-                                    vehPay = a.getVehicle().getExtraPayPerDay().multiply(factor).setScale(2, RoundingMode.HALF_UP);
-                                    break;
+                                    vehPay = a.getVehicle().getExtraPayPerDay()
+                                            .multiply(factor).setScale(2, RoundingMode.HALF_UP);
                                 }
+                                break;
                             }
-                            addAnnexureRow(annexure, isHalf,
-                                    date.format(DATE_FMT), vehicleNo, fmt(desPay),
-                                    vehPay.compareTo(BigDecimal.ZERO) > 0 ? fmt(vehPay) : "—",
-                                    fmt(desPay.add(vehPay)));
-                        } else {
-                            addAnnexureRow(annexure, isHalf, date.format(DATE_FMT), fmt(desPay), fmt(desPay));
                         }
+
+                        addAnnexureRow(annexure, isHalf,
+                                date.format(DATE_FMT),
+                                vehicleNo,
+                                fmt(desPay),
+                                vehPay.compareTo(BigDecimal.ZERO) > 0 ? fmt(vehPay) : "—",
+                                fmt(desPay.add(vehPay)));
                     }
                     doc.add(annexure);
-                    doc.add(Chunk.NEWLINE);
                 }
             } catch (Exception ignored) { }
 
