@@ -420,6 +420,42 @@ public class PayrollServiceImpl implements PayrollService {
     }
 
     @Override
+    public List<PayrollResponse> generatePayrollRange(GeneratePayrollRequest request) {
+        TransactionTemplate tt = new TransactionTemplate(transactionManager);
+        tt.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        List<PayrollResponse> results = new ArrayList<>();
+        LocalDate chunkStart = request.getPayCycleStartDate();
+
+        while (!chunkStart.isAfter(request.getPayCycleEndDate())) {
+            LocalDate monthEnd = chunkStart.withDayOfMonth(chunkStart.lengthOfMonth());
+            LocalDate chunkEnd = monthEnd.isBefore(request.getPayCycleEndDate()) ? monthEnd : request.getPayCycleEndDate();
+
+            final LocalDate s = chunkStart;
+            final LocalDate e = chunkEnd;
+
+            PayrollResponse result = tt.execute(status -> {
+                GeneratePayrollRequest chunk = new GeneratePayrollRequest();
+                chunk.setUserId(request.getUserId());
+                chunk.setPayCycleStartDate(s);
+                chunk.setPayCycleEndDate(e);
+                chunk.setDailyRate(request.getDailyRate());
+                chunk.setMonthlySalary(request.getMonthlySalary());
+                chunk.setOvertimeHours(request.getOvertimeHours());
+                chunk.setTripBonus(request.getTripBonus());
+                chunk.setRemarks(request.getRemarks());
+                chunk.setDeductions(request.getDeductions());
+                return generatePayrollCore(chunk);
+            });
+            if (result != null) results.add(result);
+
+            chunkStart = chunkEnd.plusDays(1);
+        }
+
+        return results;
+    }
+
+    @Override
     public PayrollResponse getPayrollById(Long id) {
         return mapToPayrollResponse(payrollRepository
                 .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())

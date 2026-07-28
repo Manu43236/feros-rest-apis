@@ -124,6 +124,14 @@ public class PayrollController {
                 "Payroll approved successfully", payrollService.approvePayroll(id, request)));
     }
 
+    @PostMapping("/generate-range")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<PayrollResponse>>> generatePayrollRange(
+            @Valid @RequestBody GeneratePayrollRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Payroll generated successfully", payrollService.generatePayrollRange(request)));
+    }
+
     @PostMapping("/bulk-generate")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<BulkPayrollResult>> bulkGeneratePayroll(

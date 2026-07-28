@@ -24,6 +24,8 @@ public interface PayrollService {
 
     PayrollResponse generatePayroll(GeneratePayrollRequest request);
 
+    List<PayrollResponse> generatePayrollRange(GeneratePayrollRequest request);
+
     PayrollResponse getPayrollById(Long id);
 
     Page<PayrollResponse> getAllPayrolls(int page, int size, String search);
