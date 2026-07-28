@@ -162,7 +162,7 @@ public class ServiceInvoicePdfService {
 
             // ── Footer ─────────────────────────────────────────────────────
             doc.add(Chunk.NEWLINE);
-            Paragraph footer = new Paragraph("This is a system-generated internal service invoice. — FEROS Fleet Management", FONT_GRAY);
+            Paragraph footer = new Paragraph("Powered by FEROS", FONT_GRAY);
             footer.setAlignment(Element.ALIGN_CENTER);
             doc.add(footer);
 
