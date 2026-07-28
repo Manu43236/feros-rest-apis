@@ -210,6 +210,76 @@ public class PayslipPdfService {
             payTable.addCell(deductionsCell);
             doc.add(payTable);
 
+            // ── Daily Earnings Annexure (daily-rate only) ────────────────────
+            if (!isMonthly) try {
+                List<com.feros.api.entity.Attendance> attendanceList = attendanceRepository
+                        .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrueOrderByAttendanceDateDesc(
+                                payroll.getUser().getId(), tenantId,
+                                payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
+
+                List<com.feros.api.entity.Attendance> workedDays = attendanceList.stream()
+                        .filter(a -> {
+                            String t = a.getAttendanceType().getName().toLowerCase();
+                            return t.contains("present") || t.contains("half");
+                        })
+                        .sorted(java.util.Comparator.comparing(com.feros.api.entity.Attendance::getAttendanceDate))
+                        .toList();
+
+                if (!workedDays.isEmpty()) {
+                    List<com.feros.api.entity.VehicleStaffAssignment> assignments =
+                            vehicleStaffAssignmentRepository.findOverlappingByUser(
+                                    payroll.getUser().getId(), tenantId,
+                                    payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
+
+                    // Only show vehicle columns if at least one day has vehicle extra pay
+                    boolean hasVehiclePay = payroll.getVehicleExtraPay() != null
+                            && payroll.getVehicleExtraPay().compareTo(BigDecimal.ZERO) > 0;
+
+                    doc.add(sectionLabel("DAILY EARNINGS ANNEXURE"));
+
+                    PdfPTable annexure;
+                    if (hasVehiclePay) {
+                        annexure = new PdfPTable(new float[]{1.4f, 1.8f, 1.8f, 1.8f, 1.8f});
+                        annexure.setWidthPercentage(100);
+                        addAnnexureHeader(annexure, "Date", "Vehicle No.", "Designation Pay", "Vehicle Pay", "Day Total");
+                    } else {
+                        annexure = new PdfPTable(new float[]{1.4f, 2.5f, 2.5f});
+                        annexure.setWidthPercentage(100);
+                        addAnnexureHeader(annexure, "Date", "Designation Pay", "Day Total");
+                    }
+
+                    for (com.feros.api.entity.Attendance record : workedDays) {
+                        java.time.LocalDate date = record.getAttendanceDate();
+                        boolean isHalf = record.getAttendanceType().getName().toLowerCase().contains("half");
+                        BigDecimal factor = isHalf ? new BigDecimal("0.5") : BigDecimal.ONE;
+                        BigDecimal desPay = payroll.getDailyRate().multiply(factor).setScale(2, RoundingMode.HALF_UP);
+
+                        if (hasVehiclePay) {
+                            String vehicleNo = "—";
+                            BigDecimal vehPay = BigDecimal.ZERO;
+                            for (com.feros.api.entity.VehicleStaffAssignment a : assignments) {
+                                if (!date.isBefore(a.getAssignedFrom())
+                                        && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo()))
+                                        && Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
+                                        && a.getVehicle().getExtraPayPerDay() != null) {
+                                    vehicleNo = a.getVehicle().getRegistrationNumber();
+                                    vehPay = a.getVehicle().getExtraPayPerDay().multiply(factor).setScale(2, RoundingMode.HALF_UP);
+                                    break;
+                                }
+                            }
+                            addAnnexureRow(annexure, isHalf,
+                                    date.format(DATE_FMT), vehicleNo, fmt(desPay),
+                                    vehPay.compareTo(BigDecimal.ZERO) > 0 ? fmt(vehPay) : "—",
+                                    fmt(desPay.add(vehPay)));
+                        } else {
+                            addAnnexureRow(annexure, isHalf, date.format(DATE_FMT), fmt(desPay), fmt(desPay));
+                        }
+                    }
+                    doc.add(annexure);
+                    doc.add(Chunk.NEWLINE);
+                }
+            } catch (Exception ignored) { }
+
             // ── Net Pay banner ───────────────────────────────────────────────
             PdfPTable net = new PdfPTable(new float[]{1f, 1.2f});
             net.setWidthPercentage(100);
@@ -329,6 +399,29 @@ public class PayslipPdfService {
 
         table.addCell(lc);
         table.addCell(vc);
+    }
+
+    private void addAnnexureHeader(PdfPTable table, String... headers) {
+        for (String h : headers) {
+            PdfPCell c = new PdfPCell(new Phrase(h, new Font(Font.HELVETICA, 8, Font.BOLD, Color.WHITE)));
+            c.setBackgroundColor(NAVY); c.setPadding(6); c.setBorder(Rectangle.NO_BORDER);
+            c.setHorizontalAlignment(Element.ALIGN_CENTER);
+            table.addCell(c);
+        }
+    }
+
+    private void addAnnexureRow(PdfPTable table, boolean isHalf, String... vals) {
+        Color bg = isHalf ? AMBER_BG : Color.WHITE;
+        for (int i = 0; i < vals.length; i++) {
+            PdfPCell c = new PdfPCell(new Phrase(vals[i], isHalf
+                    ? new Font(Font.HELVETICA, 8, Font.ITALIC, AMBER)
+                    : new Font(Font.HELVETICA, 8, Font.NORMAL, Color.BLACK)));
+            c.setPadding(5);
+            c.setBackgroundColor(bg);
+            c.setHorizontalAlignment(i == 0 ? Element.ALIGN_LEFT : Element.ALIGN_CENTER);
+            c.setBorderColor(BORDER);
+            table.addCell(c);
+        }
     }
 
     private Paragraph sectionLabel(String title) {
