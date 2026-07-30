@@ -503,6 +503,41 @@ public class OrderServiceImpl implements OrderService {
 
         vehicleAllocationRepository.save(allocation);
 
+        // Auto-assign vehicle's current driver/cleaner to this order allocation
+        User currentDriver = vehicle.getCurrentDriver();
+        User currentCleaner = vehicle.getCurrentCleaner();
+        User actor = getCurrentUser();
+        if (currentDriver != null) {
+            roleRepository.findByName(RoleName.DRIVER).ifPresent(driverRole ->
+                staffAllocationRepository.save(OrderStaffAllocation.builder()
+                        .tenant(allocation.getTenant())
+                        .order(order)
+                        .vehicleAllocation(allocation)
+                        .user(currentDriver)
+                        .role(driverRole)
+                        .allocationStatus(StaffAllocationStatus.ALLOCATED)
+                        .expectedStartDate(request.getExpectedLoadDate())
+                        .expectedEndDate(request.getExpectedDeliveryDate())
+                        .allocatedBy(actor)
+                        .build())
+            );
+        }
+        if (currentCleaner != null) {
+            roleRepository.findByName(RoleName.CLEANER).ifPresent(cleanerRole ->
+                staffAllocationRepository.save(OrderStaffAllocation.builder()
+                        .tenant(allocation.getTenant())
+                        .order(order)
+                        .vehicleAllocation(allocation)
+                        .user(currentCleaner)
+                        .role(cleanerRole)
+                        .allocationStatus(StaffAllocationStatus.ALLOCATED)
+                        .expectedStartDate(request.getExpectedLoadDate())
+                        .expectedEndDate(request.getExpectedDeliveryDate())
+                        .allocatedBy(actor)
+                        .build())
+            );
+        }
+
         // Update vehicle status → ASSIGNED
         setVehicleStatus(vehicle, VehicleStatusType.ASSIGNED);
 
