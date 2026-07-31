@@ -30,7 +30,7 @@ public class TyreController {
     }
 
     @PostMapping("/bulk")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<List<TyreResponse>>> bulkCreate(@RequestBody TyreBulkRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Tyres created", tyreService.bulkCreateTyres(request)));
     }
