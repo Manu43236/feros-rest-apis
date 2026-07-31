@@ -24,43 +24,43 @@ public class TyreController {
     private final TyreService tyreService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<TyreResponse>> create(@RequestBody TyreRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Tyre created", tyreService.createTyre(request)));
     }
 
     @PostMapping("/bulk")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'STORE_KEEPER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<List<TyreResponse>>> bulkCreate(@RequestBody TyreBulkRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Tyres created", tyreService.bulkCreateTyres(request)));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<List<TyreResponse>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success("Tyres fetched", tyreService.getAllTyres()));
     }
 
     @GetMapping("/available")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER', 'SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER', 'SUPERVISOR', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<List<TyreResponse>>> getAvailable() {
         return ResponseEntity.ok(ApiResponse.success("Available tyres fetched", tyreService.getAvailableTyres()));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<TyreResponse>> update(@PathVariable Long id, @RequestBody TyreRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Tyre updated", tyreService.updateTyre(id, request)));
     }
 
     @GetMapping("/{id}/history")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<List<TyreFittingResponse>>> getTyreHistory(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Tyre history fetched", tyreService.getTyreHistory(id)));
     }
 
     @PatchMapping("/{id}/back-to-stock")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<TyreResponse>> markBackToStock(
             @PathVariable Long id,
             @RequestBody(required = false) TyreBackToStockRequest request) {
@@ -68,7 +68,7 @@ public class TyreController {
     }
 
     @PatchMapping("/{id}/scrap")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<TyreResponse>> scrapTyre(
             @PathVariable Long id,
             @RequestBody TyreScrapRequest request) {
@@ -76,7 +76,7 @@ public class TyreController {
     }
 
     @GetMapping("/{id}/retread-history")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<List<TyreRetreadLogResponse>>> getRetreadHistory(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Retread history fetched", tyreService.getRetreadHistory(id)));
     }
