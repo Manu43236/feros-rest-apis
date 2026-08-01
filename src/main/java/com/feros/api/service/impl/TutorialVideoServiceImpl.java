@@ -22,8 +22,11 @@ public class TutorialVideoServiceImpl implements TutorialVideoService {
     @Override
     public List<TutorialVideoResponse> getForMobile(String language) {
         String role = SecurityUtil.getCurrentRole();
-        return repository.findForRole(role, language)
-                .stream().map(TutorialVideoResponse::from).toList();
+        List<TutorialVideo> videos = repository.findForRole(role, language);
+        if (videos.isEmpty() && !"te".equals(language)) {
+            videos = repository.findForRole(role, "te");
+        }
+        return videos.stream().map(TutorialVideoResponse::from).toList();
     }
 
     @Override
