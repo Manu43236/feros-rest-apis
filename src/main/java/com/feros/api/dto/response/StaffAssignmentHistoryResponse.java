@@ -3,7 +3,6 @@ package com.feros.api.dto.response;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
@@ -16,7 +15,7 @@ public class StaffAssignmentHistoryResponse {
     private String userName;
     private String userRole;
     private String assignedByName;
-    private LocalDate assignedAt;
+    private LocalDateTime assignedAt;
     private String unassignedByName;
     private LocalDateTime unassignedAt;
 }

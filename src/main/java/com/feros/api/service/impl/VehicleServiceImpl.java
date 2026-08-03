@@ -1095,7 +1095,7 @@ public class VehicleServiceImpl implements VehicleService {
                         .userRole(a.getUser() != null ? a.getUser().getRoles().stream().findFirst()
                                 .map(r -> r.getName().name()).orElse(null) : null)
                         .assignedByName(a.getAssignedBy() != null ? a.getAssignedBy().getName() : null)
-                        .assignedAt(a.getAssignedFrom())
+                        .assignedAt(a.getCreatedAt())
                         .unassignedByName(a.getUnassignedBy() != null ? a.getUnassignedBy().getName() : null)
                         .unassignedAt(a.getUnassignedAt())
                         .build())
