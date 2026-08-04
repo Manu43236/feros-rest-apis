@@ -1095,23 +1095,50 @@ public class VehicleServiceImpl implements VehicleService {
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<com.feros.api.dto.response.StaffAssignmentHistoryResponse> getAllStaffAssignmentHistory() {
         Long tenantId = getCurrentTenantId();
-        return vehicleStaffAssignmentRepository
-                .findAllByTenantIdOrderByCreatedAtDesc(tenantId)
-                .stream()
-                .map(a -> com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
+        List<com.feros.api.dto.response.StaffAssignmentHistoryResponse> events = new java.util.ArrayList<>();
+
+        for (VehicleStaffAssignment a : vehicleStaffAssignmentRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId)) {
+            Long vehicleId = a.getVehicle() != null ? a.getVehicle().getId() : null;
+            String regNum   = a.getVehicle() != null ? a.getVehicle().getRegistrationNumber() : null;
+            Long userId     = a.getUser() != null ? a.getUser().getId() : null;
+            String userName = a.getUser() != null ? a.getUser().getName() : null;
+            String userRole = a.getUser() != null ? a.getUser().getRoles().stream().findFirst()
+                    .map(r -> r.getName().name()).orElse(null) : null;
+
+            events.add(com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
+                    .id(a.getId())
+                    .vehicleId(vehicleId)
+                    .vehicleRegistrationNumber(regNum)
+                    .userId(userId)
+                    .userName(userName)
+                    .userRole(userRole)
+                    .action("Assigned")
+                    .actionByName(a.getAssignedBy() != null ? a.getAssignedBy().getName() : null)
+                    .actionAt(a.getCreatedAt())
+                    .build());
+
+            if (a.getUnassignedAt() != null) {
+                events.add(com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
                         .id(a.getId())
-                        .vehicleId(a.getVehicle() != null ? a.getVehicle().getId() : null)
-                        .vehicleRegistrationNumber(a.getVehicle() != null ? a.getVehicle().getRegistrationNumber() : null)
-                        .userId(a.getUser() != null ? a.getUser().getId() : null)
-                        .userName(a.getUser() != null ? a.getUser().getName() : null)
-                        .userRole(a.getUser() != null ? a.getUser().getRoles().stream().findFirst()
-                                .map(r -> r.getName().name()).orElse(null) : null)
-                        .assignedByName(a.getAssignedBy() != null ? a.getAssignedBy().getName() : null)
-                        .assignedAt(a.getCreatedAt())
-                        .unassignedByName(a.getUnassignedBy() != null ? a.getUnassignedBy().getName() : null)
-                        .unassignedAt(a.getUnassignedAt())
-                        .build())
-                .toList();
+                        .vehicleId(vehicleId)
+                        .vehicleRegistrationNumber(regNum)
+                        .userId(userId)
+                        .userName(userName)
+                        .userRole(userRole)
+                        .action("Unassigned")
+                        .actionByName(a.getUnassignedBy() != null ? a.getUnassignedBy().getName() : null)
+                        .actionAt(a.getUnassignedAt())
+                        .build());
+            }
+        }
+
+        // Sort newest first; at same timestamp, Assigned (happened after) sorts above Unassigned
+        events.sort(java.util.Comparator
+                .<com.feros.api.dto.response.StaffAssignmentHistoryResponse, java.time.LocalDateTime>comparing(
+                        e -> e.getActionAt(), java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()))
+                .thenComparing(e -> "Assigned".equals(e.getAction()) ? 0 : 1));
+
+        return events;
     }
 
     private Integer computeFinanceMonthsRemaining(Vehicle v) {

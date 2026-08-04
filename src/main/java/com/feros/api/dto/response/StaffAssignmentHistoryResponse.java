@@ -14,8 +14,7 @@ public class StaffAssignmentHistoryResponse {
     private Long userId;
     private String userName;
     private String userRole;
-    private String assignedByName;
-    private LocalDateTime assignedAt;
-    private String unassignedByName;
-    private LocalDateTime unassignedAt;
+    private String action; // "Assigned" or "Unassigned"
+    private String actionByName;
+    private LocalDateTime actionAt;
 }
