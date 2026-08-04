@@ -803,9 +803,23 @@ public class VehicleServiceImpl implements VehicleService {
         if (vehicleRepository.existsByCurrentDriver_IdAndIdNot(userId, vehicleId))
             throw new FerosException("This driver is already assigned to another vehicle", HttpStatus.CONFLICT);
 
-        // Close any existing open assignment for this driver
         User actorForClose = userRepository.findById(SecurityUtil.getCurrentUserId())
                 .orElseThrow(() -> new FerosException("Current user not found", HttpStatus.NOT_FOUND));
+        User oldDriver = vehicle.getCurrentDriver();
+
+        // Auto-unassign the current driver from this vehicle before assigning the new one
+        if (oldDriver != null) {
+            vehicleStaffAssignmentRepository
+                    .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(oldDriver.getId(), tenantId)
+                    .ifPresent(a -> {
+                        a.setAssignedTo(TimeUtil.today());
+                        a.setUnassignedBy(actorForClose);
+                        a.setUnassignedAt(LocalDateTime.now());
+                        vehicleStaffAssignmentRepository.save(a);
+                    });
+        }
+
+        // Close any existing open assignment for the new driver (e.g. previously on another vehicle)
         vehicleStaffAssignmentRepository
                 .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(userId, tenantId)
                 .ifPresent(a -> {
@@ -824,8 +838,6 @@ public class VehicleServiceImpl implements VehicleService {
                 .assignedFrom(TimeUtil.today())
                 .assignedBy(assignedBy)
                 .build());
-
-        User oldDriver = vehicle.getCurrentDriver();
 
         vehicle.setCurrentDriver(driver);
         vehicleRepository.save(vehicle);
