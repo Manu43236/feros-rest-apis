@@ -1097,6 +1097,12 @@ public class VehicleServiceImpl implements VehicleService {
         Long tenantId = getCurrentTenantId();
         List<com.feros.api.dto.response.StaffAssignmentHistoryResponse> events = new java.util.ArrayList<>();
 
+        // One query to build vehicle → order allocation map for order number lookup
+        java.util.Map<Long, List<com.feros.api.entity.OrderVehicleAllocation>> vehicleOrderMap =
+                allocationRepository.findAllByTenantIdWithOrder(tenantId).stream()
+                        .collect(java.util.stream.Collectors.groupingBy(
+                                ova -> ova.getVehicle().getId()));
+
         for (VehicleStaffAssignment a : vehicleStaffAssignmentRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId)) {
             Long vehicleId = a.getVehicle() != null ? a.getVehicle().getId() : null;
             String regNum   = a.getVehicle() != null ? a.getVehicle().getRegistrationNumber() : null;
@@ -1104,6 +1110,18 @@ public class VehicleServiceImpl implements VehicleService {
             String userName = a.getUser() != null ? a.getUser().getName() : null;
             String userRole = a.getUser() != null ? a.getUser().getRoles().stream().findFirst()
                     .map(r -> r.getName().name()).orElse(null) : null;
+
+            // Find order allocation active at the moment of this staff assignment
+            String orderNum = null;
+            if (vehicleId != null && a.getCreatedAt() != null) {
+                java.time.LocalDateTime assignedAt = a.getCreatedAt();
+                orderNum = vehicleOrderMap.getOrDefault(vehicleId, java.util.Collections.emptyList()).stream()
+                        .filter(ova -> !ova.getCreatedAt().isAfter(assignedAt) &&
+                                       (ova.getUnassignedAt() == null || !ova.getUnassignedAt().isBefore(assignedAt)))
+                        .findFirst()
+                        .map(ova -> ova.getOrder().getOrderNumber())
+                        .orElse(null);
+            }
 
             events.add(com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
                     .id(a.getId())
@@ -1115,6 +1133,7 @@ public class VehicleServiceImpl implements VehicleService {
                     .action("Assigned")
                     .actionByName(a.getAssignedBy() != null ? a.getAssignedBy().getName() : null)
                     .actionAt(a.getCreatedAt())
+                    .orderNumber(orderNum)
                     .build());
 
             if (a.getUnassignedAt() != null) {
@@ -1128,6 +1147,7 @@ public class VehicleServiceImpl implements VehicleService {
                         .action("Unassigned")
                         .actionByName(a.getUnassignedBy() != null ? a.getUnassignedBy().getName() : null)
                         .actionAt(a.getUnassignedAt())
+                        .orderNumber(orderNum)
                         .build());
             }
         }

@@ -17,4 +17,5 @@ public class StaffAssignmentHistoryResponse {
     private String action; // "Assigned" or "Unassigned"
     private String actionByName;
     private LocalDateTime actionAt;
+    private String orderNumber;
 }
