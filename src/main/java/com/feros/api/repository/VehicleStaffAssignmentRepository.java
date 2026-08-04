@@ -51,6 +51,7 @@ public interface VehicleStaffAssignmentRepository extends JpaRepository<VehicleS
     @Query("SELECT a FROM VehicleStaffAssignment a " +
            "LEFT JOIN FETCH a.vehicle LEFT JOIN FETCH a.user " +
            "LEFT JOIN FETCH a.assignedBy LEFT JOIN FETCH a.unassignedBy " +
-           "WHERE a.tenant.id = :tenantId ORDER BY a.createdAt DESC")
+           "WHERE a.tenant.id = :tenantId " +
+           "ORDER BY COALESCE(a.unassignedAt, a.createdAt) DESC, a.id DESC")
     List<VehicleStaffAssignment> findAllByTenantIdOrderByCreatedAtDesc(@Param("tenantId") Long tenantId);
 }
