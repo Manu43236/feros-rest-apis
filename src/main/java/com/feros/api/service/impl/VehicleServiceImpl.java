@@ -1132,10 +1132,14 @@ public class VehicleServiceImpl implements VehicleService {
             }
         }
 
-        // Sort newest first; at same timestamp, Assigned (happened after) sorts above Unassigned
+        // Sort newest first; truncate to seconds so same-second events always tie,
+        // then Assigned (happened after unassignment) sorts above Unassigned at same second
         events.sort(java.util.Comparator
                 .<com.feros.api.dto.response.StaffAssignmentHistoryResponse, java.time.LocalDateTime>comparing(
-                        e -> e.getActionAt(), java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()))
+                        e -> e.getActionAt() != null
+                                ? e.getActionAt().truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
+                                : null,
+                        java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()))
                 .thenComparing(e -> "Assigned".equals(e.getAction()) ? 0 : 1));
 
         return events;
