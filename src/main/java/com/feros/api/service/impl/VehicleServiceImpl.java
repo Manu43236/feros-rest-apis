@@ -1116,9 +1116,18 @@ public class VehicleServiceImpl implements VehicleService {
             if (vehicleId != null && a.getCreatedAt() != null) {
                 java.time.LocalDateTime assignedAt = a.getCreatedAt();
                 orderNum = vehicleOrderMap.getOrDefault(vehicleId, java.util.Collections.emptyList()).stream()
-                        .filter(ova -> !ova.getCreatedAt().isAfter(assignedAt) &&
-                                       (ova.getUnassignedAt() == null || !ova.getUnassignedAt().isBefore(assignedAt)))
-                        .findFirst()
+                        .filter(ova -> {
+                            // allocation must have started before or at the staff assignment
+                            if (ova.getCreatedAt().isAfter(assignedAt)) return false;
+                            // if explicitly unassigned before assignment, skip
+                            if (ova.getUnassignedAt() != null && ova.getUnassignedAt().isBefore(assignedAt)) return false;
+                            // if actually delivered before assignment date, skip
+                            if (ova.getActualDeliveryDate() != null &&
+                                    ova.getActualDeliveryDate().isBefore(assignedAt.toLocalDate())) return false;
+                            return true;
+                        })
+                        // take the most recent allocation that qualifies
+                        .max(java.util.Comparator.comparing(com.feros.api.entity.OrderVehicleAllocation::getCreatedAt))
                         .map(ova -> ova.getOrder().getOrderNumber())
                         .orElse(null);
             }
