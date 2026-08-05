@@ -14,154 +14,187 @@ import java.time.format.DateTimeFormatter;
 @Service
 public class SubscriptionInvoicePdfService {
 
-    private static final Color NAVY    = new Color(15, 33, 55);
-    private static final Color GRAY    = new Color(90, 105, 120);
-    private static final Color SUCCESS = new Color(21, 128, 61);
+    private static final Color NAVY      = new Color(15, 33, 55);
+    private static final Color LIGHT_BG  = new Color(240, 244, 250);
+    private static final Color BORDER    = new Color(210, 220, 235);
+    private static final Color GRAY_TXT  = new Color(90, 105, 120);
+    private static final Color GREEN     = new Color(21, 128, 61);
+
+    private static final Font F_CO_NAME  = new Font(Font.HELVETICA, 14, Font.BOLD,  NAVY);
+    private static final Font F_DOC_TYPE = new Font(Font.HELVETICA, 10, Font.BOLD,  NAVY);
+    private static final Font F_LABEL    = new Font(Font.HELVETICA,  8, Font.NORMAL, GRAY_TXT);
+    private static final Font F_VALUE    = new Font(Font.HELVETICA,  9, Font.BOLD,  Color.BLACK);
+    private static final Font F_BODY     = new Font(Font.HELVETICA,  9, Font.NORMAL, Color.BLACK);
+    private static final Font F_BOLD     = new Font(Font.HELVETICA,  9, Font.BOLD,  Color.BLACK);
+    private static final Font F_TH       = new Font(Font.HELVETICA,  9, Font.BOLD,  Color.WHITE);
+    private static final Font F_TOTAL    = new Font(Font.HELVETICA, 10, Font.BOLD,  NAVY);
+    private static final Font F_GRAND    = new Font(Font.HELVETICA, 11, Font.BOLD,  GREEN);
+    private static final Font F_SMALL    = new Font(Font.HELVETICA,  8, Font.NORMAL, GRAY_TXT);
+
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
-    private static final Font FONT_HEADER = new Font(Font.HELVETICA, 18, Font.BOLD, Color.WHITE);
-    private static final Font FONT_TITLE  = new Font(Font.HELVETICA, 11, Font.BOLD, NAVY);
-    private static final Font FONT_BODY   = new Font(Font.HELVETICA, 9, Font.NORMAL, Color.BLACK);
-    private static final Font FONT_BOLD   = new Font(Font.HELVETICA, 9, Font.BOLD, Color.BLACK);
-    private static final Font FONT_GRAY   = new Font(Font.HELVETICA, 8, Font.NORMAL, GRAY);
-    private static final Font FONT_TOTAL  = new Font(Font.HELVETICA, 11, Font.BOLD, NAVY);
+    // SAC code for cloud/SaaS software services
+    private static final String SAC_CODE = "998315";
 
     public byte[] generate(SubscriptionInvoice inv) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            Document doc = new Document(PageSize.A4, 40, 40, 40, 40);
+            Document doc = new Document(PageSize.A4, 36, 36, 36, 36);
             PdfWriter.getInstance(doc, baos);
             doc.open();
 
             var tenant = inv.getTenant();
-            String company = tenant.getCompanyName() != null ? tenant.getCompanyName().toUpperCase() : "FEROS";
-            boolean isProforma = "PROFORMA".equals(inv.getInvoiceStatus());
+            boolean isProforma   = "PROFORMA".equals(inv.getInvoiceStatus());
             boolean isInterState = "INTER_STATE".equals(inv.getGstType());
-            String docLabel = isProforma ? "Proforma Invoice" : "Tax Invoice";
-            String docNumber = isProforma ? inv.getProformaNumber() : inv.getInvoiceNumber();
-
-            // ── Header banner ─────────────────────────────────────────────────
-            PdfPTable header = new PdfPTable(1);
-            header.setWidthPercentage(100);
-            PdfPCell hCell = new PdfPCell();
-            hCell.setBackgroundColor(NAVY);
-            hCell.setPadding(14);
-            hCell.setBorder(Rectangle.NO_BORDER);
-            hCell.addElement(new Phrase(company, FONT_HEADER));
-            hCell.addElement(new Phrase(docLabel, new Font(Font.HELVETICA, 10, Font.NORMAL, new Color(180, 200, 230))));
-            header.addCell(hCell);
-            doc.add(header);
-            doc.add(Chunk.NEWLINE);
-
-            // ── Supplier block (MandM Technologies) ───────────────────────────
-            doc.add(new Paragraph("Supplier: M&M Technologies", FONT_BOLD));
-            doc.add(new Paragraph("Andhra Pradesh, India", FONT_GRAY));
-            doc.add(new Paragraph("GSTIN: 37CHFM8981H1ZK", FONT_GRAY));
-            doc.add(Chunk.NEWLINE);
-
-            // ── Billed to (Tenant) ─────────────────────────────────────────────
-            doc.add(new Paragraph("Billed To:", FONT_BOLD));
-            doc.add(new Paragraph(company, FONT_BODY));
-            if (tenant.getAddress() != null || tenant.getCity() != null) {
-                StringBuilder addr = new StringBuilder();
-                if (tenant.getAddress() != null) addr.append(tenant.getAddress());
-                if (tenant.getCity() != null) addr.append(", ").append(tenant.getCity());
-                if (tenant.getState() != null) addr.append(", ").append(tenant.getState());
-                if (tenant.getPincode() != null) addr.append(" - ").append(tenant.getPincode());
-                doc.add(new Paragraph(addr.toString(), FONT_GRAY));
-            }
-            if (tenant.getGstin() != null) {
-                doc.add(new Paragraph("GSTIN: " + tenant.getGstin(), FONT_GRAY));
-            }
-            doc.add(Chunk.NEWLINE);
-
-            // ── Invoice meta ──────────────────────────────────────────────────
-            PdfPTable meta = new PdfPTable(new float[]{1, 1});
-            meta.setWidthPercentage(100);
-            addMetaCell(meta, isProforma ? "Proforma No" : "Invoice No", docNumber != null ? docNumber : "—");
-            String dateLabel = isProforma ? "Proforma Date" : "Invoice Date";
-            String dateValue = isProforma
-                    ? (inv.getCreatedAt() != null ? inv.getCreatedAt().format(DATE_FMT) : "—")
+            String  docLabel     = isProforma ? "PROFORMA INVOICE" : "TAX INVOICE";
+            String  docNumber    = isProforma ? inv.getProformaNumber() : inv.getInvoiceNumber();
+            String  docDate      = isProforma
+                    ? (inv.getCreatedAt()   != null ? inv.getCreatedAt().format(DATE_FMT)   : "—")
                     : (inv.getPaymentDate() != null ? inv.getPaymentDate().format(DATE_FMT) : "—");
-            addMetaCell(meta, dateLabel, dateValue);
-            addMetaCell(meta, "Plan", inv.getPlanName() != null ? inv.getPlanName() : "—");
-            addMetaCell(meta, "Billing Cycle", formatCycle(inv.getBillingCycle()));
-            addMetaCell(meta, "Vehicle Count",
-                    inv.getVehicleCount() != null ? inv.getVehicleCount() + " vehicles" : "—");
-            addMetaCell(meta, "Price / Vehicle / Month",
-                    inv.getPricePerVehicle() != null ? "₹" + inv.getPricePerVehicle().setScale(2, RoundingMode.HALF_UP) : "—");
-            addMetaCell(meta, "Period Start",
-                    inv.getPeriodStart() != null ? inv.getPeriodStart().format(DATE_FMT) : "—");
-            addMetaCell(meta, "Period End",
-                    inv.getPeriodEnd() != null ? inv.getPeriodEnd().format(DATE_FMT) : "—");
+
+            // ── TOP HEADER: Supplier (left) | Invoice meta (right) ─────────────
+            PdfPTable topHeader = new PdfPTable(new float[]{1, 1});
+            topHeader.setWidthPercentage(100);
+
+            // Left — Supplier
+            PdfPCell supplierCell = new PdfPCell();
+            supplierCell.setBorder(Rectangle.BOX);
+            supplierCell.setBorderColor(BORDER);
+            supplierCell.setBackgroundColor(LIGHT_BG);
+            supplierCell.setPadding(10);
+            supplierCell.addElement(new Phrase("M&M Technologies", F_CO_NAME));
+            supplierCell.addElement(spacer(3));
+            supplierCell.addElement(labelVal("GSTIN", "37CHFM8981H1ZK"));
+            supplierCell.addElement(labelVal("State", "Andhra Pradesh (State Code: 37)"));
+            supplierCell.addElement(labelVal("Email", "manikanta.chadaram1992@gmail.com"));
+            topHeader.addCell(supplierCell);
+
+            // Right — Invoice meta
+            PdfPCell metaCell = new PdfPCell();
+            metaCell.setBorder(Rectangle.BOX);
+            metaCell.setBorderColor(BORDER);
+            metaCell.setPadding(10);
+            metaCell.addElement(new Phrase(docLabel, F_DOC_TYPE));
+            metaCell.addElement(spacer(4));
+            metaCell.addElement(labelVal(isProforma ? "Proforma No." : "Invoice No.", docNumber != null ? docNumber : "—"));
+            metaCell.addElement(labelVal("Date", docDate));
             if (!isProforma && inv.getPaymentMode() != null) {
-                addMetaCell(meta, "Payment Mode", inv.getPaymentMode());
+                metaCell.addElement(labelVal("Payment Mode", inv.getPaymentMode()));
             }
             if (inv.getPaymentRef() != null) {
-                addMetaCell(meta, "Payment Ref", inv.getPaymentRef());
+                metaCell.addElement(labelVal("Payment Ref", inv.getPaymentRef()));
             }
-            doc.add(meta);
-            doc.add(Chunk.NEWLINE);
+            metaCell.addElement(labelVal("GST Type", isInterState ? "Inter-State (IGST)" : "Intra-State (CGST+SGST)"));
+            topHeader.addCell(metaCell);
 
-            // ── Amount summary ────────────────────────────────────────────────
-            doc.add(sectionTitle(isProforma ? "ESTIMATED AMOUNT" : "AMOUNT SUMMARY"));
-            PdfPTable totals = new PdfPTable(new float[]{3, 1.5f});
-            totals.setWidthPercentage(60);
-            totals.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            doc.add(topHeader);
 
-            BigDecimal gst = inv.getGstAmount() != null ? inv.getGstAmount() : BigDecimal.ZERO;
+            // ── BILL TO ──────────────────────────────────────────────────────────
+            PdfPTable billTo = new PdfPTable(1);
+            billTo.setWidthPercentage(100);
+            PdfPCell btCell = new PdfPCell();
+            btCell.setBorder(Rectangle.BOX);
+            btCell.setBorderColor(BORDER);
+            btCell.setPadding(8);
+            btCell.addElement(new Phrase("Bill To", F_LABEL));
+            btCell.addElement(spacer(2));
+            String company = tenant.getCompanyName() != null ? tenant.getCompanyName() : "—";
+            btCell.addElement(new Phrase(company, F_VALUE));
+            StringBuilder addr = new StringBuilder();
+            if (tenant.getAddress() != null) addr.append(tenant.getAddress());
+            if (tenant.getCity()    != null) addr.append(", ").append(tenant.getCity());
+            if (tenant.getState()   != null) addr.append(", ").append(tenant.getState());
+            if (tenant.getPincode() != null) addr.append(" - ").append(tenant.getPincode());
+            if (!addr.isEmpty()) btCell.addElement(new Phrase(addr.toString(), F_BODY));
+            if (tenant.getGstin() != null) btCell.addElement(labelVal("GSTIN", tenant.getGstin()));
+            billTo.addCell(btCell);
+            doc.add(billTo);
 
-            // Vehicle subscription line
-            if (inv.getVehicleCount() != null && inv.getPricePerVehicle() != null) {
-                long periodDays = inv.getPeriodStart() != null && inv.getPeriodEnd() != null
-                        ? java.time.temporal.ChronoUnit.DAYS.between(inv.getPeriodStart(), inv.getPeriodEnd()) + 1 : 0;
-                String vehicleLine = inv.getVehicleCount() + " vehicles × ₹"
-                        + inv.getPricePerVehicle().setScale(2, RoundingMode.HALF_UP)
-                        + "/month × " + periodDays + " days";
-                BigDecimal vehicleBase = inv.getPricePerVehicle()
+            // ── LINE ITEMS TABLE ─────────────────────────────────────────────────
+            doc.add(spacer(6));
+            PdfPTable items = new PdfPTable(new float[]{0.5f, 3.5f, 1f, 1f, 1f, 1.2f});
+            items.setWidthPercentage(100);
+            addTh(items, "#");
+            addTh(items, "Description");
+            addTh(items, "SAC");
+            addTh(items, "Period");
+            addTh(items, "Vehicles");
+            addTh(items, "Taxable Amount");
+
+            // Vehicle subscription row
+            long periodDays = 0;
+            if (inv.getPeriodStart() != null && inv.getPeriodEnd() != null) {
+                periodDays = java.time.temporal.ChronoUnit.DAYS.between(inv.getPeriodStart(), inv.getPeriodEnd()) + 1;
+            }
+            String periodStr = (inv.getPeriodStart() != null ? inv.getPeriodStart().format(DATE_FMT) : "—")
+                    + " to " + (inv.getPeriodEnd() != null ? inv.getPeriodEnd().format(DATE_FMT) : "—");
+            BigDecimal vehicleBase = BigDecimal.ZERO;
+            if (inv.getPricePerVehicle() != null && inv.getVehicleCount() != null && periodDays > 0) {
+                vehicleBase = inv.getPricePerVehicle()
                         .multiply(new BigDecimal(inv.getVehicleCount()))
                         .multiply(new BigDecimal(periodDays).divide(new BigDecimal("30"), 4, RoundingMode.HALF_UP))
                         .setScale(2, RoundingMode.HALF_UP);
-                addTotalRow(totals, vehicleLine, vehicleBase, false);
             }
+            int rowNum = 1;
+            addItemRow(items, rowNum++, "Fleet Management SaaS Subscription",
+                    SAC_CODE, periodStr,
+                    inv.getVehicleCount() != null ? inv.getVehicleCount() + " @ ₹" + inv.getPricePerVehicle() + "/mo" : "—",
+                    vehicleBase);
 
-            // Additional charge lines (parsed from JSON)
+            // Additional charge rows
+            BigDecimal extraTotal = BigDecimal.ZERO;
             if (inv.getAdditionalChargesJson() != null && !inv.getAdditionalChargesJson().isBlank()) {
                 try {
                     String json = inv.getAdditionalChargesJson().trim().replaceAll("^\\[|]$", "");
-                    for (String entry : json.split("\\},\\{")) {
+                    for (String entry : json.split("\\},\\s*\\{")) {
                         entry = entry.replaceAll("[\\[\\]{}]", "");
                         String name   = entry.replaceAll(".*\"name\":\"([^\"]+)\".*", "$1");
-                        String amount = entry.replaceAll(".*\"amount\":([0-9.]+).*", "$1");
-                        addTotalRow(totals, name, new BigDecimal(amount), false);
+                        String amtStr = entry.replaceAll(".*\"amount\":([0-9.]+).*", "$1");
+                        BigDecimal amt = new BigDecimal(amtStr);
+                        extraTotal = extraTotal.add(amt);
+                        addItemRow(items, rowNum++, name, SAC_CODE, "—", "—", amt);
                     }
                 } catch (Exception ignored) {}
             }
 
-            addTotalRow(totals, "Taxable Amount", inv.getAmount(), false);
+            doc.add(items);
+
+            // ── TOTALS SECTION ───────────────────────────────────────────────────
+            doc.add(spacer(4));
+            PdfPTable totals = new PdfPTable(new float[]{3, 1.5f});
+            totals.setWidthPercentage(42);
+            totals.setHorizontalAlignment(Element.ALIGN_RIGHT);
+
+            BigDecimal base = inv.getAmount() != null ? inv.getAmount() : BigDecimal.ZERO;
+            BigDecimal gst  = inv.getGstAmount() != null ? inv.getGstAmount() : BigDecimal.ZERO;
+            BigDecimal grandTotal = inv.getTotalAmount() != null ? inv.getTotalAmount() : BigDecimal.ZERO;
+
+            addTotalRow(totals, "Taxable Amount", base, false);
             if (isInterState) {
-                addTotalRow(totals, "IGST (18%)", gst, false);
+                addTotalRow(totals, "IGST @ 18%", gst, false);
             } else {
                 BigDecimal half = gst.divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
-                addTotalRow(totals, "CGST (9%)", half, false);
-                addTotalRow(totals, "SGST (9%)", gst.subtract(half), false);
+                addTotalRow(totals, "CGST @ 9%",  half, false);
+                addTotalRow(totals, "SGST @ 9%",  gst.subtract(half), false);
             }
-            addTotalRow(totals, isProforma ? "EXPECTED TOTAL" : "TOTAL", inv.getTotalAmount(), true);
+            addGrandTotalRow(totals, isProforma ? "ESTIMATED TOTAL" : "GRAND TOTAL", grandTotal);
             doc.add(totals);
 
-            // ── Proforma note ─────────────────────────────────────────────────
+            // ── NOTES ────────────────────────────────────────────────────────────
+            doc.add(spacer(10));
             if (isProforma) {
-                doc.add(Chunk.NEWLINE);
                 Paragraph note = new Paragraph(
-                        "This is a proforma invoice only. It is not a tax document. "
-                        + "A GST Tax Invoice will be issued upon receipt of payment.", FONT_GRAY);
-                note.setAlignment(Element.ALIGN_CENTER);
+                        "Note: This is a Proforma Invoice only. It is not a GST Tax Invoice. "
+                        + "An official Tax Invoice will be issued upon receipt of payment.", F_SMALL);
+                doc.add(note);
+            } else {
+                Paragraph note = new Paragraph(
+                        "This is a computer-generated Tax Invoice. No signature required.", F_SMALL);
                 doc.add(note);
             }
 
-            // ── Footer ────────────────────────────────────────────────────────
-            doc.add(Chunk.NEWLINE);
-            Paragraph footer = new Paragraph(
-                    "System-generated by FEROS Fleet Management.", FONT_GRAY);
+            // ── FOOTER ───────────────────────────────────────────────────────────
+            doc.add(spacer(8));
+            Paragraph footer = new Paragraph("Powered by FEROS Fleet Management  |  M&M Technologies, Andhra Pradesh", F_SMALL);
             footer.setAlignment(Element.ALIGN_CENTER);
             doc.add(footer);
 
@@ -174,48 +207,70 @@ public class SubscriptionInvoicePdfService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private void addMetaCell(PdfPTable table, String label, String value) {
-        PdfPCell cell = new PdfPCell();
-        cell.setBorder(Rectangle.BOTTOM);
-        cell.setBorderColor(new Color(220, 228, 240));
-        cell.setPadding(6);
-        cell.addElement(new Phrase(label, FONT_GRAY));
-        cell.addElement(new Phrase(value != null ? value : "—", FONT_BOLD));
-        table.addCell(cell);
-    }
-
-    private Paragraph sectionTitle(String title) {
-        Paragraph p = new Paragraph(title, FONT_TITLE);
-        p.setSpacingBefore(4);
-        p.setSpacingAfter(6);
+    private Phrase labelVal(String label, String value) {
+        Phrase p = new Phrase();
+        p.add(new Chunk(label + ": ", F_LABEL));
+        p.add(new Chunk(value != null ? value : "—", F_VALUE));
         return p;
     }
 
-    private void addTotalRow(PdfPTable table, String label, BigDecimal amount, boolean highlight) {
-        Font lf = highlight ? FONT_TOTAL : FONT_BODY;
-        Font vf = highlight ? new Font(Font.HELVETICA, 11, Font.BOLD, SUCCESS) : FONT_BODY;
-        PdfPCell lc = new PdfPCell(new Phrase(label, lf));
-        lc.setPadding(5);
-        lc.setBorder(highlight ? Rectangle.TOP : Rectangle.BOTTOM);
-        lc.setBorderColor(new Color(220, 228, 240));
-        PdfPCell vc = new PdfPCell(new Phrase(
-                "₹" + (amount != null ? amount.setScale(2, RoundingMode.HALF_UP) : "0.00"), vf));
-        vc.setPadding(5);
-        vc.setHorizontalAlignment(Element.ALIGN_RIGHT);
-        vc.setBorder(highlight ? Rectangle.TOP : Rectangle.BOTTOM);
-        vc.setBorderColor(new Color(220, 228, 240));
-        table.addCell(lc);
-        table.addCell(vc);
+    private Paragraph spacer(float pt) {
+        Paragraph p = new Paragraph(" ");
+        p.setSpacingBefore(pt);
+        p.setSpacingAfter(0);
+        return p;
     }
 
-    private String formatCycle(String cycle) {
-        if (cycle == null) return "—";
-        return switch (cycle) {
-            case "MONTHLY" -> "Monthly";
-            case "THREE_MONTHS" -> "3 Months";
-            case "SIX_MONTHS" -> "6 Months";
-            case "YEARLY" -> "Annual";
-            default -> cycle;
-        };
+    private void addTh(PdfPTable table, String text) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, F_TH));
+        cell.setBackgroundColor(NAVY);
+        cell.setPadding(6);
+        cell.setBorder(Rectangle.NO_BORDER);
+        table.addCell(cell);
+    }
+
+    private void addItemRow(PdfPTable table, int num, String desc, String sac, String period, String vehicles, BigDecimal amount) {
+        Color bc = BORDER;
+        PdfPCell c1 = td(String.valueOf(num), F_BODY); c1.setHorizontalAlignment(Element.ALIGN_CENTER);
+        PdfPCell c2 = td(desc, F_BODY);
+        PdfPCell c3 = td(sac, F_BODY); c3.setHorizontalAlignment(Element.ALIGN_CENTER);
+        PdfPCell c4 = td(period, F_SMALL);
+        PdfPCell c5 = td(vehicles, F_SMALL); c5.setHorizontalAlignment(Element.ALIGN_CENTER);
+        PdfPCell c6 = td("₹" + amount.setScale(2, RoundingMode.HALF_UP), F_BOLD);
+        c6.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        for (PdfPCell c : new PdfPCell[]{c1, c2, c3, c4, c5, c6}) {
+            c.setBorderColor(bc);
+        }
+        table.addCell(c1); table.addCell(c2); table.addCell(c3);
+        table.addCell(c4); table.addCell(c5); table.addCell(c6);
+    }
+
+    private PdfPCell td(String text, Font font) {
+        PdfPCell cell = new PdfPCell(new Phrase(text != null ? text : "—", font));
+        cell.setPadding(6);
+        cell.setBorderColor(BORDER);
+        return cell;
+    }
+
+    private void addTotalRow(PdfPTable table, String label, BigDecimal amount, boolean bold) {
+        Font lf = bold ? F_TOTAL : F_BODY;
+        Font vf = bold ? F_TOTAL : F_BODY;
+        PdfPCell lc = new PdfPCell(new Phrase(label, lf));
+        lc.setPadding(5); lc.setBorder(Rectangle.BOTTOM); lc.setBorderColor(BORDER);
+        PdfPCell vc = new PdfPCell(new Phrase("₹" + (amount != null ? amount.setScale(2, RoundingMode.HALF_UP) : "0.00"), vf));
+        vc.setPadding(5); vc.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        vc.setBorder(Rectangle.BOTTOM); vc.setBorderColor(BORDER);
+        table.addCell(lc); table.addCell(vc);
+    }
+
+    private void addGrandTotalRow(PdfPTable table, String label, BigDecimal amount) {
+        PdfPCell lc = new PdfPCell(new Phrase(label, F_TOTAL));
+        lc.setBackgroundColor(LIGHT_BG);
+        lc.setPadding(7); lc.setBorder(Rectangle.BOX); lc.setBorderColor(BORDER);
+        PdfPCell vc = new PdfPCell(new Phrase("₹" + (amount != null ? amount.setScale(2, RoundingMode.HALF_UP) : "0.00"), F_GRAND));
+        vc.setBackgroundColor(LIGHT_BG);
+        vc.setPadding(7); vc.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        vc.setBorder(Rectangle.BOX); vc.setBorderColor(BORDER);
+        table.addCell(lc); table.addCell(vc);
     }
 }
