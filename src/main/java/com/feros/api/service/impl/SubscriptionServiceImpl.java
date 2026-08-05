@@ -666,9 +666,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                     .collect(java.util.stream.Collectors.joining(",", "[", "]"));
         }
 
-        BigDecimal base  = vehicleBase.add(extraTotal);
-        BigDecimal gst   = base.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal total = base.add(gst);
+        // Proforma is a quote — GST is NOT applied. Total = base amount only.
+        // GST is calculated only when payment is confirmed (tax invoice).
+        BigDecimal base = vehicleBase.add(extraTotal);
 
         LocalDate today = TimeUtil.nowIst().toLocalDate();
         String fyYear = financialYear(today);
@@ -687,8 +687,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .periodStart(request.getFromDate())
                 .periodEnd(request.getToDate())
                 .amount(base)
-                .gstAmount(gst)
-                .totalAmount(total)
+                .gstAmount(BigDecimal.ZERO)
+                .totalAmount(base)
                 .additionalChargesJson(additionalChargesJson)
                 .build();
         invoiceRepository.save(invoice);
