@@ -39,4 +39,6 @@ public class SubscriptionInvoiceResponse {
     private String tenantState;
     private String tenantPincode;
     private String tenantGstin;
+    // Additional charges as raw JSON — parsed on frontend for edit pre-fill
+    private String additionalChargesJson;
 }

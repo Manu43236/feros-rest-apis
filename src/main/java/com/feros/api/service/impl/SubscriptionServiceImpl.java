@@ -613,6 +613,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .tenantState(tenant.getState())
                 .tenantPincode(tenant.getPincode())
                 .tenantGstin(tenant.getGstin())
+                .additionalChargesJson(i.getAdditionalChargesJson())
                 .build();
     }
 
@@ -705,7 +706,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
                 .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
 
-        if (!"PROFORMA".equals(invoice.getInvoiceStatus())) {
+        if ("CONFIRMED".equals(invoice.getInvoiceStatus())) {
             throw new FerosException("Invoice is already confirmed", HttpStatus.CONFLICT);
         }
 
@@ -767,10 +768,74 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     public void deleteProformaInvoice(Long tenantId, Long invoiceId) {
         SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
                 .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
-        if (!"PROFORMA".equals(invoice.getInvoiceStatus())) {
-            throw new FerosException("Only proforma invoices can be deleted", HttpStatus.BAD_REQUEST);
+        if ("CONFIRMED".equals(invoice.getInvoiceStatus())) {
+            throw new FerosException("Confirmed invoices cannot be deleted", HttpStatus.BAD_REQUEST);
         }
         invoiceRepository.delete(invoice);
+    }
+
+    @Override
+    @Transactional
+    public SubscriptionInvoiceResponse sendProformaInvoice(Long tenantId, Long invoiceId) {
+        Tenant tenant = getTenant(tenantId);
+        SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
+                .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
+        if (!"PROFORMA".equals(invoice.getInvoiceStatus())) {
+            throw new FerosException("Only PROFORMA invoices can be marked as sent", HttpStatus.BAD_REQUEST);
+        }
+        invoice.setInvoiceStatus("SENT");
+        invoiceRepository.save(invoice);
+        return toInvoiceResponse(invoice, tenant);
+    }
+
+    @Override
+    @Transactional
+    public SubscriptionInvoiceResponse updateProformaInvoice(Long tenantId, Long invoiceId, CreateProformaInvoiceRequest request) {
+        Tenant tenant = getTenant(tenantId);
+        SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
+                .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
+        if ("CONFIRMED".equals(invoice.getInvoiceStatus())) {
+            throw new FerosException("Confirmed invoices cannot be edited", HttpStatus.BAD_REQUEST);
+        }
+        if (!request.getToDate().isAfter(request.getFromDate())) {
+            throw new FerosException("To date must be after from date", HttpStatus.BAD_REQUEST);
+        }
+
+        long days = java.time.temporal.ChronoUnit.DAYS.between(request.getFromDate(), request.getToDate()) + 1;
+        BigDecimal months = new BigDecimal(days).divide(new BigDecimal("30"), 4, RoundingMode.HALF_UP);
+        BigDecimal vehicleBase = request.getRatePerVehicle()
+                .multiply(new BigDecimal(request.getVehicleCount()))
+                .multiply(months)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal extraTotal = BigDecimal.ZERO;
+        String additionalChargesJson = null;
+        if (request.getAdditionalCharges() != null && !request.getAdditionalCharges().isEmpty()) {
+            extraTotal = request.getAdditionalCharges().stream()
+                    .map(c -> c.getAmount() != null ? c.getAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            additionalChargesJson = request.getAdditionalCharges().stream()
+                    .map(c -> "{\"name\":\"" + c.getName().replace("\"", "'") + "\",\"amount\":" + c.getAmount() + "}")
+                    .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+        }
+
+        BigDecimal base = vehicleBase.add(extraTotal);
+        LocalDate invoiceDate = request.getInvoiceDate() != null
+                ? request.getInvoiceDate()
+                : invoice.getPaymentDate(); // keep existing date if not changed
+
+        invoice.setPeriodStart(request.getFromDate());
+        invoice.setPeriodEnd(request.getToDate());
+        invoice.setVehicleCount(request.getVehicleCount());
+        invoice.setPricePerVehicle(request.getRatePerVehicle());
+        invoice.setGstType(request.getGstType());
+        invoice.setAmount(base);
+        invoice.setGstAmount(BigDecimal.ZERO);
+        invoice.setTotalAmount(base);
+        invoice.setPaymentDate(invoiceDate);
+        invoice.setAdditionalChargesJson(additionalChargesJson);
+        invoiceRepository.save(invoice);
+        return toInvoiceResponse(invoice, tenant);
     }
 
     @Override

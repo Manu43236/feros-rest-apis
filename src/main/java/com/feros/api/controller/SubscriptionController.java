@@ -135,6 +135,23 @@ public class SubscriptionController {
                 subscriptionService.confirmPayment(tenantId, invoiceId, request)));
     }
 
+    @PostMapping("/{tenantId}/invoices/{invoiceId}/send")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<SubscriptionInvoiceResponse>> sendProforma(
+            @PathVariable Long tenantId, @PathVariable Long invoiceId) {
+        return ResponseEntity.ok(ApiResponse.success("Invoice marked as sent",
+                subscriptionService.sendProformaInvoice(tenantId, invoiceId)));
+    }
+
+    @PutMapping("/{tenantId}/invoices/{invoiceId}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<SubscriptionInvoiceResponse>> updateProforma(
+            @PathVariable Long tenantId, @PathVariable Long invoiceId,
+            @Valid @RequestBody CreateProformaInvoiceRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Invoice updated",
+                subscriptionService.updateProformaInvoice(tenantId, invoiceId, request)));
+    }
+
     @GetMapping("/invoices")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<SubscriptionInvoiceResponse>>> getAllInvoices(

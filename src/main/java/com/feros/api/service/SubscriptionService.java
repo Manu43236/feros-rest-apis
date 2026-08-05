@@ -29,5 +29,7 @@ public interface SubscriptionService {
     SubscriptionInvoiceResponse confirmPayment(Long tenantId, Long invoiceId, ConfirmSubscriptionPaymentRequest request);
     SubscriptionInvoiceSummaryResponse getInvoiceSummary(Long tenantId);
     void deleteProformaInvoice(Long tenantId, Long invoiceId);
+    SubscriptionInvoiceResponse sendProformaInvoice(Long tenantId, Long invoiceId);
+    SubscriptionInvoiceResponse updateProformaInvoice(Long tenantId, Long invoiceId, CreateProformaInvoiceRequest request);
     List<SubscriptionInvoiceResponse> getAllInvoices(Long tenantId, Integer year, Integer month);
 }
