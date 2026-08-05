@@ -306,7 +306,7 @@ public class ReportServiceImpl implements ReportService {
     public List<AttendanceDailyRow> getAttendanceDaily(LocalDate startDate, LocalDate endDate) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         List<Attendance> records = attendanceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
-        Map<Long, String> userVehicleMap = buildUserVehicleMap(tenantId);
+        Map<Long, List<VehicleStaffAssignment>> userAssignments = buildUserAssignmentMap(tenantId, startDate, endDate);
 
         return records.stream().map(a -> {
             Double hoursWorked = null;
@@ -318,7 +318,7 @@ public class ReportServiceImpl implements ReportService {
                     .employeeId(a.getUser().getId())
                     .employeeName(a.getUser().getName())
                     .role(primaryRole(a.getUser()))
-                    .vehicleRegistrationNumber(userVehicleMap.getOrDefault(a.getUser().getId(), "—"))
+                    .vehicleRegistrationNumber(resolveVehicleForDate(userAssignments, a.getUser().getId(), a.getAttendanceDate()))
                     .attendanceDate(a.getAttendanceDate())
                     .attendanceType(a.getAttendanceType().getName())
                     .markedAt(a.getMarkedAt())
@@ -338,7 +338,7 @@ public class ReportServiceImpl implements ReportService {
     public List<AttendanceSummaryRow> getAttendanceSummary(LocalDate startDate, LocalDate endDate) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         List<Attendance> records = attendanceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
-        Map<Long, String> userVehicleMap = buildUserVehicleMap(tenantId);
+        Map<Long, List<VehicleStaffAssignment>> userAssignments = buildUserAssignmentMap(tenantId, startDate, endDate);
 
         Map<Long, List<Attendance>> byUser = records.stream()
                 .collect(Collectors.groupingBy(a -> a.getUser().getId()));
@@ -366,7 +366,7 @@ public class ReportServiceImpl implements ReportService {
                     .employeeId(entry.getKey())
                     .employeeName(first.getUser().getName())
                     .role(primaryRole(first.getUser()))
-                    .vehicleRegistrationNumber(userVehicleMap.getOrDefault(entry.getKey(), "—"))
+                    .vehicleRegistrationNumber(resolveVehiclesForPeriod(userAssignments, entry.getKey()))
                     .presentDays(present)
                     .absentDays(absent)
                     .leaveDays(leave)
@@ -759,17 +759,26 @@ public class ReportServiceImpl implements ReportService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────────
 
-    private Map<Long, String> buildUserVehicleMap(Long tenantId) {
-        return vehicleRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
-                .flatMap(v -> {
-                    List<Map.Entry<Long, String>> entries = new ArrayList<>();
-                    if (v.getCurrentDriver() != null)
-                        entries.add(Map.entry(v.getCurrentDriver().getId(), v.getRegistrationNumber()));
-                    if (v.getCurrentCleaner() != null)
-                        entries.add(Map.entry(v.getCurrentCleaner().getId(), v.getRegistrationNumber()));
-                    return entries.stream();
-                })
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a));
+    private Map<Long, List<VehicleStaffAssignment>> buildUserAssignmentMap(Long tenantId, LocalDate startDate, LocalDate endDate) {
+        return vehicleStaffAssignmentRepository.findOverlappingForTenant(tenantId, startDate, endDate)
+                .stream()
+                .collect(Collectors.groupingBy(a -> a.getUser().getId()));
+    }
+
+    private String resolveVehicleForDate(Map<Long, List<VehicleStaffAssignment>> userAssignments, Long userId, LocalDate date) {
+        return userAssignments.getOrDefault(userId, List.of()).stream()
+                .filter(a -> !a.getAssignedFrom().isAfter(date) && (a.getAssignedTo() == null || !a.getAssignedTo().isBefore(date)))
+                .findFirst()
+                .map(a -> a.getVehicle().getRegistrationNumber())
+                .orElse("—");
+    }
+
+    private String resolveVehiclesForPeriod(Map<Long, List<VehicleStaffAssignment>> userAssignments, Long userId) {
+        String vehicles = userAssignments.getOrDefault(userId, List.of()).stream()
+                .map(a -> a.getVehicle().getRegistrationNumber())
+                .distinct()
+                .collect(Collectors.joining(", "));
+        return vehicles.isEmpty() ? "—" : vehicles;
     }
 
     // ── Invoice Register ──────────────────────────────────────────────────────────

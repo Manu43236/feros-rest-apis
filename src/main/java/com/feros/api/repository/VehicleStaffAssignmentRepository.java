@@ -18,6 +18,7 @@ public interface VehicleStaffAssignmentRepository extends JpaRepository<VehicleS
     // All assignments for a user that overlap with the given date range (for payroll)
     @Query("""
             SELECT a FROM VehicleStaffAssignment a
+            JOIN FETCH a.vehicle
             WHERE a.user.id = :userId
               AND a.tenant.id = :tenantId
               AND a.isActive = true
@@ -54,4 +55,18 @@ public interface VehicleStaffAssignmentRepository extends JpaRepository<VehicleS
            "WHERE a.tenant.id = :tenantId " +
            "ORDER BY COALESCE(a.unassignedAt, a.createdAt) DESC, a.id DESC")
     List<VehicleStaffAssignment> findAllByTenantIdOrderByCreatedAtDesc(@Param("tenantId") Long tenantId);
+
+    @Query("""
+            SELECT a FROM VehicleStaffAssignment a
+            JOIN FETCH a.vehicle
+            JOIN FETCH a.user
+            WHERE a.tenant.id = :tenantId
+              AND a.isActive = true
+              AND a.assignedFrom <= :endDate
+              AND (a.assignedTo IS NULL OR a.assignedTo >= :startDate)
+            """)
+    List<VehicleStaffAssignment> findOverlappingForTenant(
+            @Param("tenantId") Long tenantId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 }

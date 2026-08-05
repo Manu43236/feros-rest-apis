@@ -494,8 +494,9 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .approvedById(a.getApprovedBy() != null ? a.getApprovedBy().getId() : null)
                 .approvedByName(a.getApprovedBy() != null ? a.getApprovedBy().getName() : null)
                 .approvedAt(a.getApprovedAt())
-                .assignedVehicleNumber(vehicleRepository.findAssignedVehiclesByStaffUserId(a.getUser().getId())
-                        .stream().findFirst().map(v -> v.getRegistrationNumber()).orElse(null))
+                .assignedVehicleNumber(vehicleStaffAssignmentRepository.findOverlappingByUser(
+                        a.getUser().getId(), a.getTenant().getId(), a.getAttendanceDate(), a.getAttendanceDate())
+                        .stream().findFirst().map(vsa -> vsa.getVehicle().getRegistrationNumber()).orElse(null))
                 .selfieUrl(a.getSelfieUrl() != null ? s3Service.getPublicUrl(a.getSelfieUrl()) : null)
                 .latitude(a.getLatitude())
                 .longitude(a.getLongitude())

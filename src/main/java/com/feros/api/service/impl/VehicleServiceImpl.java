@@ -1095,23 +1095,83 @@ public class VehicleServiceImpl implements VehicleService {
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<com.feros.api.dto.response.StaffAssignmentHistoryResponse> getAllStaffAssignmentHistory() {
         Long tenantId = getCurrentTenantId();
-        return vehicleStaffAssignmentRepository
-                .findAllByTenantIdOrderByCreatedAtDesc(tenantId)
-                .stream()
-                .map(a -> com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
+        List<com.feros.api.dto.response.StaffAssignmentHistoryResponse> events = new java.util.ArrayList<>();
+
+        // One query to build vehicle → order allocation map for order number lookup
+        java.util.Map<Long, List<com.feros.api.entity.OrderVehicleAllocation>> vehicleOrderMap =
+                allocationRepository.findAllByTenantIdWithOrder(tenantId).stream()
+                        .collect(java.util.stream.Collectors.groupingBy(
+                                ova -> ova.getVehicle().getId()));
+
+        for (VehicleStaffAssignment a : vehicleStaffAssignmentRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId)) {
+            Long vehicleId = a.getVehicle() != null ? a.getVehicle().getId() : null;
+            String regNum   = a.getVehicle() != null ? a.getVehicle().getRegistrationNumber() : null;
+            Long userId     = a.getUser() != null ? a.getUser().getId() : null;
+            String userName = a.getUser() != null ? a.getUser().getName() : null;
+            String userRole = a.getUser() != null ? a.getUser().getRoles().stream().findFirst()
+                    .map(r -> r.getName().name()).orElse(null) : null;
+
+            // Find order allocation active at the moment of this staff assignment
+            String orderNum = null;
+            if (vehicleId != null && a.getCreatedAt() != null) {
+                java.time.LocalDateTime assignedAt = a.getCreatedAt();
+                orderNum = vehicleOrderMap.getOrDefault(vehicleId, java.util.Collections.emptyList()).stream()
+                        .filter(ova -> {
+                            // allocation must have started before or at the staff assignment
+                            if (ova.getCreatedAt().isAfter(assignedAt)) return false;
+                            // if explicitly unassigned before assignment, skip
+                            if (ova.getUnassignedAt() != null && ova.getUnassignedAt().isBefore(assignedAt)) return false;
+                            // if actually delivered before assignment date, skip
+                            if (ova.getActualDeliveryDate() != null &&
+                                    ova.getActualDeliveryDate().isBefore(assignedAt.toLocalDate())) return false;
+                            return true;
+                        })
+                        // take the most recent allocation that qualifies
+                        .max(java.util.Comparator.comparing(com.feros.api.entity.OrderVehicleAllocation::getCreatedAt))
+                        .map(ova -> ova.getOrder().getOrderNumber())
+                        .orElse(null);
+            }
+
+            events.add(com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
+                    .id(a.getId())
+                    .vehicleId(vehicleId)
+                    .vehicleRegistrationNumber(regNum)
+                    .userId(userId)
+                    .userName(userName)
+                    .userRole(userRole)
+                    .action("Assigned")
+                    .actionByName(a.getAssignedBy() != null ? a.getAssignedBy().getName() : null)
+                    .actionAt(a.getCreatedAt())
+                    .orderNumber(orderNum)
+                    .build());
+
+            if (a.getUnassignedAt() != null) {
+                events.add(com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
                         .id(a.getId())
-                        .vehicleId(a.getVehicle() != null ? a.getVehicle().getId() : null)
-                        .vehicleRegistrationNumber(a.getVehicle() != null ? a.getVehicle().getRegistrationNumber() : null)
-                        .userId(a.getUser() != null ? a.getUser().getId() : null)
-                        .userName(a.getUser() != null ? a.getUser().getName() : null)
-                        .userRole(a.getUser() != null ? a.getUser().getRoles().stream().findFirst()
-                                .map(r -> r.getName().name()).orElse(null) : null)
-                        .assignedByName(a.getAssignedBy() != null ? a.getAssignedBy().getName() : null)
-                        .assignedAt(a.getCreatedAt())
-                        .unassignedByName(a.getUnassignedBy() != null ? a.getUnassignedBy().getName() : null)
-                        .unassignedAt(a.getUnassignedAt())
-                        .build())
-                .toList();
+                        .vehicleId(vehicleId)
+                        .vehicleRegistrationNumber(regNum)
+                        .userId(userId)
+                        .userName(userName)
+                        .userRole(userRole)
+                        .action("Unassigned")
+                        .actionByName(a.getUnassignedBy() != null ? a.getUnassignedBy().getName() : null)
+                        .actionAt(a.getUnassignedAt())
+                        .orderNumber(orderNum)
+                        .build());
+            }
+        }
+
+        // Sort newest first; truncate to seconds so same-second events always tie,
+        // then Assigned (happened after unassignment) sorts above Unassigned at same second
+        events.sort(java.util.Comparator
+                .<com.feros.api.dto.response.StaffAssignmentHistoryResponse, java.time.LocalDateTime>comparing(
+                        e -> e.getActionAt() != null
+                                ? e.getActionAt().truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
+                                : null,
+                        java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()))
+                .thenComparing(e -> "Assigned".equals(e.getAction()) ? 0 : 1));
+
+        return events;
     }
 
     private Integer computeFinanceMonthsRemaining(Vehicle v) {

@@ -62,6 +62,7 @@ public class OrderServiceImpl implements OrderService {
     private final RoleRepository roleRepository;
     private final LrRepository lrRepository;
     private final AttendanceRepository attendanceRepository;
+    private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final NotificationService notificationService;
     private final NumberGeneratorService numberGenerator;
 
@@ -714,6 +715,8 @@ public class OrderServiceImpl implements OrderService {
             throw new FerosException("This " + role.getName().name().toLowerCase() + " is currently assigned to another order and is not available.", HttpStatus.CONFLICT);
 
         // Cancel any existing active allocation of the same role for this vehicle (swap scenario)
+        // Also close the displaced user's VehicleStaffAssignment history record
+        User actor = getCurrentUser();
         RoleName incomingRole = role.getName();
         staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(request.getVehicleAllocationId())
                 .stream()
@@ -723,6 +726,16 @@ public class OrderServiceImpl implements OrderService {
                     sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
                     sa.setActualEndDate(TimeUtil.today());
                     staffAllocationRepository.save(sa);
+                    // Close displaced user's open VehicleStaffAssignment
+                    vehicleStaffAssignmentRepository
+                            .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(
+                                    sa.getUser().getId(), tenantId)
+                            .ifPresent(vsa -> {
+                                vsa.setAssignedTo(TimeUtil.today());
+                                vsa.setUnassignedBy(actor);
+                                vsa.setUnassignedAt(java.time.LocalDateTime.now());
+                                vehicleStaffAssignmentRepository.save(vsa);
+                            });
                 });
 
         OrderStaffAllocation staffAllocation = OrderStaffAllocation.builder()
@@ -734,7 +747,7 @@ public class OrderServiceImpl implements OrderService {
                 .expectedStartDate(request.getExpectedStartDate())
                 .expectedEndDate(request.getExpectedEndDate())
                 .remarks(request.getRemarks())
-                .allocatedBy(getCurrentUser())
+                .allocatedBy(actor)
                 .isActive(true)
                 .build();
 
@@ -756,6 +769,29 @@ public class OrderServiceImpl implements OrderService {
             else if (roleName == RoleName.CLEANER) lr.setCleaner(user);
             lrRepository.save(lr);
         });
+
+        // Record in VehicleStaffAssignment history
+        java.util.Optional<VehicleStaffAssignment> existingVsa = vehicleStaffAssignmentRepository
+                .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(user.getId(), tenantId);
+        boolean alreadyOnThisVehicle = existingVsa
+                .map(e -> e.getVehicle().getId().equals(vehicle.getId()))
+                .orElse(false);
+        if (!alreadyOnThisVehicle) {
+            // Close open assignment on a different vehicle (if any)
+            existingVsa.ifPresent(e -> {
+                e.setAssignedTo(TimeUtil.today());
+                e.setUnassignedBy(actor);
+                e.setUnassignedAt(java.time.LocalDateTime.now());
+                vehicleStaffAssignmentRepository.save(e);
+            });
+            vehicleStaffAssignmentRepository.save(VehicleStaffAssignment.builder()
+                    .tenant(vehicle.getTenant())
+                    .vehicle(vehicle)
+                    .user(user)
+                    .assignedFrom(TimeUtil.today())
+                    .assignedBy(actor)
+                    .build());
+        }
 
         String vehicleReg = vehicleAllocation.getVehicle().getRegistrationNumber();
         String destination = order.getDestinationCity().getName();
@@ -797,6 +833,20 @@ public class OrderServiceImpl implements OrderService {
         allocation.setAllocationStatus(StaffAllocationStatus.CANCELLED);
         allocation.setIsActive(false);
         staffAllocationRepository.save(allocation);
+
+        // Close VehicleStaffAssignment history record only if it's for this same vehicle
+        User actor = getCurrentUser();
+        Long vehicleId = allocation.getVehicleAllocation().getVehicle().getId();
+        vehicleStaffAssignmentRepository
+                .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(
+                        allocation.getUser().getId(), tenantId)
+                .filter(vsa -> vsa.getVehicle().getId().equals(vehicleId))
+                .ifPresent(vsa -> {
+                    vsa.setAssignedTo(TimeUtil.today());
+                    vsa.setUnassignedBy(actor);
+                    vsa.setUnassignedAt(java.time.LocalDateTime.now());
+                    vehicleStaffAssignmentRepository.save(vsa);
+                });
 
         // Sync vehicle-level assignment
         Vehicle vehicle = allocation.getVehicleAllocation().getVehicle();
