@@ -21,7 +21,7 @@ public class SubscriptionInvoice {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "invoice_number", unique = true, nullable = false)
+    @Column(name = "invoice_number", unique = true)
     private String invoiceNumber;
 
     @ManyToOne(fetch = FetchType.LAZY)
