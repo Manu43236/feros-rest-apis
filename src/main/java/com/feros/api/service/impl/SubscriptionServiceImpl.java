@@ -641,14 +641,20 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     @Override
     @Transactional
     public SubscriptionInvoiceResponse createProformaInvoice(Long tenantId, CreateProformaInvoiceRequest request) {
+        if (!request.getToDate().isAfter(request.getFromDate())) {
+            throw new FerosException("To date must be after from date", HttpStatus.BAD_REQUEST);
+        }
         Tenant tenant = getTenant(tenantId);
-        SubscriptionHistory history = historyRepository.findById(request.getHistoryId())
-                .filter(h -> h.getTenant().getId().equals(tenantId))
-                .orElseThrow(() -> new FerosException("Subscription history not found", HttpStatus.NOT_FOUND));
 
-        BigDecimal total = request.getExpectedAmount();
-        BigDecimal base  = total.divide(new BigDecimal("1.18"), 2, RoundingMode.HALF_UP);
-        BigDecimal gst   = total.subtract(base);
+        // Days-based calculation: rate is per vehicle per month (30 days)
+        long days = java.time.temporal.ChronoUnit.DAYS.between(request.getFromDate(), request.getToDate()) + 1;
+        BigDecimal months = new BigDecimal(days).divide(new BigDecimal("30"), 4, RoundingMode.HALF_UP);
+        BigDecimal base   = request.getRatePerVehicle()
+                .multiply(new BigDecimal(request.getVehicleCount()))
+                .multiply(months)
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal gst    = base.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total  = base.add(gst);
 
         LocalDate today = TimeUtil.nowIst().toLocalDate();
         String fyYear = financialYear(today);
@@ -661,14 +667,11 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .fyYear(fyYear)
                 .sequenceNo(seq)
                 .gstType(request.getGstType())
-                .subscriptionHistory(history)
                 .tenant(tenant)
-                .planName(history.getPlanName())
-                .billingCycle(history.getBillingCycle() != null ? history.getBillingCycle().name() : null)
-                .vehicleCount(history.getVehicleCount())
-                .pricePerVehicle(history.getPricePerVehicle())
-                .periodStart(history.getStartDate())
-                .periodEnd(history.getEndDate())
+                .vehicleCount(request.getVehicleCount())
+                .pricePerVehicle(request.getRatePerVehicle())
+                .periodStart(request.getFromDate())
+                .periodEnd(request.getToDate())
                 .amount(base)
                 .gstAmount(gst)
                 .totalAmount(total)
