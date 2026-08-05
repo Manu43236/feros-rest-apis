@@ -20,4 +20,13 @@ public interface SubscriptionInvoiceRepository extends JpaRepository<Subscriptio
 
     @Query("SELECT COALESCE(MAX(i.sequenceNo), 0) FROM SubscriptionInvoice i WHERE i.fyYear = :fyYear AND i.invoiceStatus = 'CONFIRMED'")
     int maxInvoiceSeq(@Param("fyYear") String fyYear);
+
+    @Query("SELECT i FROM SubscriptionInvoice i JOIN FETCH i.tenant t WHERE " +
+           "(:tenantId IS NULL OR t.id = :tenantId) AND " +
+           "(:year IS NULL OR YEAR(i.createdAt) = :year) AND " +
+           "(:month IS NULL OR MONTH(i.createdAt) = :month) " +
+           "ORDER BY i.createdAt DESC")
+    List<SubscriptionInvoice> findAllFiltered(@Param("tenantId") Long tenantId,
+                                              @Param("year") Integer year,
+                                              @Param("month") Integer month);
 }

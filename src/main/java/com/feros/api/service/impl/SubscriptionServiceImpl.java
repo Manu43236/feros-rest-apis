@@ -772,4 +772,12 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         }
         invoiceRepository.delete(invoice);
     }
+
+    @Override
+    public List<SubscriptionInvoiceResponse> getAllInvoices(Long tenantId, Integer year, Integer month) {
+        return invoiceRepository.findAllFiltered(tenantId, year, month)
+                .stream()
+                .map(i -> toInvoiceResponse(i, i.getTenant()))
+                .collect(java.util.stream.Collectors.toList());
+    }
 }
