@@ -15,7 +15,7 @@ public interface SubscriptionInvoiceRepository extends JpaRepository<Subscriptio
     @Query("SELECT COUNT(i) FROM SubscriptionInvoice i WHERE YEAR(i.createdAt) = :year AND MONTH(i.createdAt) = :month")
     long countByYearAndMonth(@Param("year") int year, @Param("month") int month);
 
-    @Query("SELECT COALESCE(MAX(i.sequenceNo), 0) FROM SubscriptionInvoice i WHERE i.fyYear = :fyYear AND i.invoiceStatus = 'PROFORMA'")
+    @Query("SELECT COALESCE(MAX(i.sequenceNo), 0) FROM SubscriptionInvoice i WHERE i.fyYear = :fyYear AND i.proformaNumber IS NOT NULL")
     int maxProformaSeq(@Param("fyYear") String fyYear);
 
     @Query("SELECT COALESCE(MAX(i.sequenceNo), 0) FROM SubscriptionInvoice i WHERE i.fyYear = :fyYear AND i.invoiceStatus = 'CONFIRMED'")
