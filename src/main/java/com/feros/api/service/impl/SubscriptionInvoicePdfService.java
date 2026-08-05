@@ -357,16 +357,16 @@ public class SubscriptionInvoicePdfService {
         String dec = String.format("%02d", paise % 100);
         long rupees = paise / 100;
         if (rupees == 0) return (neg ? "-" : "") + "0." + dec;
-        // Indian system: last 3 digits, then groups of 2 (no leading zero on first group)
+        // Indian system: last 3 digits, then prepend groups of 2 with comma
         StringBuilder sb = new StringBuilder(String.format("%03d", rupees % 1000));
         rupees /= 1000;
         while (rupees > 0) {
-            long chunk = rupees % 100;
+            sb.insert(0, String.format("%02d,", rupees % 100));
             rupees /= 100;
-            if (rupees > 0) sb.insert(0, String.format(",%02d", chunk));
-            else            sb.insert(0, chunk + ",");
         }
-        return (neg ? "-" : "") + sb + "." + dec;
+        // Strip any leading zero from the most-significant group
+        String result = sb.toString().replaceFirst("^0", "");
+        return (neg ? "-" : "") + result + "." + dec;
     }
 
     // ── Amount in words (Indian system) ──────────────────────────────────────
