@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class SubscriptionInvoiceResponse {
     private Long id;
@@ -22,6 +23,15 @@ public class SubscriptionInvoiceResponse {
     private BigDecimal gstAmount;
     private BigDecimal totalAmount;
     private String paymentRef;
+    private String proformaNumber;
+    private String invoiceStatus; // PROFORMA / CONFIRMED
+    private String gstType;       // INTRA_STATE / INTER_STATE
+    private LocalDate paymentDate;
+    private String paymentMode;
+    private BigDecimal cgstAmount;
+    private BigDecimal sgstAmount;
+    private BigDecimal igstAmount;
+    private LocalDateTime confirmedAt;
     private LocalDateTime createdAt;
     // Tenant details for print/PDF
     private String tenantAddress;

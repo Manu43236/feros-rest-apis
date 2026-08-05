@@ -34,6 +34,10 @@ public class SubscriptionInvoicePdfService {
 
             var tenant = inv.getTenant();
             String company = tenant.getCompanyName() != null ? tenant.getCompanyName().toUpperCase() : "FEROS";
+            boolean isProforma = "PROFORMA".equals(inv.getInvoiceStatus());
+            boolean isInterState = "INTER_STATE".equals(inv.getGstType());
+            String docLabel = isProforma ? "Proforma Invoice" : "Tax Invoice";
+            String docNumber = isProforma ? inv.getProformaNumber() : inv.getInvoiceNumber();
 
             // ── Header banner ─────────────────────────────────────────────────
             PdfPTable header = new PdfPTable(1);
@@ -43,21 +47,27 @@ public class SubscriptionInvoicePdfService {
             hCell.setPadding(14);
             hCell.setBorder(Rectangle.NO_BORDER);
             hCell.addElement(new Phrase(company, FONT_HEADER));
-            hCell.addElement(new Phrase("Subscription Invoice", new Font(Font.HELVETICA, 10, Font.NORMAL, new Color(180, 200, 230))));
+            hCell.addElement(new Phrase(docLabel, new Font(Font.HELVETICA, 10, Font.NORMAL, new Color(180, 200, 230))));
             header.addCell(hCell);
             doc.add(header);
             doc.add(Chunk.NEWLINE);
 
-            // ── Company address block ──────────────────────────────────────────
+            // ── Supplier block (MandM Technologies) ───────────────────────────
+            doc.add(new Paragraph("Supplier: M&M Technologies", FONT_BOLD));
+            doc.add(new Paragraph("Andhra Pradesh, India", FONT_GRAY));
+            doc.add(new Paragraph("GSTIN: 37CHFM8981H1ZK", FONT_GRAY));
+            doc.add(Chunk.NEWLINE);
+
+            // ── Billed to (Tenant) ─────────────────────────────────────────────
+            doc.add(new Paragraph("Billed To:", FONT_BOLD));
+            doc.add(new Paragraph(company, FONT_BODY));
             if (tenant.getAddress() != null || tenant.getCity() != null) {
                 StringBuilder addr = new StringBuilder();
                 if (tenant.getAddress() != null) addr.append(tenant.getAddress());
                 if (tenant.getCity() != null) addr.append(", ").append(tenant.getCity());
                 if (tenant.getState() != null) addr.append(", ").append(tenant.getState());
                 if (tenant.getPincode() != null) addr.append(" - ").append(tenant.getPincode());
-                Paragraph addrPara = new Paragraph(addr.toString(), FONT_GRAY);
-                addrPara.setSpacingAfter(2);
-                doc.add(addrPara);
+                doc.add(new Paragraph(addr.toString(), FONT_GRAY));
             }
             if (tenant.getGstin() != null) {
                 doc.add(new Paragraph("GSTIN: " + tenant.getGstin(), FONT_GRAY));
@@ -67,9 +77,12 @@ public class SubscriptionInvoicePdfService {
             // ── Invoice meta ──────────────────────────────────────────────────
             PdfPTable meta = new PdfPTable(new float[]{1, 1});
             meta.setWidthPercentage(100);
-            addMetaCell(meta, "Invoice No", inv.getInvoiceNumber());
-            addMetaCell(meta, "Invoice Date",
-                    inv.getCreatedAt() != null ? inv.getCreatedAt().format(DATE_FMT) : "—");
+            addMetaCell(meta, isProforma ? "Proforma No" : "Invoice No", docNumber != null ? docNumber : "—");
+            String dateLabel = isProforma ? "Proforma Date" : "Invoice Date";
+            String dateValue = isProforma
+                    ? (inv.getCreatedAt() != null ? inv.getCreatedAt().format(DATE_FMT) : "—")
+                    : (inv.getPaymentDate() != null ? inv.getPaymentDate().format(DATE_FMT) : "—");
+            addMetaCell(meta, dateLabel, dateValue);
             addMetaCell(meta, "Plan", inv.getPlanName() != null ? inv.getPlanName() : "—");
             addMetaCell(meta, "Billing Cycle", formatCycle(inv.getBillingCycle()));
             addMetaCell(meta, "Vehicle Count",
@@ -80,6 +93,9 @@ public class SubscriptionInvoicePdfService {
                     inv.getPeriodStart() != null ? inv.getPeriodStart().format(DATE_FMT) : "—");
             addMetaCell(meta, "Period End",
                     inv.getPeriodEnd() != null ? inv.getPeriodEnd().format(DATE_FMT) : "—");
+            if (!isProforma && inv.getPaymentMode() != null) {
+                addMetaCell(meta, "Payment Mode", inv.getPaymentMode());
+            }
             if (inv.getPaymentRef() != null) {
                 addMetaCell(meta, "Payment Ref", inv.getPaymentRef());
             }
@@ -87,20 +103,37 @@ public class SubscriptionInvoicePdfService {
             doc.add(Chunk.NEWLINE);
 
             // ── Amount summary ────────────────────────────────────────────────
-            doc.add(sectionTitle("AMOUNT SUMMARY"));
+            doc.add(sectionTitle(isProforma ? "ESTIMATED AMOUNT" : "AMOUNT SUMMARY"));
             PdfPTable totals = new PdfPTable(new float[]{3, 1.5f});
             totals.setWidthPercentage(60);
             totals.setHorizontalAlignment(Element.ALIGN_RIGHT);
-            addTotalRow(totals, "Base Amount", inv.getAmount(), false);
-            addTotalRow(totals, "GST (18%)", inv.getGstAmount(), false);
-            addTotalRow(totals, "TOTAL", inv.getTotalAmount(), true);
+
+            BigDecimal gst = inv.getGstAmount() != null ? inv.getGstAmount() : BigDecimal.ZERO;
+            addTotalRow(totals, "Taxable Amount", inv.getAmount(), false);
+            if (isInterState) {
+                addTotalRow(totals, "IGST (18%)", gst, false);
+            } else {
+                BigDecimal half = gst.divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
+                addTotalRow(totals, "CGST (9%)", half, false);
+                addTotalRow(totals, "SGST (9%)", gst.subtract(half), false);
+            }
+            addTotalRow(totals, isProforma ? "EXPECTED TOTAL" : "TOTAL", inv.getTotalAmount(), true);
             doc.add(totals);
+
+            // ── Proforma note ─────────────────────────────────────────────────
+            if (isProforma) {
+                doc.add(Chunk.NEWLINE);
+                Paragraph note = new Paragraph(
+                        "This is a proforma invoice only. It is not a tax document. "
+                        + "A GST Tax Invoice will be issued upon receipt of payment.", FONT_GRAY);
+                note.setAlignment(Element.ALIGN_CENTER);
+                doc.add(note);
+            }
 
             // ── Footer ────────────────────────────────────────────────────────
             doc.add(Chunk.NEWLINE);
-            doc.add(Chunk.NEWLINE);
             Paragraph footer = new Paragraph(
-                    "This is a system-generated subscription invoice. — FEROS Fleet Management", FONT_GRAY);
+                    "System-generated by FEROS Fleet Management.", FONT_GRAY);
             footer.setAlignment(Element.ALIGN_CENTER);
             doc.add(footer);
 

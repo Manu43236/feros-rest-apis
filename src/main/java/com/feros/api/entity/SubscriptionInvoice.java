@@ -65,6 +65,30 @@ public class SubscriptionInvoice {
     @Column(name = "payment_ref")
     private String paymentRef;
 
+    @Column(name = "proforma_number", unique = true)
+    private String proformaNumber;
+
+    @Column(name = "invoice_status")
+    private String invoiceStatus; // PROFORMA / CONFIRMED
+
+    @Column(name = "gst_type")
+    private String gstType; // INTRA_STATE / INTER_STATE
+
+    @Column(name = "payment_date")
+    private LocalDate paymentDate;
+
+    @Column(name = "payment_mode")
+    private String paymentMode;
+
+    @Column(name = "confirmed_at")
+    private LocalDateTime confirmedAt;
+
+    @Column(name = "fy_year", length = 4)
+    private String fyYear; // e.g. "2526" for FY 2025-26
+
+    @Column(name = "sequence_no")
+    private Integer sequenceNo;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

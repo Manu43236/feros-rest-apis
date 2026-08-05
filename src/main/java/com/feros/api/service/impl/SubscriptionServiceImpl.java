@@ -2,11 +2,14 @@ package com.feros.api.service.impl;
 
 import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.ActivateSubscriptionRequest;
+import com.feros.api.dto.request.ConfirmSubscriptionPaymentRequest;
 import com.feros.api.dto.request.CorrectSubscriptionRequest;
+import com.feros.api.dto.request.CreateProformaInvoiceRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
 import com.feros.api.dto.response.SubscriptionHistoryResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceResponse;
+import com.feros.api.dto.response.SubscriptionInvoiceSummaryResponse;
 import com.feros.api.entity.*;
 import com.feros.api.enums.BillingCycle;
 import com.feros.api.enums.NotificationType;
@@ -566,9 +569,31 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     }
 
     private SubscriptionInvoiceResponse toInvoiceResponse(SubscriptionInvoice i, Tenant tenant) {
+        // Old invoices (pre-proforma feature) have no invoiceStatus — treat as CONFIRMED
+        String status = i.getInvoiceStatus() != null ? i.getInvoiceStatus() : "CONFIRMED";
+        String gstType = i.getGstType() != null ? i.getGstType() : "INTRA_STATE";
+
+        BigDecimal gst = i.getGstAmount() != null ? i.getGstAmount() : BigDecimal.ZERO;
+        BigDecimal cgst = null, sgst = null, igst = null;
+        if ("INTER_STATE".equals(gstType)) {
+            igst = gst;
+        } else {
+            cgst = gst.divide(BigDecimal.TWO, 2, RoundingMode.HALF_UP);
+            sgst = gst.subtract(cgst);
+        }
+
         return SubscriptionInvoiceResponse.builder()
                 .id(i.getId())
                 .invoiceNumber(i.getInvoiceNumber())
+                .proformaNumber(i.getProformaNumber())
+                .invoiceStatus(status)
+                .gstType(gstType)
+                .paymentDate(i.getPaymentDate())
+                .paymentMode(i.getPaymentMode())
+                .confirmedAt(i.getConfirmedAt())
+                .cgstAmount(cgst)
+                .sgstAmount(sgst)
+                .igstAmount(igst)
                 .tenantId(i.getTenant().getId())
                 .companyName(tenant.getCompanyName())
                 .planName(i.getPlanName())
@@ -588,6 +613,131 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .tenantState(tenant.getState())
                 .tenantPincode(tenant.getPincode())
                 .tenantGstin(tenant.getGstin())
+                .build();
+    }
+
+    // ─── Invoice number helpers ───────────────────────────────────────────────
+
+    private String financialYear(LocalDate date) {
+        // FY runs April–March; e.g. Jan 2026 → 2025-26 → "2526"
+        int year = date.getMonthValue() >= 4 ? date.getYear() : date.getYear() - 1;
+        return String.format("%02d%02d", year % 100, (year + 1) % 100);
+    }
+
+    private String nextProformaNumber(LocalDate date) {
+        String fy = financialYear(date);
+        int seq = invoiceRepository.maxProformaSeq(fy) + 1;
+        return String.format("MMPRF%s%02d", fy, seq);
+    }
+
+    private String nextInvoiceNumber(LocalDate date) {
+        String fy = financialYear(date);
+        int seq = invoiceRepository.maxInvoiceSeq(fy) + 1;
+        return String.format("MMINV%s%02d", fy, seq);
+    }
+
+    // ─── Proforma & Payment Confirmation ─────────────────────────────────────
+
+    @Override
+    @Transactional
+    public SubscriptionInvoiceResponse createProformaInvoice(Long tenantId, CreateProformaInvoiceRequest request) {
+        Tenant tenant = getTenant(tenantId);
+        SubscriptionHistory history = historyRepository.findById(request.getHistoryId())
+                .filter(h -> h.getTenant().getId().equals(tenantId))
+                .orElseThrow(() -> new FerosException("Subscription history not found", HttpStatus.NOT_FOUND));
+
+        BigDecimal total = request.getExpectedAmount();
+        BigDecimal base  = total.divide(new BigDecimal("1.18"), 2, RoundingMode.HALF_UP);
+        BigDecimal gst   = total.subtract(base);
+
+        LocalDate today = TimeUtil.nowIst().toLocalDate();
+        String fyYear = financialYear(today);
+        int seq = invoiceRepository.maxProformaSeq(fyYear) + 1;
+        String proformaNumber = String.format("MMPRF%s%02d", fyYear, seq);
+
+        SubscriptionInvoice invoice = SubscriptionInvoice.builder()
+                .proformaNumber(proformaNumber)
+                .invoiceStatus("PROFORMA")
+                .fyYear(fyYear)
+                .sequenceNo(seq)
+                .gstType(request.getGstType())
+                .subscriptionHistory(history)
+                .tenant(tenant)
+                .planName(history.getPlanName())
+                .billingCycle(history.getBillingCycle() != null ? history.getBillingCycle().name() : null)
+                .vehicleCount(history.getVehicleCount())
+                .pricePerVehicle(history.getPricePerVehicle())
+                .periodStart(history.getStartDate())
+                .periodEnd(history.getEndDate())
+                .amount(base)
+                .gstAmount(gst)
+                .totalAmount(total)
+                .build();
+        invoiceRepository.save(invoice);
+        return toInvoiceResponse(invoice, tenant);
+    }
+
+    @Override
+    @Transactional
+    public SubscriptionInvoiceResponse confirmPayment(Long tenantId, Long invoiceId, ConfirmSubscriptionPaymentRequest request) {
+        Tenant tenant = getTenant(tenantId);
+        SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
+                .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
+
+        if (!"PROFORMA".equals(invoice.getInvoiceStatus())) {
+            throw new FerosException("Invoice is already confirmed", HttpStatus.CONFLICT);
+        }
+
+        BigDecimal total = request.getReceivedAmount();
+        BigDecimal base  = total.divide(new BigDecimal("1.18"), 2, RoundingMode.HALF_UP);
+        BigDecimal gst   = total.subtract(base);
+
+        String fyYear = financialYear(request.getPaymentDate());
+        int seq = invoiceRepository.maxInvoiceSeq(fyYear) + 1;
+        String invoiceNumber = String.format("MMINV%s%02d", fyYear, seq);
+
+        invoice.setInvoiceNumber(invoiceNumber);
+        invoice.setFyYear(fyYear);
+        invoice.setSequenceNo(seq);
+        invoice.setInvoiceStatus("CONFIRMED");
+        invoice.setAmount(base);
+        invoice.setGstAmount(gst);
+        invoice.setTotalAmount(total);
+        invoice.setPaymentDate(request.getPaymentDate());
+        invoice.setPaymentMode(request.getPaymentMode());
+        invoice.setPaymentRef(request.getPaymentRef());
+        invoice.setConfirmedAt(TimeUtil.nowIst());
+        invoiceRepository.save(invoice);
+        return toInvoiceResponse(invoice, tenant);
+    }
+
+    @Override
+    public SubscriptionInvoiceSummaryResponse getInvoiceSummary(Long tenantId) {
+        getTenant(tenantId);
+        BigDecimal subscriptionValue = historyRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId)
+                .stream()
+                .filter(h -> h.getTotalAmount() != null)
+                .findFirst()
+                .map(SubscriptionHistory::getTotalAmount)
+                .orElse(BigDecimal.ZERO);
+
+        List<SubscriptionInvoice> all = invoiceRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId);
+
+        BigDecimal totalInvoiced = all.stream()
+                .filter(i -> "CONFIRMED".equals(i.getInvoiceStatus())
+                             || i.getInvoiceStatus() == null) // legacy invoices
+                .map(i -> i.getTotalAmount() != null ? i.getTotalAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        long pendingProformas = all.stream()
+                .filter(i -> "PROFORMA".equals(i.getInvoiceStatus()))
+                .count();
+
+        return SubscriptionInvoiceSummaryResponse.builder()
+                .totalSubscriptionValue(subscriptionValue)
+                .totalInvoiced(totalInvoiced)
+                .balanceOutstanding(subscriptionValue.subtract(totalInvoiced))
+                .pendingProformas(pendingProformas)
                 .build();
     }
 }
