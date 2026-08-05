@@ -132,12 +132,12 @@ public class SubscriptionInvoicePdfService {
             // ── 4. LINE ITEMS TABLE ───────────────────────────────────────────────
             PdfPTable items = new PdfPTable(new float[]{0.4f, 3f, 0.8f, 0.7f, 1f, 1.2f, 1.1f});
             items.setWidthPercentage(100);
-            for (String h : new String[]{"#", "Description of Service", "HSN/SAC", "Vehicles", "Rate / Vehicle", "Duration", "Amount (₹)"}) {
+            for (String h : new String[]{"#", "Description of Service", "HSN/SAC", "Vehicles", "Rate / Vehicle", "Duration", "Amount (Rs.)"}) {
                 PdfPCell th = new PdfPCell(new Phrase(h, F_TH));
                 th.setBackgroundColor(NAVY);
                 th.setPadding(6);
                 th.setBorder(Rectangle.NO_BORDER);
-                if (h.equals("Amount (₹)") || h.equals("Vehicles") || h.equals("Rate / Vehicle")) {
+                if (h.equals("Amount (Rs.)") || h.equals("Vehicles") || h.equals("Rate / Vehicle")) {
                     th.setHorizontalAlignment(Element.ALIGN_RIGHT);
                 }
                 items.addCell(th);
@@ -196,7 +196,7 @@ public class SubscriptionInvoicePdfService {
             gstNote.setBorderColor(BORDER);
             gstNote.setPadding(5);
             subtotalRow.addCell(gstNote);
-            PdfPCell totalAmt = new PdfPCell(new Phrase("Total   ₹" + fmt(base), F_BOLD));
+            PdfPCell totalAmt = new PdfPCell(new Phrase("Total   Rs." + fmt(base), F_BOLD));
             totalAmt.setBorder(Rectangle.TOP);
             totalAmt.setBorderColor(BORDER);
             totalAmt.setPadding(5);
@@ -231,7 +231,7 @@ public class SubscriptionInvoicePdfService {
             wordsCell.addElement(new Phrase("INR " + amountInWords(grand) + " Only", F_WORDS));
             grandRow.addCell(wordsCell);
 
-            PdfPCell grandCell = new PdfPCell(new Phrase("Total Amount\n₹" + fmt(grand), F_GRAND));
+            PdfPCell grandCell = new PdfPCell(new Phrase("Total Amount\nRs." + fmt(grand), F_GRAND));
             grandCell.setBackgroundColor(NAVY);
             grandCell.setBorder(Rectangle.NO_BORDER);
             grandCell.setPadding(10);
@@ -264,10 +264,13 @@ public class SubscriptionInvoicePdfService {
             footer.addCell(bankCell);
 
             PdfPCell sigCell = noBorder();
-            sigCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
-            sigCell.addElement(new Phrase("For MandM Technologies", F_BODY));
+            Paragraph sigFor = new Paragraph("For MandM Technologies", F_BODY);
+            sigFor.setAlignment(Element.ALIGN_RIGHT);
+            sigCell.addElement(sigFor);
             sigCell.addElement(gap(20));
-            sigCell.addElement(new Phrase("Authorised Signatory", F_LABEL));
+            Paragraph sigLabel = new Paragraph("Authorised Signatory", F_LABEL);
+            sigLabel.setAlignment(Element.ALIGN_RIGHT);
+            sigCell.addElement(sigLabel);
             footer.addCell(sigCell);
             doc.add(footer);
 
@@ -326,7 +329,7 @@ public class SubscriptionInvoicePdfService {
         PdfPCell lc = new PdfPCell(new Phrase("", F_TD));
         lc.setBorder(Rectangle.NO_BORDER); lc.setPadding(3);
         table.addCell(lc);
-        PdfPCell vc = new PdfPCell(new Phrase(label + "   ₹" + fmt(amount), F_TD));
+        PdfPCell vc = new PdfPCell(new Phrase(label + "   Rs." + fmt(amount), F_TD));
         vc.setBorder(Rectangle.NO_BORDER); vc.setPadding(3);
         vc.setHorizontalAlignment(Element.ALIGN_RIGHT);
         table.addCell(vc);
@@ -348,21 +351,22 @@ public class SubscriptionInvoicePdfService {
 
     private String fmt(BigDecimal v) {
         if (v == null) return "0.00";
-        // Indian number formatting: last 3 digits, then groups of 2
         long paise = v.setScale(2, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).longValue();
         boolean neg = paise < 0;
         paise = Math.abs(paise);
-        String cents = String.format("%02d", paise % 100);
+        String dec = String.format("%02d", paise % 100);
         long rupees = paise / 100;
-        if (rupees == 0) return (neg ? "-" : "") + "0." + cents;
-        StringBuilder sb = new StringBuilder();
-        sb.append(rupees % 1000);
+        if (rupees == 0) return (neg ? "-" : "") + "0." + dec;
+        // Indian system: last 3 digits, then groups of 2 (no leading zero on first group)
+        StringBuilder sb = new StringBuilder(String.format("%03d", rupees % 1000));
         rupees /= 1000;
         while (rupees > 0) {
-            sb.insert(0, ","); sb.insert(0, String.format("%02d", rupees % 100));
+            long chunk = rupees % 100;
             rupees /= 100;
+            if (rupees > 0) sb.insert(0, String.format(",%02d", chunk));
+            else            sb.insert(0, chunk + ",");
         }
-        return (neg ? "-" : "") + sb + "." + cents;
+        return (neg ? "-" : "") + sb + "." + dec;
     }
 
     // ── Amount in words (Indian system) ──────────────────────────────────────
