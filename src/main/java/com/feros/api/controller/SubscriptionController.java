@@ -135,6 +135,14 @@ public class SubscriptionController {
                 subscriptionService.confirmPayment(tenantId, invoiceId, request)));
     }
 
+    @DeleteMapping("/{tenantId}/invoices/{invoiceId}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteProforma(
+            @PathVariable Long tenantId, @PathVariable Long invoiceId) {
+        subscriptionService.deleteProformaInvoice(tenantId, invoiceId);
+        return ResponseEntity.ok(ApiResponse.success("Proforma invoice deleted", null));
+    }
+
     @GetMapping("/{tenantId}/invoices/summary")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<SubscriptionInvoiceSummaryResponse>> getInvoiceSummary(
