@@ -51,7 +51,8 @@ public class SubscriptionInvoicePdfService {
             String docLabel = isPro ? "PROFORMA INVOICE" : "TAX INVOICE";
             String docNo    = isPro ? inv.getProformaNumber() : inv.getInvoiceNumber();
             LocalDate docDate = isPro
-                    ? (inv.getCreatedAt() != null ? inv.getCreatedAt().toLocalDate() : LocalDate.now())
+                    ? (inv.getPaymentDate() != null ? inv.getPaymentDate()
+                       : inv.getCreatedAt() != null ? inv.getCreatedAt().toLocalDate() : LocalDate.now())
                     : (inv.getPaymentDate() != null ? inv.getPaymentDate() : LocalDate.now());
             LocalDate validUntil = docDate.plusDays(15);
 

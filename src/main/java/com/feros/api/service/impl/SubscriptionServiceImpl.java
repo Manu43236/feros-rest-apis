@@ -670,8 +670,10 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         // GST is calculated only when payment is confirmed (tax invoice).
         BigDecimal base = vehicleBase.add(extraTotal);
 
-        LocalDate today = TimeUtil.nowIst().toLocalDate();
-        String fyYear = financialYear(today);
+        LocalDate invoiceDate = request.getInvoiceDate() != null
+                ? request.getInvoiceDate()
+                : TimeUtil.nowIst().toLocalDate();
+        String fyYear = financialYear(invoiceDate);
         int seq = invoiceRepository.maxProformaSeq(fyYear) + 1;
         String proformaNumber = String.format("MMPRF%s%02d", fyYear, seq);
 
@@ -689,6 +691,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .amount(base)
                 .gstAmount(BigDecimal.ZERO)
                 .totalAmount(base)
+                .paymentDate(invoiceDate) // stores proforma date for PDF/display
                 .additionalChargesJson(additionalChargesJson)
                 .build();
         invoiceRepository.save(invoice);

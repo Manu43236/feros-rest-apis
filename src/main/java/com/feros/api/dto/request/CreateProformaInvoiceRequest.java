@@ -33,6 +33,8 @@ public class CreateProformaInvoiceRequest {
 
     private List<AdditionalCharge> additionalCharges;
 
+    private LocalDate invoiceDate; // optional back-date; defaults to today if null
+
     private String notes;
 
     @Getter
