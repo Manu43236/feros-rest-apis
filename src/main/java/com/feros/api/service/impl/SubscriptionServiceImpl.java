@@ -649,12 +649,26 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         // Days-based calculation: rate is per vehicle per month (30 days)
         long days = java.time.temporal.ChronoUnit.DAYS.between(request.getFromDate(), request.getToDate()) + 1;
         BigDecimal months = new BigDecimal(days).divide(new BigDecimal("30"), 4, RoundingMode.HALF_UP);
-        BigDecimal base   = request.getRatePerVehicle()
+        BigDecimal vehicleBase = request.getRatePerVehicle()
                 .multiply(new BigDecimal(request.getVehicleCount()))
                 .multiply(months)
                 .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal gst    = base.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal total  = base.add(gst);
+
+        // Sum additional charges (onboarding, etc.) — all taxable under GST
+        BigDecimal extraTotal = BigDecimal.ZERO;
+        String additionalChargesJson = null;
+        if (request.getAdditionalCharges() != null && !request.getAdditionalCharges().isEmpty()) {
+            extraTotal = request.getAdditionalCharges().stream()
+                    .map(c -> c.getAmount() != null ? c.getAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            additionalChargesJson = request.getAdditionalCharges().stream()
+                    .map(c -> "{\"name\":\"" + c.getName().replace("\"", "'") + "\",\"amount\":" + c.getAmount() + "}")
+                    .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+        }
+
+        BigDecimal base  = vehicleBase.add(extraTotal);
+        BigDecimal gst   = base.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total = base.add(gst);
 
         LocalDate today = TimeUtil.nowIst().toLocalDate();
         String fyYear = financialYear(today);
@@ -675,6 +689,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .amount(base)
                 .gstAmount(gst)
                 .totalAmount(total)
+                .additionalChargesJson(additionalChargesJson)
                 .build();
         invoiceRepository.save(invoice);
         return toInvoiceResponse(invoice, tenant);

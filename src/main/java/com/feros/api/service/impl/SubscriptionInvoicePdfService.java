@@ -109,6 +109,34 @@ public class SubscriptionInvoicePdfService {
             totals.setHorizontalAlignment(Element.ALIGN_RIGHT);
 
             BigDecimal gst = inv.getGstAmount() != null ? inv.getGstAmount() : BigDecimal.ZERO;
+
+            // Vehicle subscription line
+            if (inv.getVehicleCount() != null && inv.getPricePerVehicle() != null) {
+                long periodDays = inv.getPeriodStart() != null && inv.getPeriodEnd() != null
+                        ? java.time.temporal.ChronoUnit.DAYS.between(inv.getPeriodStart(), inv.getPeriodEnd()) + 1 : 0;
+                String vehicleLine = inv.getVehicleCount() + " vehicles × ₹"
+                        + inv.getPricePerVehicle().setScale(2, RoundingMode.HALF_UP)
+                        + "/month × " + periodDays + " days";
+                BigDecimal vehicleBase = inv.getPricePerVehicle()
+                        .multiply(new BigDecimal(inv.getVehicleCount()))
+                        .multiply(new BigDecimal(periodDays).divide(new BigDecimal("30"), 4, RoundingMode.HALF_UP))
+                        .setScale(2, RoundingMode.HALF_UP);
+                addTotalRow(totals, vehicleLine, vehicleBase, false);
+            }
+
+            // Additional charge lines (parsed from JSON)
+            if (inv.getAdditionalChargesJson() != null && !inv.getAdditionalChargesJson().isBlank()) {
+                try {
+                    String json = inv.getAdditionalChargesJson().trim().replaceAll("^\\[|]$", "");
+                    for (String entry : json.split("\\},\\{")) {
+                        entry = entry.replaceAll("[\\[\\]{}]", "");
+                        String name   = entry.replaceAll(".*\"name\":\"([^\"]+)\".*", "$1");
+                        String amount = entry.replaceAll(".*\"amount\":([0-9.]+).*", "$1");
+                        addTotalRow(totals, name, new BigDecimal(amount), false);
+                    }
+                } catch (Exception ignored) {}
+            }
+
             addTotalRow(totals, "Taxable Amount", inv.getAmount(), false);
             if (isInterState) {
                 addTotalRow(totals, "IGST (18%)", gst, false);

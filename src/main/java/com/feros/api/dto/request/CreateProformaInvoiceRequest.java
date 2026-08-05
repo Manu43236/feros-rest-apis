@@ -8,6 +8,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Setter
@@ -25,10 +26,19 @@ public class CreateProformaInvoiceRequest {
 
     @NotNull
     @Positive
-    private BigDecimal ratePerVehicle; // per vehicle per month
+    private BigDecimal ratePerVehicle;
 
     @NotNull
     private String gstType; // INTRA_STATE / INTER_STATE
 
+    private List<AdditionalCharge> additionalCharges;
+
     private String notes;
+
+    @Getter
+    @Setter
+    public static class AdditionalCharge {
+        private String name;
+        private BigDecimal amount;
+    }
 }

@@ -83,6 +83,9 @@ public class SubscriptionInvoice {
     @Column(name = "confirmed_at")
     private LocalDateTime confirmedAt;
 
+    @Column(name = "additional_charges_json", columnDefinition = "TEXT")
+    private String additionalChargesJson; // [{name, amount}] stored as JSON
+
     @Column(name = "fy_year", length = 4)
     private String fyYear; // e.g. "2526" for FY 2025-26
 
