@@ -18,7 +18,7 @@ public interface SubscriptionInvoiceRepository extends JpaRepository<Subscriptio
     @Query("SELECT COALESCE(MAX(i.sequenceNo), 0) FROM SubscriptionInvoice i WHERE i.fyYear = :fyYear AND i.proformaNumber IS NOT NULL")
     int maxProformaSeq(@Param("fyYear") String fyYear);
 
-    @Query("SELECT COALESCE(MAX(i.sequenceNo), 0) FROM SubscriptionInvoice i WHERE i.fyYear = :fyYear AND i.invoiceStatus = 'CONFIRMED'")
+    @Query(value = "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number, 10) AS UNSIGNED)), 0) FROM subscription_invoices WHERE invoice_number LIKE CONCAT('MMINV', :fyYear, '%')", nativeQuery = true)
     int maxInvoiceSeq(@Param("fyYear") String fyYear);
 
     @Query("SELECT i FROM SubscriptionInvoice i JOIN FETCH i.tenant t WHERE " +

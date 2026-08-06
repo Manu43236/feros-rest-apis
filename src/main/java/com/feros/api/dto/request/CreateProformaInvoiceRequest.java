@@ -37,6 +37,8 @@ public class CreateProformaInvoiceRequest {
 
     private String notes;
 
+    private String proformaNumber; // optional — edit mode allows customising the proforma reference
+
     @Getter
     @Setter
     public static class AdditionalCharge {
