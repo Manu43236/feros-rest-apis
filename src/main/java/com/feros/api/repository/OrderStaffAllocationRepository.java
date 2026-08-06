@@ -78,6 +78,10 @@ public interface OrderStaffAllocationRepository extends JpaRepository<OrderStaff
            "AND sa.order.id = :orderId")
     List<OrderStaffAllocation> findByTenantIdAndOrderId(@Param("tenantId") Long tenantId, @Param("orderId") Long orderId);
 
+    @Query("SELECT sa FROM OrderStaffAllocation sa JOIN FETCH sa.order " +
+           "WHERE sa.tenant.id = :tenantId AND sa.isActive = true")
+    List<OrderStaffAllocation> findAllByTenantWithOrder(@Param("tenantId") Long tenantId);
+
     @Query("SELECT COUNT(DISTINCT sa.user.id) FROM OrderStaffAllocation sa " +
            "WHERE sa.tenant.id = :tenantId AND sa.isActive = true " +
            "AND sa.role.name = :roleName AND sa.allocationStatus = :status")

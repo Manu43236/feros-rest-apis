@@ -1097,11 +1097,13 @@ public class VehicleServiceImpl implements VehicleService {
         Long tenantId = getCurrentTenantId();
         List<com.feros.api.dto.response.StaffAssignmentHistoryResponse> events = new java.util.ArrayList<>();
 
-        // One query to build vehicle → order allocation map for order number lookup
-        java.util.Map<Long, List<com.feros.api.entity.OrderVehicleAllocation>> vehicleOrderMap =
-                allocationRepository.findAllByTenantIdWithOrder(tenantId).stream()
+        // Build user+vehicle → staff order allocations map (direct source of truth)
+        java.util.Map<String, List<com.feros.api.entity.OrderStaffAllocation>> staffOrderMap =
+                orderStaffAllocationRepository.findAllByTenantWithOrder(tenantId).stream()
+                        .filter(sa -> sa.getUser() != null && sa.getVehicleAllocation() != null
+                                && sa.getVehicleAllocation().getVehicle() != null)
                         .collect(java.util.stream.Collectors.groupingBy(
-                                ova -> ova.getVehicle().getId()));
+                                sa -> sa.getUser().getId() + ":" + sa.getVehicleAllocation().getVehicle().getId()));
 
         for (VehicleStaffAssignment a : vehicleStaffAssignmentRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId)) {
             Long vehicleId = a.getVehicle() != null ? a.getVehicle().getId() : null;
@@ -1111,24 +1113,15 @@ public class VehicleServiceImpl implements VehicleService {
             String userRole = a.getUser() != null ? a.getUser().getRoles().stream().findFirst()
                     .map(r -> r.getName().name()).orElse(null) : null;
 
-            // Find order allocation active at the moment of this staff assignment
+            // Find the OrderStaffAllocation for this user+vehicle closest in time to the assignment
             String orderNum = null;
-            if (vehicleId != null && a.getCreatedAt() != null) {
+            if (userId != null && vehicleId != null && a.getCreatedAt() != null) {
                 java.time.LocalDateTime assignedAt = a.getCreatedAt();
-                orderNum = vehicleOrderMap.getOrDefault(vehicleId, java.util.Collections.emptyList()).stream()
-                        .filter(ova -> {
-                            // allocation must have started before or at the staff assignment
-                            if (ova.getCreatedAt().isAfter(assignedAt)) return false;
-                            // if explicitly unassigned before assignment, skip
-                            if (ova.getUnassignedAt() != null && ova.getUnassignedAt().isBefore(assignedAt)) return false;
-                            // if actually delivered before assignment date, skip
-                            if (ova.getActualDeliveryDate() != null &&
-                                    ova.getActualDeliveryDate().isBefore(assignedAt.toLocalDate())) return false;
-                            return true;
-                        })
-                        // take the most recent allocation that qualifies
-                        .max(java.util.Comparator.comparing(com.feros.api.entity.OrderVehicleAllocation::getCreatedAt))
-                        .map(ova -> ova.getOrder().getOrderNumber())
+                String key = userId + ":" + vehicleId;
+                orderNum = staffOrderMap.getOrDefault(key, java.util.Collections.emptyList()).stream()
+                        .min(java.util.Comparator.comparingLong(sa ->
+                                Math.abs(java.time.Duration.between(sa.getCreatedAt(), assignedAt).toSeconds())))
+                        .map(sa -> sa.getOrder().getOrderNumber())
                         .orElse(null);
             }
 
