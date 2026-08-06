@@ -768,8 +768,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     public void deleteProformaInvoice(Long tenantId, Long invoiceId) {
         SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
                 .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
-        if (!"PROFORMA".equals(invoice.getInvoiceStatus())) {
-            throw new FerosException("Only draft invoices can be deleted", HttpStatus.BAD_REQUEST);
+        if ("CONFIRMED".equals(invoice.getInvoiceStatus())) {
+            throw new FerosException("Confirmed invoices cannot be deleted", HttpStatus.BAD_REQUEST);
         }
         invoiceRepository.delete(invoice);
     }
