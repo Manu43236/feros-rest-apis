@@ -14,4 +14,19 @@ public interface SubscriptionInvoiceRepository extends JpaRepository<Subscriptio
 
     @Query("SELECT COUNT(i) FROM SubscriptionInvoice i WHERE YEAR(i.createdAt) = :year AND MONTH(i.createdAt) = :month")
     long countByYearAndMonth(@Param("year") int year, @Param("month") int month);
+
+    @Query("SELECT COALESCE(MAX(i.sequenceNo), 0) FROM SubscriptionInvoice i WHERE i.fyYear = :fyYear AND i.proformaNumber IS NOT NULL")
+    int maxProformaSeq(@Param("fyYear") String fyYear);
+
+    @Query(value = "SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number, 10) AS UNSIGNED)), 0) FROM subscription_invoices WHERE invoice_number LIKE CONCAT('MMINV', :fyYear, '%')", nativeQuery = true)
+    int maxInvoiceSeq(@Param("fyYear") String fyYear);
+
+    @Query("SELECT i FROM SubscriptionInvoice i JOIN FETCH i.tenant t WHERE " +
+           "(:tenantId IS NULL OR t.id = :tenantId) AND " +
+           "(:year IS NULL OR YEAR(i.createdAt) = :year) AND " +
+           "(:month IS NULL OR MONTH(i.createdAt) = :month) " +
+           "ORDER BY i.createdAt DESC")
+    List<SubscriptionInvoice> findAllFiltered(@Param("tenantId") Long tenantId,
+                                              @Param("year") Integer year,
+                                              @Param("month") Integer month);
 }

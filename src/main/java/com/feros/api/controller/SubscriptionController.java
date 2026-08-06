@@ -1,9 +1,12 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.request.ActivateSubscriptionRequest;
+import com.feros.api.dto.request.ConfirmSubscriptionPaymentRequest;
 import com.feros.api.dto.request.CorrectSubscriptionRequest;
+import com.feros.api.dto.request.CreateProformaInvoiceRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
+import com.feros.api.dto.response.SubscriptionInvoiceSummaryResponse;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.SubscriptionHistoryResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceResponse;
@@ -112,6 +115,79 @@ public class SubscriptionController {
             @PathVariable Long tenantId, @PathVariable Long historyId) {
         return ResponseEntity.ok(ApiResponse.success("Invoice generated",
                 subscriptionService.generateInvoiceForHistory(tenantId, historyId)));
+    }
+
+    @PostMapping("/{tenantId}/invoices/proforma")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<SubscriptionInvoiceResponse>> createProforma(
+            @PathVariable Long tenantId,
+            @Valid @RequestBody CreateProformaInvoiceRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Proforma invoice created",
+                subscriptionService.createProformaInvoice(tenantId, request)));
+    }
+
+    @PostMapping("/{tenantId}/invoices/{invoiceId}/confirm")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<SubscriptionInvoiceResponse>> confirmPayment(
+            @PathVariable Long tenantId, @PathVariable Long invoiceId,
+            @Valid @RequestBody ConfirmSubscriptionPaymentRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Payment confirmed, tax invoice issued",
+                subscriptionService.confirmPayment(tenantId, invoiceId, request)));
+    }
+
+    @PostMapping("/{tenantId}/invoices/{invoiceId}/send")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<SubscriptionInvoiceResponse>> sendProforma(
+            @PathVariable Long tenantId, @PathVariable Long invoiceId) {
+        return ResponseEntity.ok(ApiResponse.success("Invoice marked as sent",
+                subscriptionService.sendProformaInvoice(tenantId, invoiceId)));
+    }
+
+    @PutMapping("/{tenantId}/invoices/{invoiceId}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<SubscriptionInvoiceResponse>> updateProforma(
+            @PathVariable Long tenantId, @PathVariable Long invoiceId,
+            @Valid @RequestBody CreateProformaInvoiceRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Invoice updated",
+                subscriptionService.updateProformaInvoice(tenantId, invoiceId, request)));
+    }
+
+    @GetMapping("/invoices")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<List<SubscriptionInvoiceResponse>>> getAllInvoices(
+            @RequestParam(required = false) Long tenantId,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month) {
+        return ResponseEntity.ok(ApiResponse.success("OK",
+                subscriptionService.getAllInvoices(tenantId, year, month)));
+    }
+
+    @DeleteMapping("/{tenantId}/invoices/{invoiceId}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteProforma(
+            @PathVariable Long tenantId, @PathVariable Long invoiceId) {
+        subscriptionService.deleteProformaInvoice(tenantId, invoiceId);
+        return ResponseEntity.ok(ApiResponse.success("Proforma invoice deleted", null));
+    }
+
+    @GetMapping("/{tenantId}/invoices/summary")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<SubscriptionInvoiceSummaryResponse>> getInvoiceSummary(
+            @PathVariable Long tenantId) {
+        return ResponseEntity.ok(ApiResponse.success("Summary fetched",
+                subscriptionService.getInvoiceSummary(tenantId)));
+    }
+
+    @GetMapping("/{tenantId}/invoices/{invoiceId}/pdf")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<byte[]> getInvoicePdf(
+            @PathVariable Long tenantId, @PathVariable Long invoiceId) {
+        byte[] pdf = subscriptionService.generateInvoicePdf(tenantId, invoiceId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=\"invoice-" + invoiceId + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     // ─── Tenant self-service ──────────────────────────────────────────────────

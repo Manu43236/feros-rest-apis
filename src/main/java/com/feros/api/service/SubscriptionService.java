@@ -1,11 +1,14 @@
 package com.feros.api.service;
 
 import com.feros.api.dto.request.ActivateSubscriptionRequest;
+import com.feros.api.dto.request.ConfirmSubscriptionPaymentRequest;
 import com.feros.api.dto.request.CorrectSubscriptionRequest;
+import com.feros.api.dto.request.CreateProformaInvoiceRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
 import com.feros.api.dto.response.SubscriptionHistoryResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceResponse;
+import com.feros.api.dto.response.SubscriptionInvoiceSummaryResponse;
 
 import java.util.List;
 
@@ -22,4 +25,11 @@ public interface SubscriptionService {
     SubscriptionHistoryResponse getCurrentSubscription(Long tenantId);
     SubscriptionHistoryResponse correctSubscription(Long tenantId, CorrectSubscriptionRequest request);
     SubscriptionInvoiceResponse generateInvoiceForHistory(Long tenantId, Long historyId);
+    SubscriptionInvoiceResponse createProformaInvoice(Long tenantId, CreateProformaInvoiceRequest request);
+    SubscriptionInvoiceResponse confirmPayment(Long tenantId, Long invoiceId, ConfirmSubscriptionPaymentRequest request);
+    SubscriptionInvoiceSummaryResponse getInvoiceSummary(Long tenantId);
+    void deleteProformaInvoice(Long tenantId, Long invoiceId);
+    SubscriptionInvoiceResponse sendProformaInvoice(Long tenantId, Long invoiceId);
+    SubscriptionInvoiceResponse updateProformaInvoice(Long tenantId, Long invoiceId, CreateProformaInvoiceRequest request);
+    List<SubscriptionInvoiceResponse> getAllInvoices(Long tenantId, Integer year, Integer month);
 }

@@ -2,11 +2,14 @@ package com.feros.api.service.impl;
 
 import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.ActivateSubscriptionRequest;
+import com.feros.api.dto.request.ConfirmSubscriptionPaymentRequest;
 import com.feros.api.dto.request.CorrectSubscriptionRequest;
+import com.feros.api.dto.request.CreateProformaInvoiceRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
 import com.feros.api.dto.response.SubscriptionHistoryResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceResponse;
+import com.feros.api.dto.response.SubscriptionInvoiceSummaryResponse;
 import com.feros.api.entity.*;
 import com.feros.api.enums.BillingCycle;
 import com.feros.api.enums.NotificationType;
@@ -566,9 +569,31 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     }
 
     private SubscriptionInvoiceResponse toInvoiceResponse(SubscriptionInvoice i, Tenant tenant) {
+        // Old invoices (pre-proforma feature) have no invoiceStatus — treat as CONFIRMED
+        String status = i.getInvoiceStatus() != null ? i.getInvoiceStatus() : "CONFIRMED";
+        String gstType = i.getGstType() != null ? i.getGstType() : "INTRA_STATE";
+
+        BigDecimal gst = i.getGstAmount() != null ? i.getGstAmount() : BigDecimal.ZERO;
+        BigDecimal cgst = null, sgst = null, igst = null;
+        if ("INTER_STATE".equals(gstType)) {
+            igst = gst;
+        } else {
+            cgst = gst.divide(BigDecimal.TWO, 2, RoundingMode.HALF_UP);
+            sgst = gst.subtract(cgst);
+        }
+
         return SubscriptionInvoiceResponse.builder()
                 .id(i.getId())
                 .invoiceNumber(i.getInvoiceNumber())
+                .proformaNumber(i.getProformaNumber())
+                .invoiceStatus(status)
+                .gstType(gstType)
+                .paymentDate(i.getPaymentDate())
+                .paymentMode(i.getPaymentMode())
+                .confirmedAt(i.getConfirmedAt())
+                .cgstAmount(cgst)
+                .sgstAmount(sgst)
+                .igstAmount(igst)
                 .tenantId(i.getTenant().getId())
                 .companyName(tenant.getCompanyName())
                 .planName(i.getPlanName())
@@ -588,6 +613,256 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .tenantState(tenant.getState())
                 .tenantPincode(tenant.getPincode())
                 .tenantGstin(tenant.getGstin())
+                .additionalChargesJson(i.getAdditionalChargesJson())
                 .build();
+    }
+
+    // ─── Invoice number helpers ───────────────────────────────────────────────
+
+    private String financialYear(LocalDate date) {
+        // FY runs April–March; e.g. Jan 2026 → 2025-26 → "2526"
+        int year = date.getMonthValue() >= 4 ? date.getYear() : date.getYear() - 1;
+        return String.format("%02d%02d", year % 100, (year + 1) % 100);
+    }
+
+    private String nextProformaNumber(LocalDate date) {
+        String fy = financialYear(date);
+        int seq = invoiceRepository.maxProformaSeq(fy) + 1;
+        return String.format("MMPRF%s%02d", fy, seq);
+    }
+
+    private String nextInvoiceNumber(LocalDate date) {
+        String fy = financialYear(date);
+        int seq = invoiceRepository.maxInvoiceSeq(fy) + 1;
+        return String.format("MMINV%s%02d", fy, seq);
+    }
+
+    // ─── Proforma & Payment Confirmation ─────────────────────────────────────
+
+    @Override
+    @Transactional
+    public SubscriptionInvoiceResponse createProformaInvoice(Long tenantId, CreateProformaInvoiceRequest request) {
+        if (!request.getToDate().isAfter(request.getFromDate())) {
+            throw new FerosException("To date must be after from date", HttpStatus.BAD_REQUEST);
+        }
+        Tenant tenant = getTenant(tenantId);
+
+        // Days-based calculation: rate is per vehicle per month (30 days)
+        long days = java.time.temporal.ChronoUnit.DAYS.between(request.getFromDate(), request.getToDate()) + 1;
+        BigDecimal months = new BigDecimal(days).divide(new BigDecimal("30"), 4, RoundingMode.HALF_UP);
+        BigDecimal vehicleBase = request.getRatePerVehicle()
+                .multiply(new BigDecimal(request.getVehicleCount()))
+                .multiply(months)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        // Sum additional charges (onboarding, etc.) — all taxable under GST
+        BigDecimal extraTotal = BigDecimal.ZERO;
+        String additionalChargesJson = null;
+        if (request.getAdditionalCharges() != null && !request.getAdditionalCharges().isEmpty()) {
+            extraTotal = request.getAdditionalCharges().stream()
+                    .map(c -> c.getAmount() != null ? c.getAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            additionalChargesJson = request.getAdditionalCharges().stream()
+                    .map(c -> "{\"name\":\"" + c.getName().replace("\"", "'") + "\",\"amount\":" + c.getAmount() + "}")
+                    .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+        }
+
+        // Proforma is a quote — GST is NOT applied. Total = base amount only.
+        // GST is calculated only when payment is confirmed (tax invoice).
+        BigDecimal base = vehicleBase.add(extraTotal);
+
+        LocalDate invoiceDate = request.getInvoiceDate() != null
+                ? request.getInvoiceDate()
+                : TimeUtil.nowIst().toLocalDate();
+        String fyYear = financialYear(invoiceDate);
+        int seq = invoiceRepository.maxProformaSeq(fyYear) + 1;
+        String proformaNumber = String.format("MMPRF%s%02d", fyYear, seq);
+
+        SubscriptionInvoice invoice = SubscriptionInvoice.builder()
+                .proformaNumber(proformaNumber)
+                .invoiceStatus("PROFORMA")
+                .fyYear(fyYear)
+                .sequenceNo(seq)
+                .gstType(request.getGstType())
+                .tenant(tenant)
+                .vehicleCount(request.getVehicleCount())
+                .pricePerVehicle(request.getRatePerVehicle())
+                .periodStart(request.getFromDate())
+                .periodEnd(request.getToDate())
+                .amount(base)
+                .gstAmount(BigDecimal.ZERO)
+                .totalAmount(base)
+                .paymentDate(invoiceDate) // stores proforma date for PDF/display
+                .additionalChargesJson(additionalChargesJson)
+                .build();
+        invoiceRepository.save(invoice);
+        return toInvoiceResponse(invoice, tenant);
+    }
+
+    @Override
+    @Transactional
+    public SubscriptionInvoiceResponse confirmPayment(Long tenantId, Long invoiceId, ConfirmSubscriptionPaymentRequest request) {
+        Tenant tenant = getTenant(tenantId);
+        SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
+                .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
+
+        if ("CONFIRMED".equals(invoice.getInvoiceStatus())) {
+            throw new FerosException("Invoice is already confirmed", HttpStatus.CONFLICT);
+        }
+
+        BigDecimal total = request.getReceivedAmount();
+        BigDecimal base  = total.divide(new BigDecimal("1.18"), 2, RoundingMode.HALF_UP);
+        BigDecimal gst   = total.subtract(base);
+
+        String fyYear = financialYear(request.getPaymentDate());
+        int seq = invoiceRepository.maxInvoiceSeq(fyYear) + 1;
+        String invoiceNumber = String.format("MMINV%s%02d", fyYear, seq);
+
+        invoice.setInvoiceNumber(invoiceNumber);
+        invoice.setFyYear(fyYear);
+        invoice.setSequenceNo(seq);
+        invoice.setInvoiceStatus("CONFIRMED");
+        invoice.setAmount(base);
+        invoice.setGstAmount(gst);
+        invoice.setTotalAmount(total);
+        invoice.setPaymentDate(request.getPaymentDate());
+        invoice.setPaymentMode(request.getPaymentMode());
+        invoice.setPaymentRef(request.getPaymentRef());
+        invoice.setConfirmedAt(TimeUtil.nowIst());
+        invoiceRepository.save(invoice);
+        return toInvoiceResponse(invoice, tenant);
+    }
+
+    @Override
+    public SubscriptionInvoiceSummaryResponse getInvoiceSummary(Long tenantId) {
+        getTenant(tenantId);
+        BigDecimal subscriptionValue = historyRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId)
+                .stream()
+                .filter(h -> h.getTotalAmount() != null)
+                .findFirst()
+                .map(SubscriptionHistory::getTotalAmount)
+                .orElse(BigDecimal.ZERO);
+
+        List<SubscriptionInvoice> all = invoiceRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId);
+
+        BigDecimal totalInvoiced = all.stream()
+                .filter(i -> "CONFIRMED".equals(i.getInvoiceStatus())
+                             || i.getInvoiceStatus() == null) // legacy invoices
+                .map(i -> i.getTotalAmount() != null ? i.getTotalAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        long pendingProformas = all.stream()
+                .filter(i -> "PROFORMA".equals(i.getInvoiceStatus()))
+                .count();
+
+        return SubscriptionInvoiceSummaryResponse.builder()
+                .totalSubscriptionValue(subscriptionValue)
+                .totalInvoiced(totalInvoiced)
+                .balanceOutstanding(subscriptionValue.subtract(totalInvoiced))
+                .pendingProformas(pendingProformas)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void deleteProformaInvoice(Long tenantId, Long invoiceId) {
+        SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
+                .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
+        if ("CONFIRMED".equals(invoice.getInvoiceStatus())) {
+            throw new FerosException("Confirmed invoices cannot be deleted", HttpStatus.BAD_REQUEST);
+        }
+        invoiceRepository.delete(invoice);
+    }
+
+    @Override
+    @Transactional
+    public SubscriptionInvoiceResponse sendProformaInvoice(Long tenantId, Long invoiceId) {
+        Tenant tenant = getTenant(tenantId);
+        SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
+                .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
+        if (!"PROFORMA".equals(invoice.getInvoiceStatus())) {
+            throw new FerosException("Only draft invoices can be issued", HttpStatus.BAD_REQUEST);
+        }
+
+        // Issuing the invoice: calculate GST and assign MMINV number
+        BigDecimal base  = invoice.getAmount();
+        BigDecimal gst   = base.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total = base.add(gst);
+
+        LocalDate issueDate = invoice.getPaymentDate() != null ? invoice.getPaymentDate() : TimeUtil.nowIst().toLocalDate();
+        String fyYear = financialYear(issueDate);
+        String invoiceNumber = String.format("MMINV%s%02d", fyYear, invoiceRepository.maxInvoiceSeq(fyYear) + 1);
+
+        invoice.setInvoiceNumber(invoiceNumber);
+        invoice.setGstAmount(gst);
+        invoice.setTotalAmount(total);
+        invoice.setInvoiceStatus("SENT");
+        invoiceRepository.save(invoice);
+        return toInvoiceResponse(invoice, tenant);
+    }
+
+    @Override
+    @Transactional
+    public SubscriptionInvoiceResponse updateProformaInvoice(Long tenantId, Long invoiceId, CreateProformaInvoiceRequest request) {
+        Tenant tenant = getTenant(tenantId);
+        SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
+                .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
+        if ("CONFIRMED".equals(invoice.getInvoiceStatus())) {
+            throw new FerosException("Confirmed invoices cannot be edited", HttpStatus.BAD_REQUEST);
+        }
+        if (!request.getToDate().isAfter(request.getFromDate())) {
+            throw new FerosException("To date must be after from date", HttpStatus.BAD_REQUEST);
+        }
+
+        long days = java.time.temporal.ChronoUnit.DAYS.between(request.getFromDate(), request.getToDate()) + 1;
+        BigDecimal months = new BigDecimal(days).divide(new BigDecimal("30"), 4, RoundingMode.HALF_UP);
+        BigDecimal vehicleBase = request.getRatePerVehicle()
+                .multiply(new BigDecimal(request.getVehicleCount()))
+                .multiply(months)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal extraTotal = BigDecimal.ZERO;
+        String additionalChargesJson = null;
+        if (request.getAdditionalCharges() != null && !request.getAdditionalCharges().isEmpty()) {
+            extraTotal = request.getAdditionalCharges().stream()
+                    .map(c -> c.getAmount() != null ? c.getAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            additionalChargesJson = request.getAdditionalCharges().stream()
+                    .map(c -> "{\"name\":\"" + c.getName().replace("\"", "'") + "\",\"amount\":" + c.getAmount() + "}")
+                    .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+        }
+
+        BigDecimal base = vehicleBase.add(extraTotal);
+        LocalDate invoiceDate = request.getInvoiceDate() != null
+                ? request.getInvoiceDate()
+                : invoice.getPaymentDate(); // keep existing date if not changed
+
+        boolean isSent = "SENT".equals(invoice.getInvoiceStatus());
+        BigDecimal gst   = isSent ? base.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+        BigDecimal total = base.add(gst);
+
+        invoice.setPeriodStart(request.getFromDate());
+        invoice.setPeriodEnd(request.getToDate());
+        invoice.setVehicleCount(request.getVehicleCount());
+        invoice.setPricePerVehicle(request.getRatePerVehicle());
+        invoice.setGstType(request.getGstType());
+        invoice.setAmount(base);
+        invoice.setGstAmount(gst);
+        invoice.setTotalAmount(total);
+        invoice.setPaymentDate(invoiceDate);
+        invoice.setAdditionalChargesJson(additionalChargesJson);
+        if (request.getProformaNumber() != null && !request.getProformaNumber().isBlank()) {
+            invoice.setProformaNumber(request.getProformaNumber().trim());
+        }
+        invoiceRepository.save(invoice);
+        return toInvoiceResponse(invoice, tenant);
+    }
+
+    @Override
+    public List<SubscriptionInvoiceResponse> getAllInvoices(Long tenantId, Integer year, Integer month) {
+        return invoiceRepository.findAllFiltered(tenantId, year, month)
+                .stream()
+                .map(i -> toInvoiceResponse(i, i.getTenant()))
+                .collect(java.util.stream.Collectors.toList());
     }
 }
