@@ -58,9 +58,17 @@ public class Lr extends BaseEntity {
     @Column(name = "delivered_weight")
     private BigDecimal deliveredWeight;
 
-    // weight_variance is GENERATED in DB — read only
+    // weight_variance: computed here so it works even if the DB generated column is absent
+    @Getter(lombok.AccessLevel.NONE)
     @Column(name = "weight_variance", insertable = false, updatable = false)
     private BigDecimal weightVariance;
+
+    public BigDecimal getWeightVariance() {
+        if (deliveredWeight != null && loadedWeight != null) {
+            return deliveredWeight.subtract(loadedWeight);
+        }
+        return weightVariance;
+    }
 
     // is_overloaded is GENERATED in DB — read only
     @Column(name = "is_overloaded", insertable = false, updatable = false)
