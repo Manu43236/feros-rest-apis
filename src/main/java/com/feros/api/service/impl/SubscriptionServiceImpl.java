@@ -807,8 +807,8 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         Tenant tenant = getTenant(tenantId);
         SubscriptionInvoice invoice = invoiceRepository.findByIdAndTenant_Id(invoiceId, tenantId)
                 .orElseThrow(() -> new FerosException("Invoice not found", HttpStatus.NOT_FOUND));
-        if (!"PROFORMA".equals(invoice.getInvoiceStatus())) {
-            throw new FerosException("Only draft invoices can be edited", HttpStatus.BAD_REQUEST);
+        if ("CONFIRMED".equals(invoice.getInvoiceStatus())) {
+            throw new FerosException("Confirmed invoices cannot be edited", HttpStatus.BAD_REQUEST);
         }
         if (!request.getToDate().isAfter(request.getFromDate())) {
             throw new FerosException("To date must be after from date", HttpStatus.BAD_REQUEST);
@@ -837,14 +837,18 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 ? request.getInvoiceDate()
                 : invoice.getPaymentDate(); // keep existing date if not changed
 
+        boolean isSent = "SENT".equals(invoice.getInvoiceStatus());
+        BigDecimal gst   = isSent ? base.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+        BigDecimal total = base.add(gst);
+
         invoice.setPeriodStart(request.getFromDate());
         invoice.setPeriodEnd(request.getToDate());
         invoice.setVehicleCount(request.getVehicleCount());
         invoice.setPricePerVehicle(request.getRatePerVehicle());
         invoice.setGstType(request.getGstType());
         invoice.setAmount(base);
-        invoice.setGstAmount(BigDecimal.ZERO);
-        invoice.setTotalAmount(base);
+        invoice.setGstAmount(gst);
+        invoice.setTotalAmount(total);
         invoice.setPaymentDate(invoiceDate);
         invoice.setAdditionalChargesJson(additionalChargesJson);
         if (request.getProformaNumber() != null && !request.getProformaNumber().isBlank()) {
