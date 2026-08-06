@@ -766,11 +766,23 @@ public class ReportServiceImpl implements ReportService {
     }
 
     private String resolveVehicleForDate(Map<Long, List<VehicleStaffAssignment>> userAssignments, Long userId, LocalDate date) {
-        return userAssignments.getOrDefault(userId, List.of()).stream()
+        Optional<VehicleStaffAssignment> myVsa = userAssignments.getOrDefault(userId, List.of()).stream()
                 .filter(a -> !a.getAssignedFrom().isAfter(date) && (a.getAssignedTo() == null || !a.getAssignedTo().isBefore(date)))
-                .findFirst()
-                .map(a -> a.getVehicle().getRegistrationNumber())
-                .orElse("—");
+                .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom));
+        if (myVsa.isEmpty()) return "—";
+
+        Long vehicleId = myVsa.get().getVehicle().getId();
+        LocalDate myAssignedFrom = myVsa.get().getAssignedFrom();
+
+        // ponytail: suppress swapped-out driver — if another user has a later assignment for same vehicle on this date
+        boolean swappedOut = userAssignments.values().stream()
+                .flatMap(List::stream)
+                .anyMatch(a -> !a.getUser().getId().equals(userId)
+                        && a.getVehicle().getId().equals(vehicleId)
+                        && !a.getAssignedFrom().isAfter(date)
+                        && (a.getAssignedTo() == null || !a.getAssignedTo().isBefore(date))
+                        && a.getAssignedFrom().isAfter(myAssignedFrom));
+        return swappedOut ? "—" : myVsa.get().getVehicle().getRegistrationNumber();
     }
 
     private String resolveVehiclesForPeriod(Map<Long, List<VehicleStaffAssignment>> userAssignments, Long userId) {

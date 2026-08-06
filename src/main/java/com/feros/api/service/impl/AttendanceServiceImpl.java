@@ -29,8 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -259,11 +259,23 @@ public class AttendanceServiceImpl implements AttendanceService {
     @Override
     public List<AttendanceResponse> getAttendanceByDate(LocalDate date) {
         String role = SecurityUtil.getCurrentRole();
+        Long tenantId = getCurrentTenantId();
+        // vehicleId → userId of the latest-assigned user (by assignedFrom) for mid-day swap dedup
+        Map<Long, Long> latestForVehicle = vehicleStaffAssignmentRepository
+                .findOverlappingForTenant(tenantId, date, date).stream()
+                .collect(Collectors.groupingBy(a -> a.getVehicle().getId()))
+                .entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> e.getValue().stream()
+                                .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom))
+                                .map(a -> a.getUser().getId())
+                                .orElseThrow()));
         return attendanceRepository
-                .findByTenantIdAndAttendanceDateAndIsActiveTrue(getCurrentTenantId(), date)
+                .findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, date)
                 .stream()
                 .filter(a -> isVisibleToRole(a, role))
-                .map(this::mapToResponse).toList();
+                .map(a -> mapToResponse(a, latestForVehicle)).toList();
     }
 
     private boolean isVisibleToRole(Attendance a, String callerRole) {
@@ -455,6 +467,10 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     // ===================== MAPPERS =====================
     private AttendanceResponse mapToResponse(Attendance a) {
+        return mapToResponse(a, Collections.emptyMap());
+    }
+
+    private AttendanceResponse mapToResponse(Attendance a, Map<Long, Long> latestForVehicle) {
         String roleName = a.getUser().getRoles().stream()
                 .findFirst().map(r -> r.getName().name()).orElse(null);
 
@@ -469,6 +485,18 @@ public class AttendanceServiceImpl implements AttendanceService {
             dutyLabel  = dutyHours + " hrs";
             canUndoOut = Duration.between(a.getMarkedOutAt(), TimeUtil.nowIst()).toMinutes() <= 10;
         }
+
+        // Resolve vehicle — pick the latest assignment; suppress if another user was assigned later (mid-day swap)
+        String assignedVehicleNumber = vehicleStaffAssignmentRepository.findOverlappingByUser(
+                a.getUser().getId(), a.getTenant().getId(), a.getAttendanceDate(), a.getAttendanceDate())
+                .stream()
+                .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom))
+                .map(vsa -> {
+                    Long latestUserId = latestForVehicle.get(vsa.getVehicle().getId());
+                    return (latestUserId == null || latestUserId.equals(a.getUser().getId()))
+                            ? vsa.getVehicle().getRegistrationNumber() : null;
+                })
+                .orElse(null);
 
         return AttendanceResponse.builder()
                 .id(a.getId())
@@ -494,9 +522,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .approvedById(a.getApprovedBy() != null ? a.getApprovedBy().getId() : null)
                 .approvedByName(a.getApprovedBy() != null ? a.getApprovedBy().getName() : null)
                 .approvedAt(a.getApprovedAt())
-                .assignedVehicleNumber(vehicleStaffAssignmentRepository.findOverlappingByUser(
-                        a.getUser().getId(), a.getTenant().getId(), a.getAttendanceDate(), a.getAttendanceDate())
-                        .stream().findFirst().map(vsa -> vsa.getVehicle().getRegistrationNumber()).orElse(null))
+                .assignedVehicleNumber(assignedVehicleNumber)
                 .selfieUrl(a.getSelfieUrl() != null ? s3Service.getPublicUrl(a.getSelfieUrl()) : null)
                 .latitude(a.getLatitude())
                 .longitude(a.getLongitude())
