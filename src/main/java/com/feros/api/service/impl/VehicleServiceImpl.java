@@ -963,9 +963,24 @@ public class VehicleServiceImpl implements VehicleService {
         if (vehicleRepository.existsByCurrentCleaner_IdAndIdNot(userId, vehicleId))
             throw new FerosException("This cleaner is already assigned to another vehicle", HttpStatus.CONFLICT);
 
-        // Close any existing open assignment for this cleaner
         User actorForClose = userRepository.findById(SecurityUtil.getCurrentUserId())
                 .orElseThrow(() -> new FerosException("Current user not found", HttpStatus.NOT_FOUND));
+
+        User oldCleaner = vehicle.getCurrentCleaner();
+
+        // Auto-unassign the current cleaner from this vehicle (mirrors assignDriver logic)
+        if (oldCleaner != null) {
+            vehicleStaffAssignmentRepository
+                    .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(oldCleaner.getId(), tenantId)
+                    .ifPresent(a -> {
+                        a.setAssignedTo(TimeUtil.today());
+                        a.setUnassignedBy(actorForClose);
+                        a.setUnassignedAt(LocalDateTime.now());
+                        vehicleStaffAssignmentRepository.save(a);
+                    });
+        }
+
+        // Close any existing open assignment for the new cleaner (e.g. previously on another vehicle)
         vehicleStaffAssignmentRepository
                 .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(userId, tenantId)
                 .ifPresent(a -> {
@@ -984,8 +999,6 @@ public class VehicleServiceImpl implements VehicleService {
                 .assignedFrom(TimeUtil.today())
                 .assignedBy(assignedBy)
                 .build());
-
-        User oldCleaner = vehicle.getCurrentCleaner();
 
         vehicle.setCurrentCleaner(cleaner);
         vehicleRepository.save(vehicle);
