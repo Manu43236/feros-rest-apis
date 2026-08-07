@@ -768,20 +768,26 @@ public class ReportServiceImpl implements ReportService {
     private String resolveVehicleForDate(Map<Long, List<VehicleStaffAssignment>> userAssignments, Long userId, LocalDate date) {
         Optional<VehicleStaffAssignment> myVsa = userAssignments.getOrDefault(userId, List.of()).stream()
                 .filter(a -> !a.getAssignedFrom().isAfter(date) && (a.getAssignedTo() == null || !a.getAssignedTo().isBefore(date)))
-                .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom));
+                .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom)
+                        .thenComparing(VehicleStaffAssignment::getCreatedAt));
         if (myVsa.isEmpty()) return "—";
 
         Long vehicleId = myVsa.get().getVehicle().getId();
         LocalDate myAssignedFrom = myVsa.get().getAssignedFrom();
+        String myRole = primaryRole(myVsa.get().getUser());
 
-        // ponytail: suppress swapped-out driver — if another user has a later assignment for same vehicle on this date
+        // ponytail: suppress swapped-out user — only when same role has a later assignment for same vehicle
         boolean swappedOut = userAssignments.values().stream()
                 .flatMap(List::stream)
                 .anyMatch(a -> !a.getUser().getId().equals(userId)
                         && a.getVehicle().getId().equals(vehicleId)
+                        && primaryRole(a.getUser()).equals(myRole)
                         && !a.getAssignedFrom().isAfter(date)
                         && (a.getAssignedTo() == null || !a.getAssignedTo().isBefore(date))
-                        && a.getAssignedFrom().isAfter(myAssignedFrom));
+                        && (a.getAssignedFrom().isAfter(myAssignedFrom)
+                            || (a.getAssignedFrom().isEqual(myAssignedFrom)
+                                && a.getCreatedAt() != null && myVsa.get().getCreatedAt() != null
+                                && a.getCreatedAt().isAfter(myVsa.get().getCreatedAt()))));
         return swappedOut ? "—" : myVsa.get().getVehicle().getRegistrationNumber();
     }
 

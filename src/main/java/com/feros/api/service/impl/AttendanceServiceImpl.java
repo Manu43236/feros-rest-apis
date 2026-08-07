@@ -260,15 +260,20 @@ public class AttendanceServiceImpl implements AttendanceService {
     public List<AttendanceResponse> getAttendanceByDate(LocalDate date) {
         String role = SecurityUtil.getCurrentRole();
         Long tenantId = getCurrentTenantId();
-        // vehicleId → userId of the latest-assigned user (by assignedFrom) for mid-day swap dedup
-        Map<Long, Long> latestForVehicle = vehicleStaffAssignmentRepository
+        // "vehicleId:role" → userId of latest assignment for that role on that vehicle (role-aware swap dedup)
+        Map<String, Long> latestForVehicle = vehicleStaffAssignmentRepository
                 .findOverlappingForTenant(tenantId, date, date).stream()
-                .collect(Collectors.groupingBy(a -> a.getVehicle().getId()))
+                .collect(Collectors.groupingBy(a -> {
+                    String r = a.getUser().getRoles().stream()
+                            .findFirst().map(ro -> ro.getName().name()).orElse("UNKNOWN");
+                    return a.getVehicle().getId() + ":" + r;
+                }))
                 .entrySet().stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
                         e -> e.getValue().stream()
-                                .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom))
+                                .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom)
+                                        .thenComparing(VehicleStaffAssignment::getCreatedAt))
                                 .map(a -> a.getUser().getId())
                                 .orElseThrow()));
         return attendanceRepository
@@ -470,7 +475,7 @@ public class AttendanceServiceImpl implements AttendanceService {
         return mapToResponse(a, Collections.emptyMap());
     }
 
-    private AttendanceResponse mapToResponse(Attendance a, Map<Long, Long> latestForVehicle) {
+    private AttendanceResponse mapToResponse(Attendance a, Map<String, Long> latestForVehicle) {
         String roleName = a.getUser().getRoles().stream()
                 .findFirst().map(r -> r.getName().name()).orElse(null);
 
@@ -486,13 +491,16 @@ public class AttendanceServiceImpl implements AttendanceService {
             canUndoOut = Duration.between(a.getMarkedOutAt(), TimeUtil.nowIst()).toMinutes() <= 10;
         }
 
-        // Resolve vehicle — pick the latest assignment; suppress if another user was assigned later (mid-day swap)
+        // Resolve vehicle — role-aware swap dedup: only suppress if same role has a later assignment
+        String userRole = a.getUser().getRoles().stream()
+                .findFirst().map(r -> r.getName().name()).orElse("UNKNOWN");
         String assignedVehicleNumber = vehicleStaffAssignmentRepository.findOverlappingByUser(
                 a.getUser().getId(), a.getTenant().getId(), a.getAttendanceDate(), a.getAttendanceDate())
                 .stream()
-                .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom))
+                .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom)
+                        .thenComparing(VehicleStaffAssignment::getCreatedAt))
                 .map(vsa -> {
-                    Long latestUserId = latestForVehicle.get(vsa.getVehicle().getId());
+                    Long latestUserId = latestForVehicle.get(vsa.getVehicle().getId() + ":" + userRole);
                     return (latestUserId == null || latestUserId.equals(a.getUser().getId()))
                             ? vsa.getVehicle().getRegistrationNumber() : null;
                 })
