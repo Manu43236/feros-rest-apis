@@ -47,6 +47,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final NotificationService notificationService;
     private final VehicleRepository vehicleRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final LocationResolverService locationResolverService;
 
     private Long getCurrentTenantId() {
@@ -505,6 +506,14 @@ public class AttendanceServiceImpl implements AttendanceService {
                             ? vsa.getVehicle().getRegistrationNumber() : null;
                 })
                 .orElse(null);
+        // ponytail: fallback — standing assignment lapsed but driver is on an active order trip
+        if (assignedVehicleNumber == null) {
+            assignedVehicleNumber = orderStaffAllocationRepository
+                    .findActiveOnDateForUser(a.getUser().getId(), a.getTenant().getId(), a.getAttendanceDate())
+                    .stream().findFirst()
+                    .map(sa -> sa.getVehicleAllocation().getVehicle().getRegistrationNumber())
+                    .orElse(null);
+        }
 
         return AttendanceResponse.builder()
                 .id(a.getId())

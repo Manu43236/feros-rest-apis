@@ -88,4 +88,32 @@ public interface OrderStaffAllocationRepository extends JpaRepository<OrderStaff
     long countDistinctUsersByTenantIdAndRoleAndStatus(@Param("tenantId") Long tenantId,
                                                       @Param("roleName") RoleName roleName,
                                                       @Param("status") com.feros.api.enums.StaffAllocationStatus status);
+
+    // Bulk period preload for attendance summary — all active trips in a date range for the tenant
+    @Query("SELECT sa FROM OrderStaffAllocation sa " +
+           "JOIN FETCH sa.vehicleAllocation va " +
+           "JOIN FETCH va.vehicle " +
+           "WHERE sa.tenant.id = :tenantId " +
+           "AND sa.isActive = true " +
+           "AND sa.allocationStatus <> com.feros.api.enums.StaffAllocationStatus.CANCELLED " +
+           "AND va.isActive = true " +
+           "AND sa.actualStartDate IS NOT NULL AND sa.actualStartDate <= :endDate " +
+           "AND (sa.actualEndDate IS NULL OR sa.actualEndDate >= :startDate)")
+    List<OrderStaffAllocation> findActiveInPeriodForTenant(@Param("tenantId") Long tenantId,
+                                                           @Param("startDate") LocalDate startDate,
+                                                           @Param("endDate") LocalDate endDate);
+
+    // Fallback vehicle lookup: standing assignment has lapsed but driver is on an active order trip
+    @Query("SELECT sa FROM OrderStaffAllocation sa " +
+           "JOIN FETCH sa.vehicleAllocation va " +
+           "JOIN FETCH va.vehicle " +
+           "WHERE sa.user.id = :userId AND sa.tenant.id = :tenantId " +
+           "AND sa.isActive = true " +
+           "AND sa.allocationStatus <> com.feros.api.enums.StaffAllocationStatus.CANCELLED " +
+           "AND va.isActive = true " +
+           "AND sa.actualStartDate IS NOT NULL AND sa.actualStartDate <= :date " +
+           "AND (sa.actualEndDate IS NULL OR sa.actualEndDate >= :date)")
+    List<OrderStaffAllocation> findActiveOnDateForUser(@Param("userId") Long userId,
+                                                       @Param("tenantId") Long tenantId,
+                                                       @Param("date") LocalDate date);
 }
