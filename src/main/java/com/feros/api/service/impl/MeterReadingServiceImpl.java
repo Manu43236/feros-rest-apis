@@ -180,6 +180,12 @@ public class MeterReadingServiceImpl implements MeterReadingService {
                 .orElseThrow(() -> new FerosException("Meter reading not found", HttpStatus.NOT_FOUND));
         reading.setIsActive(false);
         meterReadingRepository.save(reading);
+
+        Vehicle vehicle = reading.getVehicle();
+        List<VehicleMeterReading> remaining = meterReadingRepository
+                .findByVehicleIdAndTenantIdAndIsActiveTrueOrderByReadingKmDesc(vehicle.getId(), tenantId());
+        vehicle.setCurrentOdometerReading(remaining.isEmpty() ? null : remaining.get(0).getReadingKm());
+        vehicleRepository.save(vehicle);
     }
 
     private MeterReadingResponse mapToResponse(VehicleMeterReading r,
