@@ -647,9 +647,11 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         }
         Tenant tenant = getTenant(tenantId);
 
-        // Days-based calculation: rate is per vehicle per month (30 days)
-        long days = java.time.temporal.ChronoUnit.DAYS.between(request.getFromDate(), request.getToDate()) + 1;
-        BigDecimal months = new BigDecimal(days).divide(new BigDecimal("30"), 4, RoundingMode.HALF_UP);
+        // Calendar month calculation: whole months + remaining days / 30
+        long wholeMonths = java.time.temporal.ChronoUnit.MONTHS.between(request.getFromDate(), request.getToDate());
+        int remDays = java.time.Period.between(request.getFromDate().plusMonths(wholeMonths), request.getToDate()).getDays();
+        BigDecimal months = BigDecimal.valueOf(wholeMonths)
+                .add(new BigDecimal(remDays).divide(new BigDecimal("30"), 4, RoundingMode.HALF_UP));
         BigDecimal vehicleBase = request.getRatePerVehicle()
                 .multiply(new BigDecimal(request.getVehicleCount()))
                 .multiply(months)
@@ -814,8 +816,10 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             throw new FerosException("To date must be after from date", HttpStatus.BAD_REQUEST);
         }
 
-        long days = java.time.temporal.ChronoUnit.DAYS.between(request.getFromDate(), request.getToDate()) + 1;
-        BigDecimal months = new BigDecimal(days).divide(new BigDecimal("30"), 4, RoundingMode.HALF_UP);
+        long wholeMonths2 = java.time.temporal.ChronoUnit.MONTHS.between(request.getFromDate(), request.getToDate());
+        int remDays2 = java.time.Period.between(request.getFromDate().plusMonths(wholeMonths2), request.getToDate()).getDays();
+        BigDecimal months = BigDecimal.valueOf(wholeMonths2)
+                .add(new BigDecimal(remDays2).divide(new BigDecimal("30"), 4, RoundingMode.HALF_UP));
         BigDecimal vehicleBase = request.getRatePerVehicle()
                 .multiply(new BigDecimal(request.getVehicleCount()))
                 .multiply(months)

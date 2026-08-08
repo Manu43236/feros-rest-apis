@@ -145,17 +145,21 @@ public class SubscriptionInvoicePdfService {
             }
 
             long periodDays = 0;
+            double months = 0;
             if (inv.getPeriodStart() != null && inv.getPeriodEnd() != null) {
                 periodDays = java.time.temporal.ChronoUnit.DAYS.between(inv.getPeriodStart(), inv.getPeriodEnd()) + 1;
+                long wholeMonths = java.time.temporal.ChronoUnit.MONTHS.between(inv.getPeriodStart(), inv.getPeriodEnd());
+                int remDays = java.time.Period.between(inv.getPeriodStart().plusMonths(wholeMonths), inv.getPeriodEnd()).getDays();
+                double frac = remDays > 0 ? Math.round((remDays / 30.0) * 10.0) / 10.0 : 0;
+                months = wholeMonths + frac;
             }
-            double months = periodDays > 0 ? Math.round((periodDays / 30.0) * 10.0) / 10.0 : 0;
             String durationStr = months > 0 ? (months == Math.floor(months) ? (int) months + " months" : months + " months") : "—";
 
             BigDecimal vehicleBase = BigDecimal.ZERO;
-            if (inv.getPricePerVehicle() != null && inv.getVehicleCount() != null && periodDays > 0) {
+            if (inv.getPricePerVehicle() != null && inv.getVehicleCount() != null && months > 0) {
                 vehicleBase = inv.getPricePerVehicle()
                         .multiply(new BigDecimal(inv.getVehicleCount()))
-                        .multiply(new BigDecimal(periodDays).divide(new BigDecimal("30"), 4, RoundingMode.HALF_UP))
+                        .multiply(BigDecimal.valueOf(months))
                         .setScale(2, RoundingMode.HALF_UP);
             }
 
@@ -260,8 +264,11 @@ public class SubscriptionInvoicePdfService {
 
             PdfPCell bankCell = noBorder();
             bankCell.addElement(new Phrase("Bank Details", F_BOLD));
-            bankCell.addElement(new Phrase("MandM Technologies", F_BODY));
-            bankCell.addElement(new Phrase("Current Account: HDFC Bank Ltd, Anakapalle Branch", F_ADDR));
+            bankCell.addElement(new Phrase("MANDM TECHNOLOGIES", F_BODY));
+            bankCell.addElement(new Phrase("A/C No: 50200123104534", F_ADDR));
+            bankCell.addElement(new Phrase("IFSC Code: HDFC0001032", F_ADDR));
+            bankCell.addElement(new Phrase("Type: Current Account", F_ADDR));
+            bankCell.addElement(new Phrase("HDFC Bank Ltd, Anakapalli Branch", F_ADDR));
             footer.addCell(bankCell);
 
             PdfPCell sigCell = noBorder();
