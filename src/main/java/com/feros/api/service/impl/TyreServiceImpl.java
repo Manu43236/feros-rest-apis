@@ -637,6 +637,15 @@ public class TyreServiceImpl implements TyreService {
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
     }
 
+    private BigDecimal effectiveTotalKm(Tyre tyre, VehicleTyreFitting fitting) {
+        if (fitting == null) return tyre.getTotalLifetimeKm();
+        BigDecimal currentOdometer = fitting.getVehicle().getCurrentOdometerReading();
+        if (currentOdometer == null) return tyre.getTotalLifetimeKm();
+        BigDecimal inProgress = currentOdometer.subtract(fitting.getFittedAtKm());
+        if (inProgress.compareTo(BigDecimal.ZERO) <= 0) return tyre.getTotalLifetimeKm();
+        return tyre.getTotalLifetimeKm().add(inProgress);
+    }
+
     // ── Mappers ───────────────────────────────────────────────────────────────
 
     private TyreResponse toTyreResponse(Tyre tyre, VehicleTyreFitting currentFitting) {
@@ -652,7 +661,7 @@ public class TyreServiceImpl implements TyreService {
                 .purchaseCost(tyre.getPurchaseCost())
                 .status(tyre.getStatus())
                 .retreadCount(tyre.getRetreadCount())
-                .totalLifetimeKm(tyre.getTotalLifetimeKm())
+                .totalLifetimeKm(effectiveTotalKm(tyre, currentFitting))
                 .notes(tyre.getNotes())
                 .tyreLifeYears(tyre.getTyreLifeYears())
                 .expiryDate(tyre.getExpiryDate())
