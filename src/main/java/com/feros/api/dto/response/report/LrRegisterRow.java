@@ -35,4 +35,5 @@ public class LrRegisterRow {
     private LocalDate ewayBillValidUpto;
     private String lrStatus;
     private String remarks;
+    private Boolean isInvoiced;
 }

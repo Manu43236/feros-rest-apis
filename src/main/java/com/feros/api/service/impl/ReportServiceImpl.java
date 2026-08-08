@@ -392,6 +392,8 @@ public class ReportServiceImpl implements ReportService {
                 ? lrRepository.findByTenantIdAndDateRangeAndClient(tenantId, startDate, endDate, clientId)
                 : lrRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
 
+        Set<Long> invoicedLrIds = new java.util.HashSet<>(invoiceLrRepository.findActiveLrIds(tenantId));
+
         return lrs.stream().map(l -> LrRegisterRow.builder()
                 .lrId(l.getId())
                 .lrNumber(l.getLrNumber())
@@ -418,6 +420,7 @@ public class ReportServiceImpl implements ReportService {
                 .ewayBillValidUpto(l.getEwayBillValidUpto())
                 .lrStatus(l.getLrStatus() != null ? l.getLrStatus().name() : "—")
                 .remarks(l.getRemarks())
+                .isInvoiced(invoicedLrIds.contains(l.getId()))
                 .build()).toList();
     }
 
