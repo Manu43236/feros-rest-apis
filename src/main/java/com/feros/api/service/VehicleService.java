@@ -27,4 +27,5 @@ public interface VehicleService {
     VehicleResponse assignCleaner(Long vehicleId, Long userId);
     VehicleResponse unassignCleaner(Long vehicleId);
     List<StaffAssignmentHistoryResponse> getAllStaffAssignmentHistory();
+    void resetOdometer(Long vehicleId, java.math.BigDecimal km);
 }
