@@ -19,6 +19,9 @@ public interface VehicleMeterReadingRepository extends JpaRepository<VehicleMete
     @Query("SELECT m FROM VehicleMeterReading m WHERE m.vehicle.id = :vehicleId AND m.isActive = true ORDER BY m.readingKm DESC")
     List<VehicleMeterReading> findTopByVehicleOrderByReadingKmDesc(@Param("vehicleId") Long vehicleId);
 
+    @Query("SELECT m FROM VehicleMeterReading m WHERE m.vehicle.id = :vehicleId AND m.readingType = 'TRIP_END' AND m.isActive = true ORDER BY m.readingKm DESC")
+    List<VehicleMeterReading> findLatestTripEndByVehicle(@Param("vehicleId") Long vehicleId);
+
     java.util.Optional<VehicleMeterReading> findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
             Long lrId, com.feros.api.enums.MeterReadingType readingType);
 

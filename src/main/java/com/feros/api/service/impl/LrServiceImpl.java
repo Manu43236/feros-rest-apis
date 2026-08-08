@@ -543,15 +543,26 @@ public class LrServiceImpl implements LrService {
                 .isOverloaded(lr.getIsOverloaded())
                 .loadedAt(lr.getLoadedAt())
                 .deliveredAt(lr.getDeliveredAt())
-                .currentVehicleOdometer(vehicle != null ? vehicle.getCurrentOdometerReading() : null)
+                .currentVehicleOdometer(vehicle != null
+                        ? vehicleMeterReadingRepository.findLatestTripEndByVehicle(vehicle.getId())
+                                .stream().findFirst().map(VehicleMeterReading::getReadingKm).orElse(vehicle.getCurrentOdometerReading())
+                        : null)
                 .startOdometer(vehicleMeterReadingRepository
                         .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
                                 lr.getId(), MeterReadingType.TRIP_START)
                         .map(VehicleMeterReading::getReadingKm).orElse(null))
+                .startOdometerRecordedAt(vehicleMeterReadingRepository
+                        .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
+                                lr.getId(), MeterReadingType.TRIP_START)
+                        .map(VehicleMeterReading::getRecordedAt).orElse(null))
                 .endOdometer(vehicleMeterReadingRepository
                         .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
                                 lr.getId(), MeterReadingType.TRIP_END)
                         .map(VehicleMeterReading::getReadingKm).orElse(null))
+                .endOdometerRecordedAt(vehicleMeterReadingRepository
+                        .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
+                                lr.getId(), MeterReadingType.TRIP_END)
+                        .map(VehicleMeterReading::getRecordedAt).orElse(null))
                 .ewayBillNumber(lr.getEwayBillNumber())
                 .ewayBillDate(lr.getEwayBillDate())
                 .ewayBillValidUpto(lr.getEwayBillValidUpto())
