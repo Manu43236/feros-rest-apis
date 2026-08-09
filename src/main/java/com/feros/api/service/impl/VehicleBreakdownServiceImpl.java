@@ -323,6 +323,14 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
             lrRepository.save(lr);
         }
 
+        // Close open VSA for whoever was previously denormalized on V2 (e.g. Sai Kumar on an available vehicle)
+        if (replacementVehicle.getCurrentDriver() != null) {
+            closeVsa(replacementVehicle.getCurrentDriver().getId(), tenantId, currentUser);
+        }
+        if (replacementVehicle.getCurrentCleaner() != null) {
+            closeVsa(replacementVehicle.getCurrentCleaner().getId(), tenantId, currentUser);
+        }
+
         // Sync denormalized currentDriver/currentCleaner on both vehicles
         Vehicle originalVehicle = originalAllocation.getVehicle();
         originalVehicle.setCurrentDriver(null);
