@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,6 +37,7 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
     private final VehicleMeterReadingRepository vehicleMeterReadingRepository;
     private final AttendanceRepository attendanceRepository;
     private final RoleRepository roleRepository;
+    private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -249,15 +251,19 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         List<OrderStaffAllocation> v1Staff = staffAllocationRepository
                 .findByVehicleAllocationIdAndIsActiveTrue(originalAllocation.getId());
 
+        User newDriver = null;
+        User newCleaner = null;
+
         if (request.getSelectedDriverId() != null) {
             // Supervisor chose specific staff → cancel all from V1 + V2, assign selected
             for (OrderStaffAllocation sa : v1Staff) {
                 sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
                 sa.setIsActive(false);
+                closeVsa(sa.getUser().getId(), tenantId, currentUser);
             }
             staffAllocationRepository.saveAll(v1Staff);
 
-            // Cancel V2's current active staff if any
+            // Cancel V2's current active staff if any + close their VSA
             vehicleAllocationRepository.findCurrentActiveAllocationForVehicle(replacementVehicle.getId())
                     .ifPresent(v2Alloc -> {
                         List<OrderStaffAllocation> v2Staff = staffAllocationRepository
@@ -265,50 +271,66 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
                         for (OrderStaffAllocation sa : v2Staff) {
                             sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
                             sa.setIsActive(false);
+                            closeVsa(sa.getUser().getId(), tenantId, currentUser);
                         }
                         staffAllocationRepository.saveAll(v2Staff);
                     });
 
             // Assign selected driver
-            User selectedDriver = userRepository.findById(request.getSelectedDriverId())
+            newDriver = userRepository.findById(request.getSelectedDriverId())
                     .orElseThrow(() -> new FerosException("Selected driver not found", HttpStatus.NOT_FOUND));
             Role driverRole = roleRepository.findByName(RoleName.DRIVER)
                     .orElseThrow(() -> new FerosException("Driver role not found", HttpStatus.INTERNAL_SERVER_ERROR));
             staffAllocationRepository.save(OrderStaffAllocation.builder()
-                    .tenant(tenant)
-                    .order(order)
-                    .vehicleAllocation(replacementAllocation)
-                    .user(selectedDriver)
-                    .role(driverRole)
+                    .tenant(tenant).order(order).vehicleAllocation(replacementAllocation)
+                    .user(newDriver).role(driverRole)
                     .allocationStatus(StaffAllocationStatus.IN_TRANSIT)
-                    .allocatedBy(currentUser)
-                    .isActive(true)
-                    .build());
+                    .allocatedBy(currentUser).isActive(true).build());
+            closeVsa(newDriver.getId(), tenantId, currentUser);
+            openVsa(tenant, replacementVehicle, newDriver, currentUser);
 
             // Assign selected cleaner (optional)
             if (request.getSelectedCleanerId() != null) {
-                User selectedCleaner = userRepository.findById(request.getSelectedCleanerId())
+                newCleaner = userRepository.findById(request.getSelectedCleanerId())
                         .orElseThrow(() -> new FerosException("Selected cleaner not found", HttpStatus.NOT_FOUND));
                 Role cleanerRole = roleRepository.findByName(RoleName.CLEANER)
                         .orElseThrow(() -> new FerosException("Cleaner role not found", HttpStatus.INTERNAL_SERVER_ERROR));
                 staffAllocationRepository.save(OrderStaffAllocation.builder()
-                        .tenant(tenant)
-                        .order(order)
-                        .vehicleAllocation(replacementAllocation)
-                        .user(selectedCleaner)
-                        .role(cleanerRole)
+                        .tenant(tenant).order(order).vehicleAllocation(replacementAllocation)
+                        .user(newCleaner).role(cleanerRole)
                         .allocationStatus(StaffAllocationStatus.IN_TRANSIT)
-                        .allocatedBy(currentUser)
-                        .isActive(true)
-                        .build());
+                        .allocatedBy(currentUser).isActive(true).build());
+                closeVsa(newCleaner.getId(), tenantId, currentUser);
+                openVsa(tenant, replacementVehicle, newCleaner, currentUser);
             }
         } else {
             // No staff choice → auto-move D1+C1 to replacement vehicle
             for (OrderStaffAllocation sa : v1Staff) {
                 sa.setVehicleAllocation(replacementAllocation);
+                if (sa.getRole().getName() == RoleName.DRIVER) newDriver = sa.getUser();
+                else if (sa.getRole().getName() == RoleName.CLEANER) newCleaner = sa.getUser();
+                closeVsa(sa.getUser().getId(), tenantId, currentUser);
+                openVsa(tenant, replacementVehicle, sa.getUser(), currentUser);
             }
             staffAllocationRepository.saveAll(v1Staff);
         }
+
+        // Sync LR driver/cleaner
+        if (lrOpt.isPresent()) {
+            Lr lr = lrOpt.get();
+            lr.setDriver(newDriver);
+            lr.setCleaner(newCleaner);
+            lrRepository.save(lr);
+        }
+
+        // Sync denormalized currentDriver/currentCleaner on both vehicles
+        Vehicle originalVehicle = originalAllocation.getVehicle();
+        originalVehicle.setCurrentDriver(null);
+        originalVehicle.setCurrentCleaner(null);
+        vehicleRepository.save(originalVehicle);
+
+        replacementVehicle.setCurrentDriver(newDriver);
+        replacementVehicle.setCurrentCleaner(newCleaner);
 
         // Mark original allocation as BREAKDOWN + soft-delete
         originalAllocation.setAllocationStatus(VehicleAllocationStatus.BREAKDOWN);
@@ -561,6 +583,26 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         breakdown.setResolvedAt(TimeUtil.nowIst());
 
         return mapToResponse(breakdownRepository.save(breakdown));
+    }
+
+    // ── VSA history helpers ───────────────────────────────────────────────────
+
+    private void closeVsa(Long userId, Long tenantId, User actor) {
+        vehicleStaffAssignmentRepository
+                .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(userId, tenantId)
+                .ifPresent(vsa -> {
+                    vsa.setAssignedTo(TimeUtil.today());
+                    vsa.setUnassignedBy(actor);
+                    vsa.setUnassignedAt(LocalDateTime.now());
+                    vehicleStaffAssignmentRepository.save(vsa);
+                });
+    }
+
+    private void openVsa(Tenant tenant, Vehicle vehicle, User user, User actor) {
+        vehicleStaffAssignmentRepository.save(VehicleStaffAssignment.builder()
+                .tenant(tenant).vehicle(vehicle).user(user)
+                .assignedFrom(TimeUtil.today()).assignedBy(actor)
+                .build());
     }
 
     // ── mapper ────────────────────────────────────────────────────────────────
