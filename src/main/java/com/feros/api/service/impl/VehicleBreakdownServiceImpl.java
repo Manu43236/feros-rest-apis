@@ -4,6 +4,7 @@ import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.BreakdownRequest;
 import com.feros.api.dto.request.BreakdownReplaceRequest;
 import com.feros.api.dto.response.BreakdownResponse;
+import com.feros.api.dto.response.VehicleCurrentStaffResponse;
 import com.feros.api.entity.*;
 import com.feros.api.enums.*;
 import com.feros.api.exception.FerosException;
@@ -15,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,6 +33,9 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
     private final LrRepository lrRepository;
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
+    private final VehicleMeterReadingRepository vehicleMeterReadingRepository;
+    private final AttendanceRepository attendanceRepository;
+    private final RoleRepository roleRepository;
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -164,7 +169,6 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
             throw new FerosException("Breakdown is already resolved — no replacement needed", HttpStatus.BAD_REQUEST);
         }
 
-        // Validate replacement vehicle
         Vehicle replacementVehicle = vehicleRepository
                 .findByIdAndTenantIdAndIsActiveTrue(request.getReplacementVehicleId(), tenantId)
                 .orElseThrow(() -> new FerosException("Replacement vehicle not found", HttpStatus.NOT_FOUND));
@@ -186,11 +190,13 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
                     HttpStatus.CONFLICT);
         }
 
+        Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(tenantId).orElseThrow();
+        User currentUser = getCurrentUser();
         OrderVehicleAllocation originalAllocation = breakdown.getVehicleAllocation();
 
-        // Create replacement vehicle allocation (same weight — do NOT touch order.totalWeightFulfilled)
+        // Create replacement vehicle allocation
         OrderVehicleAllocation replacementAllocation = OrderVehicleAllocation.builder()
-                .tenant(tenantRepository.findByIdAndIsActiveTrue(tenantId).orElseThrow())
+                .tenant(tenant)
                 .order(order)
                 .vehicle(replacementVehicle)
                 .allocatedWeight(originalAllocation.getAllocatedWeight())
@@ -199,8 +205,8 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
                         request.getExpectedDeliveryDate() != null
                         ? request.getExpectedDeliveryDate()
                         : originalAllocation.getExpectedDeliveryDate())
-                .allocationStatus(VehicleAllocationStatus.IN_TRANSIT) // goods already moving
-                .allocatedBy(getCurrentUser())
+                .allocationStatus(VehicleAllocationStatus.IN_TRANSIT)
+                .allocatedBy(currentUser)
                 .remarks("Replacement for breakdown — " +
                         (request.getNotes() != null ? request.getNotes() : ""))
                 .isActive(true)
@@ -208,31 +214,100 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
 
         replacementAllocation = vehicleAllocationRepository.save(replacementAllocation);
 
-        // Reassign the LR to replacement allocation (same LR travels with goods)
+        // Move LR to replacement allocation + reset odometer baseline to V2's current reading
         Optional<Lr> lrOpt = lrRepository.findByVehicleAllocationId(originalAllocation.getId());
         if (lrOpt.isPresent()) {
             Lr lr = lrOpt.get();
             lr.setVehicleAllocation(replacementAllocation);
             lrRepository.save(lr);
+
+            // Soft-delete V1's TRIP_START so end-trip validation uses V2's ODR
+            vehicleMeterReadingRepository
+                    .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
+                            lr.getId(), MeterReadingType.TRIP_START)
+                    .ifPresent(r -> {
+                        r.setIsActive(false);
+                        vehicleMeterReadingRepository.save(r);
+                    });
+
+            // Create new TRIP_START for V2 at its current odometer reading
+            if (replacementVehicle.getCurrentOdometerReading() != null) {
+                vehicleMeterReadingRepository.save(VehicleMeterReading.builder()
+                        .tenant(tenant)
+                        .vehicle(replacementVehicle)
+                        .readingKm(replacementVehicle.getCurrentOdometerReading())
+                        .readingType(MeterReadingType.TRIP_START)
+                        .lr(lr)
+                        .recordedBy(currentUser)
+                        .recordedAt(TimeUtil.nowIst())
+                        .isActive(true)
+                        .build());
+            }
         }
 
-        // Handle staff
-        List<OrderStaffAllocation> staffList = staffAllocationRepository
+        // Staff handling
+        List<OrderStaffAllocation> v1Staff = staffAllocationRepository
                 .findByVehicleAllocationIdAndIsActiveTrue(originalAllocation.getId());
 
-        if (Boolean.TRUE.equals(request.getTransferStaff())) {
-            // Transfer driver + cleaner to replacement allocation
-            for (OrderStaffAllocation sa : staffList) {
-                sa.setVehicleAllocation(replacementAllocation);
-            }
-            staffAllocationRepository.saveAll(staffList);
-        } else {
-            // Cancel existing staff — admin will assign fresh
-            for (OrderStaffAllocation sa : staffList) {
+        if (request.getSelectedDriverId() != null) {
+            // Supervisor chose specific staff → cancel all from V1 + V2, assign selected
+            for (OrderStaffAllocation sa : v1Staff) {
                 sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
                 sa.setIsActive(false);
             }
-            staffAllocationRepository.saveAll(staffList);
+            staffAllocationRepository.saveAll(v1Staff);
+
+            // Cancel V2's current active staff if any
+            vehicleAllocationRepository.findCurrentActiveAllocationForVehicle(replacementVehicle.getId())
+                    .ifPresent(v2Alloc -> {
+                        List<OrderStaffAllocation> v2Staff = staffAllocationRepository
+                                .findByVehicleAllocationIdAndIsActiveTrue(v2Alloc.getId());
+                        for (OrderStaffAllocation sa : v2Staff) {
+                            sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
+                            sa.setIsActive(false);
+                        }
+                        staffAllocationRepository.saveAll(v2Staff);
+                    });
+
+            // Assign selected driver
+            User selectedDriver = userRepository.findById(request.getSelectedDriverId())
+                    .orElseThrow(() -> new FerosException("Selected driver not found", HttpStatus.NOT_FOUND));
+            Role driverRole = roleRepository.findByName(RoleName.DRIVER)
+                    .orElseThrow(() -> new FerosException("Driver role not found", HttpStatus.INTERNAL_SERVER_ERROR));
+            staffAllocationRepository.save(OrderStaffAllocation.builder()
+                    .tenant(tenant)
+                    .order(order)
+                    .vehicleAllocation(replacementAllocation)
+                    .user(selectedDriver)
+                    .role(driverRole)
+                    .allocationStatus(StaffAllocationStatus.IN_TRANSIT)
+                    .allocatedBy(currentUser)
+                    .isActive(true)
+                    .build());
+
+            // Assign selected cleaner (optional)
+            if (request.getSelectedCleanerId() != null) {
+                User selectedCleaner = userRepository.findById(request.getSelectedCleanerId())
+                        .orElseThrow(() -> new FerosException("Selected cleaner not found", HttpStatus.NOT_FOUND));
+                Role cleanerRole = roleRepository.findByName(RoleName.CLEANER)
+                        .orElseThrow(() -> new FerosException("Cleaner role not found", HttpStatus.INTERNAL_SERVER_ERROR));
+                staffAllocationRepository.save(OrderStaffAllocation.builder()
+                        .tenant(tenant)
+                        .order(order)
+                        .vehicleAllocation(replacementAllocation)
+                        .user(selectedCleaner)
+                        .role(cleanerRole)
+                        .allocationStatus(StaffAllocationStatus.IN_TRANSIT)
+                        .allocatedBy(currentUser)
+                        .isActive(true)
+                        .build());
+            }
+        } else {
+            // No staff choice → auto-move D1+C1 to replacement vehicle
+            for (OrderStaffAllocation sa : v1Staff) {
+                sa.setVehicleAllocation(replacementAllocation);
+            }
+            staffAllocationRepository.saveAll(v1Staff);
         }
 
         // Mark original allocation as BREAKDOWN + soft-delete
@@ -240,15 +315,63 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         originalAllocation.setIsActive(false);
         vehicleAllocationRepository.save(originalAllocation);
 
-        // Set replacement vehicle status → ASSIGNED (then ON_TRIP when LR dispatched)
         setVehicleStatus(replacementVehicle, VehicleStatusType.ASSIGNED);
 
-        // Update breakdown record — VEHICLE_REPLACED means trip handed off,
-        // NOT that the vehicle is repaired. resolvedAt stays null until service man resolves it.
         breakdown.setStatus(BreakdownStatus.VEHICLE_REPLACED);
         breakdown.setReplacementVehicleAllocation(replacementAllocation);
 
         return mapToResponse(breakdownRepository.save(breakdown));
+    }
+
+    // ── get replacement vehicle's current staff (for the replace dialog) ──────
+
+    @Override
+    public VehicleCurrentStaffResponse getReplacementVehicleStaff(Long vehicleId) {
+        Long tenantId = getTenantId();
+        LocalDate today = LocalDate.now();
+
+        // Prefer an active allocation (ALLOCATED / LR_CREATED); fall back to most recent
+        OrderVehicleAllocation alloc = vehicleAllocationRepository
+                .findCurrentActiveAllocationForVehicle(vehicleId)
+                .orElseGet(() -> {
+                    List<OrderVehicleAllocation> history = vehicleAllocationRepository
+                            .findByVehicleIdAndTenantIdOrderByCreatedAtDesc(vehicleId, tenantId);
+                    return history.isEmpty() ? null : history.get(0);
+                });
+
+        if (alloc == null) {
+            return VehicleCurrentStaffResponse.builder().build();
+        }
+
+        List<OrderStaffAllocation> staffList = staffAllocationRepository
+                .findByVehicleAllocationIdAndIsActiveTrue(alloc.getId());
+
+        VehicleCurrentStaffResponse.StaffMember driverMember = null;
+        VehicleCurrentStaffResponse.StaffMember cleanerMember = null;
+
+        for (OrderStaffAllocation sa : staffList) {
+            boolean hasAttendance = attendanceRepository
+                    .existsByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
+                            sa.getUser().getId(), tenantId, today);
+
+            VehicleCurrentStaffResponse.StaffMember member = VehicleCurrentStaffResponse.StaffMember.builder()
+                    .id(sa.getUser().getId())
+                    .name(sa.getUser().getName())
+                    .phone(sa.getUser().getPhone())
+                    .hasAttendanceToday(hasAttendance)
+                    .build();
+
+            if (sa.getRole().getName() == RoleName.DRIVER) {
+                driverMember = member;
+            } else if (sa.getRole().getName() == RoleName.CLEANER) {
+                cleanerMember = member;
+            }
+        }
+
+        return VehicleCurrentStaffResponse.builder()
+                .driver(driverMember)
+                .cleaner(cleanerMember)
+                .build();
     }
 
     // ── resolve breakdown (repaired on road) ─────────────────────────────────

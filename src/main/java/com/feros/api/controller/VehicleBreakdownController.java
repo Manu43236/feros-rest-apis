@@ -4,6 +4,7 @@ import com.feros.api.dto.request.BreakdownRequest;
 import com.feros.api.dto.request.BreakdownReplaceRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.BreakdownResponse;
+import com.feros.api.dto.response.VehicleCurrentStaffResponse;
 import com.feros.api.service.VehicleBreakdownService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -90,6 +91,15 @@ public class VehicleBreakdownController {
                 ? breakdownService.getBreakdownHistoryByVehicle(vehicleId)
                 : breakdownService.getAllBreakdowns();
         return ResponseEntity.ok(ApiResponse.success("Breakdown history fetched", data));
+    }
+
+    // Get V2's current staff for the replace-vehicle dialog
+    @GetMapping("/vehicles/{vehicleId}/current-staff")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    public ResponseEntity<ApiResponse<VehicleCurrentStaffResponse>> getVehicleCurrentStaff(
+            @PathVariable Long vehicleId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Current staff fetched", breakdownService.getReplacementVehicleStaff(vehicleId)));
     }
 
     // Standalone — mark available vehicle as BREAKDOWN (not on any order)

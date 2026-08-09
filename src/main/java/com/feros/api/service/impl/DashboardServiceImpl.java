@@ -235,6 +235,10 @@ public class DashboardServiceImpl implements DashboardService {
                                         .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
                                                 lr.getId(), MeterReadingType.TRIP_START)
                                         .map(VehicleMeterReading::getReadingKm).orElse(null))
+                                .startOdometerRecordedAt(vehicleMeterReadingRepository
+                                        .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
+                                                lr.getId(), MeterReadingType.TRIP_START)
+                                        .map(VehicleMeterReading::getRecordedAt).orElse(null))
                                 .loadedWeight(lr.getLoadedWeight())
                                 .expectedLoadDate(lr.getVehicleAllocation().getExpectedLoadDate())
                                 .expectedDeliveryDate(lr.getVehicleAllocation().getExpectedDeliveryDate())

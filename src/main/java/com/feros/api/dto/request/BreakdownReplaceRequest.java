@@ -15,10 +15,10 @@ public class BreakdownReplaceRequest {
 
     private LocalDate expectedDeliveryDate;
 
-    // true = transfer existing driver+cleaner to replacement vehicle
-    // false = cancel existing staff, admin assigns manually
-    @NotNull(message = "transferStaff flag is required")
-    private Boolean transferStaff;
+    // null = auto-move existing D1+C1 to replacement vehicle
+    // provided = supervisor chose specific staff; unselected staff are freed
+    private Long selectedDriverId;
+    private Long selectedCleanerId;
 
     private String notes;
 }
