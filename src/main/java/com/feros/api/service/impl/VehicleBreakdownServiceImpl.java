@@ -262,8 +262,8 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         if (replacementVehicle.getCurrentCleaner() != null) {
             closeVsa(replacementVehicle.getCurrentCleaner().getId(), tenantId, currentUser);
         }
-        vehicleAllocationRepository.findCurrentActiveAllocationForVehicle(replacementVehicle.getId())
-                .ifPresent(v2Alloc -> {
+        vehicleAllocationRepository.findCurrentActiveAllocationsForVehicle(replacementVehicle.getId())
+                .stream().findFirst().ifPresent(v2Alloc -> {
                     List<OrderStaffAllocation> v2Staff = staffAllocationRepository
                             .findByVehicleAllocationIdAndIsActiveTrue(v2Alloc.getId());
                     for (OrderStaffAllocation sa : v2Staff) {
@@ -361,7 +361,8 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
 
         // Prefer an active allocation (ALLOCATED / LR_CREATED); fall back to most recent
         OrderVehicleAllocation alloc = vehicleAllocationRepository
-                .findCurrentActiveAllocationForVehicle(vehicleId)
+                .findCurrentActiveAllocationsForVehicle(vehicleId)
+                .stream().findFirst()
                 .orElseGet(() -> {
                     List<OrderVehicleAllocation> history = vehicleAllocationRepository
                             .findByVehicleIdAndTenantIdOrderByCreatedAtDesc(vehicleId, tenantId);
@@ -531,7 +532,8 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
                 (vehicle.getCurrentStatus().getStatusType() == VehicleStatusType.ASSIGNED ||
                  vehicle.getCurrentStatus().getStatusType() == VehicleStatusType.ON_TRIP)) {
             OrderVehicleAllocation allocation = vehicleAllocationRepository
-                    .findCurrentActiveAllocationForVehicle(vehicleId)
+                    .findCurrentActiveAllocationsForVehicle(vehicleId)
+                    .stream().findFirst()
                     .orElseThrow(() -> new FerosException(
                             "Vehicle is currently " + vehicle.getCurrentStatus().getName() +
                             " but no active allocation was found — please contact admin",
