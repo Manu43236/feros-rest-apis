@@ -254,8 +254,28 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         User newDriver = null;
         User newCleaner = null;
 
+        // UNASSIGN FIRST: close VSAs for anyone currently on V2 (available or active)
+        // This covers both denormalized currentDriver and any active-allocation staff
+        if (replacementVehicle.getCurrentDriver() != null) {
+            closeVsa(replacementVehicle.getCurrentDriver().getId(), tenantId, currentUser);
+        }
+        if (replacementVehicle.getCurrentCleaner() != null) {
+            closeVsa(replacementVehicle.getCurrentCleaner().getId(), tenantId, currentUser);
+        }
+        vehicleAllocationRepository.findCurrentActiveAllocationForVehicle(replacementVehicle.getId())
+                .ifPresent(v2Alloc -> {
+                    List<OrderStaffAllocation> v2Staff = staffAllocationRepository
+                            .findByVehicleAllocationIdAndIsActiveTrue(v2Alloc.getId());
+                    for (OrderStaffAllocation sa : v2Staff) {
+                        sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
+                        sa.setIsActive(false);
+                        closeVsa(sa.getUser().getId(), tenantId, currentUser);
+                    }
+                    staffAllocationRepository.saveAll(v2Staff);
+                });
+
         if (request.getSelectedDriverId() != null) {
-            // Supervisor chose specific staff → cancel all from V1 + V2, assign selected
+            // Supervisor chose specific staff → cancel all V1 staff, then assign selected
             for (OrderStaffAllocation sa : v1Staff) {
                 sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
                 sa.setIsActive(false);
@@ -263,20 +283,7 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
             }
             staffAllocationRepository.saveAll(v1Staff);
 
-            // Cancel V2's current active staff if any + close their VSA
-            vehicleAllocationRepository.findCurrentActiveAllocationForVehicle(replacementVehicle.getId())
-                    .ifPresent(v2Alloc -> {
-                        List<OrderStaffAllocation> v2Staff = staffAllocationRepository
-                                .findByVehicleAllocationIdAndIsActiveTrue(v2Alloc.getId());
-                        for (OrderStaffAllocation sa : v2Staff) {
-                            sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
-                            sa.setIsActive(false);
-                            closeVsa(sa.getUser().getId(), tenantId, currentUser);
-                        }
-                        staffAllocationRepository.saveAll(v2Staff);
-                    });
-
-            // Assign selected driver
+            // ASSIGN: selected driver
             newDriver = userRepository.findById(request.getSelectedDriverId())
                     .orElseThrow(() -> new FerosException("Selected driver not found", HttpStatus.NOT_FOUND));
             Role driverRole = roleRepository.findByName(RoleName.DRIVER)
@@ -289,7 +296,7 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
             closeVsa(newDriver.getId(), tenantId, currentUser);
             openVsa(tenant, replacementVehicle, newDriver, currentUser);
 
-            // Assign selected cleaner (optional)
+            // ASSIGN: selected cleaner (optional)
             if (request.getSelectedCleanerId() != null) {
                 newCleaner = userRepository.findById(request.getSelectedCleanerId())
                         .orElseThrow(() -> new FerosException("Selected cleaner not found", HttpStatus.NOT_FOUND));
@@ -304,7 +311,7 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
                 openVsa(tenant, replacementVehicle, newCleaner, currentUser);
             }
         } else {
-            // No staff choice → auto-move D1+C1 to replacement vehicle
+            // Auto-move: UNASSIGN V1 staff from V1, then ASSIGN them to V2
             for (OrderStaffAllocation sa : v1Staff) {
                 sa.setVehicleAllocation(replacementAllocation);
                 if (sa.getRole().getName() == RoleName.DRIVER) newDriver = sa.getUser();
@@ -321,14 +328,6 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
             lr.setDriver(newDriver);
             lr.setCleaner(newCleaner);
             lrRepository.save(lr);
-        }
-
-        // Close open VSA for whoever was previously denormalized on V2 (e.g. Sai Kumar on an available vehicle)
-        if (replacementVehicle.getCurrentDriver() != null) {
-            closeVsa(replacementVehicle.getCurrentDriver().getId(), tenantId, currentUser);
-        }
-        if (replacementVehicle.getCurrentCleaner() != null) {
-            closeVsa(replacementVehicle.getCurrentCleaner().getId(), tenantId, currentUser);
         }
 
         // Sync denormalized currentDriver/currentCleaner on both vehicles
