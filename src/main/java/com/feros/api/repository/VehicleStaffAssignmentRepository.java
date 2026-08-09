@@ -15,6 +15,10 @@ public interface VehicleStaffAssignmentRepository extends JpaRepository<VehicleS
     Optional<VehicleStaffAssignment> findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(
             Long userId, Long tenantId);
 
+    // All open assignments for a user — use in closeVsa to handle duplicate open records safely
+    List<VehicleStaffAssignment> findAllByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(
+            Long userId, Long tenantId);
+
     // All assignments for a user that overlap with the given date range (for payroll)
     @Query("""
             SELECT a FROM VehicleStaffAssignment a

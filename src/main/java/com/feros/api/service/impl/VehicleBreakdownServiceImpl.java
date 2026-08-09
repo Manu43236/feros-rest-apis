@@ -596,8 +596,8 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
 
     private void closeVsa(Long userId, Long tenantId, User actor) {
         vehicleStaffAssignmentRepository
-                .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(userId, tenantId)
-                .ifPresent(vsa -> {
+                .findAllByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(userId, tenantId)
+                .forEach(vsa -> {
                     vsa.setAssignedTo(TimeUtil.today());
                     vsa.setUnassignedBy(actor);
                     vsa.setUnassignedAt(LocalDateTime.now());
