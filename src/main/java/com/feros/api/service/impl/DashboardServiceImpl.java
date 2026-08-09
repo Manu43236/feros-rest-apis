@@ -227,11 +227,18 @@ public class DashboardServiceImpl implements DashboardService {
                                 .toCity(lr.getOrder().getDestinationCity() != null
                                         ? lr.getOrder().getDestinationCity().getName() : "—")
                                 .vehicleNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
-                                .currentVehicleOdometer(lr.getVehicleAllocation().getVehicle().getCurrentOdometerReading())
+                                .currentVehicleOdometer(vehicleMeterReadingRepository
+                                        .findLatestTripEndByVehicle(lr.getVehicleAllocation().getVehicle().getId())
+                                        .stream().findFirst().map(VehicleMeterReading::getReadingKm)
+                                        .orElse(lr.getVehicleAllocation().getVehicle().getCurrentOdometerReading()))
                                 .startOdometer(vehicleMeterReadingRepository
                                         .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
                                                 lr.getId(), MeterReadingType.TRIP_START)
                                         .map(VehicleMeterReading::getReadingKm).orElse(null))
+                                .startOdometerRecordedAt(vehicleMeterReadingRepository
+                                        .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(
+                                                lr.getId(), MeterReadingType.TRIP_START)
+                                        .map(VehicleMeterReading::getRecordedAt).orElse(null))
                                 .loadedWeight(lr.getLoadedWeight())
                                 .expectedLoadDate(lr.getVehicleAllocation().getExpectedLoadDate())
                                 .expectedDeliveryDate(lr.getVehicleAllocation().getExpectedDeliveryDate())
@@ -261,7 +268,10 @@ public class DashboardServiceImpl implements DashboardService {
                         .toCity(lr.getOrder().getDestinationCity() != null
                                 ? lr.getOrder().getDestinationCity().getName() : "—")
                         .vehicleNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
-                        .currentVehicleOdometer(lr.getVehicleAllocation().getVehicle().getCurrentOdometerReading())
+                        .currentVehicleOdometer(vehicleMeterReadingRepository
+                                        .findLatestTripEndByVehicle(lr.getVehicleAllocation().getVehicle().getId())
+                                        .stream().findFirst().map(VehicleMeterReading::getReadingKm)
+                                        .orElse(lr.getVehicleAllocation().getVehicle().getCurrentOdometerReading()))
                         .expectedLoadDate(lr.getVehicleAllocation().getExpectedLoadDate())
                         .expectedDeliveryDate(lr.getVehicleAllocation().getExpectedDeliveryDate())
                         .build())

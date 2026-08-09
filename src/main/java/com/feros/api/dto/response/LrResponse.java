@@ -50,7 +50,9 @@ public class LrResponse {
 
     private java.math.BigDecimal currentVehicleOdometer;
     private java.math.BigDecimal startOdometer;
+    private LocalDateTime startOdometerRecordedAt;
     private java.math.BigDecimal endOdometer;
+    private LocalDateTime endOdometerRecordedAt;
 
     private String ewayBillNumber;
     private LocalDate ewayBillDate;

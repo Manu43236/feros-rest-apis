@@ -1258,4 +1258,12 @@ public class VehicleServiceImpl implements VehicleService {
                 .isActive(true)
                 .build();
     }
+
+    @Override
+    public void resetOdometer(Long vehicleId, java.math.BigDecimal km) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+        vehicle.setCurrentOdometerReading(km);
+        vehicleRepository.save(vehicle);
+    }
 }

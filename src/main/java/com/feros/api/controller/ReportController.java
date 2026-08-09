@@ -279,7 +279,7 @@ public class ReportController {
         String[] headers = {"LR No.", "LR Date", "Order No.", "Client", "Vehicle", "Driver", "Cleaner",
                 "From City", "From State", "To City", "To State", "Material",
                 "Alloc. Wt (kg)", "Loaded Wt (kg)", "Delivered Wt (kg)", "Variance (kg)", "Overloaded",
-                "Loaded At", "Delivered At", "E-Way Bill No.", "E-Way Date", "E-Way Valid Upto", "Status", "Remarks"};
+                "Loaded At", "Delivered At", "E-Way Bill No.", "E-Way Date", "E-Way Valid Upto", "Invoiced", "Status", "Remarks"};
         List<String[]> data = rows.stream().map(r -> new String[]{
                 r.getLrNumber(), r.getLrDate().toString(), r.getOrderNumber(), r.getClientName(),
                 r.getVehicleRegistrationNumber(), r.getDriverName(), r.getCleanerName(),
@@ -290,6 +290,7 @@ public class ReportController {
                 r.getDeliveredAt() != null ? r.getDeliveredAt().toString() : "—",
                 safe(r.getEwayBillNumber()), r.getEwayBillDate() != null ? r.getEwayBillDate().toString() : "—",
                 r.getEwayBillValidUpto() != null ? r.getEwayBillValidUpto().toString() : "—",
+                Boolean.TRUE.equals(r.getIsInvoiced()) ? "Yes" : "No",
                 r.getLrStatus(), safe(r.getRemarks())
         }).toList();
         return export("lr-register-" + startDate + "-" + endDate,

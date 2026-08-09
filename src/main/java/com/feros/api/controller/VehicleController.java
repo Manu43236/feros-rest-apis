@@ -159,4 +159,18 @@ public class VehicleController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Staff assignment history fetched", vehicleService.getAllStaffAssignmentHistory()));
     }
+
+    @PatchMapping("/{id}/odometer")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> resetOdometer(
+            @PathVariable Long id, @RequestBody ResetOdometerRequest request) {
+        vehicleService.resetOdometer(id, request.getKm());
+        return ResponseEntity.ok(ApiResponse.success("Odometer reset successfully", null));
+    }
+
+    @Getter
+    @Setter
+    public static class ResetOdometerRequest {
+        private java.math.BigDecimal km;
+    }
 }

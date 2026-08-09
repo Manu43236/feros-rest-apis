@@ -3,6 +3,7 @@ package com.feros.api.service;
 import com.feros.api.dto.request.BreakdownRequest;
 import com.feros.api.dto.request.BreakdownReplaceRequest;
 import com.feros.api.dto.response.BreakdownResponse;
+import com.feros.api.dto.response.VehicleCurrentStaffResponse;
 
 import java.util.List;
 
@@ -37,4 +38,7 @@ public interface VehicleBreakdownService {
 
     // Standalone — resolve a standalone breakdown, restore vehicle to AVAILABLE
     BreakdownResponse resolveStandaloneBreakdown(Long vehicleId, Long breakdownId);
+
+    // Return V2's most recent staff with today's attendance status (for the replace dialog)
+    VehicleCurrentStaffResponse getReplacementVehicleStaff(Long vehicleId);
 }

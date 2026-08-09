@@ -56,6 +56,7 @@ public class DriverDashboardResponse {
         private String vehicleNumber;
         private java.math.BigDecimal currentVehicleOdometer;
         private java.math.BigDecimal startOdometer;
+        private java.time.LocalDateTime startOdometerRecordedAt;
         private java.math.BigDecimal loadedWeight;
         private java.time.LocalDate expectedLoadDate;
         private java.time.LocalDate expectedDeliveryDate;
