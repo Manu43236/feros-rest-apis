@@ -44,6 +44,7 @@ public class TripExpenseResponse {
     private String settledByName;
     private LocalDateTime settledAt;
 
+    private String driverPhone;
     private String driverBankName;
     private String driverAccountNumber;
     private String driverIfscCode;

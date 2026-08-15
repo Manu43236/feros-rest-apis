@@ -145,6 +145,7 @@ public class TripExpenseServiceImpl implements TripExpenseService {
                 .lrId(lr.getId())
                 .lrNumber(lr.getLrNumber())
                 .driverName(driver != null ? driver.getName() : null)
+                .driverPhone(driver != null ? driver.getPhone() : null)
                 .driverBankName(driverProfile != null ? driverProfile.getBankName() : null)
                 .driverAccountNumber(driverProfile != null ? driverProfile.getAccountNumber() : null)
                 .driverIfscCode(driverProfile != null ? driverProfile.getIfscCode() : null)
