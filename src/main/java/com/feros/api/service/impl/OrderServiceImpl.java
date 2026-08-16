@@ -796,10 +796,30 @@ public class OrderServiceImpl implements OrderService {
         }
 
         String vehicleReg = vehicleAllocation.getVehicle().getRegistrationNumber();
-        String destination = order.getDestinationCity().getName();
-        notificationService.sendToUser(saved.getTenant(), user, NotificationType.TRIP_ASSIGNED,
-                "Trip Assigned",
-                "You have been assigned to vehicle " + vehicleReg + " for trip to " + destination + " (Order: " + order.getOrderNumber() + ")");
+        String src = order.getSourceCity().getName();
+        String dest = order.getDestinationCity().getName();
+        String orderNum = order.getOrderNumber();
+        RoleName assignedRole = role.getName();
+
+        if (assignedRole == RoleName.DRIVER) {
+            java.util.Optional<com.feros.api.entity.Lr> lrOpt =
+                    lrRepository.findByVehicleAllocationId(request.getVehicleAllocationId());
+            if (lrOpt.isPresent()) {
+                notificationService.sendToUser(saved.getTenant(), user, NotificationType.TRIP_ASSIGNED,
+                        "Trip Ready — " + vehicleReg,
+                        "Vehicle " + vehicleReg + " | Order " + orderNum + " | LR " + lrOpt.get().getLrNumber()
+                                + " from " + src + " to " + dest + " — you can start the trip");
+            } else {
+                notificationService.sendToUser(saved.getTenant(), user, NotificationType.TRIP_ASSIGNED,
+                        "Trip Assigned — " + vehicleReg,
+                        "Vehicle " + vehicleReg + " | Order " + orderNum + " from " + src + " to " + dest
+                                + " — LR will be created shortly");
+            }
+        } else if (assignedRole == RoleName.CLEANER) {
+            notificationService.sendToUser(saved.getTenant(), user, NotificationType.TRIP_ASSIGNED,
+                    "Trip Assigned — " + vehicleReg,
+                    "Vehicle " + vehicleReg + " | Order " + orderNum + " from " + src + " to " + dest);
+        }
 
         return mapToStaffAllocationResponse(saved);
     }

@@ -138,7 +138,24 @@ public class LrServiceImpl implements LrService {
         allocation.setAllocationStatus(VehicleAllocationStatus.LR_CREATED);
         vehicleAllocationRepository.save(allocation);
 
-        return mapToLrResponse(lrRepository.save(lr));
+        Lr savedLr = lrRepository.save(lr);
+
+        // Notify driver if already assigned — LR is ready, they can start the trip
+        staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(allocation.getId())
+                .stream()
+                .filter(sa -> sa.getRole().getName() == RoleName.DRIVER
+                        && sa.getAllocationStatus() == com.feros.api.enums.StaffAllocationStatus.ALLOCATED)
+                .findFirst()
+                .ifPresent(sa -> notificationService.sendToUser(savedLr.getTenant(), sa.getUser(),
+                        NotificationType.TRIP_ASSIGNED,
+                        "LR Ready — " + vehicle.getRegistrationNumber(),
+                        "LR " + savedLr.getLrNumber() + " | Order " + order.getOrderNumber()
+                                + " | Vehicle " + vehicle.getRegistrationNumber()
+                                + " from " + order.getSourceCity().getName()
+                                + " to " + order.getDestinationCity().getName()
+                                + " — you can start the trip"));
+
+        return mapToLrResponse(savedLr);
     }
 
     @Override
