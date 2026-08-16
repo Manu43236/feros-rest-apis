@@ -162,7 +162,7 @@ public class OrderServiceImpl implements OrderService {
                     .orElseThrow(() -> new FerosException("Route not found", HttpStatus.NOT_FOUND)));
 
         Order savedOrder = orderRepository.save(order);
-        notificationService.sendToRoles(savedOrder.getTenant(), List.of(RoleName.SUPERVISOR, RoleName.ADMIN),
+        notificationService.sendToRoles(savedOrder.getTenant(), List.of(RoleName.SUPERVISOR, RoleName.OFFICE_STAFF, RoleName.ADMIN),
                 NotificationType.ORDER_CREATED,
                 "New Order Created",
                 "Order " + savedOrder.getOrderNumber() + " from " + savedOrder.getSourceCity().getName() + " to " + savedOrder.getDestinationCity().getName() + " is ready for vehicle assignment.",

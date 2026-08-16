@@ -12,10 +12,13 @@ import com.feros.api.entity.*;
 import com.feros.api.enums.BillingOn;
 import com.feros.api.enums.FreightRateType;
 import com.feros.api.enums.InvoiceStatus;
+import com.feros.api.enums.NotificationType;
+import com.feros.api.enums.RoleName;
 import com.feros.api.exception.FerosException;
 import com.feros.api.entity.master.TenantSettings;
 import com.feros.api.repository.*;
 import com.feros.api.service.InvoiceService;
+import com.feros.api.service.NotificationService;
 import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.S3Service;
 import com.feros.api.util.NumberUtil;
@@ -33,6 +36,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +54,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final TenantSettingsRepository tenantSettingsRepository;
     private final S3Service s3Service;
     private final NumberGeneratorService numberGenerator;
+    private final NotificationService notificationService;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -325,6 +330,17 @@ public class InvoiceServiceImpl implements InvoiceService {
         }
 
         invoiceRepository.save(invoice);
+
+        String clientName = invoice.getClient().getClientName();
+        String amountStr = "₹" + String.format("%,.0f", request.getAmount());
+        String balanceStr = newBalanceDue.compareTo(BigDecimal.ZERO) <= 0
+                ? "Fully paid." : "Balance: ₹" + String.format("%,.0f", newBalanceDue) + " remaining.";
+        notificationService.sendToRoles(invoice.getTenant(),
+                List.of(RoleName.ADMIN, RoleName.OFFICE_STAFF),
+                NotificationType.INVOICE_PAYMENT_RECEIVED,
+                "Payment Received — " + clientName,
+                invoice.getInvoiceNumber() + " | " + clientName + " | " + amountStr + " received. " + balanceStr,
+                Map.of("type", "INVOICE_PAYMENT"));
 
         return mapToPaymentResponse(payment);
     }

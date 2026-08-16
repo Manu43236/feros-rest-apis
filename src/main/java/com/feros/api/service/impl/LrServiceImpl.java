@@ -453,10 +453,18 @@ public class LrServiceImpl implements LrService {
 
                 if (allAllocationsDelivered && allWeightAllocated) {
                     order.setOrderStatus(OrderStatus.DELIVERED);
+                    orderRepository.save(order);
+                    notificationService.sendToRoles(lr.getTenant(),
+                            List.of(RoleName.OFFICE_STAFF, RoleName.ADMIN),
+                            NotificationType.TRIP_COMPLETED,
+                            "Order Fully Delivered — Ready to Invoice",
+                            "Order " + order.getOrderNumber() + " | " + order.getClient().getClientName()
+                                    + " | All vehicles delivered. Generate invoice now.",
+                            Map.of("type", "ORDER_DELIVERED", "orderId", String.valueOf(order.getId())));
                 } else {
                     order.setOrderStatus(OrderStatus.PARTIALLY_DELIVERED);
+                    orderRepository.save(order);
                 }
-                orderRepository.save(order);
             }
 
             vehicleAllocationRepository.save(allocation);

@@ -276,14 +276,13 @@ public class TripExpenseServiceImpl implements TripExpenseService {
         expense.setRejectionReason(null);
         tripExpenseRepository.save(expense);
 
-        // Notify admin
         notificationService.sendToRoles(
                 tenant,
-                List.of(RoleName.ADMIN),
+                List.of(RoleName.ADMIN, RoleName.OFFICE_STAFF),
                 NotificationType.TRIP_EXPENSE_SUBMITTED,
                 "Trip Expense Submitted",
-                "Expense sheet for LR " + expense.getLr().getLrNumber() + " has been submitted for review."
-        );
+                "Expense sheet for LR " + expense.getLr().getLrNumber() + " submitted by "
+                        + expense.getLr().getDriver().getName() + ". Review and approve.");
 
         return toResponse(expense);
     }
