@@ -36,6 +36,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.List;
 
 @Service
@@ -291,6 +292,9 @@ public class LrServiceImpl implements LrService {
 
                 String tripStartVehicleReg = allocation.getVehicle().getRegistrationNumber();
                 String tripStartDest = order.getDestinationCity().getName();
+                String tripStartDriverName = lr.getStartedBy() != null ? lr.getStartedBy().getName() : "Driver";
+                String tripStartTime = TimeUtil.nowIst().format(java.time.format.DateTimeFormatter.ofPattern("dd MMM hh:mm a"));
+                String tripStartOdometer = request.getStartOdometer() != null ? request.getStartOdometer().toPlainString() : "-";
                 for (OrderStaffAllocation sa : staffAllocations) {
                     if (sa.getAllocationStatus() == StaffAllocationStatus.IN_TRANSIT) {
                         notificationService.sendToUser(lr.getTenant(), sa.getUser(), NotificationType.TRIP_STARTED,
@@ -298,10 +302,15 @@ public class LrServiceImpl implements LrService {
                                 "Your trip to " + tripStartDest + " has started. Vehicle: " + tripStartVehicleReg + " (LR: " + lr.getLrNumber() + ")");
                     }
                 }
-                notificationService.sendToRoles(lr.getTenant(), List.of(RoleName.OFFICE_STAFF, RoleName.ADMIN),
+                notificationService.sendToRoles(lr.getTenant(),
+                        List.of(RoleName.SUPERVISOR, RoleName.OFFICE_STAFF, RoleName.ADMIN),
                         NotificationType.TRIP_STARTED,
-                        "Trip Started",
-                        "LR " + lr.getLrNumber() + " to " + tripStartDest + " has started. Vehicle: " + tripStartVehicleReg);
+                        "Trip Started — " + tripStartVehicleReg,
+                        tripStartVehicleReg + " | Order " + order.getOrderNumber() + " | LR " + lr.getLrNumber()
+                                + " trip started by " + tripStartDriverName
+                                + " at " + tripStartTime
+                                + " | Odometer: " + tripStartOdometer + " km",
+                        Map.of("type", "NEW_ORDER", "orderId", String.valueOf(order.getId())));
 
             } else if (request.getLrStatus() == LrStatus.CANCELLED) {
                 // Revert allocation back to ALLOCATED — vehicle is still assigned to order, just no LR
@@ -403,15 +412,23 @@ public class LrServiceImpl implements LrService {
 
                 String tripEndVehicleReg = allocation.getVehicle().getRegistrationNumber();
                 String tripEndDest = order.getDestinationCity().getName();
+                String tripEndDriverName = lr.getCompletedBy() != null ? lr.getCompletedBy().getName() : "Driver";
+                String tripEndTime = TimeUtil.nowIst().format(java.time.format.DateTimeFormatter.ofPattern("dd MMM hh:mm a"));
+                String tripEndOdometer = request.getEndOdometer() != null ? request.getEndOdometer().toPlainString() : "-";
                 for (OrderStaffAllocation sa : staffAllocations) {
                     notificationService.sendToUser(lr.getTenant(), sa.getUser(), NotificationType.TRIP_COMPLETED,
                             "Trip Completed",
                             "Your trip to " + tripEndDest + " is complete. Vehicle: " + tripEndVehicleReg + " (LR: " + lr.getLrNumber() + ")");
                 }
-                notificationService.sendToRoles(lr.getTenant(), List.of(RoleName.OFFICE_STAFF, RoleName.ADMIN),
+                notificationService.sendToRoles(lr.getTenant(),
+                        List.of(RoleName.SUPERVISOR, RoleName.OFFICE_STAFF, RoleName.ADMIN),
                         NotificationType.TRIP_COMPLETED,
-                        "Trip Completed",
-                        "LR " + lr.getLrNumber() + " to " + tripEndDest + " has been delivered. Ready for invoicing.");
+                        "Trip Ended — " + tripEndVehicleReg,
+                        tripEndVehicleReg + " | Order " + order.getOrderNumber() + " | LR " + lr.getLrNumber()
+                                + " trip ended by " + tripEndDriverName
+                                + " at " + tripEndTime
+                                + " | Odometer: " + tripEndOdometer + " km",
+                        Map.of("type", "NEW_ORDER", "orderId", String.valueOf(order.getId())));
 
                 // Set actual delivery date and free the vehicle regardless
                 allocation.setActualDeliveryDate(TimeUtil.today());
