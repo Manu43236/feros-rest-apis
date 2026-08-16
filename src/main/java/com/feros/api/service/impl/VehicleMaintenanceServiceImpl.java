@@ -342,6 +342,12 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
             vehicleServiceRepository.save(vs);
         }
 
+        notificationService.sendToUser(vs.getTenant(), mechanic,
+                com.feros.api.enums.NotificationType.TRIP_ASSIGNED,
+                "Service Task Assigned — " + vs.getVehicle().getRegistrationNumber(),
+                "Task: " + task.getTaskType().getName() + " | Vehicle: " + vs.getVehicle().getRegistrationNumber()
+                        + " — assigned to you. Open the app to start.");
+
         return mapToResponse(vehicleServiceRepository.findById(vs.getId()).orElse(vs));
     }
 
