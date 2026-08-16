@@ -7,6 +7,7 @@ import com.feros.api.entity.User;
 import com.feros.api.enums.NotificationType;
 
 import java.util.List;
+import java.util.Map;
 
 public interface NotificationService {
     List<NotificationResponse> getMyNotifications();
@@ -16,4 +17,5 @@ public interface NotificationService {
     void sendToTenant(Tenant tenant, NotificationType type, String title, String message);
     void sendToUser(Tenant tenant, User user, NotificationType type, String title, String message);
     void sendToRoles(Tenant tenant, List<com.feros.api.enums.RoleName> roles, NotificationType type, String title, String message);
+    void sendToRoles(Tenant tenant, List<com.feros.api.enums.RoleName> roles, NotificationType type, String title, String message, Map<String, String> data);
 }

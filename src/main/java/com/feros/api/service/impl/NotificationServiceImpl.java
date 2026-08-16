@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -92,6 +93,11 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public void sendToRoles(Tenant tenant, List<RoleName> roles, NotificationType type, String title, String message) {
+        sendToRoles(tenant, roles, type, title, message, null);
+    }
+
+    @Override
+    public void sendToRoles(Tenant tenant, List<RoleName> roles, NotificationType type, String title, String message, Map<String, String> data) {
         List<User> users = userRepository.findByTenantIdAndRoleNames(tenant.getId(), roles);
         List<Long> userIds = users.stream().map(User::getId).toList();
         for (User user : users) {
@@ -105,7 +111,7 @@ public class NotificationServiceImpl implements NotificationService {
             notificationRepository.save(notification);
         }
         List<String> tokens = userSessionRepository.findFcmTokensByUserIds(userIds);
-        pushNotificationService.sendToTokens(tokens, title, message);
+        pushNotificationService.sendToTokens(tokens, title, message, data);
     }
 
     private NotificationResponse toResponse(Notification n) {

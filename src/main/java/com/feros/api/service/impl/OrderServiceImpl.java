@@ -42,6 +42,7 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -164,7 +165,8 @@ public class OrderServiceImpl implements OrderService {
         notificationService.sendToRoles(savedOrder.getTenant(), List.of(RoleName.SUPERVISOR, RoleName.ADMIN),
                 NotificationType.ORDER_CREATED,
                 "New Order Created",
-                "Order " + savedOrder.getOrderNumber() + " from " + savedOrder.getSourceCity().getName() + " to " + savedOrder.getDestinationCity().getName() + " is ready for vehicle assignment.");
+                "Order " + savedOrder.getOrderNumber() + " from " + savedOrder.getSourceCity().getName() + " to " + savedOrder.getDestinationCity().getName() + " is ready for vehicle assignment.",
+                Map.of("type", "NEW_ORDER", "orderId", String.valueOf(savedOrder.getId())));
         return mapToOrderResponse(savedOrder);
     }
 
