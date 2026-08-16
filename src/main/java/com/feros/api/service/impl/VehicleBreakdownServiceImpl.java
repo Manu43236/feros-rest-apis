@@ -153,11 +153,11 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         String reporterName = saved.getReportedBy() != null ? saved.getReportedBy().getName() : "Driver";
         String location = request.getLocation() != null ? request.getLocation() : "unknown location";
         notificationService.sendToRoles(saved.getTenant(),
-                List.of(RoleName.SUPERVISOR, RoleName.ADMIN),
+                List.of(RoleName.SUPERVISOR, RoleName.ADMIN, RoleName.SERVICE_MANAGER),
                 NotificationType.BREAKDOWN_REPORTED,
                 "Breakdown Reported — " + vehicleReg,
                 vehicleReg + " | Order " + orderNum + " breakdown reported by " + reporterName + " at " + location + ". Tap to take action.",
-                Map.of("type", "NEW_ORDER", "orderId", String.valueOf(allocation.getOrder().getId())));
+                Map.of("type", "BREAKDOWN", "orderId", String.valueOf(allocation.getOrder().getId())));
 
         return mapToResponse(saved);
     }
@@ -457,11 +457,11 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         String resolvedVehicleReg = resolved.getVehicle().getRegistrationNumber();
         String resolvedOrderNum = resolved.getOrder().getOrderNumber();
         notificationService.sendToRoles(resolved.getTenant(),
-                List.of(RoleName.SUPERVISOR, RoleName.ADMIN),
+                List.of(RoleName.SUPERVISOR, RoleName.ADMIN, RoleName.SERVICE_MANAGER),
                 NotificationType.BREAKDOWN_REPORTED,
                 "Breakdown Cleared — " + resolvedVehicleReg,
                 resolvedVehicleReg + " | Order " + resolvedOrderNum + " breakdown resolved. Vehicle has resumed the trip.",
-                Map.of("type", "NEW_ORDER", "orderId", String.valueOf(resolved.getOrder().getId())));
+                Map.of("type", "BREAKDOWN", "orderId", String.valueOf(resolved.getOrder().getId())));
 
         return mapToResponse(resolved);
     }
@@ -588,10 +588,11 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         String standaloneReporter = savedStandalone.getReportedBy() != null ? savedStandalone.getReportedBy().getName() : "Staff";
         String standaloneLocation = request.getLocation() != null ? request.getLocation() : "unknown location";
         notificationService.sendToRoles(savedStandalone.getTenant(),
-                List.of(RoleName.SUPERVISOR, RoleName.ADMIN),
+                List.of(RoleName.SUPERVISOR, RoleName.ADMIN, RoleName.SERVICE_MANAGER),
                 NotificationType.BREAKDOWN_REPORTED,
                 "Breakdown Reported — " + vehicle.getRegistrationNumber(),
-                vehicle.getRegistrationNumber() + " breakdown reported by " + standaloneReporter + " at " + standaloneLocation + ". Vehicle is now unavailable.");
+                vehicle.getRegistrationNumber() + " breakdown reported by " + standaloneReporter + " at " + standaloneLocation + ". Vehicle is now unavailable.",
+                Map.of("type", "BREAKDOWN"));
 
         return mapToResponse(savedStandalone);
     }
@@ -628,10 +629,11 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
 
         VehicleBreakdown resolvedStandalone = breakdownRepository.save(breakdown);
         notificationService.sendToRoles(resolvedStandalone.getTenant(),
-                List.of(RoleName.SUPERVISOR, RoleName.ADMIN),
+                List.of(RoleName.SUPERVISOR, RoleName.ADMIN, RoleName.SERVICE_MANAGER),
                 NotificationType.BREAKDOWN_REPORTED,
                 "Vehicle Available — " + resolvedStandalone.getVehicle().getRegistrationNumber(),
-                resolvedStandalone.getVehicle().getRegistrationNumber() + " repair completed. Vehicle is now available for assignment.");
+                resolvedStandalone.getVehicle().getRegistrationNumber() + " repair completed. Vehicle is now available for assignment.",
+                Map.of("type", "BREAKDOWN"));
 
         return mapToResponse(resolvedStandalone);
     }

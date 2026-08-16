@@ -117,6 +117,17 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
 
         VehicleService saved = vehicleServiceRepository.save(vs);
 
+        String triggerLabel = request.getTriggeredBy() != null
+                ? request.getTriggeredBy().name().replace("_", " ") : "Manual";
+        int taskCount = request.getTasks() != null ? request.getTasks().size() : 0;
+        String taskSuffix = taskCount > 0 ? taskCount + " task(s) added." : "No tasks yet — assign technicians.";
+        notificationService.sendToRoles(saved.getTenant(),
+                List.of(com.feros.api.enums.RoleName.SERVICE_MANAGER),
+                com.feros.api.enums.NotificationType.SERVICE_OPENED,
+                "New Service — " + vehicle.getRegistrationNumber(),
+                vehicle.getRegistrationNumber() + " | " + triggerLabel + " | " + taskSuffix,
+                java.util.Map.of("type", "SERVICE_COMPLETE"));
+
         // When a service is created for a breakdown → move breakdown to IN_REPAIR + vehicle to IN_REPAIR
         if (breakdown != null) {
             breakdown.setStatus(BreakdownStatus.IN_REPAIR);
@@ -267,7 +278,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
 
             String serviceVehicleReg = vs.getVehicle().getRegistrationNumber();
             notificationService.sendToRoles(vs.getTenant(),
-                    List.of(com.feros.api.enums.RoleName.SUPERVISOR, com.feros.api.enums.RoleName.ADMIN),
+                    List.of(com.feros.api.enums.RoleName.SUPERVISOR, com.feros.api.enums.RoleName.ADMIN, com.feros.api.enums.RoleName.SERVICE_MANAGER),
                     com.feros.api.enums.NotificationType.BREAKDOWN_REPORTED,
                     "Vehicle Available — " + serviceVehicleReg,
                     serviceVehicleReg + " repair completed. Vehicle is now available for assignment.");
@@ -302,6 +313,28 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
 
         task.setStatus(ServiceTaskStatus.COMPLETED);
         vehicleServiceTaskRepository.save(task);
+
+        String taskName = task.getTaskType() != null ? task.getTaskType().getName()
+                : (task.getCustomName() != null ? task.getCustomName() : "Task");
+        String vehicleReg = vs.getVehicle().getRegistrationNumber();
+        notificationService.sendToRoles(vs.getTenant(),
+                List.of(com.feros.api.enums.RoleName.SERVICE_MANAGER),
+                com.feros.api.enums.NotificationType.SERVICE_TASK_COMPLETE,
+                "Task Done — " + vehicleReg,
+                taskName + " on " + vehicleReg + " marked complete.",
+                java.util.Map.of("type", "SERVICE_COMPLETE"));
+
+        boolean allDone = vs.getTasks().stream()
+                .allMatch(t -> t.getStatus() == ServiceTaskStatus.COMPLETED
+                        || t.getStatus() == ServiceTaskStatus.MECHANIC_CLOSED);
+        if (allDone) {
+            notificationService.sendToRoles(vs.getTenant(),
+                    List.of(com.feros.api.enums.RoleName.SERVICE_MANAGER),
+                    com.feros.api.enums.NotificationType.SERVICE_TASK_COMPLETE,
+                    "All Tasks Done — " + vehicleReg,
+                    "All tasks completed on " + vehicleReg + ". Review and release the vehicle.",
+                    java.util.Map.of("type", "SERVICE_COMPLETE"));
+        }
 
         return mapToResponse(vehicleServiceRepository.findById(vs.getId()).orElse(vs));
     }

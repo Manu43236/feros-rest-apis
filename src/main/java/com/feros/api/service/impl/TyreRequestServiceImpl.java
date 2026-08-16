@@ -6,10 +6,13 @@ import com.feros.api.dto.request.TyreRequestCreateRequest;
 import com.feros.api.dto.request.TyreRequestRejectRequest;
 import com.feros.api.dto.response.TyreRequestResponse;
 import com.feros.api.entity.*;
+import com.feros.api.enums.NotificationType;
+import com.feros.api.enums.RoleName;
 import com.feros.api.enums.TyreRequestStatus;
 import com.feros.api.enums.TyreStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
+import com.feros.api.service.NotificationService;
 import com.feros.api.service.TyreRequestService;
 import com.feros.api.service.TyreService;
 import com.feros.api.util.SecurityUtil;
@@ -32,6 +35,7 @@ public class TyreRequestServiceImpl implements TyreRequestService {
     private final UserRepository userRepository;
     private final TyreRepository tyreRepository;
     private final TyreService tyreService;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -63,7 +67,13 @@ public class TyreRequestServiceImpl implements TyreRequestService {
                 .isActive(true)
                 .build();
 
-        return toResponse(tyreRequestRepository.save(tyreRequest));
+        TyreIssueRequest saved = tyreRequestRepository.save(tyreRequest);
+        notificationService.sendToRoles(tenant, List.of(RoleName.STORE_KEEPER, RoleName.ADMIN),
+                NotificationType.PART_REQUESTED,
+                "New Tyre Request — " + vehicle.getRegistrationNumber(),
+                vehicle.getRegistrationNumber() + " | Position: " + position.getPositionCode()
+                        + " | Requested by " + requestedBy.getName());
+        return toResponse(saved);
     }
 
     @Override
@@ -127,7 +137,13 @@ public class TyreRequestServiceImpl implements TyreRequestService {
         tyreRequest.setApprovedAt(TimeUtil.nowIst());
         tyreRequest.setFittedAtKm(request != null ? request.getFittedAtKm() : null);
 
-        return toResponse(tyreRequestRepository.save(tyreRequest));
+        TyreIssueRequest approved = tyreRequestRepository.save(tyreRequest);
+        notificationService.sendToUser(approved.getTenant(), approved.getRequestedBy(),
+                NotificationType.PART_APPROVED,
+                "Tyre Request Approved — " + approved.getVehicle().getRegistrationNumber(),
+                "Your tyre request for " + approved.getVehicle().getRegistrationNumber()
+                        + " | Position: " + approved.getPosition().getPositionCode() + " has been approved.");
+        return toResponse(approved);
     }
 
     @Override
@@ -152,7 +168,14 @@ public class TyreRequestServiceImpl implements TyreRequestService {
         tyreRequest.setApprovedBy(rejectedBy);
         tyreRequest.setApprovedAt(TimeUtil.nowIst());
 
-        return toResponse(tyreRequestRepository.save(tyreRequest));
+        TyreIssueRequest rejected = tyreRequestRepository.save(tyreRequest);
+        notificationService.sendToUser(rejected.getTenant(), rejected.getRequestedBy(),
+                NotificationType.PART_REJECTED,
+                "Tyre Request Rejected — " + rejected.getVehicle().getRegistrationNumber(),
+                "Your tyre request for " + rejected.getVehicle().getRegistrationNumber()
+                        + " | Position: " + rejected.getPosition().getPositionCode() + " was rejected."
+                        + (request.getRejectionReason() != null ? " Reason: " + request.getRejectionReason() : ""));
+        return toResponse(rejected);
     }
 
     private TyreRequestResponse toResponse(TyreIssueRequest r) {

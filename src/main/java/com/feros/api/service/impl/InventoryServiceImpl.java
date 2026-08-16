@@ -313,13 +313,14 @@ public class InventoryServiceImpl implements InventoryService {
 
         ServicePart saved = servicePartRepository.save(sp);
 
-        // Notify STORE_KEEPER of the new part request
+        // Notify STORE_KEEPER + SERVICE_MANAGER of the new part request
         notificationService.sendToRoles(getTenant(),
-                java.util.Arrays.asList(RoleName.STORE_KEEPER),
+                java.util.Arrays.asList(RoleName.STORE_KEEPER, RoleName.SERVICE_MANAGER),
                 NotificationType.PART_REQUESTED,
                 "Part Requested",
                 user.getName() + " requested " + request.getQuantityRequested() + "x " + part.getName()
-                        + " for service #" + service.getId());
+                        + " for service #" + service.getId(),
+                java.util.Map.of("type", "PART_REQUEST"));
 
         return toServicePartResponse(saved);
     }
@@ -414,12 +415,26 @@ public class InventoryServiceImpl implements InventoryService {
                     "Part Request Approved",
                     saved.getQuantityApproved() + "x " + saved.getSparePart().getName()
                             + " approved for service #" + saved.getService().getServiceNumber());
+            notificationService.sendToRoles(saved.getService().getTenant(),
+                    java.util.Arrays.asList(RoleName.SERVICE_MANAGER),
+                    NotificationType.PART_APPROVED,
+                    "Part Ready — " + saved.getService().getVehicle().getRegistrationNumber(),
+                    saved.getQuantityApproved() + "x " + saved.getSparePart().getName()
+                            + " approved for service #" + saved.getService().getServiceNumber() + ". Technician can proceed.",
+                    java.util.Map.of("type", "SERVICE_COMPLETE"));
         } else if (saved.getStatus() == ServicePartStatus.REJECTED) {
             notificationService.sendToUser(saved.getService().getTenant(), saved.getRequestedBy(),
                     NotificationType.PART_REJECTED,
                     "Part Request Rejected",
                     saved.getSparePart().getName() + " request rejected for service #"
                             + saved.getService().getServiceNumber() + ": " + saved.getRejectionReason());
+            notificationService.sendToRoles(saved.getService().getTenant(),
+                    java.util.Arrays.asList(RoleName.SERVICE_MANAGER),
+                    NotificationType.PART_REJECTED,
+                    "Part Rejected — " + saved.getService().getVehicle().getRegistrationNumber(),
+                    saved.getSparePart().getName() + " request rejected for service #"
+                            + saved.getService().getServiceNumber() + ". Reason: " + saved.getRejectionReason(),
+                    java.util.Map.of("type", "SERVICE_COMPLETE"));
         }
 
         return toServicePartResponse(saved);

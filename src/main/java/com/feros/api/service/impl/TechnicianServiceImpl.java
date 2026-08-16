@@ -10,6 +10,8 @@ import com.feros.api.entity.ServicePart;
 import com.feros.api.entity.User;
 import com.feros.api.entity.VehicleService;
 import com.feros.api.entity.VehicleServiceTask;
+import com.feros.api.enums.NotificationType;
+import com.feros.api.enums.RoleName;
 import com.feros.api.enums.ServicePartStatus;
 import com.feros.api.enums.ServiceTaskStatus;
 import com.feros.api.exception.FerosException;
@@ -19,6 +21,7 @@ import com.feros.api.repository.ServicePartRepository;
 import com.feros.api.repository.SparePartRepository;
 import com.feros.api.repository.VehicleServiceTaskRepository;
 import com.feros.api.service.InventoryService;
+import com.feros.api.service.NotificationService;
 import com.feros.api.service.TechnicianService;
 import com.feros.api.util.SecurityUtil;
 import com.feros.api.util.TimeUtil;
@@ -43,6 +46,7 @@ public class TechnicianServiceImpl implements TechnicianService {
     private final EquipmentServiceTaskRepository equipmentTaskRepository;
     private final EquipmentServicePartRepository equipmentServicePartRepository;
     private final SparePartRepository sparePartRepository;
+    private final NotificationService notificationService;
 
     @Override
     public List<TechnicianVehicleTasksResponse> getMyTasks() {
@@ -157,6 +161,30 @@ public class TechnicianServiceImpl implements TechnicianService {
             task.setStatus(ServiceTaskStatus.MECHANIC_CLOSED);
             task.setMechanicClosedAt(TimeUtil.nowIst());
             taskRepository.save(task);
+
+            VehicleService vs = task.getService();
+            String vehicleReg = vs.getVehicle().getRegistrationNumber();
+            String taskName = task.getTaskType() != null ? task.getTaskType().getName()
+                    : (task.getCustomName() != null ? task.getCustomName() : "Task");
+            notificationService.sendToRoles(vs.getTenant(),
+                    List.of(RoleName.SERVICE_MANAGER),
+                    NotificationType.SERVICE_TASK_COMPLETE,
+                    "Task Done — " + vehicleReg,
+                    taskName + " on " + vehicleReg + " closed by technician.",
+                    Map.of("type", "SERVICE_COMPLETE"));
+
+            boolean allDone = vs.getTasks().stream()
+                    .allMatch(t -> t.getStatus() == ServiceTaskStatus.COMPLETED
+                            || t.getStatus() == ServiceTaskStatus.MECHANIC_CLOSED);
+            if (allDone) {
+                notificationService.sendToRoles(vs.getTenant(),
+                        List.of(RoleName.SERVICE_MANAGER),
+                        NotificationType.SERVICE_TASK_COMPLETE,
+                        "All Tasks Done — " + vehicleReg,
+                        "All tasks completed on " + vehicleReg + ". Review and release the vehicle.",
+                        Map.of("type", "SERVICE_COMPLETE"));
+            }
+
             return buildVehicleServiceResponse(task.getService(), task.getService().getTasks());
         }
 

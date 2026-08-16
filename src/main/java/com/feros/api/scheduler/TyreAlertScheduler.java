@@ -18,6 +18,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -31,7 +32,7 @@ public class TyreAlertScheduler {
     private final NotificationService notificationService;
 
     private static final List<RoleName> TYRE_ALERT_ROLES =
-            Arrays.asList(RoleName.ADMIN, RoleName.OFFICE_STAFF, RoleName.SUPERVISOR);
+            Arrays.asList(RoleName.ADMIN, RoleName.OFFICE_STAFF, RoleName.SUPERVISOR, RoleName.SERVICE_MANAGER);
 
     // Runs every day at 8:00 AM
     @Scheduled(cron = "0 0 8 * * *")
@@ -61,18 +62,29 @@ public class TyreAlertScheduler {
             if (tyre.getExpiryDate() == null) continue;
             if (tyre.getStatus() == TyreStatus.SCRAPPED || tyre.getStatus() == TyreStatus.DISPOSED) continue;
 
+            // Append vehicle + position when the tyre is currently fitted
+            String locationSuffix = "";
+            if (tyre.getStatus() == TyreStatus.FITTED) {
+                locationSuffix = fittingRepository.findCurrentFittingForTyre(tyre.getId())
+                        .map(f -> " on " + f.getVehicle().getRegistrationNumber()
+                                + " [" + f.getPosition().getPositionCode() + "]")
+                        .orElse("");
+            }
+
+            String tyreDesc = tyre.getSerialNumber() + " (" + tyre.getBrand() + " " + tyre.getSize() + ")" + locationSuffix;
             long daysLeft = today.until(tyre.getExpiryDate()).getDays();
             if (daysLeft < 0) {
-                // Already expired
                 notificationService.sendToRoles(tenant, TYRE_ALERT_ROLES,
                         NotificationType.TYRE_EXPIRY,
                         "Tyre Expired",
-                        tyre.getSerialNumber() + " (" + tyre.getBrand() + " " + tyre.getSize() + ") has expired. Please replace immediately.");
+                        tyreDesc + " has expired. Please replace immediately.",
+                        Map.of("type", "TYRE_ALERT"));
             } else if (daysLeft <= 15) {
                 notificationService.sendToRoles(tenant, TYRE_ALERT_ROLES,
                         NotificationType.TYRE_EXPIRY,
                         "Tyre Expiring Soon",
-                        tyre.getSerialNumber() + " (" + tyre.getBrand() + " " + tyre.getSize() + ") expires in " + daysLeft + " day(s) on " + tyre.getExpiryDate() + ".");
+                        tyreDesc + " expires in " + daysLeft + " day(s) on " + tyre.getExpiryDate() + ".",
+                        Map.of("type", "TYRE_ALERT"));
             }
         }
     }
@@ -119,7 +131,8 @@ public class TyreAlertScheduler {
                             tyre.getSerialNumber() + " on " + vehicle + " [" + position + "] has driven " +
                             String.format("%,.0f", totalKmOnTyre) + " km. Only " +
                             String.format("%,.0f", kmLeft.max(BigDecimal.ZERO)) + " km remaining (max " +
-                            String.format("%,.0f", maxKm) + " km).");
+                            String.format("%,.0f", maxKm) + " km).",
+                            Map.of("type", "TYRE_ALERT"));
 
                     tyre.setLastKmAlertKm(currentBucket);
                     tyreRepository.save(tyre);
@@ -157,12 +170,13 @@ public class TyreAlertScheduler {
                                 if (kmSinceRotation.compareTo(alertAt) >= 0) {
                                     BigDecimal kmLeft = BigDecimal.valueOf(intervalKm).subtract(kmSinceRotation);
                                     notificationService.sendToRoles(tenant,
-                                            Arrays.asList(RoleName.ADMIN, RoleName.SUPERVISOR),
+                                            Arrays.asList(RoleName.ADMIN, RoleName.SUPERVISOR, RoleName.SERVICE_MANAGER),
                                             NotificationType.TYRE_ROTATION_DUE,
                                             "Tyre Rotation Due",
                                             vehicle.getRegistrationNumber() + " is due for tyre rotation in " +
                                             String.format("%,.0f", kmLeft.max(BigDecimal.ZERO)) + " km (interval: " +
-                                            String.format("%,d", intervalKm) + " km).");
+                                            String.format("%,d", intervalKm) + " km).",
+                                            Map.of("type", "TYRE_ALERT"));
                                 }
                             });
                 });
