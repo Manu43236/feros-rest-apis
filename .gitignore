@@ -38,3 +38,4 @@ build/
 **/application-local.properties
 aws/
 .claude/
+firebase-service-account.json

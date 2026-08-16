@@ -10,6 +10,7 @@ import com.feros.api.enums.RoleName;
 import com.feros.api.repository.NotificationRepository;
 import com.feros.api.repository.TenantRepository;
 import com.feros.api.repository.UserRepository;
+import com.feros.api.repository.UserSessionRepository;
 import com.feros.api.service.NotificationService;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,8 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationRepository notificationRepository;
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
+    private final UserSessionRepository userSessionRepository;
+    private final PushNotificationService pushNotificationService;
 
     @Override
     public List<NotificationResponse> getMyNotifications() {
@@ -90,6 +93,7 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public void sendToRoles(Tenant tenant, List<RoleName> roles, NotificationType type, String title, String message) {
         List<User> users = userRepository.findByTenantIdAndRoleNames(tenant.getId(), roles);
+        List<Long> userIds = users.stream().map(User::getId).toList();
         for (User user : users) {
             Notification notification = Notification.builder()
                     .tenant(tenant)
@@ -100,6 +104,8 @@ public class NotificationServiceImpl implements NotificationService {
                     .build();
             notificationRepository.save(notification);
         }
+        List<String> tokens = userSessionRepository.findFcmTokensByUserIds(userIds);
+        pushNotificationService.sendToTokens(tokens, title, message);
     }
 
     private NotificationResponse toResponse(Notification n) {
