@@ -24,6 +24,7 @@ import com.feros.api.entity.ServicePart;
 import com.feros.api.entity.SparePartsTransaction;
 import com.feros.api.entity.User;
 import com.feros.api.repository.*;
+import com.feros.api.service.NotificationService;
 import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.VehicleMaintenanceService;
 import com.feros.api.util.NumberUtil;
@@ -57,6 +58,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     private final SparePartsTransactionRepository sparePartsTransactionRepository;
     private final UserRepository userRepository;
     private final NumberGeneratorService numberGenerator;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -262,6 +264,13 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                         vs.getVehicle().setCurrentStatus(availStatus);
                         vehicleRepository.save(vs.getVehicle());
                     });
+
+            String serviceVehicleReg = vs.getVehicle().getRegistrationNumber();
+            notificationService.sendToRoles(vs.getTenant(),
+                    List.of(com.feros.api.enums.RoleName.SUPERVISOR, com.feros.api.enums.RoleName.ADMIN),
+                    com.feros.api.enums.NotificationType.BREAKDOWN_REPORTED,
+                    "Vehicle Available — " + serviceVehicleReg,
+                    serviceVehicleReg + " repair completed. Vehicle is now available for assignment.");
         }
 
         // Auto-schedule next services for recurring tasks (SCHEDULED flow only)

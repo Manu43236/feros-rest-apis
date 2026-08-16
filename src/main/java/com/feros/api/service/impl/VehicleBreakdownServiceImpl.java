@@ -9,6 +9,7 @@ import com.feros.api.entity.*;
 import com.feros.api.enums.*;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
+import com.feros.api.service.NotificationService;
 import com.feros.api.service.VehicleBreakdownService;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -38,6 +40,7 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
     private final AttendanceRepository attendanceRepository;
     private final RoleRepository roleRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    private final NotificationService notificationService;
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -143,7 +146,20 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         // Mark vehicle as BREAKDOWN
         setVehicleStatus(allocation.getVehicle(), VehicleStatusType.BREAKDOWN);
 
-        return mapToResponse(breakdownRepository.save(breakdown));
+        VehicleBreakdown saved = breakdownRepository.save(breakdown);
+
+        String vehicleReg = allocation.getVehicle().getRegistrationNumber();
+        String orderNum = allocation.getOrder().getOrderNumber();
+        String reporterName = saved.getReportedBy() != null ? saved.getReportedBy().getName() : "Driver";
+        String location = request.getLocation() != null ? request.getLocation() : "unknown location";
+        notificationService.sendToRoles(saved.getTenant(),
+                List.of(RoleName.SUPERVISOR, RoleName.ADMIN),
+                NotificationType.BREAKDOWN_REPORTED,
+                "Breakdown Reported — " + vehicleReg,
+                vehicleReg + " | Order " + orderNum + " breakdown reported by " + reporterName + " at " + location + ". Tap to take action.",
+                Map.of("type", "NEW_ORDER", "orderId", String.valueOf(allocation.getOrder().getId())));
+
+        return mapToResponse(saved);
     }
 
     // ── replace vehicle ───────────────────────────────────────────────────────
@@ -437,7 +453,17 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         breakdown.setStatus(BreakdownStatus.RESOLVED);
         breakdown.setResolvedAt(TimeUtil.nowIst());
 
-        return mapToResponse(breakdownRepository.save(breakdown));
+        VehicleBreakdown resolved = breakdownRepository.save(breakdown);
+        String resolvedVehicleReg = resolved.getVehicle().getRegistrationNumber();
+        String resolvedOrderNum = resolved.getOrder().getOrderNumber();
+        notificationService.sendToRoles(resolved.getTenant(),
+                List.of(RoleName.SUPERVISOR, RoleName.ADMIN),
+                NotificationType.BREAKDOWN_REPORTED,
+                "Breakdown Cleared — " + resolvedVehicleReg,
+                resolvedVehicleReg + " | Order " + resolvedOrderNum + " breakdown resolved. Vehicle has resumed the trip.",
+                Map.of("type", "NEW_ORDER", "orderId", String.valueOf(resolved.getOrder().getId())));
+
+        return mapToResponse(resolved);
     }
 
     // ── cancel false alarm ────────────────────────────────────────────────────
@@ -558,7 +584,16 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
 
         setVehicleStatus(vehicle, VehicleStatusType.BREAKDOWN);
 
-        return mapToResponse(breakdownRepository.save(breakdown));
+        VehicleBreakdown savedStandalone = breakdownRepository.save(breakdown);
+        String standaloneReporter = savedStandalone.getReportedBy() != null ? savedStandalone.getReportedBy().getName() : "Staff";
+        String standaloneLocation = request.getLocation() != null ? request.getLocation() : "unknown location";
+        notificationService.sendToRoles(savedStandalone.getTenant(),
+                List.of(RoleName.SUPERVISOR, RoleName.ADMIN),
+                NotificationType.BREAKDOWN_REPORTED,
+                "Breakdown Reported — " + vehicle.getRegistrationNumber(),
+                vehicle.getRegistrationNumber() + " breakdown reported by " + standaloneReporter + " at " + standaloneLocation + ". Vehicle is now unavailable.");
+
+        return mapToResponse(savedStandalone);
     }
 
     @Override
@@ -591,7 +626,14 @@ public class VehicleBreakdownServiceImpl implements VehicleBreakdownService {
         breakdown.setStatus(BreakdownStatus.RESOLVED);
         breakdown.setResolvedAt(TimeUtil.nowIst());
 
-        return mapToResponse(breakdownRepository.save(breakdown));
+        VehicleBreakdown resolvedStandalone = breakdownRepository.save(breakdown);
+        notificationService.sendToRoles(resolvedStandalone.getTenant(),
+                List.of(RoleName.SUPERVISOR, RoleName.ADMIN),
+                NotificationType.BREAKDOWN_REPORTED,
+                "Vehicle Available — " + resolvedStandalone.getVehicle().getRegistrationNumber(),
+                resolvedStandalone.getVehicle().getRegistrationNumber() + " repair completed. Vehicle is now available for assignment.");
+
+        return mapToResponse(resolvedStandalone);
     }
 
     // ── VSA history helpers ───────────────────────────────────────────────────
