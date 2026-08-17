@@ -43,6 +43,7 @@ class InvoiceTaxCalculationTest {
     @Mock private TenantSettingsRepository tenantSettingsRepository;
     @Mock private S3Service s3Service;
     @Mock private NumberGeneratorService numberGenerator;
+    @Mock private com.feros.api.service.NotificationService notificationService;
 
     private InvoiceServiceImpl invoiceService;
 
@@ -55,7 +56,7 @@ class InvoiceTaxCalculationTest {
             invoiceRepository, invoiceLrRepository, invoicePaymentRepository,
             tenantRepository, clientRepository, lrRepository,
             lrChargeRepository, lrCheckpostRepository, userRepository,
-            tenantSettingsRepository, s3Service, numberGenerator
+            tenantSettingsRepository, s3Service, numberGenerator, notificationService
         );
 
         UserPrincipal principal = new UserPrincipal(USER_ID, TENANT_ID, "9999999999", "ADMIN");
