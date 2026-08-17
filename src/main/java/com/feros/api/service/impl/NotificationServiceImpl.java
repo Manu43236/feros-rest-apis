@@ -89,6 +89,8 @@ public class NotificationServiceImpl implements NotificationService {
                 .message(message)
                 .build();
         notificationRepository.save(notification);
+        List<String> tokens = userSessionRepository.findFcmTokensByUserIds(List.of(user.getId()));
+        pushNotificationService.sendToTokens(tokens, title, message, null);
     }
 
     @Override
