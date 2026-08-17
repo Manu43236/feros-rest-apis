@@ -883,6 +883,17 @@ public class OrderServiceImpl implements OrderService {
             vehicleRepository.save(vehicle);
         }
 
+        // Clear driver/cleaner from the LR linked to this vehicle allocation (trip not yet started)
+        lrRepository.findByVehicleAllocationId(allocation.getVehicleAllocation().getId())
+                .filter(lr -> lr.getLrStatus() != LrStatus.IN_TRANSIT
+                        && lr.getLrStatus() != LrStatus.DELIVERED
+                        && lr.getLrStatus() != LrStatus.CANCELLED)
+                .ifPresent(lr -> {
+                    if (roleName == RoleName.DRIVER) lr.setDriver(null);
+                    else if (roleName == RoleName.CLEANER) lr.setCleaner(null);
+                    lrRepository.save(lr);
+                });
+
         String vehicleReg = vehicle.getRegistrationNumber();
         notificationService.sendToUser(allocation.getTenant(), allocation.getUser(), NotificationType.TRIP_UNASSIGNED,
                 "Trip Unassigned",
