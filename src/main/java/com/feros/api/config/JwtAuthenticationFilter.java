@@ -42,9 +42,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
 
-        // 1. Validate JWT signature + expiry
+        // 1. Validate JWT signature + expiry — explicit 401 so mobile redirects to login
         if (!jwtUtil.isTokenValid(token)) {
-            filterChain.doFilter(request, response);
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"message\":\"TOKEN_EXPIRED\"}");
             return;
         }
 

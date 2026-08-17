@@ -7,6 +7,7 @@ import com.feros.api.dto.response.LoginResponse;
 public interface AuthService {
     LoginResponse login(LoginRequest request, String ipAddress);
     void logout();
+    void updateFcmToken(String fcmToken);
     void changePin(ChangePinRequest request);
     void askPinReset(String phone);
 }

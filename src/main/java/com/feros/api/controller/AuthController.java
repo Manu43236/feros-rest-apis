@@ -37,6 +37,13 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Logged out successfully", null));
     }
 
+    @PatchMapping("/fcm-token")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> updateFcmToken(@RequestBody java.util.Map<String, String> body) {
+        authService.updateFcmToken(body.get("fcmToken"));
+        return ResponseEntity.ok(ApiResponse.success("FCM token updated", null));
+    }
+
     @PatchMapping("/change-pin")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> changePin(

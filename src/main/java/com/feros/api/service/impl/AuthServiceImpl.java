@@ -219,6 +219,15 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    public void updateFcmToken(String fcmToken) {
+        String token = SecurityUtil.getCurrentToken();
+        userSessionRepository.findByToken(token).ifPresent(session -> {
+            session.setFcmToken(fcmToken);
+            userSessionRepository.save(session);
+        });
+    }
+
+    @Override
     public void changePin(ChangePinRequest request) {
         Long userId = SecurityUtil.getCurrentUserId();
         User user = userRepository.findById(userId)
