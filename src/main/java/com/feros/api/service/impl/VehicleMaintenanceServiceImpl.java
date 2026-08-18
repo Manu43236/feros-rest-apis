@@ -457,7 +457,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
         VehicleService vs = vehicleServiceRepository
                 .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
                 .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
-        String key = s3Service.uploadFile(file, "tenants/" + tenantId + "/services/" + id + "/estimate");
+        String key = s3Service.uploadFile(file, "tenants/images/services/" + id + "/estimate");
         vs.setEstimateDocUrl(key);
         vehicleServiceRepository.save(vs);
         return mapToResponse(vs);
@@ -470,7 +470,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
         VehicleService vs = vehicleServiceRepository
                 .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
                 .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
-        String key = s3Service.uploadFile(file, "tenants/" + tenantId + "/services/" + id + "/bill");
+        String key = s3Service.uploadFile(file, "tenants/images/services/" + id + "/bill");
         vs.setBillDocUrl(key);
         vehicleServiceRepository.save(vs);
         return mapToResponse(vs);
@@ -655,8 +655,8 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .totalCost(totalCost)
                 .estimatedCost(vs.getEstimatedCost())
                 .completedCost(vs.getCompletedCost())
-                .estimateDocUrl(vs.getEstimateDocUrl() != null ? s3Service.generatePresignedUrl(vs.getEstimateDocUrl()) : null)
-                .billDocUrl(vs.getBillDocUrl() != null ? s3Service.generatePresignedUrl(vs.getBillDocUrl()) : null)
+                .estimateDocUrl(vs.getEstimateDocUrl() != null ? s3Service.getPublicUrl(vs.getEstimateDocUrl()) : null)
+                .billDocUrl(vs.getBillDocUrl() != null ? s3Service.getPublicUrl(vs.getBillDocUrl()) : null)
                 .insuranceClaimNo(vs.getInsuranceClaimNo())
                 .insuranceClaimAmt(vs.getInsuranceClaimAmt())
                 .certificateNumber(vs.getCertificateNumber())
