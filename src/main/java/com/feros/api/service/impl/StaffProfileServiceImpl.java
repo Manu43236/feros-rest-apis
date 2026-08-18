@@ -139,7 +139,10 @@ public class StaffProfileServiceImpl implements StaffProfileService {
         List<StaffProfile> profiles = equipmentOnly
                 ? staffProfileRepository.findByTenantIdAndIsActiveTrueAndCanAccessEquipmentTrue(tenantId)
                 : staffProfileRepository.findByTenantIdAndIsActiveTrue(tenantId);
-        return profiles.stream().map(this::mapToProfileResponse).toList();
+        return profiles.stream()
+                .filter(p -> userRepository.existsById(p.getUser().getId()))
+                .map(this::mapToProfileResponse)
+                .toList();
     }
 
     @Override
