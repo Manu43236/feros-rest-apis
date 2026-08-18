@@ -96,7 +96,7 @@ public class VehicleLeaseController {
     }
 
     @PutMapping("/{id}/vehicles/{assignmentId}/division")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<LeaseVehicleAssignmentResponse>> assignDivision(
             @PathVariable Long id,
             @PathVariable Long assignmentId,
