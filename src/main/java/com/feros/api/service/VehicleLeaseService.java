@@ -1,6 +1,7 @@
 package com.feros.api.service;
 
 import com.feros.api.dto.request.AssignDivisionRequest;
+import com.feros.api.dto.request.AssignDriverRequest;
 import com.feros.api.dto.request.LeaseSessionStartRequest;
 import com.feros.api.dto.request.LeaseVehicleAssignmentRequest;
 import com.feros.api.dto.request.VehicleLeaseRequest;
@@ -28,6 +29,7 @@ public interface VehicleLeaseService {
     LeaseVehicleAssignmentResponse addVehicle(Long leaseId, LeaseVehicleAssignmentRequest request);
     LeaseVehicleAssignmentResponse closeVehicleAssignment(Long leaseId, Long assignmentId, BigDecimal odometerAtEnd);
     LeaseVehicleAssignmentResponse assignDivision(Long leaseId, Long assignmentId, AssignDivisionRequest request);
+    LeaseVehicleAssignmentResponse assignDriver(Long leaseId, Long assignmentId, AssignDriverRequest request);
     List<LeaseVehicleAssignmentResponse> getVehicles(Long leaseId);
 
     LeaseBillingResponse getBilling(Long leaseId);

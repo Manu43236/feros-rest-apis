@@ -1,6 +1,7 @@
 package com.feros.api.service.impl;
 
 import com.feros.api.dto.request.AssignDivisionRequest;
+import com.feros.api.dto.request.AssignDriverRequest;
 import com.feros.api.dto.request.LeaseSessionStartRequest;
 import com.feros.api.dto.request.LeaseVehicleAssignmentRequest;
 import com.feros.api.dto.request.VehicleLeaseRequest;
@@ -11,8 +12,11 @@ import com.feros.api.dto.response.LeaseVehicleSessionResponse;
 import com.feros.api.dto.response.VehicleLeaseResponse;
 import com.feros.api.entity.*;
 import com.feros.api.enums.LeaseStatus;
+import com.feros.api.enums.NotificationType;
 import com.feros.api.enums.RateType;
+import com.feros.api.enums.RoleName;
 import com.feros.api.enums.VehicleStatusType;
+import com.feros.api.service.NotificationService;
 import com.feros.api.repository.LeaseDailyLogRepository;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
@@ -29,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Map;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -51,6 +56,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     private final VehicleStatusRepository vehicleStatusRepository;
     private final ClientDivisionRepository clientDivisionRepository;
     private final NumberGeneratorService numberGenerator;
+    private final NotificationService notificationService;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
 
@@ -100,7 +106,13 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .notes(request.getNotes())
                 .build();
 
-        return toResponse(leaseRepository.save(lease), 0);
+        VehicleLease saved = leaseRepository.save(lease);
+        notificationService.sendToRoles(t, List.of(RoleName.ADMIN, RoleName.OFFICE_STAFF, RoleName.SUPERVISOR),
+                NotificationType.LEASE_CREATED,
+                "New Vehicle Lease",
+                "Lease " + saved.getLeaseNumber() + " for " + client.getClientName() + " has been created.",
+                Map.of("type", "LEASE_CREATED", "leaseId", String.valueOf(saved.getId())));
+        return toResponse(saved, 0);
     }
 
     // ── Update ────────────────────────────────────────────────────────────────
@@ -225,6 +237,33 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         }
 
         return toAssignmentResponse(assignmentRepository.save(assignment));
+    }
+
+    @Override
+    @Transactional
+    public LeaseVehicleAssignmentResponse assignDriver(Long leaseId, Long assignmentId, AssignDriverRequest request) {
+        fetchLease(leaseId);
+        LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
+                .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
+
+        StaffProfile driver = null;
+        if (request.getDriverStaffId() == null) {
+            assignment.setDriverStaff(null);
+        } else {
+            driver = staffProfileRepository.findByIdAndTenantId(request.getDriverStaffId(), tenantId())
+                    .orElseThrow(() -> new FerosException("Driver not found", HttpStatus.NOT_FOUND));
+            assignment.setDriverStaff(driver);
+        }
+        LeaseVehicleAssignment saved = assignmentRepository.save(assignment);
+        if (driver != null && driver.getUser() != null) {
+            VehicleLease lease = saved.getLease();
+            notificationService.sendToUser(lease.getTenant(), driver.getUser(),
+                    NotificationType.LEASE_DRIVER_ASSIGNED,
+                    "Vehicle Assigned to You",
+                    "You have been assigned to " + saved.getVehicle().getRegistrationNumber()
+                            + " for lease " + lease.getLeaseNumber() + ".");
+        }
+        return toAssignmentResponse(saved);
     }
 
     @Override

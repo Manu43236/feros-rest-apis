@@ -1,6 +1,7 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.request.AssignDivisionRequest;
+import com.feros.api.dto.request.AssignDriverRequest;
 import com.feros.api.dto.request.LeaseSessionStartRequest;
 import com.feros.api.dto.request.LeaseVehicleAssignmentRequest;
 import com.feros.api.dto.request.VehicleLeaseRequest;
@@ -93,6 +94,16 @@ public class VehicleLeaseController {
     public ResponseEntity<ApiResponse<LeaseVehicleAssignmentResponse>> addVehicle(
             @PathVariable Long id, @Valid @RequestBody LeaseVehicleAssignmentRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Vehicle added to lease", vehicleLeaseService.addVehicle(id, request)));
+    }
+
+    @PutMapping("/{id}/vehicles/{assignmentId}/driver")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<LeaseVehicleAssignmentResponse>> assignDriver(
+            @PathVariable Long id,
+            @PathVariable Long assignmentId,
+            @RequestBody AssignDriverRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Driver assigned",
+                vehicleLeaseService.assignDriver(id, assignmentId, request)));
     }
 
     @PutMapping("/{id}/vehicles/{assignmentId}/division")
