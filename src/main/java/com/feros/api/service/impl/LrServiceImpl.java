@@ -216,7 +216,7 @@ public class LrServiceImpl implements LrService {
             LrStatus current = lr.getLrStatus();
             LrStatus next = request.getLrStatus();
 
-            if (!SecurityUtil.isSuperAdminOrImpersonating()) {
+            if (!SecurityUtil.isSuperAdminOrImpersonating() && !SecurityUtil.isAdmin()) {
                 // Terminal states — no changes allowed once reached
                 if (current == LrStatus.DELIVERED) {
                     throw new FerosException("LR is already delivered and cannot be modified", HttpStatus.BAD_REQUEST);
