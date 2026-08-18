@@ -47,7 +47,7 @@ public class VehicleServiceRequest {
     // Escalation flag (internal mechanic escalated to 3rd party)
     private Boolean isEscalated;
 
-    private BigDecimal serviceCharges;
+    private BigDecimal estimatedCost;
 
     private List<VehicleServiceTaskRequest> tasks;
 }

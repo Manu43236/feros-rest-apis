@@ -18,4 +18,5 @@ public class CompleteServiceRequest {
     private BigDecimal labourCharges;   // INTERNAL only — optional, defaults to 0
     private BigDecimal vendorAmount;    // EXTERNAL only — optional, can be updated later
     private String vendorInvoiceNo;     // EXTERNAL only — optional
+    private BigDecimal completedCost;   // total bill from 3rd party, stored as record
 }

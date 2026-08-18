@@ -116,7 +116,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .certificateNumber(request.getCertificateNumber())
                 .certificateValidUntil(request.getCertificateValidUntil())
                 .isEscalated(Boolean.TRUE.equals(request.getIsEscalated()))
-                .serviceCharges(request.getServiceCharges())
+                .estimatedCost(request.getEstimatedCost())
                 .isActive(true)
                 .build();
 
@@ -256,15 +256,21 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
         vs.setStatus(ServiceStatus.COMPLETED);
         vs.setCompletedDate(request.getCompletedDate());
         if (request.getOdometer() != null) vs.setOdometer(request.getOdometer());
+        if (request.getCompletedCost() != null) vs.setCompletedCost(request.getCompletedCost());
 
         vs.getTasks().forEach(t -> t.setStatus(ServiceTaskStatus.COMPLETED));
 
-        // Persist the total cost so reports can read it directly from the DB
-        BigDecimal calculatedCost = vs.getTasks().stream()
-                .filter(t -> t.getCost() != null)
-                .map(VehicleServiceTask::getCost)
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .add(vs.getServiceCharges() != null ? vs.getServiceCharges() : BigDecimal.ZERO);
+        // Use completedCost (3rd party bill) if provided; otherwise sum tasks + estimatedCost
+        BigDecimal calculatedCost;
+        if (vs.getCompletedCost() != null) {
+            calculatedCost = vs.getCompletedCost();
+        } else {
+            calculatedCost = vs.getTasks().stream()
+                    .filter(t -> t.getCost() != null)
+                    .map(VehicleServiceTask::getCost)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .add(vs.getEstimatedCost() != null ? vs.getEstimatedCost() : BigDecimal.ZERO);
+        }
         vs.setTotalCost(calculatedCost);
 
         vehicleServiceRepository.save(vs);
@@ -434,12 +440,12 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
 
     @Override
     @Transactional
-    public VehicleServiceResponse updateServiceCharges(Long id, BigDecimal serviceCharges) {
+    public VehicleServiceResponse updateEstimatedCost(Long id, BigDecimal estimatedCost) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         VehicleService vs = vehicleServiceRepository
                 .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
                 .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
-        vs.setServiceCharges(serviceCharges);
+        vs.setEstimatedCost(estimatedCost);
         vehicleServiceRepository.save(vs);
         return mapToResponse(vs);
     }
@@ -604,7 +610,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .map(VehicleServiceTask::getCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalCost = tasksCost.add(
-                vs.getServiceCharges() != null ? vs.getServiceCharges() : BigDecimal.ZERO);
+                vs.getEstimatedCost() != null ? vs.getEstimatedCost() : BigDecimal.ZERO);
 
         List<VehicleServiceTaskResponse> taskResponses = tasks.stream()
                 .map(t -> VehicleServiceTaskResponse.builder()
@@ -647,7 +653,8 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .odometer(vs.getOdometer())
                 .notes(vs.getNotes())
                 .totalCost(totalCost)
-                .serviceCharges(vs.getServiceCharges())
+                .estimatedCost(vs.getEstimatedCost())
+                .completedCost(vs.getCompletedCost())
                 .estimateDocUrl(vs.getEstimateDocUrl() != null ? s3Service.getPublicUrl(vs.getEstimateDocUrl()) : null)
                 .billDocUrl(vs.getBillDocUrl() != null ? s3Service.getPublicUrl(vs.getBillDocUrl()) : null)
                 .insuranceClaimNo(vs.getInsuranceClaimNo())

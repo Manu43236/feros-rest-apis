@@ -106,9 +106,9 @@ public class VehicleMaintenanceController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> updateCharges(
             @PathVariable Long id, @RequestBody Map<String, Object> body) {
-        BigDecimal charges = body.get("serviceCharges") != null
-                ? new BigDecimal(body.get("serviceCharges").toString()) : null;
-        return ResponseEntity.ok(ApiResponse.success("Service charges updated", vehicleMaintenanceService.updateServiceCharges(id, charges)));
+        BigDecimal charges = body.get("estimatedCost") != null
+                ? new BigDecimal(body.get("estimatedCost").toString()) : null;
+        return ResponseEntity.ok(ApiResponse.success("Estimated cost updated", vehicleMaintenanceService.updateEstimatedCost(id, charges)));
     }
 
     @PostMapping("/{id}/estimate-doc")

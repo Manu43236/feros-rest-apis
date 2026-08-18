@@ -18,7 +18,7 @@ public interface VehicleMaintenanceService {
     VehicleServiceResponse start(Long id);
     VehicleServiceResponse cancel(Long id);
     VehicleServiceResponse updateNotes(Long id, String notes);
-    VehicleServiceResponse updateServiceCharges(Long id, BigDecimal serviceCharges);
+    VehicleServiceResponse updateEstimatedCost(Long id, BigDecimal estimatedCost);
     VehicleServiceResponse uploadEstimateDoc(Long id, MultipartFile file) throws IOException;
     VehicleServiceResponse uploadBillDoc(Long id, MultipartFile file) throws IOException;
     VehicleServiceResponse complete(Long id, CompleteServiceRequest request);
