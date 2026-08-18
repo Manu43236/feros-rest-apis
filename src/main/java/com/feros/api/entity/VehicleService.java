@@ -98,6 +98,15 @@ public class VehicleService extends BaseEntity {
     @Column(name = "started_at")
     private LocalDateTime startedAt;
 
+    @Column(name = "service_charges", precision = 10, scale = 2)
+    private java.math.BigDecimal serviceCharges;
+
+    @Column(name = "estimate_doc_url", length = 500)
+    private String estimateDocUrl;
+
+    @Column(name = "bill_doc_url", length = 500)
+    private String billDocUrl;
+
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 

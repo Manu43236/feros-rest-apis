@@ -26,6 +26,7 @@ import com.feros.api.entity.User;
 import com.feros.api.repository.*;
 import com.feros.api.service.NotificationService;
 import com.feros.api.service.NumberGeneratorService;
+import com.feros.api.service.S3Service;
 import com.feros.api.service.VehicleMaintenanceService;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
@@ -33,7 +34,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -59,6 +62,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     private final UserRepository userRepository;
     private final NumberGeneratorService numberGenerator;
     private final NotificationService notificationService;
+    private final S3Service s3Service;
 
     @Override
     @Transactional
@@ -112,6 +116,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .certificateNumber(request.getCertificateNumber())
                 .certificateValidUntil(request.getCertificateValidUntil())
                 .isEscalated(Boolean.TRUE.equals(request.getIsEscalated()))
+                .serviceCharges(request.getServiceCharges())
                 .isActive(true)
                 .build();
 
@@ -258,7 +263,8 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
         BigDecimal calculatedCost = vs.getTasks().stream()
                 .filter(t -> t.getCost() != null)
                 .map(VehicleServiceTask::getCost)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .add(vs.getServiceCharges() != null ? vs.getServiceCharges() : BigDecimal.ZERO);
         vs.setTotalCost(calculatedCost);
 
         vehicleServiceRepository.save(vs);
@@ -426,6 +432,44 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
         vehicleServiceRepository.save(vs);
     }
 
+    @Override
+    @Transactional
+    public VehicleServiceResponse updateServiceCharges(Long id, BigDecimal serviceCharges) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        VehicleService vs = vehicleServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+        vs.setServiceCharges(serviceCharges);
+        vehicleServiceRepository.save(vs);
+        return mapToResponse(vs);
+    }
+
+    @Override
+    @Transactional
+    public VehicleServiceResponse uploadEstimateDoc(Long id, MultipartFile file) throws IOException {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        VehicleService vs = vehicleServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+        String key = s3Service.uploadFile(file, "tenants/" + tenantId + "/services/" + id + "/estimate");
+        vs.setEstimateDocUrl(key);
+        vehicleServiceRepository.save(vs);
+        return mapToResponse(vs);
+    }
+
+    @Override
+    @Transactional
+    public VehicleServiceResponse uploadBillDoc(Long id, MultipartFile file) throws IOException {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        VehicleService vs = vehicleServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+        String key = s3Service.uploadFile(file, "tenants/" + tenantId + "/services/" + id + "/bill");
+        vs.setBillDocUrl(key);
+        vehicleServiceRepository.save(vs);
+        return mapToResponse(vs);
+    }
+
     private void createServiceInvoice(VehicleService vs, CompleteServiceRequest request) {
         boolean isInternal = vs.getServiceType() == VehicleServiceType.INTERNAL;
 
@@ -555,10 +599,12 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     private VehicleServiceResponse mapToResponse(VehicleService vs) {
         List<VehicleServiceTask> tasks = vs.getTasks() != null ? vs.getTasks() : new ArrayList<>();
 
-        BigDecimal totalCost = tasks.stream()
+        BigDecimal tasksCost = tasks.stream()
                 .filter(t -> t.getCost() != null)
                 .map(VehicleServiceTask::getCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalCost = tasksCost.add(
+                vs.getServiceCharges() != null ? vs.getServiceCharges() : BigDecimal.ZERO);
 
         List<VehicleServiceTaskResponse> taskResponses = tasks.stream()
                 .map(t -> VehicleServiceTaskResponse.builder()
@@ -601,6 +647,9 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .odometer(vs.getOdometer())
                 .notes(vs.getNotes())
                 .totalCost(totalCost)
+                .serviceCharges(vs.getServiceCharges())
+                .estimateDocUrl(vs.getEstimateDocUrl() != null ? s3Service.getPublicUrl(vs.getEstimateDocUrl()) : null)
+                .billDocUrl(vs.getBillDocUrl() != null ? s3Service.getPublicUrl(vs.getBillDocUrl()) : null)
                 .insuranceClaimNo(vs.getInsuranceClaimNo())
                 .insuranceClaimAmt(vs.getInsuranceClaimAmt())
                 .certificateNumber(vs.getCertificateNumber())

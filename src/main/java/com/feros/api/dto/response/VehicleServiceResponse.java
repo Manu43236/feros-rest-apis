@@ -36,6 +36,9 @@ public class VehicleServiceResponse {
     private Integer odometer;
     private String notes;
     private BigDecimal totalCost;
+    private BigDecimal serviceCharges;
+    private String estimateDocUrl;
+    private String billDocUrl;
     private String insuranceClaimNo;
     private BigDecimal insuranceClaimAmt;
     private String certificateNumber;

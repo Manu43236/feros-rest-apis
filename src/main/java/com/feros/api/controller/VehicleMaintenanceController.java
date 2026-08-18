@@ -12,7 +12,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -97,6 +100,29 @@ public class VehicleMaintenanceController {
             @PathVariable Long id,
             @RequestBody VehicleServiceTaskRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Task added successfully", vehicleMaintenanceService.addTask(id, request)));
+    }
+
+    @PutMapping("/{id}/charges")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<VehicleServiceResponse>> updateCharges(
+            @PathVariable Long id, @RequestBody Map<String, Object> body) {
+        BigDecimal charges = body.get("serviceCharges") != null
+                ? new BigDecimal(body.get("serviceCharges").toString()) : null;
+        return ResponseEntity.ok(ApiResponse.success("Service charges updated", vehicleMaintenanceService.updateServiceCharges(id, charges)));
+    }
+
+    @PostMapping("/{id}/estimate-doc")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<VehicleServiceResponse>> uploadEstimateDoc(
+            @PathVariable Long id, @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(ApiResponse.success("Estimate document uploaded", vehicleMaintenanceService.uploadEstimateDoc(id, file)));
+    }
+
+    @PostMapping("/{id}/bill-doc")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<VehicleServiceResponse>> uploadBillDoc(
+            @PathVariable Long id, @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(ApiResponse.success("Bill document uploaded", vehicleMaintenanceService.uploadBillDoc(id, file)));
     }
 
     @DeleteMapping("/{id}")
