@@ -321,7 +321,7 @@ public class OrderServiceImpl implements OrderService {
                 .findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Order not found", HttpStatus.NOT_FOUND));
 
-        if (order.getOrderStatus() != OrderStatus.PENDING && !SecurityUtil.isSuperAdmin()) {
+        if (order.getOrderStatus() != OrderStatus.PENDING && !SecurityUtil.isSuperAdminOrImpersonating()) {
             throw new FerosException("Only PENDING orders can be updated", HttpStatus.BAD_REQUEST);
         }
 

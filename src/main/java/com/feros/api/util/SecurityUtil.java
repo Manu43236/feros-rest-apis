@@ -2,6 +2,7 @@ package com.feros.api.util;
 
 import com.feros.api.config.UserPrincipal;
 import com.feros.api.exception.FerosException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -12,6 +13,13 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Component
 public class SecurityUtil {
+
+    private static JwtUtil jwtUtil;
+
+    @Autowired
+    public void setJwtUtil(JwtUtil jwtUtil) {
+        SecurityUtil.jwtUtil = jwtUtil;
+    }
 
     public static Authentication getAuthentication() {
         Authentication authentication = SecurityContextHolder
@@ -69,6 +77,19 @@ public class SecurityUtil {
 
     public static boolean isSuperAdmin() {
         return getCurrentRole().equals("SUPER_ADMIN");
+    }
+
+    public static boolean isImpersonating() {
+        try {
+            String token = getCurrentToken();
+            return jwtUtil != null && jwtUtil.isImpersonationToken(token);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static boolean isSuperAdminOrImpersonating() {
+        return isSuperAdmin() || isImpersonating();
     }
 
     public static boolean isAdmin() {
