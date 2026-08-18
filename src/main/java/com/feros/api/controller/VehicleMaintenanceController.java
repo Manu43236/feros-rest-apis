@@ -5,6 +5,7 @@ import com.feros.api.dto.request.CompleteServiceRequest;
 import com.feros.api.dto.request.VehicleServiceRequest;
 import com.feros.api.dto.request.VehicleServiceTaskRequest;
 import com.feros.api.dto.response.ApiResponse;
+import com.feros.api.dto.response.ServiceVendorItemResponse;
 import com.feros.api.dto.response.VehicleServiceResponse;
 import com.feros.api.service.VehicleMaintenanceService;
 import jakarta.validation.Valid;
@@ -130,5 +131,22 @@ public class VehicleMaintenanceController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         vehicleMaintenanceService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("Service deleted successfully", null));
+    }
+
+    @PostMapping("/{id}/vendor-items")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<ServiceVendorItemResponse>> addVendorItem(
+            @PathVariable Long id, @RequestBody Map<String, Object> body) {
+        String description = (String) body.get("description");
+        BigDecimal cost = body.get("cost") != null ? new BigDecimal(body.get("cost").toString()) : null;
+        return ResponseEntity.ok(ApiResponse.success("Item added", vehicleMaintenanceService.addVendorItem(id, description, cost)));
+    }
+
+    @DeleteMapping("/{id}/vendor-items/{itemId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<Void>> deleteVendorItem(
+            @PathVariable Long id, @PathVariable Long itemId) {
+        vehicleMaintenanceService.deleteVendorItem(id, itemId);
+        return ResponseEntity.ok(ApiResponse.success("Item deleted", null));
     }
 }

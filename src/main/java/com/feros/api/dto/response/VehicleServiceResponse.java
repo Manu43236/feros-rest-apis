@@ -46,6 +46,7 @@ public class VehicleServiceResponse {
     private LocalDate certificateValidUntil;
     private Boolean isEscalated;
     private List<VehicleServiceTaskResponse> tasks;
+    private List<ServiceVendorItemResponse> vendorItems;
     private LocalDateTime startedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

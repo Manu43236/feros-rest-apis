@@ -3,6 +3,7 @@ package com.feros.api.service;
 import com.feros.api.dto.request.CompleteServiceRequest;
 import com.feros.api.dto.request.VehicleServiceRequest;
 import com.feros.api.dto.request.VehicleServiceTaskRequest;
+import com.feros.api.dto.response.ServiceVendorItemResponse;
 import com.feros.api.dto.response.VehicleServiceResponse;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -26,4 +27,7 @@ public interface VehicleMaintenanceService {
     VehicleServiceResponse assignTask(Long serviceId, Long taskId, Long mechanicId);
     VehicleServiceResponse addTask(Long serviceId, VehicleServiceTaskRequest request);
     void delete(Long id);
+
+    ServiceVendorItemResponse addVendorItem(Long serviceId, String description, java.math.BigDecimal cost);
+    void deleteVendorItem(Long serviceId, Long itemId);
 }

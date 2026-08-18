@@ -4,6 +4,7 @@ import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.CompleteServiceRequest;
 import com.feros.api.dto.request.VehicleServiceRequest;
 import com.feros.api.dto.request.VehicleServiceTaskRequest;
+import com.feros.api.dto.response.ServiceVendorItemResponse;
 import com.feros.api.dto.response.VehicleServiceResponse;
 import com.feros.api.dto.response.VehicleServiceTaskResponse;
 import com.feros.api.entity.*;
@@ -60,6 +61,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     private final ServicePartRepository servicePartRepository;
     private final SparePartsTransactionRepository sparePartsTransactionRepository;
     private final UserRepository userRepository;
+    private final ServiceVendorItemRepository serviceVendorItemRepository;
     private final NumberGeneratorService numberGenerator;
     private final NotificationService notificationService;
     private final S3Service s3Service;
@@ -668,6 +670,49 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .updatedAt(vs.getUpdatedAt())
                 .invoiceId(invoice != null ? invoice.getId() : null)
                 .invoiceNumber(invoice != null ? invoice.getInvoiceNumber() : null)
+                .vendorItems(serviceVendorItemRepository.findByServiceIdOrderByIdAsc(vs.getId())
+                        .stream()
+                        .map(i -> ServiceVendorItemResponse.builder()
+                                .id(i.getId())
+                                .description(i.getDescription())
+                                .cost(i.getCost())
+                                .build())
+                        .toList())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public ServiceVendorItemResponse addVendorItem(Long serviceId, String description, BigDecimal cost) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        VehicleService vs = vehicleServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+        ServiceVendorItem item = ServiceVendorItem.builder()
+                .service(vs)
+                .tenant(tenant)
+                .description(description)
+                .cost(cost)
+                .build();
+        item = serviceVendorItemRepository.save(item);
+        return ServiceVendorItemResponse.builder()
+                .id(item.getId())
+                .description(item.getDescription())
+                .cost(item.getCost())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void deleteVendorItem(Long serviceId, Long itemId) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        ServiceVendorItem item = serviceVendorItemRepository.findById(itemId)
+                .orElseThrow(() -> new FerosException("Item not found", HttpStatus.NOT_FOUND));
+        if (!item.getService().getId().equals(serviceId) || !item.getTenant().getId().equals(tenantId)) {
+            throw new FerosException("Item not found", HttpStatus.NOT_FOUND);
+        }
+        serviceVendorItemRepository.deleteById(itemId);
     }
 }
