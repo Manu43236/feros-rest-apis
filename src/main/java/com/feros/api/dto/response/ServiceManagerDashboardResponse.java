@@ -55,6 +55,10 @@ public class ServiceManagerDashboardResponse {
         private String displayStatus;
         private LocalDate serviceDate;
         private ServiceTriggeredBy triggeredBy;
+        private com.feros.api.enums.VehicleServiceType serviceType;
+        private String vendorName;
+        private String location;
+        private String notes;
         private int tasksTotal;
         private int tasksAssigned;
         private int tasksMechanicClosed;
