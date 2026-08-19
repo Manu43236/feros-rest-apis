@@ -611,8 +611,24 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .filter(t -> t.getCost() != null)
                 .map(VehicleServiceTask::getCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalCost = tasksCost.add(
-                vs.getEstimatedCost() != null ? vs.getEstimatedCost() : BigDecimal.ZERO);
+
+        List<ServiceVendorItem> vendorItemList = serviceVendorItemRepository.findByServiceIdOrderByIdAsc(vs.getId());
+        BigDecimal vendorItemsCost = vendorItemList.stream()
+                .filter(i -> i.getCost() != null)
+                .map(ServiceVendorItem::getCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalCost = tasksCost
+                .add(vs.getEstimatedCost() != null ? vs.getEstimatedCost() : BigDecimal.ZERO)
+                .add(vendorItemsCost);
+
+        List<ServiceVendorItemResponse> vendorItemResponses = vendorItemList.stream()
+                .map(i -> ServiceVendorItemResponse.builder()
+                        .id(i.getId())
+                        .description(i.getDescription())
+                        .cost(i.getCost())
+                        .build())
+                .toList();
 
         List<VehicleServiceTaskResponse> taskResponses = tasks.stream()
                 .map(t -> VehicleServiceTaskResponse.builder()
@@ -670,14 +686,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .updatedAt(vs.getUpdatedAt())
                 .invoiceId(invoice != null ? invoice.getId() : null)
                 .invoiceNumber(invoice != null ? invoice.getInvoiceNumber() : null)
-                .vendorItems(serviceVendorItemRepository.findByServiceIdOrderByIdAsc(vs.getId())
-                        .stream()
-                        .map(i -> ServiceVendorItemResponse.builder()
-                                .id(i.getId())
-                                .description(i.getDescription())
-                                .cost(i.getCost())
-                                .build())
-                        .toList())
+                .vendorItems(vendorItemResponses)
                 .build();
     }
 
