@@ -8,6 +8,7 @@ import com.feros.api.enums.ServiceTaskStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -59,10 +60,23 @@ public class ServiceManagerDashboardResponse {
         private String vendorName;
         private String location;
         private String notes;
+        private BigDecimal estimatedCost;
+        private BigDecimal completedCost;
+        private BigDecimal totalCost;
+        private String estimateDocUrl;
+        private String billDocUrl;
+        private List<VendorItemDto> vendorItems;
         private int tasksTotal;
         private int tasksAssigned;
         private int tasksMechanicClosed;
         private List<TaskItem> tasks;
+    }
+
+    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class VendorItemDto {
+        private Long id;
+        private String description;
+        private BigDecimal cost;
     }
 
     @Getter
@@ -74,6 +88,7 @@ public class ServiceManagerDashboardResponse {
         private Long taskId;
         private String displayName;
         private ServiceTaskStatus status;
+        private BigDecimal cost;
         private Long assignedMechanicId;
         private String assignedMechanicName;
         private java.time.LocalDateTime mechanicStartedAt;

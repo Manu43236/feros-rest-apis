@@ -3,6 +3,7 @@ package com.feros.api.service.impl;
 import com.feros.api.dto.response.TechnicianSummaryResponse;
 import com.feros.api.dto.response.ServiceManagerDashboardResponse;
 import com.feros.api.entity.ServicePart;
+import com.feros.api.entity.ServiceVendorItem;
 import com.feros.api.entity.VehicleBreakdown;
 import com.feros.api.entity.VehicleService;
 import com.feros.api.entity.VehicleServiceTask;
@@ -12,6 +13,7 @@ import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTaskStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
 import com.feros.api.repository.ServicePartRepository;
+import com.feros.api.repository.ServiceVendorItemRepository;
 import com.feros.api.repository.StaffProfileRepository;
 import com.feros.api.repository.UserRepository;
 import com.feros.api.repository.VehicleBreakdownRepository;
@@ -35,6 +37,7 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
     private final UserRepository userRepository;
     private final StaffProfileRepository staffProfileRepository;
     private final ServicePartRepository servicePartRepository;
+    private final ServiceVendorItemRepository serviceVendorItemRepository;
 
     @Override
     public ServiceManagerDashboardResponse getDashboard() {
@@ -65,7 +68,8 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
                                         .collect(Collectors.groupingBy(p -> p.getServiceTask().getId()));
                         List<ServiceManagerDashboardResponse.TaskItem> tasks = mapTaskItems(linkedTasks, partsByTask);
 
-                        serviceItem = ServiceManagerDashboardResponse.ServiceItem.builder()
+                        serviceItem = enrichServiceItem(
+                                ServiceManagerDashboardResponse.ServiceItem.builder()
                                 .serviceId(linked.getId())
                                 .serviceNumber(linked.getServiceNumber())
                                 .vehicleId(linked.getVehicle().getId())
@@ -74,11 +78,15 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
                                 .displayStatus(computeDisplayStatus(linked))
                                 .serviceDate(linked.getServiceDate())
                                 .triggeredBy(linked.getTriggeredBy())
+                                .serviceType(linked.getServiceType())
+                                .vendorName(linked.getVendorName())
+                                .location(linked.getLocation())
+                                .notes(linked.getNotes())
                                 .tasksTotal(tasks.size())
                                 .tasksAssigned(countAssigned(tasks))
                                 .tasksMechanicClosed(countMechanicClosed(tasks))
-                                .tasks(tasks)
-                                .build();
+                                .tasks(tasks),
+                                linked, tasks);
                     }
 
                     return ServiceManagerDashboardResponse.BreakdownItem.builder()
@@ -104,7 +112,8 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
                                     .collect(Collectors.groupingBy(p -> p.getServiceTask().getId()));
                     List<ServiceManagerDashboardResponse.TaskItem> tasks = mapTaskItems(vsTasks, partsByTask);
 
-                    return ServiceManagerDashboardResponse.ServiceItem.builder()
+                    return enrichServiceItem(
+                            ServiceManagerDashboardResponse.ServiceItem.builder()
                             .serviceId(vs.getId())
                             .serviceNumber(vs.getServiceNumber())
                             .vehicleId(vs.getVehicle().getId())
@@ -120,8 +129,8 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
                             .tasksTotal(tasks.size())
                             .tasksAssigned(countAssigned(tasks))
                             .tasksMechanicClosed(countMechanicClosed(tasks))
-                            .tasks(tasks)
-                            .build();
+                            .tasks(tasks),
+                            vs, tasks);
                 }).toList();
 
         return ServiceManagerDashboardResponse.builder()
@@ -170,6 +179,7 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
                             .taskId(t.getId())
                             .displayName(t.getTaskType() != null ? t.getTaskType().getName() : t.getCustomName())
                             .status(t.getStatus())
+                            .cost(t.getCost())
                             .assignedMechanicId(t.getAssignedMechanic() != null ? t.getAssignedMechanic().getId() : null)
                             .assignedMechanicName(t.getAssignedMechanic() != null ? t.getAssignedMechanic().getName() : null)
                             .mechanicStartedAt(t.getMechanicStartedAt())
@@ -178,6 +188,35 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
                             .build();
                 })
                 .toList();
+    }
+
+    private ServiceManagerDashboardResponse.ServiceItem enrichServiceItem(
+            ServiceManagerDashboardResponse.ServiceItem.ServiceItemBuilder builder,
+            VehicleService vs,
+            List<ServiceManagerDashboardResponse.TaskItem> tasks) {
+        List<ServiceVendorItem> vendorItemList = serviceVendorItemRepository.findByServiceIdOrderByIdAsc(vs.getId());
+        BigDecimal vendorCost = vendorItemList.stream()
+                .filter(i -> i.getCost() != null)
+                .map(ServiceVendorItem::getCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal tasksCost = tasks.stream()
+                .filter(t -> t.getCost() != null)
+                .map(ServiceManagerDashboardResponse.TaskItem::getCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal labor = vs.getEstimatedCost() != null ? vs.getEstimatedCost() : BigDecimal.ZERO;
+        BigDecimal total = labor.add(vendorCost).add(tasksCost);
+        List<ServiceManagerDashboardResponse.VendorItemDto> vendorDtos = vendorItemList.stream()
+                .map(i -> ServiceManagerDashboardResponse.VendorItemDto.builder()
+                        .id(i.getId()).description(i.getDescription()).cost(i.getCost()).build())
+                .toList();
+        return builder
+                .estimatedCost(labor.compareTo(BigDecimal.ZERO) > 0 ? labor : null)
+                .completedCost(vs.getCompletedCost())
+                .totalCost(total.compareTo(BigDecimal.ZERO) > 0 ? total : null)
+                .estimateDocUrl(vs.getEstimateDocUrl())
+                .billDocUrl(vs.getBillDocUrl())
+                .vendorItems(vendorDtos)
+                .build();
     }
 
     private int countAssigned(List<ServiceManagerDashboardResponse.TaskItem> tasks) {
