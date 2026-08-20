@@ -134,7 +134,7 @@ public class VehicleMaintenanceController {
     }
 
     @PostMapping("/{id}/vendor-items")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<ServiceVendorItemResponse>> addVendorItem(
             @PathVariable Long id, @RequestBody Map<String, Object> body) {
         String description = (String) body.get("description");
@@ -143,7 +143,7 @@ public class VehicleMaintenanceController {
     }
 
     @DeleteMapping("/{id}/vendor-items/{itemId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> deleteVendorItem(
             @PathVariable Long id, @PathVariable Long itemId) {
         vehicleMaintenanceService.deleteVendorItem(id, itemId);
