@@ -125,4 +125,8 @@ public class StaffProfile extends BaseEntity {
     @Builder.Default
     @Column(name = "can_access_equipment", nullable = false)
     private Boolean canAccessEquipment = false;
+
+    @Builder.Default
+    @Column(name = "can_access_leases", nullable = false)
+    private Boolean canAccessLeases = false;
 }

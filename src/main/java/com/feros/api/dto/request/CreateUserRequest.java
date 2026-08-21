@@ -56,5 +56,6 @@ public class CreateUserRequest {
     // Module access
     private Boolean canAccessVehicles;
     private Boolean canAccessEquipment;
+    private Boolean canAccessLeases;
 
 }

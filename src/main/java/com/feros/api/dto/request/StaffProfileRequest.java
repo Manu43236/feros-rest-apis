@@ -42,4 +42,5 @@ public class StaffProfileRequest {
 
     private Boolean canAccessVehicles;
     private Boolean canAccessEquipment;
+    private Boolean canAccessLeases;
 }

@@ -186,11 +186,13 @@ public class AuthServiceImpl implements AuthService {
         // 11. Resolve staff access flags (only for staff roles)
         Boolean canAccessVehicles = null;
         Boolean canAccessEquipment = null;
+        Boolean canAccessLeases = null;
         if (tenantId != null) {
             var profileOpt = staffProfileRepository.findByUserIdAndIsActiveTrue(user.getId());
             if (profileOpt.isPresent()) {
                 canAccessVehicles = profileOpt.get().getCanAccessVehicles();
                 canAccessEquipment = profileOpt.get().getCanAccessEquipment();
+                canAccessLeases = profileOpt.get().getCanAccessLeases();
             }
         }
 
@@ -209,6 +211,7 @@ public class AuthServiceImpl implements AuthService {
                 .moduleType(user.getTenant() != null ? user.getTenant().getModuleType() : null)
                 .canAccessVehicles(canAccessVehicles)
                 .canAccessEquipment(canAccessEquipment)
+                .canAccessLeases(canAccessLeases)
                 .build();
     }
 

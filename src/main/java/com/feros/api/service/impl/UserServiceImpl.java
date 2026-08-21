@@ -652,6 +652,7 @@ public class UserServiceImpl implements UserService {
                 .isActive(true)
                 .canAccessVehicles(resolveCanAccessVehicles(request, tenant))
                 .canAccessEquipment(resolveCanAccessEquipment(request, tenant))
+                .canAccessLeases(Boolean.TRUE.equals(request.getCanAccessLeases()))
                 .build();
 
         if (request.getEmploymentTypeId() != null) {

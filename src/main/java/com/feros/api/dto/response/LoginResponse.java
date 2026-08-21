@@ -25,4 +25,5 @@ public class LoginResponse {
     private ModuleType moduleType;
     private Boolean canAccessVehicles;
     private Boolean canAccessEquipment;
+    private Boolean canAccessLeases;
 }

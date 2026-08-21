@@ -67,6 +67,7 @@ public class StaffProfileResponse {
     private Boolean isActive;
     private Boolean canAccessVehicles;
     private Boolean canAccessEquipment;
+    private Boolean canAccessLeases;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

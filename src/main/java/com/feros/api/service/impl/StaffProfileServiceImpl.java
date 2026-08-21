@@ -100,6 +100,8 @@ public class StaffProfileServiceImpl implements StaffProfileService {
             profile.setCanAccessVehicles(request.getCanAccessVehicles());
         if (request.getCanAccessEquipment() != null)
             profile.setCanAccessEquipment(request.getCanAccessEquipment());
+        if (request.getCanAccessLeases() != null)
+            profile.setCanAccessLeases(request.getCanAccessLeases());
 
         if (request.getDesignationId() != null)
             profile.setDesignation(designationRepository
@@ -387,6 +389,7 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .isActive(p.getIsActive())
                 .canAccessVehicles(p.getCanAccessVehicles() != null ? p.getCanAccessVehicles() : true)
                 .canAccessEquipment(p.getCanAccessEquipment())
+                .canAccessLeases(p.getCanAccessLeases())
                 .createdAt(p.getCreatedAt())
                 .updatedAt(p.getUpdatedAt())
                 .build();
