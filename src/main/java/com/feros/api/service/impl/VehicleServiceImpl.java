@@ -123,9 +123,6 @@ public class VehicleServiceImpl implements VehicleService {
                 throw new FerosException("This owned vehicle is already registered in another fleet",
                         HttpStatus.CONFLICT);
         } else {
-            if (!vehicleRepository.existsByRegistrationNumberAndOwnershipTypeNameContainingIgnoreCase(regNum, "OWN"))
-                throw new FerosException("Please select a valid ownership type for this vehicle",
-                        HttpStatus.BAD_REQUEST);
             if (vehicleRepository.existsByRegistrationNumberAndTenantId(regNum, tenant.getId()))
                 throw new FerosException("Vehicle with this registration number already exists in your fleet",
                         HttpStatus.CONFLICT);
@@ -267,9 +264,6 @@ public class VehicleServiceImpl implements VehicleService {
                     throw new FerosException("This owned vehicle is already registered in another fleet",
                             HttpStatus.CONFLICT);
             } else {
-                if (!vehicleRepository.existsByRegistrationNumberAndOwnershipTypeNameContainingIgnoreCase(newRegNum, "OWN"))
-                    throw new FerosException("Please select a valid ownership type for this vehicle",
-                            HttpStatus.BAD_REQUEST);
                 if (vehicleRepository.existsByRegistrationNumberAndTenantIdAndIdNot(newRegNum, getCurrentTenantId(), id))
                     throw new FerosException("Vehicle with this registration number already exists in your fleet",
                             HttpStatus.CONFLICT);
