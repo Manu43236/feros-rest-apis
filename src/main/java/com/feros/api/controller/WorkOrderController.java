@@ -179,14 +179,14 @@ public class WorkOrderController {
     }
 
     @PostMapping("/{id}/logs")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<DailyLogResponse>> addLog(
             @PathVariable Long id, @Valid @RequestBody DailyLogRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Log added", workOrderService.addLog(id, request)));
     }
 
     @PutMapping("/{id}/logs/{logId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<DailyLogResponse>> updateLog(
             @PathVariable Long id,
             @PathVariable Long logId,
