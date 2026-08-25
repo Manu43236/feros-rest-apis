@@ -338,7 +338,7 @@ public class EquipmentController {
     }
 
     @PostMapping("/{id}/breakdowns")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SUPERVISOR','SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<com.feros.api.dto.response.EquipmentBreakdownResponse>> reportBreakdown(
             @PathVariable Long id, @Valid @RequestBody com.feros.api.dto.request.EquipmentBreakdownRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Breakdown reported", equipmentService.reportBreakdown(id, request)));
