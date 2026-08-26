@@ -49,6 +49,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final LocationResolverService locationResolverService;
+    private final StaffProfileRepository staffProfileRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -277,18 +278,35 @@ public class AttendanceServiceImpl implements AttendanceService {
                                         .thenComparing(VehicleStaffAssignment::getCreatedAt))
                                 .map(a -> a.getUser().getId())
                                 .orElseThrow()));
+        Set<String> supervisorAllowedRoles = resolveSupervisorAllowedRoles(role);
         return attendanceRepository
                 .findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, date)
                 .stream()
-                .filter(a -> isVisibleToRole(a, role))
+                .filter(a -> isVisibleToRole(a, role, supervisorAllowedRoles))
                 .map(a -> mapToResponse(a, latestForVehicle)).toList();
     }
 
-    private boolean isVisibleToRole(Attendance a, String callerRole) {
+    private Set<String> resolveSupervisorAllowedRoles(String role) {
+        if (!"SUPERVISOR".equals(role)) return Set.of();
+        StaffProfile profile = staffProfileRepository
+                .findByUserIdAndIsActiveTrue(SecurityUtil.getCurrentUserId())
+                .orElse(null);
+        Set<String> allowed = new HashSet<>();
+        if (profile == null || Boolean.TRUE.equals(profile.getCanAccessVehicles())) {
+            allowed.add("DRIVER");
+            allowed.add("CLEANER");
+        }
+        if (profile != null && Boolean.TRUE.equals(profile.getCanAccessEquipment())) {
+            allowed.add("OPERATOR");
+        }
+        return allowed;
+    }
+
+    private boolean isVisibleToRole(Attendance a, String callerRole, Set<String> supervisorAllowedRoles) {
         String targetRole = a.getUser().getRoles().stream()
                 .findFirst().map(r -> r.getName().name()).orElse("");
         return switch (callerRole) {
-            case "SUPERVISOR" -> targetRole.equals("DRIVER") || targetRole.equals("CLEANER");
+            case "SUPERVISOR" -> supervisorAllowedRoles.contains(targetRole);
             case "OFFICE_STAFF" -> !targetRole.equals("ADMIN");
             default -> true; // ADMIN, SUPER_ADMIN see all
         };
@@ -302,7 +320,7 @@ public class AttendanceServiceImpl implements AttendanceService {
         String targetRole = targetUser.getRoles().stream()
                 .findFirst().map(r -> r.getName().name()).orElse("");
 
-        if ("SUPERVISOR".equals(role) && !targetRole.equals("DRIVER") && !targetRole.equals("CLEANER")) {
+        if ("SUPERVISOR".equals(role) && !resolveSupervisorAllowedRoles(role).contains(targetRole)) {
             throw new FerosException("Access denied", HttpStatus.FORBIDDEN);
         }
         if ("OFFICE_STAFF".equals(role) && targetRole.equals("ADMIN")) {
