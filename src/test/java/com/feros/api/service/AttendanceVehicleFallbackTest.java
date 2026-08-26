@@ -42,6 +42,7 @@ class AttendanceVehicleFallbackTest {
     @Mock VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     @Mock OrderStaffAllocationRepository orderStaffAllocationRepository;
     @Mock LocationResolverService locationResolverService;
+    @Mock StaffProfileRepository staffProfileRepository;
 
     private AttendanceServiceImpl service;
 
@@ -56,7 +57,7 @@ class AttendanceVehicleFallbackTest {
             userRepository, lrRepository, attendanceTypeRepository,
             leaveTypeRepository, s3Service, notificationService,
             vehicleRepository, vehicleStaffAssignmentRepository,
-            orderStaffAllocationRepository, locationResolverService
+            orderStaffAllocationRepository, locationResolverService, staffProfileRepository
         );
 
         UserPrincipal principal = new UserPrincipal(ADMIN_ID, TENANT_ID, "9999999990", "ADMIN");
