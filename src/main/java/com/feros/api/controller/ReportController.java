@@ -2,6 +2,7 @@ package com.feros.api.controller;
 
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.report.*;
+import com.feros.api.enums.TripScope;
 import com.feros.api.service.ReportService;
 import com.feros.api.util.ReportExportUtil;
 import com.feros.api.util.TimeUtil;
@@ -1558,6 +1559,18 @@ public class ReportController {
                 safe(r.getIfscCode()), safe(r.getAccountHolderName())
         }).toList();
         return export("payroll-ytd-" + y, "Payroll YTD — " + y, headers, data, format);
+    }
+
+    // ── Daily Fleet Attendance ────────────────────────────────────────────────
+
+    @GetMapping("/vehicles/daily-fleet-attendance")
+    public ResponseEntity<ApiResponse<DailyFleetAttendanceReport>> getDailyFleetAttendance(
+            @RequestParam(required = false) @DateTimeFormat(pattern = DATE_FORMAT) LocalDate date,
+            @RequestParam(defaultValue = "INTRA_STATE") TripScope scope) {
+        LocalDate reportDate = date != null ? date : TimeUtil.today();
+        return ResponseEntity.ok(ApiResponse.success(
+                "Daily fleet attendance fetched",
+                reportService.getDailyFleetAttendance(reportDate, scope)));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

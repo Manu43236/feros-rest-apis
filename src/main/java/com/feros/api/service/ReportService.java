@@ -1,6 +1,7 @@
 package com.feros.api.service;
 
 import com.feros.api.dto.response.report.*;
+import com.feros.api.enums.TripScope;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -109,4 +110,7 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
 
     // ── Mechanic Performance ───────────────────────────────────────────────────
     List<TechnicianPerformanceRow> getTechnicianPerformance(LocalDate startDate, LocalDate endDate);
+
+    // ── Daily Fleet Attendance ─────────────────────────────────────────────────
+    DailyFleetAttendanceReport getDailyFleetAttendance(LocalDate date, TripScope scope);
 }

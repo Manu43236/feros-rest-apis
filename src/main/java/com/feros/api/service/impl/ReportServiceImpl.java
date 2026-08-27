@@ -2,11 +2,13 @@ package com.feros.api.service.impl;
 
 import com.feros.api.dto.response.report.*;
 import com.feros.api.entity.*;
+import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.OrderStatus;
 import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.enums.InvoiceStatus;
 import com.feros.api.enums.StockTransactionType;
+import com.feros.api.enums.TripScope;
 import com.feros.api.entity.Client;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.repository.*;
@@ -2344,5 +2346,50 @@ public class ReportServiceImpl implements ReportService {
     private Map<Long, StaffProfile> buildProfileMap(Long tenantId) {
         return staffProfileRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
                 .collect(Collectors.toMap(p -> p.getUser().getId(), p -> p, (a, b) -> a));
+    }
+
+    // ── Daily Fleet Attendance ─────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public DailyFleetAttendanceReport getDailyFleetAttendance(LocalDate date, TripScope scope) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        List<Vehicle> vehicles = vehicleRepository.findByTenantIdAndTripScopeAndIsActiveTrue(tenantId, scope);
+
+        Set<Long> presentUserIds = new HashSet<>(
+                attendanceRepository.findUserIdsWithAttendanceOnDate(
+                        tenantId, date,
+                        List.of(AttendanceApprovalStatus.APPROVED, AttendanceApprovalStatus.PENDING)));
+
+        String scopeLabel = scope == TripScope.INTRA_STATE ? "Local" : "Out Station";
+
+        List<DailyFleetAttendanceRow> rows = vehicles.stream().map(v -> {
+            String driverName = (v.getCurrentDriver() != null && presentUserIds.contains(v.getCurrentDriver().getId()))
+                    ? v.getCurrentDriver().getName() : "—";
+            String cleanerName = (v.getCurrentCleaner() != null && presentUserIds.contains(v.getCurrentCleaner().getId()))
+                    ? v.getCurrentCleaner().getName() : "—";
+            return DailyFleetAttendanceRow.builder()
+                    .registrationNumber(v.getRegistrationNumber())
+                    .scope(scopeLabel)
+                    .vehicleType(v.getVehicleType() != null ? v.getVehicleType().getName() : "—")
+                    .driverName(driverName)
+                    .cleanerName(cleanerName)
+                    .build();
+        }).sorted(Comparator.comparing(DailyFleetAttendanceRow::getRegistrationNumber)).toList();
+
+        int drivers = (int) rows.stream().filter(r -> !"—".equals(r.getDriverName())).count();
+        int cleaners = (int) rows.stream().filter(r -> !"—".equals(r.getCleanerName())).count();
+        int unassigned = vehicles.size() - drivers;
+
+        return DailyFleetAttendanceReport.builder()
+                .date(date)
+                .scope(scopeLabel)
+                .totalVehicles(vehicles.size())
+                .drivers(drivers)
+                .cleaners(cleaners)
+                .unassigned(unassigned)
+                .rows(rows)
+                .build();
     }
 }

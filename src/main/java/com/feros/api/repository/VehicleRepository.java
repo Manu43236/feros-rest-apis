@@ -1,6 +1,7 @@
 package com.feros.api.repository;
 
 import com.feros.api.entity.Vehicle;
+import com.feros.api.enums.TripScope;
 import com.feros.api.enums.VehicleStatusType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -13,6 +14,7 @@ import java.util.Optional;
 @Repository
 public interface VehicleRepository extends JpaRepository<Vehicle, Long> {
     List<Vehicle> findByTenantIdAndIsActiveTrue(Long tenantId);
+    List<Vehicle> findByTenantIdAndTripScopeAndIsActiveTrue(Long tenantId, TripScope tripScope);
     List<Vehicle> findByTenantId(Long tenantId);
     Optional<Vehicle> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     Optional<Vehicle> findByIdAndTenantId(Long id, Long tenantId);
