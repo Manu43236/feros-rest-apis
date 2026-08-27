@@ -2376,7 +2376,7 @@ public class ReportServiceImpl implements ReportService {
                     .driverName(driverName)
                     .cleanerName(cleanerName)
                     .build();
-        }).sorted(Comparator.comparing(DailyFleetAttendanceRow::getRegistrationNumber)).toList();
+        }).sorted(Comparator.comparing(r -> r.getRegistrationNumber().toUpperCase())).toList();
 
         int drivers = (int) rows.stream().filter(r -> !"—".equals(r.getDriverName())).count();
         int cleaners = (int) rows.stream().filter(r -> !"—".equals(r.getCleanerName())).count();
