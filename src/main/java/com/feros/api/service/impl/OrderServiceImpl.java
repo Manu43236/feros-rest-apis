@@ -759,9 +759,21 @@ public class OrderServiceImpl implements OrderService {
         Vehicle vehicle = vehicleAllocation.getVehicle();
         RoleName roleName = role.getName();
         if (roleName == RoleName.DRIVER) {
+            // Clear pointer on any other vehicle this driver is still set as currentDriver
+            vehicleRepository.findAssignedVehiclesByStaffUserId(user.getId()).stream()
+                    .filter(v -> !v.getId().equals(vehicle.getId())
+                              && v.getCurrentDriver() != null
+                              && v.getCurrentDriver().getId().equals(user.getId()))
+                    .forEach(v -> { v.setCurrentDriver(null); vehicleRepository.save(v); });
             vehicle.setCurrentDriver(user);
             vehicleRepository.save(vehicle);
         } else if (roleName == RoleName.CLEANER) {
+            // Clear pointer on any other vehicle this cleaner is still set as currentCleaner
+            vehicleRepository.findAssignedVehiclesByStaffUserId(user.getId()).stream()
+                    .filter(v -> !v.getId().equals(vehicle.getId())
+                              && v.getCurrentCleaner() != null
+                              && v.getCurrentCleaner().getId().equals(user.getId()))
+                    .forEach(v -> { v.setCurrentCleaner(null); vehicleRepository.save(v); });
             vehicle.setCurrentCleaner(user);
             vehicleRepository.save(vehicle);
         }
