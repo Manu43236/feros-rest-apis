@@ -154,6 +154,7 @@ public class OrderServiceImpl implements OrderService {
                 .orderStatus(OrderStatus.PENDING)
                 .specialInstructions(request.getSpecialInstructions())
                 .remarks(request.getRemarks())
+                .isPol(false)
                 .isActive(true)
                 .build();
 
