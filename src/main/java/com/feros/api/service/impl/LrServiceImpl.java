@@ -201,6 +201,14 @@ public class LrServiceImpl implements LrService {
         Lr lr = lrRepository.findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("LR not found", HttpStatus.NOT_FOUND));
 
+        boolean weightChanging = (request.getLoadedWeight() != null && !request.getLoadedWeight().equals(lr.getLoadedWeight()))
+                || (request.getDeliveredWeight() != null && !request.getDeliveredWeight().equals(lr.getDeliveredWeight()));
+        if (weightChanging && invoiceLrRepository.existsByLrIdAndIsActiveTrue(lr.getId())) {
+            throw new FerosException(
+                    "Weight cannot be changed — this LR is already invoiced. Cancel the invoice first, then edit the LR.",
+                    HttpStatus.BAD_REQUEST);
+        }
+
         if (request.getLoadedWeight() != null) lr.setLoadedWeight(request.getLoadedWeight());
         if (request.getLoadedAt() != null) lr.setLoadedAt(request.getLoadedAt());
         if (request.getEwayBillNumber() != null) lr.setEwayBillNumber(request.getEwayBillNumber());
