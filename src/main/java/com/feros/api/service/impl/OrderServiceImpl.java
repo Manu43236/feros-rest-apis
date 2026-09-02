@@ -1054,6 +1054,7 @@ public class OrderServiceImpl implements OrderService {
                 .createdById(o.getCreatedBy().getId())
                 .createdByName(o.getCreatedBy().getName())
                 .vehicleAllocations(vehicleAllocations)
+                .isPol(o.getIsPol())
                 .isActive(o.getIsActive())
                 .createdAt(o.getCreatedAt())
                 .updatedAt(o.getUpdatedAt())

@@ -3,6 +3,7 @@ package com.feros.api.controller;
 import com.feros.api.dto.request.AssignStaffRequest;
 import com.feros.api.dto.request.AssignVehicleRequest;
 import com.feros.api.dto.request.OrderRequest;
+import com.feros.api.dto.request.PostOrderLogRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.OrderResponse;
 import com.feros.api.dto.response.StaffAllocationResponse;
@@ -13,6 +14,7 @@ import com.feros.api.enums.OrderStatus;
 
 import java.util.List;
 import com.feros.api.service.OrderService;
+import com.feros.api.service.PostOrderLogService;
 import com.feros.api.service.impl.OrderPdfService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,8 +31,9 @@ import org.springframework.data.domain.Page;
 @RequiredArgsConstructor
 public class OrderController {
 
-    private final OrderService    orderService;
-    private final OrderPdfService orderPdfService;
+    private final OrderService       orderService;
+    private final OrderPdfService    orderPdfService;
+    private final PostOrderLogService postOrderLogService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER', 'CLEANER')")
@@ -56,6 +59,14 @@ public class OrderController {
             @Valid @RequestBody OrderRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Order created successfully", orderService.createOrder(request)));
+    }
+
+    @PostMapping("/post-entry")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<OrderResponse>> createPostOrderLog(
+            @Valid @RequestBody PostOrderLogRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "POL order created successfully", postOrderLogService.createPostOrderLog(request)));
     }
 
     @PutMapping("/{id}")

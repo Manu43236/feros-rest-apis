@@ -570,6 +570,7 @@ public class LrServiceImpl implements LrService {
                 .id(lr.getId())
                 .tenantId(lr.getTenant().getId())
                 .lrNumber(lr.getLrNumber())
+                .paperLrNumber(lr.getPaperLrNumber())
                 .orderId(lr.getOrder().getId())
                 .orderNumber(lr.getOrder().getOrderNumber())
                 .vehicleAllocationId(allocation != null ? allocation.getId() : null)

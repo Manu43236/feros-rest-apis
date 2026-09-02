@@ -115,6 +115,9 @@ public class Order extends BaseEntity {
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
+    @Column(name = "is_pol")
+    private Boolean isPol = false;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 }

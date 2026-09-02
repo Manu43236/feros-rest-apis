@@ -488,10 +488,13 @@ public class InvoiceServiceImpl implements InvoiceService {
         }
         if (billingWeight == null) billingWeight = lr.getAllocatedWeight();
 
+        String displayLrNumber = lr.getPaperLrNumber() != null && !lr.getPaperLrNumber().isBlank()
+                ? lr.getPaperLrNumber() : lr.getLrNumber();
         return InvoiceLrResponse.builder()
                 .id(il.getId())
                 .lrId(lr.getId())
-                .lrNumber(lr.getLrNumber())
+                .lrNumber(displayLrNumber)
+                .paperLrNumber(lr.getPaperLrNumber())
                 .lrDate(lr.getLrDate())
                 .orderId(order.getId())
                 .orderNumber(order.getOrderNumber())

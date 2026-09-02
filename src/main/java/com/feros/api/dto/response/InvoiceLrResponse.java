@@ -15,6 +15,7 @@ public class InvoiceLrResponse {
     private Long id;
     private Long lrId;
     private String lrNumber;
+    private String paperLrNumber;
     private LocalDate lrDate;
     private Long orderId;
     private String orderNumber;

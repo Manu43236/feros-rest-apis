@@ -17,6 +17,7 @@ public class LrResponse {
     private Long id;
     private Long tenantId;
     private String lrNumber;
+    private String paperLrNumber;
 
     private Long orderId;
     private String orderNumber;

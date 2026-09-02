@@ -63,6 +63,7 @@ public class OrderResponse {
 
     private List<VehicleAllocationResponse> vehicleAllocations;
 
+    private Boolean isPol;
     private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

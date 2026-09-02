@@ -31,6 +31,9 @@ public class Lr extends BaseEntity {
     @Column(name = "lr_number", nullable = false, unique = true)
     private String lrNumber;
 
+    @Column(name = "paper_lr_number", length = 100)
+    private String paperLrNumber;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
