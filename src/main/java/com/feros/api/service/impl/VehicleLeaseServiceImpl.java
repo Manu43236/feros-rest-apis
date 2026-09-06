@@ -397,7 +397,8 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
                 .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
 
-        closeActiveSession(assignmentId, LocalDateTime.now());
+        if (sessionRepository.findByAssignmentIdAndIsActiveTrue(assignmentId).isPresent())
+            throw new FerosException("Cannot close vehicle — driver has an active session in progress. End the session first.", HttpStatus.CONFLICT);
 
         // Close driver assignment log so the driver's dashboard no longer shows On Lease
         leaseDriverLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(assignmentId)
