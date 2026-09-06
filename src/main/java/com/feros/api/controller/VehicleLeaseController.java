@@ -164,7 +164,7 @@ public class VehicleLeaseController {
     }
 
     @GetMapping("/{id}/sessions")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<List<LeaseVehicleSessionResponse>>> getSessions(
             @PathVariable Long id,
             @RequestParam(required = false) Long assignmentId) {
