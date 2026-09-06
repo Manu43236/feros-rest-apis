@@ -53,6 +53,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final UserRepository userRepository;
     private final StaffProfileRepository staffProfileRepository;
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
+    private final LeaseVehicleSessionRepository leaseVehicleSessionRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -327,11 +328,17 @@ public class DashboardServiceImpl implements DashboardService {
             ).map(log -> {
                 var va = log.getLeaseVehicleAssignment();
                 var lease = va.getLease();
+                var activeSession = leaseVehicleSessionRepository.findByAssignmentIdAndIsActiveTrue(va.getId()).orElse(null);
                 return DriverDashboardResponse.ActiveLease.builder()
                         .leaseId(lease.getId())
+                        .assignmentId(va.getId())
                         .leaseNumber(lease.getLeaseNumber())
                         .clientName(lease.getClient().getClientName())
                         .vehicleNumber(va.getVehicle().getRegistrationNumber())
+                        .divisionName(va.getDivisionName())
+                        .lastOdometer(va.getVehicle().getCurrentOdometerReading())
+                        .activeSessionId(activeSession != null ? activeSession.getId() : null)
+                        .sessionStartTime(activeSession != null ? activeSession.getStartTime() : null)
                         .build();
             }).orElse(null);
         }

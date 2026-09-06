@@ -281,6 +281,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .lease(lease)
                 .vehicle(vehicle)
                 .driverStaff(driver)
+                .clientDriverName(driver == null ? request.getClientDriverName() : null)
                 .ratePerVehicle(request.getRatePerVehicle())
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
@@ -317,6 +318,11 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
                 .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
 
+        // Block driver change if session is currently active
+        sessionRepository.findByAssignmentIdAndIsActiveTrue(assignmentId).ifPresent(s -> {
+            throw new FerosException("End the active session before changing the driver.", HttpStatus.CONFLICT);
+        });
+
         // Close previous driver log entry
         leaseDriverLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(assignmentId)
                 .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
@@ -324,21 +330,25 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         StaffProfile driver = null;
         if (request.getDriverStaffId() == null) {
             assignment.setDriverStaff(null);
+            assignment.setClientDriverName(request.getClientDriverName());
         } else {
-            driver = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(request.getDriverStaffId(), tenantId())
+            final StaffProfile resolvedDriver = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(request.getDriverStaffId(), tenantId())
                     .orElseThrow(() -> new FerosException("Driver not found", HttpStatus.NOT_FOUND));
 
-            // Unassign driver from any other active lease vehicle assignment
-            leaseDriverLogRepository.findActiveByDriverStaffId(driver.getId(), tenantId()).ifPresent(prevLog -> {
-                LeaseVehicleAssignment prevAssignment = prevLog.getLeaseVehicleAssignment();
-                if (!prevAssignment.getId().equals(assignmentId)) {
-                    prevAssignment.setDriverStaff(null);
-                    assignmentRepository.save(prevAssignment);
-                    prevLog.setUnassignedAt(LocalDateTime.now());
+            // Block if driver is already actively assigned to a different lease vehicle
+            leaseDriverLogRepository.findActiveByDriverStaffId(resolvedDriver.getId(), tenantId()).ifPresent(prevLog -> {
+                if (!prevLog.getLeaseVehicleAssignment().getId().equals(assignmentId)) {
+                    String leaseNum = prevLog.getLeaseVehicleAssignment().getLease().getLeaseNumber();
+                    String vehNum = prevLog.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber();
+                    throw new FerosException(
+                            resolvedDriver.getUser().getName() + " is already assigned to " + vehNum + " in lease " + leaseNum + ". Unassign them first.",
+                            HttpStatus.CONFLICT);
                 }
             });
 
+            driver = resolvedDriver;
             assignment.setDriverStaff(driver);
+            assignment.setClientDriverName(null);
         }
         LeaseVehicleAssignment saved = assignmentRepository.save(assignment);
 
@@ -476,18 +486,31 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         // Close any currently active session
         closeActiveSession(assignmentId, startTime);
 
+        // When called by a DRIVER — auto-fill from their own profile, verify ownership
+        Long resolvedDriverStaffId = request.getDriverStaffId();
+        if ("DRIVER".equals(SecurityUtil.getCurrentRole())) {
+            StaffProfile self = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(SecurityUtil.getCurrentUserId(), tenantId())
+                    .orElseThrow(() -> new FerosException("Staff profile not found", HttpStatus.NOT_FOUND));
+            if (assignment.getDriverStaff() == null || !assignment.getDriverStaff().getId().equals(self.getId()))
+                throw new FerosException("You are not the assigned driver for this vehicle.", HttpStatus.FORBIDDEN);
+            resolvedDriverStaffId = SecurityUtil.getCurrentUserId();
+        }
+
         // Resolve driver name if own staff
         String driverName = null;
-        if (request.getDriverStaffId() != null) {
-            StaffProfile driver = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(request.getDriverStaffId(), tenantId())
+        if (resolvedDriverStaffId != null) {
+            StaffProfile driver = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(resolvedDriverStaffId, tenantId())
                     .orElseThrow(() -> new FerosException("Driver not found", HttpStatus.NOT_FOUND));
             driverName = driver.getUser().getName();
         }
 
-        // Resolve division name
+        // Resolve division name — drivers use the assignment's current division, cannot change it
         String divisionName = null;
         Long divisionId = null;
-        if (request.getDivisionId() != null) {
+        if ("DRIVER".equals(SecurityUtil.getCurrentRole())) {
+            divisionId = assignment.getDivisionId();
+            divisionName = assignment.getDivisionName();
+        } else if (request.getDivisionId() != null) {
             ClientDivision division = clientDivisionRepository.findById(request.getDivisionId())
                     .orElseThrow(() -> new FerosException("Division not found", HttpStatus.NOT_FOUND));
             divisionId = division.getId();
@@ -505,7 +528,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
 
         LeaseVehicleSession session = LeaseVehicleSession.builder()
                 .assignment(assignment)
-                .driverStaffId(request.getDriverStaffId())
+                .driverStaffId(resolvedDriverStaffId)
                 .driverName(driverName)
                 .divisionId(divisionId)
                 .divisionName(divisionName)
@@ -538,6 +561,13 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
 
         LeaseVehicleSession session = sessionRepository.findByAssignmentIdAndIsActiveTrue(assignmentId)
                 .orElseThrow(() -> new FerosException("No active session found for this vehicle", HttpStatus.NOT_FOUND));
+
+        if ("DRIVER".equals(SecurityUtil.getCurrentRole())) {
+            StaffProfile self = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(SecurityUtil.getCurrentUserId(), tenantId())
+                    .orElseThrow(() -> new FerosException("Staff profile not found", HttpStatus.NOT_FOUND));
+            if (assignment.getDriverStaff() == null || !assignment.getDriverStaff().getId().equals(self.getId()))
+                throw new FerosException("You are not the assigned driver for this vehicle.", HttpStatus.FORBIDDEN);
+        }
 
         LocalDateTime end = endTime != null ? endTime : LocalDateTime.now();
         if (end.isAfter(LocalDateTime.now()))
@@ -714,6 +744,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .vehicleType(vehicleType)
                 .driverStaffId(driverStaffId)
                 .driverName(driverName)
+                .clientDriverName(a.getClientDriverName())
                 .ratePerVehicle(a.getRatePerVehicle())
                 .startDate(a.getStartDate())
                 .endDate(a.getEndDate())

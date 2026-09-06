@@ -14,8 +14,8 @@ public class LeaseVehicleAssignmentRequest {
     @NotNull(message = "Vehicle is required")
     private Long vehicleId;
 
-    // Null when client provides their own driver
     private Long driverStaffId;
+    private String clientDriverName;
 
     @NotNull(message = "Rate per vehicle is required")
     private BigDecimal ratePerVehicle;

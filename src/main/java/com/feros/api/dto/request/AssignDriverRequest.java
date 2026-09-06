@@ -6,5 +6,6 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 public class AssignDriverRequest {
-    private Long driverStaffId; // null = remove driver (client's driver)
+    private Long driverStaffId;      // null = client's driver
+    private String clientDriverName; // optional name when client provides driver
 }

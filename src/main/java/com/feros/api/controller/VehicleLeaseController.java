@@ -139,7 +139,7 @@ public class VehicleLeaseController {
     // ── Sessions ──────────────────────────────────────────────────────────────
 
     @PostMapping("/{id}/vehicles/{assignmentId}/sessions")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<LeaseVehicleSessionResponse>> startSession(
             @PathVariable Long id,
             @PathVariable Long assignmentId,
@@ -149,7 +149,7 @@ public class VehicleLeaseController {
     }
 
     @PutMapping("/{id}/vehicles/{assignmentId}/sessions/end")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<LeaseVehicleSessionResponse>> endSession(
             @PathVariable Long id,
             @PathVariable Long assignmentId,

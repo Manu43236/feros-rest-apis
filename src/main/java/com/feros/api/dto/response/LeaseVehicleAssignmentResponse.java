@@ -17,6 +17,7 @@ public class LeaseVehicleAssignmentResponse {
     private String vehicleType;
     private Long driverStaffId;
     private String driverName;
+    private String clientDriverName;
     private BigDecimal ratePerVehicle;
     private LocalDate startDate;
     private LocalDate endDate;

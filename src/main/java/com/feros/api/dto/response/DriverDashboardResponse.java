@@ -47,9 +47,15 @@ public class DriverDashboardResponse {
     @Builder
     public static class ActiveLease {
         private Long leaseId;
+        private Long assignmentId;
         private String leaseNumber;
         private String clientName;
         private String vehicleNumber;
+        private String divisionName;
+        private java.math.BigDecimal lastOdometer;
+        // Active session info (null if no session running)
+        private Long activeSessionId;
+        private java.time.LocalDateTime sessionStartTime;
     }
 
     @Data

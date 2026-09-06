@@ -32,6 +32,9 @@ public class LeaseVehicleAssignment extends BaseEntity {
     @JoinColumn(name = "driver_staff_id")
     private StaffProfile driverStaff;
 
+    @Column(name = "client_driver_name")
+    private String clientDriverName;
+
     @Column(name = "rate_per_vehicle", precision = 12, scale = 2, nullable = false)
     private BigDecimal ratePerVehicle;
 
