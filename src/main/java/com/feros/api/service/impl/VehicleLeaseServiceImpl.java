@@ -399,6 +399,10 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
 
         closeActiveSession(assignmentId, LocalDateTime.now());
 
+        // Close driver assignment log so the driver's dashboard no longer shows On Lease
+        leaseDriverLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(assignmentId)
+                .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
+
         assignment.setIsActive(false);
         assignment.setEndDate(LocalDate.now());
         assignment.setOdometerAtEnd(odometerAtEnd);
