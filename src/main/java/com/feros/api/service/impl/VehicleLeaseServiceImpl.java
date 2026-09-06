@@ -325,7 +325,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         if (request.getDriverStaffId() == null) {
             assignment.setDriverStaff(null);
         } else {
-            driver = staffProfileRepository.findByIdAndTenantId(request.getDriverStaffId(), tenantId())
+            driver = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(request.getDriverStaffId(), tenantId())
                     .orElseThrow(() -> new FerosException("Driver not found", HttpStatus.NOT_FOUND));
             assignment.setDriverStaff(driver);
         }
