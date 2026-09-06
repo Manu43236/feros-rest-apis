@@ -327,6 +327,17 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         } else {
             driver = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(request.getDriverStaffId(), tenantId())
                     .orElseThrow(() -> new FerosException("Driver not found", HttpStatus.NOT_FOUND));
+
+            // Unassign driver from any other active lease vehicle assignment
+            leaseDriverLogRepository.findActiveByDriverStaffId(driver.getId(), tenantId()).ifPresent(prevLog -> {
+                LeaseVehicleAssignment prevAssignment = prevLog.getLeaseVehicleAssignment();
+                if (!prevAssignment.getId().equals(assignmentId)) {
+                    prevAssignment.setDriverStaff(null);
+                    assignmentRepository.save(prevAssignment);
+                    prevLog.setUnassignedAt(LocalDateTime.now());
+                }
+            });
+
             assignment.setDriverStaff(driver);
         }
         LeaseVehicleAssignment saved = assignmentRepository.save(assignment);
