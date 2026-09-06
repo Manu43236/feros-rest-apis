@@ -17,5 +17,7 @@ public class StaffAssignmentHistoryResponse {
     private String action; // "Assigned" or "Unassigned"
     private String actionByName;
     private LocalDateTime actionAt;
+    private String type; // "VEHICLE_ASSIGNMENT" | "ORDER_ALLOCATION" | "LEASE_ASSIGNMENT"
     private String orderNumber;
+    private String leaseNumber;
 }

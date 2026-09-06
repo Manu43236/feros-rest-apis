@@ -55,6 +55,7 @@ public class UserServiceImpl implements UserService {
     private final StateRepository stateRepository;
     private final EmploymentTypeRepository employmentTypeRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
+    private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     private final NotificationService notificationService;
     private final AttendanceRepository attendanceRepository;
     private final NumberGeneratorService numberGenerator;
@@ -166,8 +167,19 @@ public class UserServiceImpl implements UserService {
                 .stream()
                 .collect(Collectors.toMap(p -> p.getUser().getId(), p -> p));
 
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        // staffProfileId → active lease log (one query for all users)
+        Map<Long, com.feros.api.entity.LeaseDriverAssignmentLog> activeLeaseLogByStaffId =
+                leaseDriverAssignmentLogRepository.findAllActiveByTenantId(tenantId)
+                        .stream()
+                        .filter(l -> l.getDriverStaff() != null)
+                        .collect(Collectors.toMap(
+                                l -> l.getDriverStaff().getId(),
+                                l -> l,
+                                (a, b) -> a));
+
         return users.stream()
-                .map(u -> mapToResponseBulk(u, completedCounts, activeAllocByUser, profileByUser))
+                .map(u -> mapToResponseBulk(u, completedCounts, activeAllocByUser, profileByUser, activeLeaseLogByStaffId))
                 .toList();
     }
 
@@ -725,9 +737,16 @@ public class UserServiceImpl implements UserService {
                 orderStaffAllocationRepository.findActiveAllocationsForUser(user.getId(), driverActiveStatuses);
         if (!activeAllocs.isEmpty()) {
             response.setIsAssigned(true);
+            response.setAssignmentType("ORDER");
             response.setActiveOrderNumber(activeAllocs.get(0).getOrder().getOrderNumber());
         } else {
-            response.setIsAssigned(false);
+            staffProfileRepository.findByUserId(user.getId()).flatMap(sp ->
+                leaseDriverAssignmentLogRepository.findActiveByDriverStaffId(sp.getId(), user.getTenant() != null ? user.getTenant().getId() : null)
+            ).ifPresentOrElse(log -> {
+                response.setIsAssigned(true);
+                response.setAssignmentType("LEASE");
+                response.setActiveLeaseNumber(log.getLeaseVehicleAssignment().getLease().getLeaseNumber());
+            }, () -> response.setIsAssigned(false));
         }
 
         staffProfileRepository.findByUserId(user.getId()).ifPresent(profile -> {
@@ -759,7 +778,8 @@ public class UserServiceImpl implements UserService {
             User user,
             Map<Long, Long> completedCounts,
             Map<Long, com.feros.api.entity.OrderStaffAllocation> activeAllocByUser,
-            Map<Long, StaffProfile> profileByUser) {
+            Map<Long, StaffProfile> profileByUser,
+            Map<Long, com.feros.api.entity.LeaseDriverAssignmentLog> activeLeaseLogByStaffId) {
 
         String pinToReturn = user.getPlainPin();
         UserResponse response = UserResponse.builder()
@@ -782,9 +802,19 @@ public class UserServiceImpl implements UserService {
         com.feros.api.entity.OrderStaffAllocation activeAlloc = activeAllocByUser.get(user.getId());
         if (activeAlloc != null) {
             response.setIsAssigned(true);
+            response.setAssignmentType("ORDER");
             response.setActiveOrderNumber(activeAlloc.getOrder().getOrderNumber());
         } else {
-            response.setIsAssigned(false);
+            StaffProfile sp = profileByUser.get(user.getId());
+            com.feros.api.entity.LeaseDriverAssignmentLog leaseLog =
+                    sp != null ? activeLeaseLogByStaffId.get(sp.getId()) : null;
+            if (leaseLog != null) {
+                response.setIsAssigned(true);
+                response.setAssignmentType("LEASE");
+                response.setActiveLeaseNumber(leaseLog.getLeaseVehicleAssignment().getLease().getLeaseNumber());
+            } else {
+                response.setIsAssigned(false);
+            }
         }
 
         StaffProfile profile = profileByUser.get(user.getId());

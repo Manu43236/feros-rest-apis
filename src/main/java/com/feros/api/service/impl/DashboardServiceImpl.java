@@ -51,6 +51,8 @@ public class DashboardServiceImpl implements DashboardService {
     private final VehicleMeterReadingRepository vehicleMeterReadingRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
     private final UserRepository userRepository;
+    private final StaffProfileRepository staffProfileRepository;
+    private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -317,6 +319,23 @@ public class DashboardServiceImpl implements DashboardService {
             }
         }
 
+        // ── Active lease assignment ───────────────────────────────────────────
+        DriverDashboardResponse.ActiveLease activeLease = null;
+        if (activeTrip == null && upcoming.isEmpty() && assignedOrder == null) {
+            activeLease = staffProfileRepository.findByUserId(userId).flatMap(sp ->
+                leaseDriverAssignmentLogRepository.findActiveByDriverStaffId(sp.getId(), tenantId)
+            ).map(log -> {
+                var va = log.getLeaseVehicleAssignment();
+                var lease = va.getLease();
+                return DriverDashboardResponse.ActiveLease.builder()
+                        .leaseId(lease.getId())
+                        .leaseNumber(lease.getLeaseNumber())
+                        .clientName(lease.getClient().getClientName())
+                        .vehicleNumber(va.getVehicle().getRegistrationNumber())
+                        .build();
+            }).orElse(null);
+        }
+
         return DriverDashboardResponse.builder()
                 .totalTrips(totalTrips)
                 .pendingTrips(pendingTrips)
@@ -330,6 +349,7 @@ public class DashboardServiceImpl implements DashboardService {
                 .upcomingTrips(upcoming)
                 .assignedVehicle(assignedVehicle)
                 .assignedOrder(assignedOrder)
+                .activeLease(activeLease)
                 .build();
     }
 

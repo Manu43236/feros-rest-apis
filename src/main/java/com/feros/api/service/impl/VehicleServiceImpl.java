@@ -69,6 +69,8 @@ public class VehicleServiceImpl implements VehicleService {
     private final VehicleImageRepository vehicleImageRepository;
     private final LrRepository lrRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
+    private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
+    private final LeaseVehicleAssignmentRepository leaseVehicleAssignmentRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -712,6 +714,7 @@ public class VehicleServiceImpl implements VehicleService {
 
     private VehicleResponse mapToResponse(Vehicle v) {
         var activeLr = lrRepository.findInTransitLrByVehicleId(v.getId()).orElse(null);
+        var activeLease = leaseVehicleAssignmentRepository.findByLeaseIdAndVehicleIdActive(v.getId()).orElse(null);
         return VehicleResponse.builder()
                 .id(v.getId())
                 .tenantId(v.getTenant().getId())
@@ -776,6 +779,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .activeLrNumber(activeLr != null ? activeLr.getLrNumber() : null)
                 .activeOrderId(activeLr != null ? activeLr.getOrder().getId() : null)
                 .activeOrderNumber(activeLr != null ? activeLr.getOrder().getOrderNumber() : null)
+                .activeLeaseNumber(activeLease != null ? activeLease.getLease().getLeaseNumber() : null)
                 .build();
     }
 
@@ -1120,7 +1124,6 @@ public class VehicleServiceImpl implements VehicleService {
             String userRole = a.getUser() != null ? a.getUser().getRoles().stream().findFirst()
                     .map(r -> r.getName().name()).orElse(null) : null;
 
-            // Find the OrderStaffAllocation for this user+vehicle closest in time to the assignment
             String orderNum = null;
             if (userId != null && vehicleId != null && a.getCreatedAt() != null) {
                 java.time.LocalDateTime assignedAt = a.getCreatedAt();
@@ -1133,36 +1136,53 @@ public class VehicleServiceImpl implements VehicleService {
             }
 
             events.add(com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
-                    .id(a.getId())
-                    .vehicleId(vehicleId)
-                    .vehicleRegistrationNumber(regNum)
-                    .userId(userId)
-                    .userName(userName)
-                    .userRole(userRole)
-                    .action("Assigned")
+                    .id(a.getId()).vehicleId(vehicleId).vehicleRegistrationNumber(regNum)
+                    .userId(userId).userName(userName).userRole(userRole)
+                    .type("VEHICLE_ASSIGNMENT").action("Assigned")
                     .actionByName(a.getAssignedBy() != null ? a.getAssignedBy().getName() : null)
-                    .actionAt(a.getCreatedAt())
-                    .orderNumber(orderNum)
-                    .build());
+                    .actionAt(a.getCreatedAt()).orderNumber(orderNum).build());
 
             if (a.getUnassignedAt() != null) {
                 events.add(com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
-                        .id(a.getId())
-                        .vehicleId(vehicleId)
-                        .vehicleRegistrationNumber(regNum)
-                        .userId(userId)
-                        .userName(userName)
-                        .userRole(userRole)
-                        .action("Unassigned")
+                        .id(a.getId()).vehicleId(vehicleId).vehicleRegistrationNumber(regNum)
+                        .userId(userId).userName(userName).userRole(userRole)
+                        .type("VEHICLE_ASSIGNMENT").action("Unassigned")
                         .actionByName(a.getUnassignedBy() != null ? a.getUnassignedBy().getName() : null)
-                        .actionAt(a.getUnassignedAt())
-                        .orderNumber(orderNum)
-                        .build());
+                        .actionAt(a.getUnassignedAt()).orderNumber(orderNum).build());
             }
         }
 
-        // Sort newest first; truncate to seconds so same-second events always tie,
-        // then Assigned (happened after unassignment) sorts above Unassigned at same second
+        // Merge lease driver assignment logs
+        for (com.feros.api.entity.LeaseDriverAssignmentLog l :
+                leaseDriverAssignmentLogRepository.findAllByTenantIdForHistory(tenantId)) {
+            com.feros.api.entity.StaffProfile sp = l.getDriverStaff();
+            com.feros.api.entity.User driverUser = sp != null ? sp.getUser() : null;
+            com.feros.api.entity.LeaseVehicleAssignment lva = l.getLeaseVehicleAssignment();
+            String regNum = lva != null && lva.getVehicle() != null ? lva.getVehicle().getRegistrationNumber() : null;
+            Long vehicleId = lva != null && lva.getVehicle() != null ? lva.getVehicle().getId() : null;
+            String leaseNum = lva != null && lva.getLease() != null ? lva.getLease().getLeaseNumber() : null;
+            Long userId = driverUser != null ? driverUser.getId() : null;
+            String userName = driverUser != null ? driverUser.getName() : null;
+            String userRole = driverUser != null ? driverUser.getRoles().stream().findFirst()
+                    .map(r -> r.getName().name()).orElse(null) : null;
+
+            events.add(com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
+                    .id(l.getId()).vehicleId(vehicleId).vehicleRegistrationNumber(regNum)
+                    .userId(userId).userName(userName).userRole(userRole)
+                    .type("LEASE_ASSIGNMENT").action("Assigned")
+                    .actionByName(l.getAssignedBy() != null ? l.getAssignedBy().getName() : null)
+                    .actionAt(l.getAssignedAt()).leaseNumber(leaseNum).build());
+
+            if (l.getUnassignedAt() != null) {
+                events.add(com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
+                        .id(l.getId()).vehicleId(vehicleId).vehicleRegistrationNumber(regNum)
+                        .userId(userId).userName(userName).userRole(userRole)
+                        .type("LEASE_ASSIGNMENT").action("Unassigned")
+                        .actionByName(null).actionAt(l.getUnassignedAt()).leaseNumber(leaseNum).build());
+            }
+        }
+
+        // Sort newest first
         events.sort(java.util.Comparator
                 .<com.feros.api.dto.response.StaffAssignmentHistoryResponse, java.time.LocalDateTime>comparing(
                         e -> e.getActionAt() != null

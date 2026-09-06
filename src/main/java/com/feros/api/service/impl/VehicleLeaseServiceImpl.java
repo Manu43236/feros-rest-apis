@@ -15,6 +15,8 @@ import com.feros.api.enums.LeaseStatus;
 import com.feros.api.enums.NotificationType;
 import com.feros.api.enums.RateType;
 import com.feros.api.enums.RoleName;
+import com.feros.api.enums.StaffAllocationStatus;
+import com.feros.api.enums.VehicleAllocationStatus;
 import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.service.NotificationService;
 import com.feros.api.repository.LeaseDailyLogRepository;
@@ -57,6 +59,11 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     private final ClientDivisionRepository clientDivisionRepository;
     private final NumberGeneratorService numberGenerator;
     private final NotificationService notificationService;
+    private final LeaseDriverAssignmentLogRepository leaseDriverLogRepository;
+    private final OrderVehicleAllocationRepository orderVehicleAllocationRepository;
+    private final OrderStaffAllocationRepository orderStaffAllocationRepository;
+    private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    private final UserRepository userRepository;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
 
@@ -209,8 +216,58 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(request.getVehicleId(), tenantId())
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
 
-        if (assignmentRepository.existsActiveLeaseForVehicle(vehicle.getId()))
-            throw new FerosException("Vehicle is already on an active lease", HttpStatus.BAD_REQUEST);
+        VehicleStatusType statusType = vehicle.getCurrentStatus() != null
+                ? vehicle.getCurrentStatus().getStatusType() : null;
+
+        // Block ON_TRIP vehicles — session in progress
+        if (statusType == VehicleStatusType.ON_TRIP) {
+            throw new FerosException("Vehicle is currently on a trip and cannot be reassigned", HttpStatus.BAD_REQUEST);
+        }
+
+        // If vehicle is on an active order (ALLOCATED/LR_CREATED) — unassign it first
+        if (statusType != VehicleStatusType.ON_LEASE) {
+            List<com.feros.api.entity.OrderVehicleAllocation> activeOrderAllocs =
+                    orderVehicleAllocationRepository.findCurrentActiveAllocationsForVehicle(vehicle.getId());
+            for (com.feros.api.entity.OrderVehicleAllocation ova : activeOrderAllocs) {
+                if (ova.getAllocationStatus() == VehicleAllocationStatus.IN_TRANSIT)
+                    throw new FerosException("Vehicle is currently in transit and cannot be reassigned", HttpStatus.BAD_REQUEST);
+                // Cancel linked staff allocations
+                List<com.feros.api.entity.OrderStaffAllocation> staffAllocs =
+                        orderStaffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(ova.getId());
+                for (com.feros.api.entity.OrderStaffAllocation sa : staffAllocs) {
+                    sa.setAllocationStatus(StaffAllocationStatus.CANCELLED);
+                    sa.setIsActive(false);
+                }
+                orderStaffAllocationRepository.saveAll(staffAllocs);
+                // Close open VSA for each staff member
+                for (com.feros.api.entity.OrderStaffAllocation sa : staffAllocs) {
+                    vehicleStaffAssignmentRepository
+                            .findAllByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(
+                                    sa.getUser().getId(), tenantId())
+                            .forEach(vsa -> {
+                                vsa.setAssignedTo(LocalDate.now());
+                                vsa.setUnassignedAt(LocalDateTime.now());
+                                vsa.setIsActive(false);
+                            });
+                }
+                ova.setAllocationStatus(VehicleAllocationStatus.CANCELLED);
+                ova.setIsActive(false);
+            }
+            orderVehicleAllocationRepository.saveAll(activeOrderAllocs);
+        }
+
+        // If vehicle is on an active lease — close that assignment first
+        if (statusType == VehicleStatusType.ON_LEASE) {
+            assignmentRepository.findByLeaseIdAndVehicleIdActive(vehicle.getId()).ifPresent(existing -> {
+                closeActiveSession(existing.getId(), LocalDateTime.now());
+                existing.setIsActive(false);
+                existing.setEndDate(LocalDate.now());
+                // Close open lease driver log
+                leaseDriverLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(existing.getId())
+                        .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
+                assignmentRepository.save(existing);
+            });
+        }
 
         StaffProfile driver = null;
         if (request.getDriverStaffId() != null) {
@@ -230,13 +287,25 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .isActive(true)
                 .build();
 
-        // Mark vehicle as On Lease if lease is active
         if (lease.getStatus() == LeaseStatus.ACTIVE) {
             setVehicleOnLease(vehicle);
             vehicleRepository.save(vehicle);
         }
 
-        return toAssignmentResponse(assignmentRepository.save(assignment));
+        LeaseVehicleAssignment saved = assignmentRepository.save(assignment);
+
+        // Write initial driver log if driver provided
+        if (driver != null) {
+            leaseDriverLogRepository.save(LeaseDriverAssignmentLog.builder()
+                    .leaseVehicleAssignment(saved)
+                    .driverStaff(driver)
+                    .assignedAt(LocalDateTime.now())
+                    .assignedBy(userRepository.findById(SecurityUtil.getCurrentUserId()).orElse(null))
+                    .tenant(tenant())
+                    .build());
+        }
+
+        return toAssignmentResponse(saved);
     }
 
     @Override
@@ -245,6 +314,10 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         fetchLease(leaseId);
         LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
                 .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
+
+        // Close previous driver log entry
+        leaseDriverLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(assignmentId)
+                .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
 
         StaffProfile driver = null;
         if (request.getDriverStaffId() == null) {
@@ -255,13 +328,22 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
             assignment.setDriverStaff(driver);
         }
         LeaseVehicleAssignment saved = assignmentRepository.save(assignment);
-        if (driver != null && driver.getUser() != null) {
-            VehicleLease lease = saved.getLease();
-            notificationService.sendToUser(lease.getTenant(), driver.getUser(),
+
+        // Write new driver log entry (only when a real driver is assigned, not client's driver)
+        if (driver != null) {
+            leaseDriverLogRepository.save(LeaseDriverAssignmentLog.builder()
+                    .leaseVehicleAssignment(saved)
+                    .driverStaff(driver)
+                    .assignedAt(LocalDateTime.now())
+                    .assignedBy(userRepository.findById(SecurityUtil.getCurrentUserId()).orElse(null))
+                    .tenant(tenant())
+                    .build());
+
+            notificationService.sendToUser(saved.getLease().getTenant(), driver.getUser(),
                     NotificationType.LEASE_DRIVER_ASSIGNED,
                     "Vehicle Assigned to You",
                     "You have been assigned to " + saved.getVehicle().getRegistrationNumber()
-                            + " for lease " + lease.getLeaseNumber() + ".");
+                            + " for lease " + saved.getLease().getLeaseNumber() + ".");
         }
         return toAssignmentResponse(saved);
     }

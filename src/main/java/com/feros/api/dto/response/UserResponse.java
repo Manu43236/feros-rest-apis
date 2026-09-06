@@ -28,6 +28,8 @@ public class UserResponse {
     // Active allocation fields
     private Boolean isAssigned;
     private String activeOrderNumber;
+    private String assignmentType;   // "ORDER" | "LEASE" | null
+    private String activeLeaseNumber;
 
     // Staff Profile fields
     private String designationName;

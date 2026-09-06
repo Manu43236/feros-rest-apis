@@ -3,3 +3,4 @@ ALTER TABLE `lrs`
 
 ALTER TABLE `orders`
     ADD COLUMN `is_pol` TINYINT(1) NOT NULL DEFAULT 0;
+    

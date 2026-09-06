@@ -20,6 +20,7 @@ public class DriverDashboardResponse {
     private List<UpcomingTrip> upcomingTrips;
     private AssignedVehicle assignedVehicle;
     private AssignedOrder assignedOrder;
+    private ActiveLease activeLease;
 
     @Data
     @Builder
@@ -40,6 +41,15 @@ public class DriverDashboardResponse {
         private String toCity;
         private java.time.LocalDate expectedLoadDate;
         private java.time.LocalDate expectedDeliveryDate;
+    }
+
+    @Data
+    @Builder
+    public static class ActiveLease {
+        private Long leaseId;
+        private String leaseNumber;
+        private String clientName;
+        private String vehicleNumber;
     }
 
     @Data

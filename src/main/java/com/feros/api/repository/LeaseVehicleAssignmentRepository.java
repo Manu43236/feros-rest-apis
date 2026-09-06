@@ -26,4 +26,13 @@ public interface LeaseVehicleAssignmentRepository extends JpaRepository<LeaseVeh
     boolean existsActiveLeaseForVehicle(@Param("vehicleId") Long vehicleId);
 
     long countByLeaseId(Long leaseId);
+
+    // Find the active assignment for a vehicle on any active lease (for lease-to-lease transfer)
+    @Query("""
+        SELECT a FROM LeaseVehicleAssignment a
+        WHERE a.vehicle.id = :vehicleId
+          AND a.isActive = true
+          AND a.lease.status = com.feros.api.enums.LeaseStatus.ACTIVE
+    """)
+    Optional<LeaseVehicleAssignment> findByLeaseIdAndVehicleIdActive(@Param("vehicleId") Long vehicleId);
 }

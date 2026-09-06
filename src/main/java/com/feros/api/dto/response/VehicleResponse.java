@@ -102,4 +102,5 @@ public class VehicleResponse {
     private String activeLrNumber;
     private Long activeOrderId;
     private String activeOrderNumber;
+    private String activeLeaseNumber;
 }
