@@ -252,6 +252,8 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 }
                 ova.setAllocationStatus(VehicleAllocationStatus.CANCELLED);
                 ova.setIsActive(false);
+                ova.setUnassignedAt(LocalDateTime.now());
+                ova.setUnassignedBy(userRepository.findById(SecurityUtil.getCurrentUserId()).orElse(null));
             }
             orderVehicleAllocationRepository.saveAll(activeOrderAllocs);
         }
@@ -271,7 +273,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
 
         StaffProfile driver = null;
         if (request.getDriverStaffId() != null) {
-            driver = staffProfileRepository.findByIdAndTenantId(request.getDriverStaffId(), tenantId())
+            driver = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(request.getDriverStaffId(), tenantId())
                     .orElseThrow(() -> new FerosException("Driver not found", HttpStatus.NOT_FOUND));
         }
 
@@ -689,7 +691,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
 
     private LeaseVehicleAssignmentResponse toAssignmentResponse(LeaseVehicleAssignment a) {
         String driverName = a.getDriverStaff() != null ? a.getDriverStaff().getUser().getName() : null;
-        Long driverStaffId = a.getDriverStaff() != null ? a.getDriverStaff().getId() : null;
+        Long driverStaffId = a.getDriverStaff() != null ? a.getDriverStaff().getUser().getId() : null;
         String vehicleType = a.getVehicle().getVehicleType() != null
                 ? a.getVehicle().getVehicleType().getName() : null;
 
