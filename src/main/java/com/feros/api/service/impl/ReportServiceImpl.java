@@ -2124,6 +2124,82 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     @Transactional(readOnly = true)
+    public VehiclePayrollCostResponse getVehiclePayrollCost(Long vehicleId, String role, LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
+
+        List<VehicleStaffAssignment> assignments = vehicleStaffAssignmentRepository
+                .findByVehicleIdAndPeriod(vehicleId, tenantId, startDate, endDate);
+
+        if (role != null && !role.equalsIgnoreCase("ALL")) {
+            assignments = assignments.stream()
+                    .filter(a -> a.getUser().getRoles().stream()
+                            .anyMatch(r -> r.getName().name().equalsIgnoreCase(role)))
+                    .toList();
+        }
+
+        List<VehiclePayrollCostRow> rows = new ArrayList<>();
+        java.math.BigDecimal total = java.math.BigDecimal.ZERO;
+
+        for (VehicleStaffAssignment assignment : assignments) {
+            Long userId = assignment.getUser().getId();
+            String userName = assignment.getUser().getName();
+            String userRole = assignment.getUser().getRoles().stream().findFirst()
+                    .map(r -> r.getName().name()).orElse("UNKNOWN");
+
+            List<Payroll> payrolls = payrollRepository.findAllOverlappingByUser(userId, tenantId, startDate, endDate);
+
+            LocalDate assignStart = assignment.getAssignedFrom().isBefore(startDate) ? startDate : assignment.getAssignedFrom();
+            LocalDate assignEnd = assignment.getAssignedTo() == null ? endDate
+                    : (assignment.getAssignedTo().isAfter(endDate) ? endDate : assignment.getAssignedTo());
+
+            if (assignStart.isAfter(assignEnd)) continue;
+
+            LocalDate cursor = assignStart;
+            while (!cursor.isAfter(assignEnd)) {
+                final LocalDate day = cursor;
+                payrolls.stream()
+                        .filter(p -> !p.getPayCycleStartDate().isAfter(day) && !p.getPayCycleEndDate().isBefore(day))
+                        .findFirst()
+                        .ifPresent(p -> {
+                            java.math.BigDecimal rate = p.getDailyRate();
+                            if ((rate == null || rate.compareTo(java.math.BigDecimal.ZERO) == 0)
+                                    && p.getMonthlySalary() != null && p.getTotalDays() != null && p.getTotalDays() > 0) {
+                                rate = p.getMonthlySalary().divide(
+                                        java.math.BigDecimal.valueOf(p.getTotalDays()), 2, java.math.RoundingMode.HALF_UP);
+                            }
+                            if (rate != null && rate.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                                rows.add(VehiclePayrollCostRow.builder()
+                                        .date(day)
+                                        .vehicleNumber(vehicle.getRegistrationNumber())
+                                        .staffName(userName)
+                                        .role(userRole)
+                                        .dailyPay(rate)
+                                        .payrollStatus(p.getPayrollStatus().name())
+                                        .build());
+                            }
+                        });
+                cursor = cursor.plusDays(1);
+            }
+        }
+
+        rows.sort(java.util.Comparator.comparing(VehiclePayrollCostRow::getDate));
+        java.math.BigDecimal grandTotal = rows.stream()
+                .map(VehiclePayrollCostRow::getDailyPay)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+        return VehiclePayrollCostResponse.builder()
+                .vehicleNumber(vehicle.getRegistrationNumber())
+                .startDate(startDate)
+                .endDate(endDate)
+                .rows(rows)
+                .totalAmount(grandTotal)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<PayrollSummaryReportRow> getPayrollSummary(LocalDate startDate, LocalDate endDate) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         List<Payroll> payrolls = payrollRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);

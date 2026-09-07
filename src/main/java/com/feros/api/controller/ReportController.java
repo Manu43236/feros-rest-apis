@@ -1561,6 +1561,38 @@ public class ReportController {
         return export("payroll-ytd-" + y, "Payroll YTD — " + y, headers, data, format);
     }
 
+    @GetMapping("/payroll/vehicle-cost")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<com.feros.api.dto.response.report.VehiclePayrollCostResponse>> getVehiclePayrollCost(
+            @RequestParam Long vehicleId,
+            @RequestParam(defaultValue = "ALL") String role,
+            @RequestParam String startDate,
+            @RequestParam String endDate) {
+        return ResponseEntity.ok(ApiResponse.success("OK",
+                reportService.getVehiclePayrollCost(vehicleId, role,
+                        LocalDate.parse(startDate), LocalDate.parse(endDate))));
+    }
+
+    @GetMapping("/payroll/vehicle-cost/export")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<byte[]> exportVehiclePayrollCost(
+            @RequestParam Long vehicleId,
+            @RequestParam(defaultValue = "ALL") String role,
+            @RequestParam String startDate,
+            @RequestParam String endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        var result = reportService.getVehiclePayrollCost(vehicleId, role,
+                LocalDate.parse(startDate), LocalDate.parse(endDate));
+        String[] headers = {"Date", "Vehicle No.", "Name", "Role", "Daily Pay (₹)", "Payroll Status"};
+        List<String[]> data = result.getRows().stream().map(r -> new String[]{
+                safe(r.getDate()), safe(r.getVehicleNumber()), safe(r.getStaffName()),
+                safe(r.getRole()), safe(r.getDailyPay()), safe(r.getPayrollStatus())
+        }).toList();
+        return export("vehicle-payroll-cost-" + startDate + "-" + endDate,
+                "Vehicle Payroll Cost — " + result.getVehicleNumber() + " (" + startDate + " to " + endDate + ")",
+                headers, data, format);
+    }
+
     // ── Daily Fleet Attendance ────────────────────────────────────────────────
 
     @GetMapping("/vehicles/daily-fleet-attendance")

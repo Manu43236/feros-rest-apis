@@ -102,6 +102,8 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
     List<TyreRotationRow> getTyreRotationLog(LocalDate startDate, LocalDate endDate);
 
     // ── Payroll Reports ────────────────────────────────────────────────────────
+    VehiclePayrollCostResponse getVehiclePayrollCost(Long vehicleId, String role, LocalDate startDate, LocalDate endDate);
+
     List<PayrollSummaryReportRow> getPayrollSummary(LocalDate startDate, LocalDate endDate);
     List<SalaryRegisterRow> getSalaryRegister(LocalDate startDate, LocalDate endDate);
     List<AdvanceRegisterRow> getAdvanceRegister(LocalDate startDate, LocalDate endDate);
