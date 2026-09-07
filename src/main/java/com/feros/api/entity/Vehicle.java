@@ -92,15 +92,6 @@ public class Vehicle extends BaseEntity {
     @Column(name = "owner_pan")
     private String ownerPan;
 
-    // GPS
-    @Column(name = "gps_device_number")
-    private String gpsDeviceNumber;
-
-    @Column(name = "gps_device_imei")
-    private String gpsDeviceImei;
-
-    @Column(name = "gps_provider")
-    private String gpsProvider;
 
     // Odometer
     @Column(name = "current_odometer_reading")

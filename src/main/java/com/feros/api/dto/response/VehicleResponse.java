@@ -51,10 +51,6 @@ public class VehicleResponse {
     private LocalDate agreementEndDate;
     private BigDecimal agreementAmount;
 
-    // GPS
-    private String gpsDeviceNumber;
-    private String gpsDeviceImei;
-    private String gpsProvider;
 
     private BigDecimal currentOdometerReading;
     private BigDecimal fuelTankCapacity;

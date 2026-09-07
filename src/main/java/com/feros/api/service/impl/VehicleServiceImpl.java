@@ -151,9 +151,6 @@ public class VehicleServiceImpl implements VehicleService {
                 .agreementStartDate(request.getAgreementStartDate())
                 .agreementEndDate(request.getAgreementEndDate())
                 .agreementAmount(request.getAgreementAmount())
-                .gpsDeviceNumber(request.getGpsDeviceNumber())
-                .gpsDeviceImei(request.getGpsDeviceImei())
-                .gpsProvider(request.getGpsProvider())
                 .currentOdometerReading(request.getCurrentOdometerReading())
                 .fuelTankCapacity(request.getFuelTankCapacity())
                 .currentFuelLevel(request.getCurrentFuelLevel())
@@ -291,9 +288,6 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setAgreementStartDate(request.getAgreementStartDate());
         vehicle.setAgreementEndDate(request.getAgreementEndDate());
         vehicle.setAgreementAmount(request.getAgreementAmount());
-        vehicle.setGpsDeviceNumber(request.getGpsDeviceNumber());
-        vehicle.setGpsDeviceImei(request.getGpsDeviceImei());
-        vehicle.setGpsProvider(request.getGpsProvider());
         vehicle.setCurrentOdometerReading(request.getCurrentOdometerReading());
         vehicle.setFuelTankCapacity(request.getFuelTankCapacity());
         vehicle.setCurrentFuelLevel(request.getCurrentFuelLevel());
@@ -576,67 +570,55 @@ public class VehicleServiceImpl implements VehicleService {
                     if (row.length > 15 && !row[15].isBlank())
                         try { builder.tyreRotationIntervalKm(Integer.parseInt(row[15].trim())); } catch (NumberFormatException ignored) {}
 
-                    // col 16: gpsDeviceNumber
-                    if (row.length > 16 && !row[16].isBlank())
-                        builder.gpsDeviceNumber(row[16].trim());
-
-                    // col 17: gpsDeviceImei
-                    if (row.length > 17 && !row[17].isBlank())
-                        builder.gpsDeviceImei(row[17].trim());
-
-                    // col 18: gpsProvider
-                    if (row.length > 18 && !row[18].isBlank())
-                        builder.gpsProvider(row[18].trim());
-
-                    // col 19: isFinanced (true/yes/1)
-                    if (row.length > 19 && !row[19].isBlank()) {
-                        String val = row[19].trim().toLowerCase();
+                    // col 16: isFinanced (true/yes/1)
+                    if (row.length > 16 && !row[16].isBlank()) {
+                        String val = row[16].trim().toLowerCase();
                         builder.isFinanced(val.equals("true") || val.equals("yes") || val.equals("1"));
                     }
 
-                    // col 20: financerName
+                    // col 17: financerName
+                    if (row.length > 17 && !row[17].isBlank())
+                        builder.financerName(row[17].trim());
+
+                    // col 18: financeStartDate
+                    if (row.length > 18 && !row[18].isBlank())
+                        builder.financeStartDate(parseDate(row[18]));
+
+                    // col 19: financeEndDate
+                    if (row.length > 19 && !row[19].isBlank())
+                        builder.financeEndDate(parseDate(row[19]));
+
+                    // col 20: ownerName
                     if (row.length > 20 && !row[20].isBlank())
-                        builder.financerName(row[20].trim());
+                        builder.ownerName(row[20].trim());
 
-                    // col 21: financeStartDate
+                    // col 21: ownerPhone
                     if (row.length > 21 && !row[21].isBlank())
-                        builder.financeStartDate(parseDate(row[21]));
+                        builder.ownerPhone(row[21].trim());
 
-                    // col 22: financeEndDate
+                    // col 22: ownerAddress
                     if (row.length > 22 && !row[22].isBlank())
-                        builder.financeEndDate(parseDate(row[22]));
+                        builder.ownerAddress(row[22].trim());
 
-                    // col 23: ownerName
+                    // col 23: ownerPan
                     if (row.length > 23 && !row[23].isBlank())
-                        builder.ownerName(row[23].trim());
+                        builder.ownerPan(row[23].trim());
 
-                    // col 24: ownerPhone
+                    // col 24: agreementStartDate
                     if (row.length > 24 && !row[24].isBlank())
-                        builder.ownerPhone(row[24].trim());
+                        builder.agreementStartDate(parseDate(row[24]));
 
-                    // col 25: ownerAddress
+                    // col 25: agreementEndDate
                     if (row.length > 25 && !row[25].isBlank())
-                        builder.ownerAddress(row[25].trim());
+                        builder.agreementEndDate(parseDate(row[25]));
 
-                    // col 26: ownerPan
+                    // col 26: agreementAmount
                     if (row.length > 26 && !row[26].isBlank())
-                        builder.ownerPan(row[26].trim());
+                        try { builder.agreementAmount(new BigDecimal(row[26].trim())); } catch (NumberFormatException ignored) {}
 
-                    // col 27: agreementStartDate
+                    // col 27: notes
                     if (row.length > 27 && !row[27].isBlank())
-                        builder.agreementStartDate(parseDate(row[27]));
-
-                    // col 28: agreementEndDate
-                    if (row.length > 28 && !row[28].isBlank())
-                        builder.agreementEndDate(parseDate(row[28]));
-
-                    // col 29: agreementAmount
-                    if (row.length > 29 && !row[29].isBlank())
-                        try { builder.agreementAmount(new BigDecimal(row[29].trim())); } catch (NumberFormatException ignored) {}
-
-                    // col 30: notes
-                    if (row.length > 30 && !row[30].isBlank())
-                        builder.notes(row[30].trim());
+                        builder.notes(row[27].trim());
 
                     // default status → Available
                     vehicleStatusRepository.findByStatusTypeAndIsActiveTrue(VehicleStatusType.AVAILABLE)
@@ -645,7 +627,7 @@ public class VehicleServiceImpl implements VehicleService {
                     Vehicle saved = vehicleRepository.save(builder.build());
                     successCount++;
 
-                    // cols 31-51: fixed document columns — 7 doc types × 3 cols (number, issueDate, expiryDate)
+                    // cols 28-48: fixed document columns — 7 doc types × 3 cols (number, issueDate, expiryDate)
                     String[] docTypeNames = {
                         "Registration Certificate (RC)",
                         "Insurance Certificate",
@@ -656,7 +638,7 @@ public class VehicleServiceImpl implements VehicleService {
                         "Road Tax Receipt"
                     };
                     for (int i = 0; i < docTypeNames.length; i++) {
-                        int base = 31 + (i * 3);
+                        int base = 28 + (i * 3);
                         if (row.length <= base) break;
                         String docNumber     = row[base].trim();
                         String issueDateStr  = row.length > base + 1 ? row[base + 1].trim() : "";
@@ -744,9 +726,6 @@ public class VehicleServiceImpl implements VehicleService {
                 .agreementStartDate(v.getAgreementStartDate())
                 .agreementEndDate(v.getAgreementEndDate())
                 .agreementAmount(v.getAgreementAmount())
-                .gpsDeviceNumber(v.getGpsDeviceNumber())
-                .gpsDeviceImei(v.getGpsDeviceImei())
-                .gpsProvider(v.getGpsProvider())
                 .currentOdometerReading(v.getCurrentOdometerReading())
                 .fuelTankCapacity(v.getFuelTankCapacity())
                 .currentFuelLevel(v.getCurrentFuelLevel())
