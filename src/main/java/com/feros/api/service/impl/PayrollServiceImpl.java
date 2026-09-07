@@ -167,15 +167,7 @@ public class PayrollServiceImpl implements PayrollService {
                         + existing.getPayCycleStartDate() + " to " + existing.getPayCycleEndDate(),
                     HttpStatus.CONFLICT); });
 
-        // If a cancelled payroll exists for this period, remove it so a fresh one can be inserted
-        payrollRepository.findByUserIdAndTenantIdAndPayCycleStartDateAndPayrollStatus(
-                request.getUserId(), tenantId, request.getPayCycleStartDate(), PayrollStatus.CANCELLED)
-                .ifPresent(cancelled -> {
-                    payrollDeductionRepository.findByPayrollIdAndIsActiveTrue(cancelled.getId())
-                            .forEach(d -> { d.setIsActive(false); payrollDeductionRepository.save(d); });
-                    payrollRepository.delete(cancelled);
-                    payrollRepository.flush();
-                });
+        // Cancelled payrolls are kept as-is for history; the overlap check above already excludes them.
 
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
