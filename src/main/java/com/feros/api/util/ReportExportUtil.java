@@ -32,6 +32,11 @@ public class ReportExportUtil {
     }
 
     public static byte[] toPdf(String title, String[] headers, List<String[]> rows) {
+        return toPdf(title, null, headers, rows);
+    }
+
+    // summaryLines: e.g. [["Total Vehicles", "42"], ["Available", "10"], ...]
+    public static byte[] toPdf(String title, List<String[]> summaryLines, String[] headers, List<String[]> rows) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Document doc = new Document(PageSize.A4.rotate(), 30, 30, 40, 40);
             PdfWriter writer = PdfWriter.getInstance(doc, out);
@@ -58,8 +63,27 @@ public class ReportExportUtil {
             Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, Color.decode("#1E3A5F"));
             Paragraph titlePara = new Paragraph(title, titleFont);
             titlePara.setAlignment(Element.ALIGN_LEFT);
-            titlePara.setSpacingAfter(12f);
+            titlePara.setSpacingAfter(summaryLines != null && !summaryLines.isEmpty() ? 8f : 12f);
             doc.add(titlePara);
+
+            // ── Summary block ─────────────────────────────────────────────────
+            if (summaryLines != null && !summaryLines.isEmpty()) {
+                PdfPTable summary = new PdfPTable(summaryLines.size());
+                summary.setWidthPercentage(100f);
+                summary.setSpacingAfter(10f);
+                Font labelFont = FontFactory.getFont(FontFactory.HELVETICA, 7.5f, Color.GRAY);
+                Font valueFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13f, Color.decode("#1E3A5F"));
+                for (String[] kv : summaryLines) {
+                    PdfPCell cell = new PdfPCell();
+                    cell.setBorderColor(Color.decode("#E2E8F0"));
+                    cell.setPadding(8f);
+                    cell.setBackgroundColor(Color.decode("#F8FAFC"));
+                    cell.addElement(new Phrase(kv[0], labelFont));
+                    cell.addElement(new Phrase(kv[1], valueFont));
+                    summary.addCell(cell);
+                }
+                doc.add(summary);
+            }
 
             // ── Table ─────────────────────────────────────────────────────────
             PdfPTable table = new PdfPTable(headers.length);

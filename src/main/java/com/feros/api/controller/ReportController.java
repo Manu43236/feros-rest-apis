@@ -86,6 +86,20 @@ public class ReportController {
                 r.getRegistrationNumber(), r.getVehicleType(), r.getOwnershipType(),
                 r.getCurrentStatus(), r.getCurrentDriverName(), r.getCurrentCleanerName(), r.getTripScope()
         }).toList();
+
+        if ("pdf".equalsIgnoreCase(format)) {
+            // Build count summary for each status
+            java.util.Map<String, Long> counts = rows.stream()
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            FleetStatusRow::getCurrentStatus, java.util.stream.Collectors.counting()));
+            List<String[]> summary = new java.util.ArrayList<>();
+            summary.add(new String[]{"Total Vehicles", String.valueOf(rows.size())});
+            for (String s : new String[]{"AVAILABLE", "ASSIGNED", "ON_TRIP", "IN_REPAIR", "BREAKDOWN", "ON_LEASE", "OTHER"}) {
+                if (counts.containsKey(s)) summary.add(new String[]{s.replace('_', ' '), String.valueOf(counts.get(s))});
+            }
+            byte[] pdf = ReportExportUtil.toPdf("Fleet Status Report — " + reportDate, summary, headers, data);
+            return ReportExportUtil.pdfResponse("fleet-status-" + reportDate, pdf);
+        }
         return export("fleet-status-" + reportDate, "Fleet Status Report — " + reportDate, headers, data, format);
     }
 
