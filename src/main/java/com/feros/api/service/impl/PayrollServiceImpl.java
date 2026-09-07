@@ -183,9 +183,10 @@ public class PayrollServiceImpl implements PayrollService {
                 tenantId, request.getPayCycleStartDate(), request.getPayCycleEndDate());
 
         List<com.feros.api.entity.Attendance> attendanceList = attendanceRepository
-                .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrue(
+                .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrueAndApprovalStatus(
                         request.getUserId(), tenantId,
-                        request.getPayCycleStartDate(), request.getPayCycleEndDate());
+                        request.getPayCycleStartDate(), request.getPayCycleEndDate(),
+                        com.feros.api.enums.AttendanceApprovalStatus.APPROVED);
 
         int totalDays = (int) ChronoUnit.DAYS.between(
                 request.getPayCycleStartDate(), request.getPayCycleEndDate()) + 1;
