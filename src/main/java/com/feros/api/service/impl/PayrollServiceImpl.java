@@ -294,10 +294,19 @@ public class PayrollServiceImpl implements PayrollService {
                 for (VehicleStaffAssignment a : assignments) {
                     if (!date.isBefore(a.getAssignedFrom())
                             && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo()))) {
-                        if (Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
-                                && a.getVehicle().getExtraPayPerDay() != null) {
-                            vehicleExtraPay = vehicleExtraPay.add(
-                                    a.getVehicle().getExtraPayPerDay().multiply(factor));
+                        boolean isCleaner = user.getRoles().stream()
+                                .anyMatch(r -> r.getName() == com.feros.api.enums.RoleName.CLEANER);
+                        if (isCleaner) {
+                            BigDecimal cp = a.getVehicle().getCleanerExtraPayPerDay();
+                            if (cp != null && cp.compareTo(BigDecimal.ZERO) > 0) {
+                                vehicleExtraPay = vehicleExtraPay.add(cp.multiply(factor));
+                            }
+                        } else {
+                            if (Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
+                                    && a.getVehicle().getExtraPayPerDay() != null) {
+                                vehicleExtraPay = vehicleExtraPay.add(
+                                        a.getVehicle().getExtraPayPerDay().multiply(factor));
+                            }
                         }
                         break;
                     }
@@ -451,11 +460,19 @@ public class PayrollServiceImpl implements PayrollService {
     }
 
     @Override
-    public Page<PayrollResponse> getAllPayrolls(int page, int size, String search) {
+    public Page<PayrollResponse> getAllPayrolls(int page, int size, String search, String status, String role, Integer month, Integer year) {
         Long tenantId = getCurrentTenantId();
         Pageable pageable = PageRequest.of(page, size);
         String searchParam = (search != null && !search.isBlank()) ? search.trim() : null;
-        return payrollRepository.findAllPaged(tenantId, searchParam, pageable)
+        com.feros.api.enums.PayrollStatus statusEnum = null;
+        if (status != null && !status.isBlank()) {
+            try { statusEnum = com.feros.api.enums.PayrollStatus.valueOf(status.trim()); } catch (Exception ignored) {}
+        }
+        com.feros.api.enums.RoleName roleEnum = null;
+        if (role != null && !role.isBlank()) {
+            try { roleEnum = com.feros.api.enums.RoleName.valueOf(role.trim()); } catch (Exception ignored) {}
+        }
+        return payrollRepository.findAllPaged(tenantId, searchParam, statusEnum, roleEnum, month, year, pageable)
                 .map(this::mapToPayrollResponse);
     }
 
@@ -647,6 +664,36 @@ public class PayrollServiceImpl implements PayrollService {
         payroll.setPayrollStatus(PayrollStatus.CANCELLED);
         payroll.setIsActive(false);
         return mapToPayrollResponse(payrollRepository.save(payroll));
+    }
+
+    @Override
+    @Transactional
+    public void bulkApprovePayrolls(java.util.List<Long> ids) {
+        Long tenantId = getCurrentTenantId();
+        for (Long id : ids) {
+            payrollRepository.findByIdAndTenantIdAndIsActiveTrue(id, tenantId).ifPresent(p -> {
+                if (p.getPayrollStatus() == PayrollStatus.DRAFT) {
+                    p.setPayrollStatus(PayrollStatus.PAID);
+                    p.setPaymentDate(java.time.LocalDate.now());
+                    payrollRepository.save(p);
+                }
+            });
+        }
+    }
+
+    @Override
+    @Transactional
+    public void bulkCancelPayrolls(java.util.List<Long> ids) {
+        Long tenantId = getCurrentTenantId();
+        for (Long id : ids) {
+            payrollRepository.findByIdAndTenantIdAndIsActiveTrue(id, tenantId).ifPresent(p -> {
+                if (p.getPayrollStatus() != PayrollStatus.PAID) {
+                    p.setPayrollStatus(PayrollStatus.CANCELLED);
+                    p.setIsActive(false);
+                    payrollRepository.save(p);
+                }
+            });
+        }
     }
 
     @Override

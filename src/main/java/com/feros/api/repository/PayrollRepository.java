@@ -18,14 +18,23 @@ public interface PayrollRepository extends JpaRepository<Payroll, Long> {
 
     @Query("""
         SELECT p FROM Payroll p
+        JOIN p.user u
+        JOIN u.roles r
         WHERE p.tenant.id = :tenantId AND p.isActive = true
-        AND (:search IS NULL
-             OR LOWER(p.user.name) LIKE LOWER(CONCAT('%', :search, '%')))
+        AND (:search IS NULL OR LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%')))
+        AND (:status IS NULL OR p.payrollStatus = :status)
+        AND (:role IS NULL OR r.name = :role)
+        AND (:month IS NULL OR MONTH(p.payCycleStartDate) = :month)
+        AND (:year IS NULL OR YEAR(p.payCycleStartDate) = :year)
         ORDER BY p.payCycleStartDate DESC, p.id DESC
     """)
     Page<Payroll> findAllPaged(
             @Param("tenantId") Long tenantId,
             @Param("search") String search,
+            @Param("status") com.feros.api.enums.PayrollStatus status,
+            @Param("role") com.feros.api.enums.RoleName role,
+            @Param("month") Integer month,
+            @Param("year") Integer year,
             Pageable pageable);
 
     List<Payroll> findByUserIdAndTenantIdAndIsActiveTrue(Long userId, Long tenantId);

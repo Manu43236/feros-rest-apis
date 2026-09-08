@@ -28,7 +28,7 @@ public interface PayrollService {
 
     PayrollResponse getPayrollById(Long id);
 
-    Page<PayrollResponse> getAllPayrolls(int page, int size, String search);
+    Page<PayrollResponse> getAllPayrolls(int page, int size, String search, String status, String role, Integer month, Integer year);
 
     List<PayrollResponse> getPayrollsByUser(Long userId);
 
@@ -37,6 +37,10 @@ public interface PayrollService {
     PayrollResponse approvePayroll(Long id, ApprovePayrollRequest request);
 
     PayrollResponse cancelPayroll(Long id);
+
+    void bulkApprovePayrolls(java.util.List<Long> ids);
+
+    void bulkCancelPayrolls(java.util.List<Long> ids);
 
     BulkPayrollResult bulkGeneratePayroll(BulkGeneratePayrollRequest request);
 }

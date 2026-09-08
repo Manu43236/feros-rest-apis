@@ -80,9 +80,13 @@ public class PayrollController {
     public ResponseEntity<ApiResponse<Page<PayrollResponse>>> getAllPayrolls(
             @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false)    String search) {
+            @RequestParam(required = false)    String search,
+            @RequestParam(required = false)    String status,
+            @RequestParam(required = false)    String role,
+            @RequestParam(required = false)    Integer month,
+            @RequestParam(required = false)    Integer year) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Payrolls fetched successfully", payrollService.getAllPayrolls(page, size, search)));
+                "Payrolls fetched successfully", payrollService.getAllPayrolls(page, size, search, status, role, month, year)));
     }
 
     @GetMapping("/{id}")
@@ -145,6 +149,20 @@ public class PayrollController {
     public ResponseEntity<ApiResponse<PayrollResponse>> cancelPayroll(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Payroll cancelled successfully", payrollService.cancelPayroll(id)));
+    }
+
+    @PutMapping("/bulk-approve")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<String>> bulkApprovePayrolls(@org.springframework.web.bind.annotation.RequestBody java.util.List<Long> ids) {
+        payrollService.bulkApprovePayrolls(ids);
+        return ResponseEntity.ok(ApiResponse.success("Payrolls approved successfully", ids.size() + " payrolls approved"));
+    }
+
+    @PutMapping("/bulk-cancel")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<String>> bulkCancelPayrolls(@org.springframework.web.bind.annotation.RequestBody java.util.List<Long> ids) {
+        payrollService.bulkCancelPayrolls(ids);
+        return ResponseEntity.ok(ApiResponse.success("Payrolls cancelled successfully", ids.size() + " payrolls cancelled"));
     }
 
     @GetMapping("/{id}/payslip-pdf")
