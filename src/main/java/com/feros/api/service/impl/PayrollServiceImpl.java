@@ -285,28 +285,23 @@ public class PayrollServiceImpl implements PayrollService {
             List<VehicleStaffAssignment> assignments = vehicleStaffAssignmentRepository
                     .findOverlappingByUser(request.getUserId(), tenantId,
                             request.getPayCycleStartDate(), request.getPayCycleEndDate());
-            for (VehicleStaffAssignment assignment : assignments) {
-                if (!Boolean.TRUE.equals(assignment.getVehicle().getExtraPayEnabled())
-                        || assignment.getVehicle().getExtraPayPerDay() == null) continue;
-
-                LocalDate from = assignment.getAssignedFrom()
-                        .isBefore(request.getPayCycleStartDate())
-                        ? request.getPayCycleStartDate() : assignment.getAssignedFrom();
-                LocalDate to = (assignment.getAssignedTo() == null
-                        || assignment.getAssignedTo().isAfter(request.getPayCycleEndDate()))
-                        ? request.getPayCycleEndDate() : assignment.getAssignedTo();
-
-                long presentInWindow = attendanceList.stream()
-                        .filter(a -> {
-                            LocalDate d = a.getAttendanceDate();
-                            return !d.isBefore(from) && !d.isAfter(to)
-                                    && a.getAttendanceType().getName().toLowerCase().contains("present");
-                        })
-                        .count();
-
-                vehicleExtraPay = vehicleExtraPay.add(
-                        assignment.getVehicle().getExtraPayPerDay()
-                                .multiply(BigDecimal.valueOf(presentInWindow)));
+            // ponytail: per-day lookup mirrors annexure — avoids double-counting on transition days
+            for (com.feros.api.entity.Attendance att : attendanceList) {
+                String t = att.getAttendanceType().getName().toLowerCase();
+                if (!t.contains("present") && !t.contains("half")) continue;
+                BigDecimal factor = t.contains("half") ? new BigDecimal("0.5") : BigDecimal.ONE;
+                LocalDate date = att.getAttendanceDate();
+                for (VehicleStaffAssignment a : assignments) {
+                    if (!date.isBefore(a.getAssignedFrom())
+                            && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo()))) {
+                        if (Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
+                                && a.getVehicle().getExtraPayPerDay() != null) {
+                            vehicleExtraPay = vehicleExtraPay.add(
+                                    a.getVehicle().getExtraPayPerDay().multiply(factor));
+                        }
+                        break;
+                    }
+                }
             }
         } catch (Exception e) {
             vehicleExtraPay = BigDecimal.ZERO;

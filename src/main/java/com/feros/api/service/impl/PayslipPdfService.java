@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
@@ -58,6 +59,31 @@ public class PayslipPdfService {
     private static final DateTimeFormatter DATE_FMT  = DateTimeFormatter.ofPattern("dd MMM yyyy");
     private static final DateTimeFormatter MONTH_FMT = DateTimeFormatter.ofPattern("MMMM yyyy");
 
+    private static class WatermarkHelper extends PdfPageEventHelper {
+        private final byte[] logoBytes;
+        WatermarkHelper(byte[] logoBytes) { this.logoBytes = logoBytes; }
+
+        @Override
+        public void onEndPage(PdfWriter writer, Document document) {
+            try {
+                Image logo = Image.getInstance(logoBytes);
+                float w = 300;
+                float h = logo.getHeight() * w / logo.getWidth();
+                float x = (document.getPageSize().getWidth() - w) / 2f;
+                float y = (document.getPageSize().getHeight() - h) / 2f;
+                logo.setAbsolutePosition(x, y);
+                logo.scaleAbsolute(w, h);
+                PdfContentByte canvas = writer.getDirectContentUnder();
+                canvas.saveState();
+                PdfGState gs = new PdfGState();
+                gs.setFillOpacity(0.07f);
+                canvas.setGState(gs);
+                canvas.addImage(logo);
+                canvas.restoreState();
+            } catch (Exception ignored) {}
+        }
+    }
+
     public byte[] generate(Long payrollId) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
 
@@ -70,9 +96,15 @@ public class PayslipPdfService {
                 .findByUserIdAndTenantIdAndIsActiveTrue(payroll.getUser().getId(), tenantId)
                 .orElse(null);
 
+        byte[] logoBytes = null;
+        try (InputStream is = getClass().getResourceAsStream("/feros_solo_logo.png")) {
+            if (is != null) logoBytes = is.readAllBytes();
+        } catch (Exception ignored) {}
+
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             Document doc = new Document(PageSize.A4, 40, 40, 36, 36);
-            PdfWriter.getInstance(doc, baos);
+            PdfWriter writer = PdfWriter.getInstance(doc, baos);
+            if (logoBytes != null) writer.setPageEvent(new WatermarkHelper(logoBytes));
             doc.open();
 
             String companyName = payroll.getTenant().getCompanyName() != null
@@ -82,8 +114,8 @@ public class PayslipPdfService {
                     ? profile.getDesignation().getName() : "—";
             String role = payroll.getUser().getRoles().stream().findFirst()
                     .map(r -> r.getName().name().replace("_", " ")).orElse("—");
-            boolean isDraft    = "DRAFT".equals(payroll.getPayrollStatus().name());
-            boolean isMonthly  = payroll.getSalaryType() != null
+            boolean isDraft   = "DRAFT".equals(payroll.getPayrollStatus().name());
+            boolean isMonthly = payroll.getSalaryType() != null
                     && "MONTHLY".equals(payroll.getSalaryType().name());
 
             // ── Header ───────────────────────────────────────────────────────
@@ -100,7 +132,8 @@ public class PayslipPdfService {
             PdfPCell hRight = blankCell(NAVY, Element.ALIGN_RIGHT);
             hRight.setPadding(16);
             hRight.setVerticalAlignment(Element.ALIGN_MIDDLE);
-            Paragraph refP = new Paragraph(payroll.getReferenceNumber() != null ? payroll.getReferenceNumber() : "", F_REF);
+            Paragraph refP = new Paragraph(
+                    payroll.getReferenceNumber() != null ? payroll.getReferenceNumber() : "", F_REF);
             refP.setAlignment(Element.ALIGN_RIGHT);
             Color statusColor = isDraft ? AMBER_BG : new Color(134, 239, 172);
             Paragraph statusP = new Paragraph(payroll.getPayrollStatus().name(),
@@ -123,8 +156,8 @@ public class PayslipPdfService {
                             + " - " + payroll.getPayCycleEndDate().format(DATE_FMT));
             addInfoCell(emp, "Payment Date",
                     payroll.getPaymentDate() != null ? payroll.getPaymentDate().format(DATE_FMT) : "Pending");
-            addInfoCell(emp, "Phone",       payroll.getUser().getPhone());
-            addInfoCell(emp, "Role",        role);
+            addInfoCell(emp, "Phone",  payroll.getUser().getPhone());
+            addInfoCell(emp, "Role",   role);
             addInfoCell(emp, "Mode",
                     payroll.getPaymentMode() != null ? payroll.getPaymentMode().name() : "Pending");
             addInfoCell(emp, "Reference",
@@ -136,22 +169,21 @@ public class PayslipPdfService {
             PdfPTable att = new PdfPTable(5);
             att.setWidthPercentage(100);
             att.setSpacingAfter(6);
-            addAttTile(att, str(payroll.getTotalDays()),   "Total Days",  SURFACE, NAVY);
-            addAttTile(att, str(payroll.getPresentDays()), "Present",     new Color(219, 234, 254), ACCENT);
-            addAttTile(att, str(payroll.getHalfDays()),    "Half Days",   AMBER_BG, AMBER);
+            addAttTile(att, str(payroll.getTotalDays()),   "Total Days", SURFACE, NAVY);
+            addAttTile(att, str(payroll.getPresentDays()), "Present",    new Color(219, 234, 254), ACCENT);
+            addAttTile(att, str(payroll.getHalfDays()),    "Half Days",  AMBER_BG, AMBER);
             addAttTile(att, str(payroll.getAbsentDays()),  "Absent",
                     payroll.getAbsentDays() > 0 ? new Color(254, 226, 226) : SURFACE,
                     payroll.getAbsentDays() > 0 ? DANGER : MUTED);
-            addAttTile(att, str(payroll.getLeaveDays()),   "Leave",       SURFACE, MUTED);
+            addAttTile(att, str(payroll.getLeaveDays()),   "Leave",      SURFACE, MUTED);
             doc.add(att);
 
             // ── Earnings + Deductions ────────────────────────────────────────
             doc.add(sectionLabel("PAY SUMMARY"));
             PdfPTable payTable = new PdfPTable(new float[]{1f, 0.04f, 1f});
             payTable.setWidthPercentage(100);
-            payTable.setSpacingAfter(6);
+            payTable.setSpacingAfter(8);
 
-            // -- Earnings inner table --
             PdfPTable earningsT = new PdfPTable(new float[]{3f, 1.5f});
             earningsT.setWidthPercentage(100);
             addInnerHeader(earningsT, "EARNINGS", "Amount (Rs.)");
@@ -184,16 +216,13 @@ public class PayslipPdfService {
             earningsCell.addElement(earningsT);
             payTable.addCell(earningsCell);
 
-            // gap column
             PdfPCell gap = blankCell(Color.WHITE, Element.ALIGN_LEFT);
             gap.setBorder(Rectangle.NO_BORDER);
             payTable.addCell(gap);
 
-            // -- Deductions inner table --
             PdfPTable deductionsT = new PdfPTable(new float[]{3f, 1.5f});
             deductionsT.setWidthPercentage(100);
             addInnerHeader(deductionsT, "DEDUCTIONS", "Amount (Rs.)");
-
             if (deductions.isEmpty()) {
                 addInnerRow(deductionsT, "No deductions this period", "—");
             } else {
@@ -210,7 +239,37 @@ public class PayslipPdfService {
             payTable.addCell(deductionsCell);
             doc.add(payTable);
 
-            // ── Daily Earnings Annexure (daily-rate only) ────────────────────
+            // ── NET PAY banner — page 1 ──────────────────────────────────────
+            PdfPTable net = new PdfPTable(new float[]{1f, 1.2f});
+            net.setWidthPercentage(100);
+            net.setSpacingAfter(10);
+
+            PdfPCell netLabel = blankCell(NAVY_LIGHT, Element.ALIGN_RIGHT);
+            netLabel.setPadding(14);
+            netLabel.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            Paragraph netLblP = new Paragraph("NET PAY", F_NET_LBL);
+            netLblP.setAlignment(Element.ALIGN_RIGHT);
+            netLabel.addElement(netLblP);
+            net.addCell(netLabel);
+
+            PdfPCell netAmt = blankCell(NAVY, Element.ALIGN_RIGHT);
+            netAmt.setPadding(14);
+            netAmt.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            Paragraph netAmtP = new Paragraph("Rs. " + fmt(payroll.getNetPay()), F_NET);
+            netAmtP.setAlignment(Element.ALIGN_RIGHT);
+            netAmt.addElement(netAmtP);
+            net.addCell(netAmt);
+            doc.add(net);
+
+            // ── Remarks ──────────────────────────────────────────────────────
+            if (payroll.getRemarks() != null && !payroll.getRemarks().isBlank()) {
+                doc.add(sectionLabel("REMARKS"));
+                Paragraph rem = new Paragraph(payroll.getRemarks(), F_BODY);
+                rem.setSpacingAfter(10);
+                doc.add(rem);
+            }
+
+            // ── Daily Earnings Annexure — page 2 ─────────────────────────────
             if (!isMonthly) try {
                 List<com.feros.api.entity.Attendance> workedDays = attendanceRepository
                         .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrueOrderByAttendanceDateDesc(
@@ -267,43 +326,14 @@ public class PayslipPdfService {
                     }
                     doc.add(annexure);
                 }
-            } catch (Exception ignored) { }
-
-            // ── Net Pay banner ───────────────────────────────────────────────
-            PdfPTable net = new PdfPTable(new float[]{1f, 1.2f});
-            net.setWidthPercentage(100);
-            net.setSpacingAfter(14);
-
-            PdfPCell netLabel = blankCell(NAVY_LIGHT, Element.ALIGN_RIGHT);
-            netLabel.setPadding(14);
-            netLabel.setVerticalAlignment(Element.ALIGN_MIDDLE);
-            Paragraph netLblP = new Paragraph("NET PAY", F_NET_LBL);
-            netLblP.setAlignment(Element.ALIGN_RIGHT);
-            netLabel.addElement(netLblP);
-            net.addCell(netLabel);
-
-            PdfPCell netAmt = blankCell(NAVY, Element.ALIGN_RIGHT);
-            netAmt.setPadding(14);
-            netAmt.setVerticalAlignment(Element.ALIGN_MIDDLE);
-            Paragraph netAmtP = new Paragraph("Rs. " + fmt(payroll.getNetPay()), F_NET);
-            netAmtP.setAlignment(Element.ALIGN_RIGHT);
-            netAmt.addElement(netAmtP);
-            net.addCell(netAmt);
-            doc.add(net);
-
-            // ── Remarks ──────────────────────────────────────────────────────
-            if (payroll.getRemarks() != null && !payroll.getRemarks().isBlank()) {
-                doc.add(sectionLabel("REMARKS"));
-                Paragraph rem = new Paragraph(payroll.getRemarks(), F_BODY);
-                rem.setSpacingAfter(10);
-                doc.add(rem);
-            }
+            } catch (Exception ignored) {}
 
             // ── Footer ───────────────────────────────────────────────────────
             Paragraph footer = new Paragraph(
                     "This is a computer-generated payslip and does not require a signature.  •  FEROS Fleet Management",
                     F_SMALL);
             footer.setAlignment(Element.ALIGN_CENTER);
+            footer.setSpacingBefore(12);
             doc.add(footer);
 
             doc.close();
