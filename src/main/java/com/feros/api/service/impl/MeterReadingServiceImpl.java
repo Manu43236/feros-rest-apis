@@ -44,7 +44,7 @@ public class MeterReadingServiceImpl implements MeterReadingService {
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
 
         // Validate reading is not less than current odometer
-        if (!SecurityUtil.isSuperAdmin() &&
+        if (!SecurityUtil.isSuperAdminOrImpersonating() && !SecurityUtil.isAdmin() &&
                 vehicle.getCurrentOdometerReading() != null &&
                 request.getReadingKm().compareTo(vehicle.getCurrentOdometerReading()) < 0) {
             throw new FerosException(
@@ -141,7 +141,7 @@ public class MeterReadingServiceImpl implements MeterReadingService {
                 .filter(r -> !r.getId().equals(id))
                 .toList();
 
-        if (!SecurityUtil.isSuperAdmin() &&
+        if (!SecurityUtil.isSuperAdminOrImpersonating() && !SecurityUtil.isAdmin() &&
                 !others.isEmpty() && request.getReadingKm().compareTo(others.get(0).getReadingKm()) < 0) {
             throw new FerosException(
                     "Reading (" + request.getReadingKm() + " km) cannot be less than the previous reading (" +
