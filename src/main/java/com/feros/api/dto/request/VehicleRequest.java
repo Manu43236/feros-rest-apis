@@ -55,6 +55,10 @@ public class VehicleRequest {
     private Boolean extraPayEnabled;
     private BigDecimal extraPayPerDay;
 
+    // Extra pay for assigned cleaner
+    private Boolean cleanerExtraPayEnabled;
+    private BigDecimal cleanerExtraPayPerDay;
+
     private TripScope tripScope;
 
     private Boolean isIot;

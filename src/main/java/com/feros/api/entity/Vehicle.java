@@ -131,6 +131,14 @@ public class Vehicle extends BaseEntity {
     @Column(name = "extra_pay_per_day")
     private BigDecimal extraPayPerDay;
 
+    // Extra pay for assigned cleaner
+    @Builder.Default
+    @Column(name = "cleaner_extra_pay_enabled")
+    private Boolean cleanerExtraPayEnabled = false;
+
+    @Column(name = "cleaner_extra_pay_per_day")
+    private BigDecimal cleanerExtraPayPerDay;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "current_driver_id")
     private User currentDriver;
