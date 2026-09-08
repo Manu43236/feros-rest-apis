@@ -74,7 +74,6 @@ public class VehicleResponse {
     private BigDecimal extraPayPerDay;
 
     // Extra pay for assigned cleaner
-    private Boolean cleanerExtraPayEnabled;
     private BigDecimal cleanerExtraPayPerDay;
 
     // Vehicle-level staff assignment

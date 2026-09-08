@@ -300,8 +300,7 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setTripScope(request.getTripScope());
         vehicle.setExtraPayEnabled(Boolean.TRUE.equals(request.getExtraPayEnabled()));
         vehicle.setExtraPayPerDay(request.getExtraPayPerDay());
-        vehicle.setCleanerExtraPayEnabled(Boolean.TRUE.equals(request.getCleanerExtraPayEnabled()));
-        vehicle.setCleanerExtraPayPerDay(request.getCleanerExtraPayPerDay());
+        vehicle.setCleanerExtraPayPerDay(request.getCleanerExtraPayPerDay() != null ? request.getCleanerExtraPayPerDay() : BigDecimal.ZERO);
         vehicle.setIsIot(Boolean.TRUE.equals(request.getIsIot()));
 
         if (request.getBrandId() != null)
@@ -740,7 +739,6 @@ public class VehicleServiceImpl implements VehicleService {
                 .tyreRotationIntervalKm(v.getTyreRotationIntervalKm())
                 .extraPayEnabled(Boolean.TRUE.equals(v.getExtraPayEnabled()))
                 .extraPayPerDay(v.getExtraPayPerDay())
-                .cleanerExtraPayEnabled(Boolean.TRUE.equals(v.getCleanerExtraPayEnabled()))
                 .cleanerExtraPayPerDay(v.getCleanerExtraPayPerDay())
                 .tripScope(v.getTripScope())
                 .isIot(Boolean.TRUE.equals(v.getIsIot()))

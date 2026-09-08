@@ -56,7 +56,6 @@ public class VehicleRequest {
     private BigDecimal extraPayPerDay;
 
     // Extra pay for assigned cleaner
-    private Boolean cleanerExtraPayEnabled;
     private BigDecimal cleanerExtraPayPerDay;
 
     private TripScope tripScope;
