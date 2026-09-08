@@ -302,16 +302,25 @@ public class PayslipPdfService {
                         BigDecimal factor = isHalf ? new BigDecimal("0.5") : BigDecimal.ONE;
                         BigDecimal desPay = payroll.getDailyRate().multiply(factor).setScale(2, RoundingMode.HALF_UP);
 
+                        boolean isCleaner = payroll.getUser().getRoles().stream()
+                                .anyMatch(r -> r.getName() == com.feros.api.enums.RoleName.CLEANER);
                         String vehicleNo = "—";
                         BigDecimal vehPay = BigDecimal.ZERO;
                         for (com.feros.api.entity.VehicleStaffAssignment a : assignments) {
                             if (!date.isBefore(a.getAssignedFrom())
                                     && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo()))) {
                                 vehicleNo = a.getVehicle().getRegistrationNumber();
-                                if (Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
-                                        && a.getVehicle().getExtraPayPerDay() != null) {
-                                    vehPay = a.getVehicle().getExtraPayPerDay()
-                                            .multiply(factor).setScale(2, RoundingMode.HALF_UP);
+                                if (isCleaner) {
+                                    BigDecimal cp = a.getVehicle().getCleanerExtraPayPerDay();
+                                    if (cp != null && cp.compareTo(BigDecimal.ZERO) > 0) {
+                                        vehPay = cp.multiply(factor).setScale(2, RoundingMode.HALF_UP);
+                                    }
+                                } else {
+                                    if (Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
+                                            && a.getVehicle().getExtraPayPerDay() != null) {
+                                        vehPay = a.getVehicle().getExtraPayPerDay()
+                                                .multiply(factor).setScale(2, RoundingMode.HALF_UP);
+                                    }
                                 }
                                 break;
                             }
