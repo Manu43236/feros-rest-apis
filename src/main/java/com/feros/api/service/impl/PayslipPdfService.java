@@ -430,13 +430,13 @@ public class PayslipPdfService {
     }
 
     private void addAnnexureRow(PdfPTable table, boolean isHalf, String... vals) {
-        Color bg = isHalf ? AMBER_BG : Color.WHITE;
         for (int i = 0; i < vals.length; i++) {
             PdfPCell c = new PdfPCell(new Phrase(vals[i], isHalf
                     ? new Font(Font.HELVETICA, 8, Font.ITALIC, AMBER)
                     : new Font(Font.HELVETICA, 8, Font.NORMAL, Color.BLACK)));
             c.setPadding(5);
-            c.setBackgroundColor(bg);
+            if (isHalf) c.setBackgroundColor(AMBER_BG);
+            // no background on normal rows — lets watermark show through
             c.setHorizontalAlignment(i == 0 ? Element.ALIGN_LEFT : Element.ALIGN_CENTER);
             c.setBorderColor(BORDER);
             table.addCell(c);
