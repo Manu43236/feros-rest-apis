@@ -2438,13 +2438,29 @@ public class ReportServiceImpl implements ReportService {
                         tenantId, date,
                         List.of(AttendanceApprovalStatus.APPROVED, AttendanceApprovalStatus.PENDING)));
 
+        // Historical assignment lookup for the queried date — not the current live pointer
+        Map<Long, VehicleStaffAssignment> vehicleDriverVsa = new HashMap<>();
+        Map<Long, VehicleStaffAssignment> vehicleCleanerVsa = new HashMap<>();
+        vehicleStaffAssignmentRepository.findOverlappingForTenant(tenantId, date, date)
+                .forEach(a -> {
+                    String role = primaryRole(a.getUser());
+                    Long vid = a.getVehicle().getId();
+                    if ("DRIVER".equals(role))        vehicleDriverVsa.put(vid, a);
+                    else if ("CLEANER".equals(role))  vehicleCleanerVsa.put(vid, a);
+                });
+
         String scopeLabel = scope == TripScope.INTRA_STATE ? "Local" : "Out Station";
 
         List<DailyFleetAttendanceRow> rows = vehicles.stream().map(v -> {
-            String driverName = (v.getCurrentDriver() != null && presentUserIds.contains(v.getCurrentDriver().getId()))
-                    ? v.getCurrentDriver().getName() : "—";
-            String cleanerName = (v.getCurrentCleaner() != null && presentUserIds.contains(v.getCurrentCleaner().getId()))
-                    ? v.getCurrentCleaner().getName() : "—";
+            Long vid = v.getId();
+            VehicleStaffAssignment driverVsa  = vehicleDriverVsa.get(vid);
+            VehicleStaffAssignment cleanerVsa = vehicleCleanerVsa.get(vid);
+
+            String driverName  = (driverVsa  != null && presentUserIds.contains(driverVsa.getUser().getId()))
+                    ? driverVsa.getUser().getName()  : "—";
+            String cleanerName = (cleanerVsa != null && presentUserIds.contains(cleanerVsa.getUser().getId()))
+                    ? cleanerVsa.getUser().getName() : "—";
+
             return DailyFleetAttendanceRow.builder()
                     .registrationNumber(v.getRegistrationNumber())
                     .scope(scopeLabel)
