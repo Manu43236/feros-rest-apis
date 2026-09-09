@@ -358,6 +358,11 @@ public class VehicleServiceImpl implements VehicleService {
                     "Vehicle is In Repair — it can only move to Available",
                     HttpStatus.BAD_REQUEST);
         }
+        if (currentType == VehicleStatusType.IN_SERVICE && newType != VehicleStatusType.AVAILABLE) {
+            throw new FerosException(
+                    "Vehicle is In Service — it can only move to Available",
+                    HttpStatus.BAD_REQUEST);
+        }
         if (currentType == VehicleStatusType.ASSIGNED || currentType == VehicleStatusType.ON_TRIP) {
             throw new FerosException(
                     "Vehicle is " + vehicle.getCurrentStatus().getName() +

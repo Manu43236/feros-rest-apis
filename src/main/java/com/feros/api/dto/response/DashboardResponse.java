@@ -36,6 +36,7 @@ public class DashboardResponse {
         private long assigned;
         private long onTrip;
         private long underMaintenance;
+        private long inService;
         private long breakdown;
         private long inactive;
     }

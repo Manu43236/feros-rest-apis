@@ -82,6 +82,7 @@ public class DashboardServiceImpl implements DashboardService {
                 .assigned(vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.ASSIGNED))
                 .onTrip(vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.ON_TRIP))
                 .underMaintenance(vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.IN_REPAIR))
+                .inService(vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.IN_SERVICE))
                 .breakdown(vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.BREAKDOWN))
                 .inactive(vehicleRepository.countByTenantIdAndIsActiveFalse(tenantId))
                 .build();
@@ -388,7 +389,8 @@ public class DashboardServiceImpl implements DashboardService {
                 vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.ASSIGNED));
         int vehicleBreakdown = (int) (
                 vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.BREAKDOWN) +
-                vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.IN_REPAIR));
+                vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.IN_REPAIR) +
+                vehicleRepository.countByTenantIdAndIsActiveTrueAndStatusType(tenantId, VehicleStatusType.IN_SERVICE));
         int vehicleInactive  = (int) vehicleRepository.countByTenantIdAndIsActiveFalse(tenantId);
 
         // ── Staff — Drivers & Cleaners ────────────────────────────────────────

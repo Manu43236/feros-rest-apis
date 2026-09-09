@@ -135,7 +135,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 vehicle.getRegistrationNumber() + " | " + triggerLabel + " | " + taskSuffix,
                 java.util.Map.of("type", "SERVICE_COMPLETE"));
 
-        // When a service is created for a breakdown → move breakdown to IN_REPAIR + vehicle to IN_REPAIR
+        // Breakdown → IN_REPAIR; any other trigger → IN_SERVICE
         if (breakdown != null) {
             breakdown.setStatus(BreakdownStatus.IN_REPAIR);
             vehicleBreakdownRepository.save(breakdown);
@@ -143,6 +143,12 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
             vehicleStatusRepository.findByStatusTypeAndIsActiveTrue(VehicleStatusType.IN_REPAIR)
                     .ifPresent(inRepairStatus -> {
                         vehicle.setCurrentStatus(inRepairStatus);
+                        vehicleRepository.save(vehicle);
+                    });
+        } else {
+            vehicleStatusRepository.findByStatusTypeAndIsActiveTrue(VehicleStatusType.IN_SERVICE)
+                    .ifPresent(inServiceStatus -> {
+                        vehicle.setCurrentStatus(inServiceStatus);
                         vehicleRepository.save(vehicle);
                     });
         }
@@ -277,25 +283,31 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
 
         vehicleServiceRepository.save(vs);
 
-        // When a breakdown-triggered service is completed → resolve breakdown + move vehicle to AVAILABLE
+        // Resolve breakdown (if any) and return vehicle to AVAILABLE
         if (vs.getBreakdown() != null) {
             VehicleBreakdown bd = vs.getBreakdown();
             bd.setStatus(BreakdownStatus.RESOLVED);
             bd.setResolvedAt(TimeUtil.nowIst());
             vehicleBreakdownRepository.save(bd);
+        }
 
+        VehicleStatusType currentStatusType = vs.getVehicle().getCurrentStatus() != null
+                ? vs.getVehicle().getCurrentStatus().getStatusType() : null;
+        if (currentStatusType == VehicleStatusType.IN_REPAIR || currentStatusType == VehicleStatusType.IN_SERVICE) {
             vehicleStatusRepository.findByStatusTypeAndIsActiveTrue(VehicleStatusType.AVAILABLE)
                     .ifPresent(availStatus -> {
                         vs.getVehicle().setCurrentStatus(availStatus);
                         vehicleRepository.save(vs.getVehicle());
                     });
 
-            String serviceVehicleReg = vs.getVehicle().getRegistrationNumber();
-            notificationService.sendToRoles(vs.getTenant(),
-                    List.of(com.feros.api.enums.RoleName.SUPERVISOR, com.feros.api.enums.RoleName.ADMIN, com.feros.api.enums.RoleName.SERVICE_MANAGER),
-                    com.feros.api.enums.NotificationType.BREAKDOWN_REPORTED,
-                    "Vehicle Available — " + serviceVehicleReg,
-                    serviceVehicleReg + " repair completed. Vehicle is now available for assignment.");
+            if (vs.getBreakdown() != null) {
+                String serviceVehicleReg = vs.getVehicle().getRegistrationNumber();
+                notificationService.sendToRoles(vs.getTenant(),
+                        List.of(com.feros.api.enums.RoleName.SUPERVISOR, com.feros.api.enums.RoleName.ADMIN, com.feros.api.enums.RoleName.SERVICE_MANAGER),
+                        com.feros.api.enums.NotificationType.BREAKDOWN_REPORTED,
+                        "Vehicle Available — " + serviceVehicleReg,
+                        serviceVehicleReg + " repair completed. Vehicle is now available for assignment.");
+            }
         }
 
         // Auto-schedule next services for recurring tasks (SCHEDULED flow only)

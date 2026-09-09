@@ -465,6 +465,7 @@ public class OrderServiceImpl implements OrderService {
 
         if (vehicle.getCurrentStatus() != null &&
                 (vehicle.getCurrentStatus().getStatusType() == VehicleStatusType.IN_REPAIR ||
+                 vehicle.getCurrentStatus().getStatusType() == VehicleStatusType.IN_SERVICE ||
                  vehicle.getCurrentStatus().getStatusType() == VehicleStatusType.BREAKDOWN)) {
             throw new FerosException(
                 "Cannot assign vehicle — it is currently marked as " +
