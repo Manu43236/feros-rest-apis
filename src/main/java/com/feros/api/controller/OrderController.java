@@ -4,6 +4,7 @@ import com.feros.api.dto.request.AssignStaffRequest;
 import com.feros.api.dto.request.AssignVehicleRequest;
 import com.feros.api.dto.request.OrderRequest;
 import com.feros.api.dto.request.PostOrderLogRequest;
+import com.feros.api.dto.request.UpdatePostOrderLogRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.OrderResponse;
 import com.feros.api.dto.response.StaffAllocationResponse;
@@ -72,7 +73,7 @@ public class OrderController {
     @PutMapping("/post-entry/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<OrderResponse>> updatePostOrderLog(
-            @PathVariable Long id, @Valid @RequestBody PostOrderLogRequest request) {
+            @PathVariable Long id, @Valid @RequestBody UpdatePostOrderLogRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 "POL order updated successfully", postOrderLogService.updatePostOrderLog(id, request)));
     }
