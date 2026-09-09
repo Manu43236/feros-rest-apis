@@ -718,6 +718,10 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
             return MasterResponse.builder().id(e.getId()).name(e.getName())
                     .isActive(e.getIsActive()).createdAt(e.getCreatedAt())
                     .updatedAt(e.getUpdatedAt()).build();
+        if (entity instanceof VehicleBodyType e)
+            return MasterResponse.builder().id(e.getId()).name(e.getName())
+                    .isActive(e.getIsActive()).createdAt(e.getCreatedAt())
+                    .updatedAt(e.getUpdatedAt()).build();
         throw new FerosException("Unknown entity type", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
