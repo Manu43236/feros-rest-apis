@@ -3,6 +3,7 @@ package com.feros.api.service.impl;
 import com.feros.api.dto.request.PolLrRequest;
 import com.feros.api.dto.request.PostOrderLogRequest;
 import com.feros.api.dto.request.UpdatePostOrderLogRequest;
+import com.feros.api.dto.request.PolLrUpdateRequest;
 import com.feros.api.dto.response.OrderResponse;
 import com.feros.api.dto.response.VehicleAllocationResponse;
 import com.feros.api.entity.*;
@@ -245,6 +246,14 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
             throw new FerosException("Only POL orders can be updated via this endpoint", HttpStatus.BAD_REQUEST);
         }
 
+        // Block if ALL existing LRs are invoiced
+        List<Lr> existingLrs = lrRepository.findByOrderIdAndIsActiveTrue(orderId);
+        boolean allInvoiced = !existingLrs.isEmpty() &&
+                existingLrs.stream().allMatch(lr -> invoiceLrRepository.existsByLrIdAndIsActiveTrue(lr.getId()));
+        if (allInvoiced) {
+            throw new FerosException("Cannot edit POL order — all LRs have been invoiced", HttpStatus.BAD_REQUEST);
+        }
+
         if (request.getOrderDate().isAfter(TimeUtil.today())) {
             throw new FerosException("POL order date cannot be in the future", HttpStatus.BAD_REQUEST);
         }
@@ -266,15 +275,15 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
         User updatedBy = userRepository.findById(SecurityUtil.getCurrentUserId())
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
 
-        List<PolLrRequest> newLrs = request.getNewLrs() != null ? request.getNewLrs() : List.of();
+        List<PolLrUpdateRequest> lrUpdates = request.getLrs() != null ? request.getLrs() : List.of();
 
-        // Validate attendance for new LR rows (use their individual lrDate or the order date)
-        if (!newLrs.isEmpty()) {
+        // Validate attendance for all LR entries in the request
+        if (!lrUpdates.isEmpty()) {
             List<Long> presentUserIds = attendanceRepository.findUserIdsWithAttendanceOnDate(
                     tenant.getId(), request.getOrderDate(),
                     List.of(AttendanceApprovalStatus.APPROVED, AttendanceApprovalStatus.PENDING));
 
-            for (PolLrRequest lrReq : newLrs) {
+            for (PolLrUpdateRequest lrReq : lrUpdates) {
                 if (!presentUserIds.contains(lrReq.getDriverId())) {
                     User driver = userRepository.findById(lrReq.getDriverId())
                             .orElseThrow(() -> new FerosException("Driver not found: " + lrReq.getDriverId(), HttpStatus.NOT_FOUND));
@@ -311,69 +320,141 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
             order.setRoute(null);
         }
 
-        // Append new LRs without touching existing ones
-        if (!newLrs.isEmpty()) {
+        if (!lrUpdates.isEmpty()) {
             Role driverRole = roleRepository.findByName(RoleName.DRIVER)
                     .orElseThrow(() -> new FerosException("Driver role not found", HttpStatus.INTERNAL_SERVER_ERROR));
             Role cleanerRole = roleRepository.findByName(RoleName.CLEANER)
                     .orElseThrow(() -> new FerosException("Cleaner role not found", HttpStatus.INTERNAL_SERVER_ERROR));
 
-            for (PolLrRequest lrReq : newLrs) {
+            for (PolLrUpdateRequest lrReq : lrUpdates) {
                 Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(lrReq.getVehicleId(), tenant.getId())
                         .orElseThrow(() -> new FerosException("Vehicle not found: " + lrReq.getVehicleId(), HttpStatus.NOT_FOUND));
                 User driver = userRepository.findByIdAndIsActiveTrue(lrReq.getDriverId())
                         .orElseThrow(() -> new FerosException("Driver not found: " + lrReq.getDriverId(), HttpStatus.NOT_FOUND));
-
                 LocalDate lrDate = lrReq.getLrDate() != null ? lrReq.getLrDate() : request.getOrderDate();
 
-                OrderVehicleAllocation allocation = OrderVehicleAllocation.builder()
-                        .tenant(tenant).order(order).vehicle(vehicle)
-                        .allocatedWeight(lrReq.getAllocatedWeight())
-                        .actualLoadDate(lrDate).actualDeliveryDate(lrDate)
-                        .allocationStatus(VehicleAllocationStatus.DELIVERED)
-                        .allocatedBy(updatedBy).isActive(true).build();
-                OrderVehicleAllocation savedAllocation = vehicleAllocationRepository.save(allocation);
+                if (lrReq.getId() != null) {
+                    // Update existing LR
+                    Lr lr = lrRepository.findByIdAndTenantIdAndIsActiveTrue(lrReq.getId(), tenant.getId())
+                            .orElseThrow(() -> new FerosException("LR not found: " + lrReq.getId(), HttpStatus.NOT_FOUND));
 
-                staffAllocationRepository.save(OrderStaffAllocation.builder()
-                        .tenant(tenant).order(order).vehicleAllocation(savedAllocation)
-                        .user(driver).role(driverRole)
-                        .actualStartDate(lrDate).actualEndDate(lrDate)
-                        .allocationStatus(StaffAllocationStatus.COMPLETED)
-                        .allocatedBy(updatedBy).isActive(true).build());
+                    if (invoiceLrRepository.existsByLrIdAndIsActiveTrue(lr.getId())) {
+                        throw new FerosException("LR " + lr.getLrNumber() + " is already invoiced and cannot be edited", HttpStatus.BAD_REQUEST);
+                    }
 
-                if (lrReq.getCleanerId() != null) {
-                    User cleaner = userRepository.findByIdAndIsActiveTrue(lrReq.getCleanerId())
-                            .orElseThrow(() -> new FerosException("Cleaner not found: " + lrReq.getCleanerId(), HttpStatus.NOT_FOUND));
+                    // Update LR fields
+                    lr.setPaperLrNumber(lrReq.getPaperLrNumber());
+                    lr.setLrDate(lrDate);
+                    lr.setVehicleCapacity(lrReq.getVehicleCapacity());
+                    lr.setAllocatedWeight(lrReq.getAllocatedWeight());
+                    lr.setLoadedWeight(lrReq.getLoadedWeight());
+                    lr.setDeliveredWeight(lrReq.getDeliveredWeight());
+                    lr.setLoadedAt(lrDate.atStartOfDay());
+                    lr.setDeliveredAt(lrDate.atStartOfDay());
+                    lr.setEwayBillNumber(lrReq.getEwayBillNumber());
+                    lr.setEwayBillDate(lrReq.getEwayBillDate());
+                    lr.setEwayBillValidUpto(lrReq.getEwayBillValidUpto());
+                    lr.setRemarks(lrReq.getRemarks());
+                    lr.setDriver(driver);
+                    lr.setCleaner(lrReq.getCleanerId() != null
+                            ? userRepository.findByIdAndIsActiveTrue(lrReq.getCleanerId()).orElse(null) : null);
+                    lrRepository.save(lr);
+
+                    // Update vehicle allocation
+                    OrderVehicleAllocation alloc = lr.getVehicleAllocation();
+                    alloc.setVehicle(vehicle);
+                    alloc.setAllocatedWeight(lrReq.getAllocatedWeight());
+                    alloc.setActualLoadDate(lrDate);
+                    alloc.setActualDeliveryDate(lrDate);
+                    vehicleAllocationRepository.save(alloc);
+
+                    // Update staff allocations: find existing driver/cleaner rows and update
+                    List<OrderStaffAllocation> staffAllocs =
+                            staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(alloc.getId());
+
+                    OrderStaffAllocation driverAlloc = staffAllocs.stream()
+                            .filter(sa -> sa.getRole().getName() == RoleName.DRIVER).findFirst().orElse(null);
+                    if (driverAlloc != null) {
+                        driverAlloc.setUser(driver);
+                        driverAlloc.setActualStartDate(lrDate);
+                        driverAlloc.setActualEndDate(lrDate);
+                        staffAllocationRepository.save(driverAlloc);
+                    }
+
+                    OrderStaffAllocation cleanerAlloc = staffAllocs.stream()
+                            .filter(sa -> sa.getRole().getName() == RoleName.CLEANER).findFirst().orElse(null);
+                    if (lrReq.getCleanerId() != null) {
+                        User cleaner = userRepository.findByIdAndIsActiveTrue(lrReq.getCleanerId())
+                                .orElseThrow(() -> new FerosException("Cleaner not found: " + lrReq.getCleanerId(), HttpStatus.NOT_FOUND));
+                        if (cleanerAlloc != null) {
+                            cleanerAlloc.setUser(cleaner);
+                            cleanerAlloc.setActualStartDate(lrDate);
+                            cleanerAlloc.setActualEndDate(lrDate);
+                            staffAllocationRepository.save(cleanerAlloc);
+                        } else {
+                            staffAllocationRepository.save(OrderStaffAllocation.builder()
+                                    .tenant(tenant).order(order).vehicleAllocation(alloc)
+                                    .user(cleaner).role(cleanerRole)
+                                    .actualStartDate(lrDate).actualEndDate(lrDate)
+                                    .allocationStatus(StaffAllocationStatus.COMPLETED)
+                                    .allocatedBy(updatedBy).isActive(true).build());
+                        }
+                    } else if (cleanerAlloc != null) {
+                        cleanerAlloc.setIsActive(false);
+                        staffAllocationRepository.save(cleanerAlloc);
+                    }
+
+                } else {
+                    // Create new LR
+                    OrderVehicleAllocation allocation = OrderVehicleAllocation.builder()
+                            .tenant(tenant).order(order).vehicle(vehicle)
+                            .allocatedWeight(lrReq.getAllocatedWeight())
+                            .actualLoadDate(lrDate).actualDeliveryDate(lrDate)
+                            .allocationStatus(VehicleAllocationStatus.DELIVERED)
+                            .allocatedBy(updatedBy).isActive(true).build();
+                    OrderVehicleAllocation savedAllocation = vehicleAllocationRepository.save(allocation);
+
                     staffAllocationRepository.save(OrderStaffAllocation.builder()
                             .tenant(tenant).order(order).vehicleAllocation(savedAllocation)
-                            .user(cleaner).role(cleanerRole)
+                            .user(driver).role(driverRole)
                             .actualStartDate(lrDate).actualEndDate(lrDate)
                             .allocationStatus(StaffAllocationStatus.COMPLETED)
                             .allocatedBy(updatedBy).isActive(true).build());
-                }
 
-                Lr lr = Lr.builder()
-                        .tenant(tenant).lrNumber(numberGenerator.generateFY(tenant.getId(), NumberUtil.Type.LR))
-                        .paperLrNumber(lrReq.getPaperLrNumber())
-                        .order(order).vehicleAllocation(savedAllocation)
-                        .lrDate(lrDate).vehicleCapacity(lrReq.getVehicleCapacity())
-                        .allocatedWeight(lrReq.getAllocatedWeight())
-                        .loadedWeight(lrReq.getLoadedWeight())
-                        .deliveredWeight(lrReq.getDeliveredWeight())
-                        .loadedAt(lrDate.atStartOfDay()).deliveredAt(lrDate.atStartOfDay())
-                        .lrStatus(LrStatus.DELIVERED).driver(driver)
-                        .ewayBillNumber(lrReq.getEwayBillNumber())
-                        .ewayBillDate(lrReq.getEwayBillDate())
-                        .ewayBillValidUpto(lrReq.getEwayBillValidUpto())
-                        .remarks(lrReq.getRemarks()).createdBy(updatedBy).isActive(true).build();
+                    if (lrReq.getCleanerId() != null) {
+                        User cleaner = userRepository.findByIdAndIsActiveTrue(lrReq.getCleanerId())
+                                .orElseThrow(() -> new FerosException("Cleaner not found: " + lrReq.getCleanerId(), HttpStatus.NOT_FOUND));
+                        staffAllocationRepository.save(OrderStaffAllocation.builder()
+                                .tenant(tenant).order(order).vehicleAllocation(savedAllocation)
+                                .user(cleaner).role(cleanerRole)
+                                .actualStartDate(lrDate).actualEndDate(lrDate)
+                                .allocationStatus(StaffAllocationStatus.COMPLETED)
+                                .allocatedBy(updatedBy).isActive(true).build());
+                    }
 
-                if (lrReq.getCleanerId() != null) {
-                    userRepository.findByIdAndIsActiveTrue(lrReq.getCleanerId()).ifPresent(lr::setCleaner);
+                    Lr newLr = Lr.builder()
+                            .tenant(tenant).lrNumber(numberGenerator.generateFY(tenant.getId(), NumberUtil.Type.LR))
+                            .paperLrNumber(lrReq.getPaperLrNumber())
+                            .order(order).vehicleAllocation(savedAllocation)
+                            .lrDate(lrDate).vehicleCapacity(lrReq.getVehicleCapacity())
+                            .allocatedWeight(lrReq.getAllocatedWeight())
+                            .loadedWeight(lrReq.getLoadedWeight())
+                            .deliveredWeight(lrReq.getDeliveredWeight())
+                            .loadedAt(lrDate.atStartOfDay()).deliveredAt(lrDate.atStartOfDay())
+                            .lrStatus(LrStatus.DELIVERED).driver(driver)
+                            .ewayBillNumber(lrReq.getEwayBillNumber())
+                            .ewayBillDate(lrReq.getEwayBillDate())
+                            .ewayBillValidUpto(lrReq.getEwayBillValidUpto())
+                            .remarks(lrReq.getRemarks()).createdBy(updatedBy).isActive(true).build();
+
+                    if (lrReq.getCleanerId() != null) {
+                        userRepository.findByIdAndIsActiveTrue(lrReq.getCleanerId()).ifPresent(newLr::setCleaner);
+                    }
+                    lrRepository.save(newLr);
                 }
-                lrRepository.save(lr);
             }
 
-            // Recalculate fulfilled weight from all LRs (existing + new)
+            // Recalculate fulfilled weight from all active LRs
             BigDecimal totalFulfilled = lrRepository.findByOrderIdAndIsActiveTrue(orderId).stream()
                     .map(Lr::getAllocatedWeight)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);

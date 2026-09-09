@@ -55,7 +55,7 @@ public class UpdatePostOrderLogRequest {
     private String specialInstructions;
     private String remarks;
 
-    // Optional — empty means "just update order fields, no new LRs"
+    // Each entry: id present = update existing LR; id null = create new LR
     @Valid
-    private List<PolLrRequest> newLrs;
+    private List<PolLrUpdateRequest> lrs;
 }
