@@ -178,6 +178,31 @@ public class GlobalMasterController {
         return ResponseEntity.ok(ApiResponse.success("Vehicle type deleted successfully", null));
     }
 
+    // ===================== VEHICLE BODY TYPES =====================
+    @GetMapping("/vehicle-body-types")
+    public ResponseEntity<ApiResponse<List<MasterResponse>>> getAllVehicleBodyTypes() {
+        return ResponseEntity.ok(ApiResponse.success("Vehicle body types fetched successfully", globalMasterService.getAllVehicleBodyTypes()));
+    }
+
+    @PostMapping("/vehicle-body-types")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<MasterResponse>> createVehicleBodyType(@Valid @RequestBody MasterRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Vehicle body type created successfully", globalMasterService.createVehicleBodyType(request)));
+    }
+
+    @PutMapping("/vehicle-body-types/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<MasterResponse>> updateVehicleBodyType(@PathVariable Long id, @Valid @RequestBody MasterRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Vehicle body type updated successfully", globalMasterService.updateVehicleBodyType(id, request)));
+    }
+
+    @DeleteMapping("/vehicle-body-types/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteVehicleBodyType(@PathVariable Long id) {
+        globalMasterService.deleteVehicleBodyType(id);
+        return ResponseEntity.ok(ApiResponse.success("Vehicle body type deleted successfully", null));
+    }
+
     // ===================== FUEL TYPES =====================
     @GetMapping("/fuel-types")
     public ResponseEntity<ApiResponse<List<MasterResponse>>> getAllFuelTypes() {

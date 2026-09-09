@@ -18,6 +18,7 @@ public class VehicleRequest {
     private Long brandId;
     private String model;
     private Long vehicleTypeId;
+    private Long bodyTypeId;
     private Long fuelTypeId;
     private Long ownershipTypeId;
     private Long currentStatusId;

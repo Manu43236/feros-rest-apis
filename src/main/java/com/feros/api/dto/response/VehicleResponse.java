@@ -25,6 +25,9 @@ public class VehicleResponse {
     private Long vehicleTypeId;
     private String vehicleTypeName;
 
+    private Long bodyTypeId;
+    private String bodyTypeName;
+
     private Long fuelTypeId;
     private String fuelTypeName;
 

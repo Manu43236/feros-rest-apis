@@ -40,6 +40,12 @@ public interface GlobalMasterService {
     MasterResponse updateVehicleType(Long id, VehicleTypeRequest request);
     void deleteVehicleType(Long id);
 
+    // Vehicle Body Types
+    MasterResponse createVehicleBodyType(MasterRequest request);
+    List<MasterResponse> getAllVehicleBodyTypes();
+    MasterResponse updateVehicleBodyType(Long id, MasterRequest request);
+    void deleteVehicleBodyType(Long id);
+
     // Fuel Types
     MasterResponse createFuelType(MasterRequest request);
     MasterResponse getFuelTypeById(Long id);

@@ -24,6 +24,7 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
     private final CityRepository cityRepository;
     private final VehicleBrandRepository vehicleBrandRepository;
     private final VehicleTypeRepository vehicleTypeRepository;
+    private final VehicleBodyTypeRepository vehicleBodyTypeRepository;
     private final FuelTypeRepository fuelTypeRepository;
     private final PartCategoryRepository partCategoryRepository;
     private final MaterialTypeRepository materialTypeRepository;
@@ -223,6 +224,35 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
                 .orElseThrow(() -> new FerosException("Vehicle type not found", HttpStatus.NOT_FOUND));
         type.setIsActive(false);
         vehicleTypeRepository.save(type);
+    }
+
+    // ===================== VEHICLE BODY TYPES =====================
+    @Override
+    public MasterResponse createVehicleBodyType(MasterRequest request) {
+        VehicleBodyType bt = VehicleBodyType.builder().name(request.getName()).isActive(true).build();
+        return mapToMasterResponse(vehicleBodyTypeRepository.save(bt));
+    }
+
+    @Override
+    public List<MasterResponse> getAllVehicleBodyTypes() {
+        return vehicleBodyTypeRepository.findAllByIsActiveTrue()
+                .stream().map(this::mapToMasterResponse).toList();
+    }
+
+    @Override
+    public MasterResponse updateVehicleBodyType(Long id, MasterRequest request) {
+        VehicleBodyType bt = vehicleBodyTypeRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Body type not found", HttpStatus.NOT_FOUND));
+        bt.setName(request.getName());
+        return mapToMasterResponse(vehicleBodyTypeRepository.save(bt));
+    }
+
+    @Override
+    public void deleteVehicleBodyType(Long id) {
+        VehicleBodyType bt = vehicleBodyTypeRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Body type not found", HttpStatus.NOT_FOUND));
+        bt.setIsActive(false);
+        vehicleBodyTypeRepository.save(bt);
     }
 
     // ===================== FUEL TYPES =====================

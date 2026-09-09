@@ -54,6 +54,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final TenantRepository tenantRepository;
     private final VehicleBrandRepository vehicleBrandRepository;
     private final VehicleTypeRepository vehicleTypeRepository;
+    private final VehicleBodyTypeRepository vehicleBodyTypeRepository;
     private final FuelTypeRepository fuelTypeRepository;
     private final OwnershipTypeRepository ownershipTypeRepository;
     private final VehicleStatusRepository vehicleStatusRepository;
@@ -172,6 +173,12 @@ public class VehicleServiceImpl implements VehicleService {
         if (request.getVehicleTypeId() != null)
             vehicle.setVehicleType(vehicleTypeRepository.findById(request.getVehicleTypeId())
                     .orElseThrow(() -> new FerosException("Vehicle type not found", HttpStatus.NOT_FOUND)));
+
+        if (request.getBodyTypeId() != null)
+            vehicle.setVehicleBodyType(vehicleBodyTypeRepository.findById(request.getBodyTypeId())
+                    .orElseThrow(() -> new FerosException("Body type not found", HttpStatus.NOT_FOUND)));
+        else if (request.getBodyTypeId() == null && vehicle.getId() == null)
+            vehicle.setVehicleBodyType(null);
 
         if (request.getFuelTypeId() != null)
             vehicle.setFuelType(fuelTypeRepository.findById(request.getFuelTypeId())
@@ -310,6 +317,10 @@ public class VehicleServiceImpl implements VehicleService {
         if (request.getVehicleTypeId() != null)
             vehicle.setVehicleType(vehicleTypeRepository.findById(request.getVehicleTypeId())
                     .orElseThrow(() -> new FerosException("Vehicle type not found", HttpStatus.NOT_FOUND)));
+
+        if (request.getBodyTypeId() != null)
+            vehicle.setVehicleBodyType(vehicleBodyTypeRepository.findById(request.getBodyTypeId())
+                    .orElseThrow(() -> new FerosException("Body type not found", HttpStatus.NOT_FOUND)));
 
         if (request.getFuelTypeId() != null)
             vehicle.setFuelType(fuelTypeRepository.findById(request.getFuelTypeId())
@@ -712,6 +723,8 @@ public class VehicleServiceImpl implements VehicleService {
                 .model(v.getModel())
                 .vehicleTypeId(v.getVehicleType() != null ? v.getVehicleType().getId() : null)
                 .vehicleTypeName(v.getVehicleType() != null ? v.getVehicleType().getName() : null)
+                .bodyTypeId(v.getVehicleBodyType() != null ? v.getVehicleBodyType().getId() : null)
+                .bodyTypeName(v.getVehicleBodyType() != null ? v.getVehicleBodyType().getName() : null)
                 .fuelTypeId(v.getFuelType() != null ? v.getFuelType().getId() : null)
                 .fuelTypeName(v.getFuelType() != null ? v.getFuelType().getName() : null)
                 .ownershipTypeId(v.getOwnershipType() != null ? v.getOwnershipType().getId() : null)

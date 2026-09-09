@@ -41,6 +41,10 @@ public class Vehicle extends BaseEntity {
     private VehicleType vehicleType;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehicle_body_type_id")
+    private VehicleBodyType vehicleBodyType;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fuel_type_id")
     private FuelType fuelType;
 
