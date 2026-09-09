@@ -5,4 +5,5 @@ import com.feros.api.dto.response.OrderResponse;
 
 public interface PostOrderLogService {
     OrderResponse createPostOrderLog(PostOrderLogRequest request);
+    OrderResponse updatePostOrderLog(Long orderId, PostOrderLogRequest request);
 }

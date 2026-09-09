@@ -69,6 +69,14 @@ public class OrderController {
                 "POL order created successfully", postOrderLogService.createPostOrderLog(request)));
     }
 
+    @PutMapping("/post-entry/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<OrderResponse>> updatePostOrderLog(
+            @PathVariable Long id, @Valid @RequestBody PostOrderLogRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "POL order updated successfully", postOrderLogService.updatePostOrderLog(id, request)));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<OrderResponse>> updateOrder(

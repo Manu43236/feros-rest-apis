@@ -12,6 +12,7 @@ import com.feros.api.enums.*;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.service.NotificationService;
+import com.feros.api.repository.InvoiceLrRepository;
 import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.PostOrderLogService;
 import com.feros.api.util.NumberUtil;
@@ -48,6 +49,7 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
     private final AttendanceRepository attendanceRepository;
     private final NumberGeneratorService numberGenerator;
     private final NotificationService notificationService;
+    private final InvoiceLrRepository invoiceLrRepository;
 
     @Override
     @Transactional
@@ -225,6 +227,169 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
                 "POL Order Created",
                 "POL order " + savedOrder.getOrderNumber() + " created with " + request.getLrs().size() + " LR(s).",
                 Map.of("type", "NEW_ORDER", "orderId", String.valueOf(savedOrder.getId())));
+
+        return mapToOrderResponse(orderRepository.findById(savedOrder.getId()).orElse(savedOrder));
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updatePostOrderLog(Long orderId, PostOrderLogRequest request) {
+        Tenant tenant = tenantRepository.findByIdAndIsActiveTrue(SecurityUtil.getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Tenant not found", HttpStatus.NOT_FOUND));
+
+        Order order = orderRepository.findByIdAndTenantIdAndIsActiveTrue(orderId, tenant.getId())
+                .orElseThrow(() -> new FerosException("Order not found", HttpStatus.NOT_FOUND));
+
+        if (!Boolean.TRUE.equals(order.getIsPol())) {
+            throw new FerosException("Only POL orders can be updated via this endpoint", HttpStatus.BAD_REQUEST);
+        }
+
+        // Block edit if any LR is already invoiced
+        List<Lr> existingLrs = lrRepository.findByOrderIdAndIsActiveTrue(orderId);
+        for (Lr lr : existingLrs) {
+            if (invoiceLrRepository.existsByLrIdAndIsActiveTrue(lr.getId())) {
+                throw new FerosException("Cannot edit POL order — one or more LRs have already been invoiced", HttpStatus.BAD_REQUEST);
+            }
+        }
+
+        if (request.getOrderDate().isAfter(TimeUtil.today())) {
+            throw new FerosException("POL order date cannot be in the future", HttpStatus.BAD_REQUEST);
+        }
+
+        Client client = clientRepository.findByIdAndTenantIdAndIsActiveTrue(request.getClientId(), tenant.getId())
+                .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
+
+        MaterialType materialType = resolveMaterialType(request, tenant);
+
+        City sourceCity = cityRepository.findById(request.getSourceCityId())
+                .orElseThrow(() -> new FerosException("Source city not found", HttpStatus.NOT_FOUND));
+        State sourceState = stateRepository.findById(request.getSourceStateId())
+                .orElseThrow(() -> new FerosException("Source state not found", HttpStatus.NOT_FOUND));
+        City destCity = cityRepository.findById(request.getDestinationCityId())
+                .orElseThrow(() -> new FerosException("Destination city not found", HttpStatus.NOT_FOUND));
+        State destState = stateRepository.findById(request.getDestinationStateId())
+                .orElseThrow(() -> new FerosException("Destination state not found", HttpStatus.NOT_FOUND));
+
+        List<Long> presentUserIds = attendanceRepository.findUserIdsWithAttendanceOnDate(
+                tenant.getId(), request.getOrderDate(),
+                List.of(AttendanceApprovalStatus.APPROVED, AttendanceApprovalStatus.PENDING));
+
+        for (PolLrRequest lrReq : request.getLrs()) {
+            if (!presentUserIds.contains(lrReq.getDriverId())) {
+                User driver = userRepository.findById(lrReq.getDriverId())
+                        .orElseThrow(() -> new FerosException("Driver not found: " + lrReq.getDriverId(), HttpStatus.NOT_FOUND));
+                throw new FerosException("Driver '" + driver.getName() + "' has no attendance on " + request.getOrderDate(), HttpStatus.BAD_REQUEST);
+            }
+            if (lrReq.getCleanerId() != null && !presentUserIds.contains(lrReq.getCleanerId())) {
+                User cleaner = userRepository.findById(lrReq.getCleanerId())
+                        .orElseThrow(() -> new FerosException("Cleaner not found: " + lrReq.getCleanerId(), HttpStatus.NOT_FOUND));
+                throw new FerosException("Cleaner '" + cleaner.getName() + "' has no attendance on " + request.getOrderDate(), HttpStatus.BAD_REQUEST);
+            }
+        }
+
+        // Soft-delete existing LRs, staff allocations and vehicle allocations
+        for (Lr lr : existingLrs) {
+            lr.setIsActive(false);
+            lrRepository.save(lr);
+        }
+        List<OrderVehicleAllocation> existingAllocations = vehicleAllocationRepository.findByOrderIdAndIsActiveTrue(orderId);
+        for (OrderVehicleAllocation alloc : existingAllocations) {
+            List<OrderStaffAllocation> staffAllocs = staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(alloc.getId());
+            staffAllocs.forEach(sa -> { sa.setIsActive(false); staffAllocationRepository.save(sa); });
+            alloc.setIsActive(false);
+            vehicleAllocationRepository.save(alloc);
+        }
+
+        BigDecimal totalFulfilled = request.getLrs().stream()
+                .map(PolLrRequest::getAllocatedWeight)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Update order fields
+        order.setClient(client);
+        order.setMaterialType(materialType);
+        order.setTotalWeight(request.getTotalWeight());
+        order.setTotalWeightFulfilled(totalFulfilled);
+        order.setOrderDate(request.getOrderDate());
+        order.setSourceAddress(request.getSourceAddress());
+        order.setSourceCity(sourceCity);
+        order.setSourceState(sourceState);
+        order.setDestinationAddress(request.getDestinationAddress());
+        order.setDestinationCity(destCity);
+        order.setDestinationState(destState);
+        order.setFreightRateType(request.getFreightRateType());
+        order.setFreightRate(request.getFreightRate());
+        order.setBillingOn(request.getBillingOn() != null ? request.getBillingOn() : BillingOn.LOADED_WEIGHT);
+        order.setSpecialInstructions(request.getSpecialInstructions());
+        order.setRemarks(request.getRemarks());
+        if (request.getRouteId() != null) {
+            order.setRoute(routeRepository.findByIdAndTenantId(request.getRouteId(), tenant.getId())
+                    .orElseThrow(() -> new FerosException("Route not found", HttpStatus.NOT_FOUND)));
+        } else {
+            order.setRoute(null);
+        }
+        Order savedOrder = orderRepository.save(order);
+
+        User updatedBy = userRepository.findById(SecurityUtil.getCurrentUserId())
+                .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
+        Role driverRole = roleRepository.findByName(RoleName.DRIVER)
+                .orElseThrow(() -> new FerosException("Driver role not found", HttpStatus.INTERNAL_SERVER_ERROR));
+        Role cleanerRole = roleRepository.findByName(RoleName.CLEANER)
+                .orElseThrow(() -> new FerosException("Cleaner role not found", HttpStatus.INTERNAL_SERVER_ERROR));
+
+        for (PolLrRequest lrReq : request.getLrs()) {
+            Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(lrReq.getVehicleId(), tenant.getId())
+                    .orElseThrow(() -> new FerosException("Vehicle not found: " + lrReq.getVehicleId(), HttpStatus.NOT_FOUND));
+            User driver = userRepository.findByIdAndIsActiveTrue(lrReq.getDriverId())
+                    .orElseThrow(() -> new FerosException("Driver not found: " + lrReq.getDriverId(), HttpStatus.NOT_FOUND));
+
+            LocalDate lrDate = lrReq.getLrDate() != null ? lrReq.getLrDate() : request.getOrderDate();
+
+            OrderVehicleAllocation allocation = OrderVehicleAllocation.builder()
+                    .tenant(tenant).order(savedOrder).vehicle(vehicle)
+                    .allocatedWeight(lrReq.getAllocatedWeight())
+                    .actualLoadDate(lrDate).actualDeliveryDate(lrDate)
+                    .allocationStatus(VehicleAllocationStatus.DELIVERED)
+                    .allocatedBy(updatedBy).isActive(true).build();
+            OrderVehicleAllocation savedAllocation = vehicleAllocationRepository.save(allocation);
+
+            staffAllocationRepository.save(OrderStaffAllocation.builder()
+                    .tenant(tenant).order(savedOrder).vehicleAllocation(savedAllocation)
+                    .user(driver).role(driverRole)
+                    .actualStartDate(lrDate).actualEndDate(lrDate)
+                    .allocationStatus(StaffAllocationStatus.COMPLETED)
+                    .allocatedBy(updatedBy).isActive(true).build());
+
+            if (lrReq.getCleanerId() != null) {
+                User cleaner = userRepository.findByIdAndIsActiveTrue(lrReq.getCleanerId())
+                        .orElseThrow(() -> new FerosException("Cleaner not found: " + lrReq.getCleanerId(), HttpStatus.NOT_FOUND));
+                staffAllocationRepository.save(OrderStaffAllocation.builder()
+                        .tenant(tenant).order(savedOrder).vehicleAllocation(savedAllocation)
+                        .user(cleaner).role(cleanerRole)
+                        .actualStartDate(lrDate).actualEndDate(lrDate)
+                        .allocationStatus(StaffAllocationStatus.COMPLETED)
+                        .allocatedBy(updatedBy).isActive(true).build());
+            }
+
+            Lr lr = Lr.builder()
+                    .tenant(tenant).lrNumber(numberGenerator.generateFY(tenant.getId(), NumberUtil.Type.LR))
+                    .paperLrNumber(lrReq.getPaperLrNumber())
+                    .order(savedOrder).vehicleAllocation(savedAllocation)
+                    .lrDate(lrDate).vehicleCapacity(lrReq.getVehicleCapacity())
+                    .allocatedWeight(lrReq.getAllocatedWeight())
+                    .loadedWeight(lrReq.getLoadedWeight())
+                    .deliveredWeight(lrReq.getDeliveredWeight())
+                    .loadedAt(lrDate.atStartOfDay()).deliveredAt(lrDate.atStartOfDay())
+                    .lrStatus(LrStatus.DELIVERED).driver(driver)
+                    .ewayBillNumber(lrReq.getEwayBillNumber())
+                    .ewayBillDate(lrReq.getEwayBillDate())
+                    .ewayBillValidUpto(lrReq.getEwayBillValidUpto())
+                    .remarks(lrReq.getRemarks()).createdBy(updatedBy).isActive(true).build();
+
+            if (lrReq.getCleanerId() != null) {
+                userRepository.findByIdAndIsActiveTrue(lrReq.getCleanerId()).ifPresent(lr::setCleaner);
+            }
+            lrRepository.save(lr);
+        }
 
         return mapToOrderResponse(orderRepository.findById(savedOrder.getId()).orElse(savedOrder));
     }
