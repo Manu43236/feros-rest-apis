@@ -81,22 +81,28 @@ public class ReportController {
             @RequestParam(defaultValue = "csv") String format) {
         LocalDate reportDate = date != null ? date : TimeUtil.today();
         List<FleetStatusRow> rows = reportService.getFleetStatus(reportDate);
-        String[] headers = {"Vehicle No.", "Type", "Ownership", "Status", "Driver", "Cleaner", "Trip Scope"};
-        List<String[]> data = rows.stream().map(r -> new String[]{
-                r.getRegistrationNumber(), r.getVehicleType(), r.getOwnershipType(),
-                r.getCurrentStatus(), r.getCurrentDriverName(), r.getCurrentCleanerName(), r.getTripScope()
+        String[] headers = {"Vehicle No.", "Tyre Type", "Status"};
+        List<String[]> data = rows.stream().map(r -> {
+            String statusLabel = "IN_REPAIR".equals(r.getCurrentStatus())
+                    ? ("BREAKDOWN".equals(r.getInRepairType()) ? "Breakdown In Repair" : "Maintenance In Repair")
+                    : r.getCurrentStatus();
+            return new String[]{ r.getRegistrationNumber(), r.getVehicleType(), statusLabel };
         }).toList();
 
         if ("pdf".equalsIgnoreCase(format)) {
-            // Build count summary for each status
+            // Build count summary
+            long breakdownInRepair  = rows.stream().filter(r -> "IN_REPAIR".equals(r.getCurrentStatus()) && "BREAKDOWN".equals(r.getInRepairType())).count();
+            long maintenanceInRepair = rows.stream().filter(r -> "IN_REPAIR".equals(r.getCurrentStatus()) && !"BREAKDOWN".equals(r.getInRepairType())).count();
             java.util.Map<String, Long> counts = rows.stream()
-                    .collect(java.util.stream.Collectors.groupingBy(
-                            FleetStatusRow::getCurrentStatus, java.util.stream.Collectors.counting()));
+                    .filter(r -> !"IN_REPAIR".equals(r.getCurrentStatus()))
+                    .collect(java.util.stream.Collectors.groupingBy(FleetStatusRow::getCurrentStatus, java.util.stream.Collectors.counting()));
             List<String[]> summary = new java.util.ArrayList<>();
             summary.add(new String[]{"Total Vehicles", String.valueOf(rows.size())});
-            for (String s : new String[]{"AVAILABLE", "ASSIGNED", "ON_TRIP", "IN_REPAIR", "BREAKDOWN", "ON_LEASE", "OTHER"}) {
+            for (String s : new String[]{"AVAILABLE", "ASSIGNED", "ON_TRIP", "BREAKDOWN", "ON_LEASE", "OTHER"}) {
                 if (counts.containsKey(s)) summary.add(new String[]{s.replace('_', ' '), String.valueOf(counts.get(s))});
             }
+            if (breakdownInRepair > 0) summary.add(new String[]{"Breakdown In Repair", String.valueOf(breakdownInRepair)});
+            if (maintenanceInRepair > 0) summary.add(new String[]{"Maintenance In Repair", String.valueOf(maintenanceInRepair)});
             byte[] pdf = ReportExportUtil.toPdf("Fleet Status Report — " + reportDate, summary, headers, data);
             return ReportExportUtil.pdfResponse("fleet-status-" + reportDate, pdf);
         }

@@ -5,6 +5,8 @@ import com.feros.api.entity.*;
 import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.OrderStatus;
+import com.feros.api.enums.ServiceStatus;
+import com.feros.api.enums.ServiceTriggeredBy;
 import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.enums.InvoiceStatus;
 import com.feros.api.enums.StockTransactionType;
@@ -139,17 +141,26 @@ public class ReportServiceImpl implements ReportService {
     @Transactional(readOnly = true)
     public List<FleetStatusRow> getFleetStatus(LocalDate date) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
+        // build vehicleId → inRepairType map from active services
+        Map<Long, String> inRepairTypeByVehicle = vehicleServiceRepository
+                .findByTenantIdAndIsActiveTrueAndStatusIn(tenantId, List.of(ServiceStatus.OPEN, ServiceStatus.IN_PROGRESS))
+                .stream()
+                .collect(Collectors.toMap(
+                        s -> s.getVehicle().getId(),
+                        s -> s.getTriggeredBy() == ServiceTriggeredBy.BREAKDOWN ? "BREAKDOWN" : "GENERAL",
+                        (a, b) -> a // keep first if multiple active services
+                ));
         return vehicleRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
-                .map(v -> FleetStatusRow.builder()
-                        .vehicleId(v.getId())
-                        .registrationNumber(v.getRegistrationNumber())
-                        .vehicleType(v.getVehicleType() != null ? v.getVehicleType().getName() : "—")
-                        .ownershipType(v.getOwnershipType() != null ? v.getOwnershipType().getName() : "—")
-                        .currentStatus(v.getCurrentStatus() != null ? v.getCurrentStatus().getStatusType().name() : "UNKNOWN")
-                        .currentDriverName(v.getCurrentDriver() != null ? v.getCurrentDriver().getName() : "—")
-                        .currentCleanerName(v.getCurrentCleaner() != null ? v.getCurrentCleaner().getName() : "—")
-                        .tripScope(v.getTripScope() != null ? v.getTripScope().name() : "—")
-                        .build())
+                .map(v -> {
+                    String status = v.getCurrentStatus() != null ? v.getCurrentStatus().getStatusType().name() : "UNKNOWN";
+                    return FleetStatusRow.builder()
+                            .vehicleId(v.getId())
+                            .registrationNumber(v.getRegistrationNumber())
+                            .vehicleType(v.getVehicleType() != null ? v.getVehicleType().getName() : "—")
+                            .currentStatus(status)
+                            .inRepairType("IN_REPAIR".equals(status) ? inRepairTypeByVehicle.get(v.getId()) : null)
+                            .build();
+                })
                 .toList();
     }
 

@@ -33,6 +33,8 @@ public interface VehicleServiceRepository extends JpaRepository<VehicleService, 
                                                     @Param("excludeTrigger") ServiceTriggeredBy excludeTrigger,
                                                     @Param("statuses") List<ServiceStatus> statuses);
 
+    List<VehicleService> findByTenantIdAndIsActiveTrueAndStatusIn(Long tenantId, List<ServiceStatus> statuses);
+
     // Find open/in-progress services with due_at_odometer within alert range of current reading
     @Query("SELECT s FROM VehicleService s WHERE s.vehicle.id = :vehicleId AND s.isActive = true " +
            "AND s.status IN ('OPEN','IN_PROGRESS') AND s.dueAtOdometer IS NOT NULL " +
