@@ -1,43 +1,61 @@
 package com.feros.api.gps.model;
 
-import lombok.Builder;
-import lombok.Data;
+import jakarta.persistence.*;
+import lombok.*;
 
 import java.math.BigDecimal;
-import java.time.Instant;
+import java.time.LocalDateTime;
 
-/**
- * Normalized GPS ping — device-agnostic output from any GpsPacketParser.
- * Fields confirmed against real packet data before persisting to DB.
- */
-@Data
+@Entity
+@Table(
+    name = "gps_pings",
+    indexes = {
+        @Index(name = "idx_vehicle_time",  columnList = "vehicle_id, recorded_at_utc"),
+        @Index(name = "idx_tenant_time",   columnList = "tenant_id, recorded_at_utc"),
+        @Index(name = "idx_device_frame",  columnList = "device_id, frame_number")
+    },
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_device_recorded", columnNames = {"device_id", "recorded_at_utc"})
+    }
+)
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
 public class GpsPing {
 
-    private Long deviceId;
-    private Long vehicleId;
-    private Long tenantId;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    private Instant recordedAtUtc;   // from device packet (always UTC)
-    private Instant receivedAt;       // server wall clock when packet arrived
+    // Denormalized for fast queries — avoids joins on every map load
+    @Column(name = "device_id",  nullable = false) private Long deviceId;
+    @Column(name = "vehicle_id", nullable = false) private Long vehicleId;
+    @Column(name = "tenant_id",  nullable = false) private Long tenantId;
 
-    private BigDecimal latitude;      // signed: negative if S
-    private BigDecimal longitude;     // signed: negative if W
-    private BigDecimal speedKmh;
-    private Integer   heading;        // 0–360 degrees
-    private BigDecimal altitude;      // metres above sea level
+    @Column(name = "recorded_at_utc", nullable = false)
+    private LocalDateTime recordedAtUtc;   // from device packet — always UTC
 
-    private Boolean ignitionOn;
-    private Boolean gpsFixValid;
+    @Column(name = "received_at", nullable = false)
+    private LocalDateTime receivedAt;       // server wall clock
 
-    private String  packetType;       // NR, IN, IF, EA, HP, BD, etc.
-    private Integer alertId;          // message ID from device
-    private Boolean isHistory;        // true = H (stored), false = L (live)
-    private Integer frameNumber;      // for deduplication
+    @Column(name = "latitude",  nullable = false, precision = 9, scale = 6) private BigDecimal latitude;
+    @Column(name = "longitude", nullable = false, precision = 9, scale = 6) private BigDecimal longitude;
 
-    private BigDecimal batteryVoltage; // internal device battery (V)
-    private BigDecimal mainVoltage;    // vehicle main power (V)
-    private Integer    gsmSignal;      // 0–31
+    @Column(name = "speed_kmh", precision = 5, scale = 1) private BigDecimal speedKmh;
+    @Column(name = "heading")                             private Integer    heading;
+    @Column(name = "altitude",  precision = 7, scale = 1) private BigDecimal altitude;
 
-    private String rawFrame;           // original packet string (debug only)
+    @Column(name = "ignition_on")    private Boolean ignitionOn;
+    @Column(name = "gps_fix_valid")  private Boolean gpsFixValid;
+
+    @Column(name = "packet_type", length = 5) private String  packetType;  // NR, IN, IF, HP, etc.
+    @Column(name = "alert_id")                private Integer alertId;
+    @Column(name = "is_history")              private Boolean isHistory;
+    @Column(name = "frame_number")            private Integer frameNumber;
+
+    @Column(name = "battery_voltage", precision = 4, scale = 1) private BigDecimal batteryVoltage;
+    @Column(name = "main_voltage",    precision = 4, scale = 1) private BigDecimal mainVoltage;
+    @Column(name = "gsm_signal")                                private Integer    gsmSignal;
 }
