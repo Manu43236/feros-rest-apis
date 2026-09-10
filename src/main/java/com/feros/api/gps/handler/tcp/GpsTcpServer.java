@@ -157,13 +157,16 @@ public class GpsTcpServer implements GpsConnectionHandler {
         }
     }
 
-    // $PVT,vendor,firmware,type,alertId,L/H,IMEI,...  →  field[6] = IMEI
+    // $LGN,vehicleReg,IMEI,...      → field[2] = IMEI
+    // $PVT,vendor,fw,...,L/H,IMEI  → field[6] = IMEI
     private String extractImei(String line) {
         try {
             int star = line.lastIndexOf('*');
             String stripped = star > 0 ? line.substring(0, star) : line;
             String[] f = stripped.split(",");
-            return f.length > 6 ? f[6].trim() : null;
+            if (line.startsWith("$LGN") && f.length > 2) return f[2].trim();
+            if (line.startsWith("$PVT") && f.length > 6) return f[6].trim();
+            return null;
         } catch (Exception e) {
             return null;
         }
