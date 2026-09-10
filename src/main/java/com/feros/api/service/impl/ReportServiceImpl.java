@@ -519,6 +519,9 @@ public class ReportServiceImpl implements ReportService {
                 .orderStatus(o.getOrderStatus() != null ? o.getOrderStatus().name() : "—")
                 .orderPaymentStatus(o.getOrderPaymentStatus() != null ? o.getOrderPaymentStatus().name() : "—")
                 .vehicleCount(orderVehicleAllocationRepository.countByOrderIdAndIsActiveTrue(o.getId()))
+                .durationDays(o.getExpectedDeliveryDate() != null
+                        ? (int) ChronoUnit.DAYS.between(o.getOrderDate(), o.getExpectedDeliveryDate())
+                        : null)
                 .build()).toList();
     }
 

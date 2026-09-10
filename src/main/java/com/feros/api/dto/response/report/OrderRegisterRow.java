@@ -27,4 +27,5 @@ public class OrderRegisterRow {
     private String orderStatus;
     private String orderPaymentStatus;
     private long vehicleCount;
+    private Integer durationDays;
 }

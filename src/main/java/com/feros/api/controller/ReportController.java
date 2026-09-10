@@ -394,20 +394,38 @@ public class ReportController {
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "csv") String format) {
         List<OrderRegisterRow> rows = reportService.getOrderRegister(startDate, endDate, status);
-        String[] headers = {"Order No.", "Order Date", "Exp. Delivery", "Client", "Material",
+        String[] headers = {"Order No.", "Order Date", "Exp. Delivery", "Duration (days)", "Client", "Material",
                 "From", "To", "Total Wt (kg)", "Fulfilled Wt (kg)", "Freight Rate Type",
                 "Freight Rate", "Total Freight", "Status", "Payment Status", "Vehicles"};
         List<String[]> data = rows.stream().map(r -> new String[]{
                 r.getOrderNumber(), r.getOrderDate().toString(),
                 r.getExpectedDeliveryDate() != null ? r.getExpectedDeliveryDate().toString() : "—",
+                r.getDurationDays() != null ? r.getDurationDays() + " days" : "—",
                 r.getClientName(), r.getMaterialType(),
                 r.getFromCity() + ", " + r.getFromState(), r.getToCity() + ", " + r.getToState(),
                 safe(r.getTotalWeight()), safe(r.getTotalWeightFulfilled()),
                 r.getFreightRateType(), safe(r.getFreightRate()), safe(r.getTotalFreightAmount()),
                 r.getOrderStatus(), r.getOrderPaymentStatus(), String.valueOf(r.getVehicleCount())
         }).toList();
-        return export("order-register-" + startDate + "-" + endDate,
-                "Order Register — " + startDate + " to " + endDate, headers, data, format);
+        java.util.Map<String, Long> statusCounts = rows.stream()
+                .collect(Collectors.groupingBy(OrderRegisterRow::getOrderStatus, Collectors.counting()));
+        List<String[]> summary = List.of(
+                new String[]{"Total Orders",         String.valueOf(rows.size())},
+                new String[]{"Pending",              String.valueOf(statusCounts.getOrDefault("PENDING", 0L))},
+                new String[]{"Partially Assigned",   String.valueOf(statusCounts.getOrDefault("PARTIALLY_ASSIGNED", 0L))},
+                new String[]{"Fully Assigned",       String.valueOf(statusCounts.getOrDefault("FULLY_ASSIGNED", 0L))},
+                new String[]{"In Transit",           String.valueOf(statusCounts.getOrDefault("IN_TRANSIT", 0L))},
+                new String[]{"Partially Delivered",  String.valueOf(statusCounts.getOrDefault("PARTIALLY_DELIVERED", 0L))},
+                new String[]{"Delivered",            String.valueOf(statusCounts.getOrDefault("DELIVERED", 0L))},
+                new String[]{"Completed",            String.valueOf(statusCounts.getOrDefault("COMPLETED", 0L))},
+                new String[]{"Cancelled",            String.valueOf(statusCounts.getOrDefault("CANCELLED", 0L))}
+        );
+        if ("pdf".equalsIgnoreCase(format)) {
+            byte[] pdf = ReportExportUtil.toPdf("Order Register — " + startDate + " to " + endDate, summary, headers, data);
+            return ReportExportUtil.pdfResponse("order-register-" + startDate + "-" + endDate, pdf);
+        }
+        return ReportExportUtil.csvResponse("order-register-" + startDate + "-" + endDate,
+                ReportExportUtil.toCsv(headers, data));
     }
 
     // ── Open Orders ───────────────────────────────────────────────────────────────
