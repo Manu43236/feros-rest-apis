@@ -2480,6 +2480,7 @@ public class ReportServiceImpl implements ReportService {
         int drivers = (int) rows.stream().filter(r -> !"—".equals(r.getDriverName())).count();
         int cleaners = (int) rows.stream().filter(r -> !"—".equals(r.getCleanerName())).count();
         int unassigned = vehicles.size() - drivers;
+        int empty = (int) rows.stream().filter(r -> "—".equals(r.getDriverName()) && "—".equals(r.getCleanerName())).count();
 
         return DailyFleetAttendanceReport.builder()
                 .date(date)
@@ -2488,6 +2489,7 @@ public class ReportServiceImpl implements ReportService {
                 .drivers(drivers)
                 .cleaners(cleaners)
                 .unassigned(unassigned)
+                .empty(empty)
                 .rows(rows)
                 .build();
     }

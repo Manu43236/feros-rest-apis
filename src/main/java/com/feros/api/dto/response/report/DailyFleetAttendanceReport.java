@@ -17,5 +17,6 @@ public class DailyFleetAttendanceReport {
     private int drivers;
     private int cleaners;
     private int unassigned;
+    private int empty;
     private List<DailyFleetAttendanceRow> rows;
 }
