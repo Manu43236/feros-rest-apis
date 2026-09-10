@@ -4,6 +4,7 @@ import com.feros.api.dto.response.report.*;
 import com.feros.api.entity.*;
 import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.enums.LrStatus;
+import com.feros.api.enums.MeterReadingType;
 import com.feros.api.enums.OrderStatus;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
@@ -2519,11 +2520,14 @@ public class ReportServiceImpl implements ReportService {
             OrderVehicleAllocation alloc = lr.getVehicleAllocation();
             Vehicle vehicle = alloc != null ? alloc.getVehicle() : null;
 
-            java.time.LocalDateTime loadedAt   = lr.getLoadedAt();
+            java.time.LocalDateTime tripStart = meterReadingRepository
+                    .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(lr.getId(), MeterReadingType.TRIP_START)
+                    .map(com.feros.api.entity.VehicleMeterReading::getRecordedAt)
+                    .orElse(null);
             java.time.LocalDateTime deliveredAt = lr.getDeliveredAt();
             Double durationHours = null;
-            if (loadedAt != null && deliveredAt != null) {
-                long minutes = Duration.between(loadedAt, deliveredAt).toMinutes();
+            if (tripStart != null && deliveredAt != null) {
+                long minutes = Duration.between(tripStart, deliveredAt).toMinutes();
                 if (minutes >= 0) durationHours = Math.round(minutes / 60.0 * 100.0) / 100.0;
             }
 
@@ -2535,7 +2539,7 @@ public class ReportServiceImpl implements ReportService {
                     .lrCreatedAt(lr.getCreatedAt())
                     .registrationNumber(vehicle != null ? vehicle.getRegistrationNumber() : "—")
                     .vehicleAssignedAt(alloc != null ? alloc.getCreatedAt() : null)
-                    .tripStartTime(loadedAt)
+                    .tripStartTime(tripStart)
                     .tripEndTime(deliveredAt)
                     .driverName(lr.getDriver() != null ? lr.getDriver().getName() : "—")
                     .lrStatus(lr.getLrStatus().name())
