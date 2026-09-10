@@ -2506,7 +2506,9 @@ public class ReportServiceImpl implements ReportService {
     @Transactional(readOnly = true)
     public List<TripSummaryRow> getTripSummary(LocalDate startDate, LocalDate endDate, String orderNumber) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        List<Lr> lrs = lrRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+        List<Lr> lrs = lrRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate).stream()
+                .filter(lr -> !Boolean.TRUE.equals(lr.getOrder().getIsPol()))
+                .toList();
 
         if (orderNumber != null && !orderNumber.isBlank()) {
             String filter = orderNumber.trim().toUpperCase();
