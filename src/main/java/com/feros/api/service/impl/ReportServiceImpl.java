@@ -66,6 +66,7 @@ public class ReportServiceImpl implements ReportService {
     private final StaffProfileRepository staffProfileRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
+    private final OrderVehicleAllocationRepository orderVehicleAllocationRepository;
     private final VehicleServiceTaskRepository vehicleServiceTaskRepository;
 
     // ── 0. Vehicle Master ──────────────────────────────────────────────────────
@@ -517,6 +518,7 @@ public class ReportServiceImpl implements ReportService {
                 .totalFreightAmount(o.getTotalFreightAmount())
                 .orderStatus(o.getOrderStatus() != null ? o.getOrderStatus().name() : "—")
                 .orderPaymentStatus(o.getOrderPaymentStatus() != null ? o.getOrderPaymentStatus().name() : "—")
+                .vehicleCount(orderVehicleAllocationRepository.countByOrderIdAndIsActiveTrue(o.getId()))
                 .build()).toList();
     }
 

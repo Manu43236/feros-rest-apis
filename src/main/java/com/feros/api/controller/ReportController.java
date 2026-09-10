@@ -396,7 +396,7 @@ public class ReportController {
         List<OrderRegisterRow> rows = reportService.getOrderRegister(startDate, endDate, status);
         String[] headers = {"Order No.", "Order Date", "Exp. Delivery", "Client", "Material",
                 "From", "To", "Total Wt (kg)", "Fulfilled Wt (kg)", "Freight Rate Type",
-                "Freight Rate", "Total Freight", "Status", "Payment Status"};
+                "Freight Rate", "Total Freight", "Status", "Payment Status", "Vehicles"};
         List<String[]> data = rows.stream().map(r -> new String[]{
                 r.getOrderNumber(), r.getOrderDate().toString(),
                 r.getExpectedDeliveryDate() != null ? r.getExpectedDeliveryDate().toString() : "—",
@@ -404,7 +404,7 @@ public class ReportController {
                 r.getFromCity() + ", " + r.getFromState(), r.getToCity() + ", " + r.getToState(),
                 safe(r.getTotalWeight()), safe(r.getTotalWeightFulfilled()),
                 r.getFreightRateType(), safe(r.getFreightRate()), safe(r.getTotalFreightAmount()),
-                r.getOrderStatus(), r.getOrderPaymentStatus()
+                r.getOrderStatus(), r.getOrderPaymentStatus(), String.valueOf(r.getVehicleCount())
         }).toList();
         return export("order-register-" + startDate + "-" + endDate,
                 "Order Register — " + startDate + " to " + endDate, headers, data, format);

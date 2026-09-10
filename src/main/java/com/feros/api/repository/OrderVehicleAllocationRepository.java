@@ -14,6 +14,7 @@ import java.util.Optional;
 @Repository
 public interface OrderVehicleAllocationRepository extends JpaRepository<OrderVehicleAllocation, Long> {
     List<OrderVehicleAllocation> findByOrderIdAndIsActiveTrue(Long orderId);
+    long countByOrderIdAndIsActiveTrue(Long orderId);
     Optional<OrderVehicleAllocation> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
     boolean existsByOrderIdAndVehicleIdAndIsActiveTrue(Long orderId, Long vehicleId);
     @Query("SELECT CASE WHEN COUNT(ova) > 0 THEN true ELSE false END FROM OrderVehicleAllocation ova " +

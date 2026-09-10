@@ -26,4 +26,5 @@ public class OrderRegisterRow {
     private BigDecimal totalFreightAmount;
     private String orderStatus;
     private String orderPaymentStatus;
+    private long vehicleCount;
 }
