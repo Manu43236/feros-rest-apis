@@ -126,7 +126,7 @@ public class GpsTcpServer implements GpsConnectionHandler {
                 return;
             }
 
-            GpsDevice device = deviceRepo.findByDeviceIdentifier(imei).orElse(null);
+            GpsDevice device = deviceRepo.findActiveByDeviceIdentifierEager(imei).orElse(null);
             if (device == null) {
                 log.warn("GPS TCP: unknown IMEI {} from {}", imei, remote);
                 return;
