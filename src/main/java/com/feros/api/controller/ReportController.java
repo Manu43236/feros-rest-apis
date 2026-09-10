@@ -1657,6 +1657,17 @@ public class ReportController {
                 reportService.getDailyFleetAttendance(reportDate, scope)));
     }
 
+    // ── Trip Summary ─────────────────────────────────────────────────────────
+
+    @GetMapping("/trips/summary")
+    public ResponseEntity<ApiResponse<List<TripSummaryRow>>> getTripSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(required = false) String orderNumber) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Trip summary fetched", reportService.getTripSummary(startDate, endDate, orderNumber)));
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private ResponseEntity<byte[]> export(String filename, String title,

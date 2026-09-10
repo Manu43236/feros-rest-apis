@@ -2498,4 +2498,54 @@ public class ReportServiceImpl implements ReportService {
                 .rows(rows)
                 .build();
     }
+
+    // ── Trip Summary ─────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TripSummaryRow> getTripSummary(LocalDate startDate, LocalDate endDate, String orderNumber) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<Lr> lrs = lrRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+
+        if (orderNumber != null && !orderNumber.isBlank()) {
+            String filter = orderNumber.trim().toUpperCase();
+            lrs = lrs.stream()
+                    .filter(lr -> lr.getOrder().getOrderNumber().toUpperCase().contains(filter))
+                    .toList();
+        }
+
+        // pre-load all attendance in range to avoid N+1 per driver
+        Map<Long, Map<LocalDate, Attendance>> attendanceByDriverAndDate = attendanceRepository
+                .findByTenantIdAndDateRange(tenantId, startDate, endDate).stream()
+                .filter(a -> a.getUser() != null)
+                .collect(Collectors.groupingBy(
+                        a -> a.getUser().getId(),
+                        Collectors.toMap(Attendance::getAttendanceDate, a -> a, (existing, dup) -> existing)));
+
+        return lrs.stream().map(lr -> {
+            Order order = lr.getOrder();
+            OrderVehicleAllocation alloc = lr.getVehicleAllocation();
+            Vehicle vehicle = alloc != null ? alloc.getVehicle() : null;
+            User driver = lr.getDriver();
+
+            Attendance attendance = null;
+            if (driver != null) {
+                Map<LocalDate, Attendance> driverMap = attendanceByDriverAndDate.get(driver.getId());
+                if (driverMap != null) attendance = driverMap.get(lr.getLrDate());
+            }
+
+            return TripSummaryRow.builder()
+                    .orderNumber(order.getOrderNumber())
+                    .orderCreatedAt(order.getCreatedAt())
+                    .material(order.getMaterialType() != null ? order.getMaterialType().getName() : "—")
+                    .lrNumber(lr.getLrNumber())
+                    .lrCreatedAt(lr.getCreatedAt())
+                    .registrationNumber(vehicle != null ? vehicle.getRegistrationNumber() : "—")
+                    .vehicleAssignedAt(alloc != null ? alloc.getCreatedAt() : null)
+                    .tripStartTime(attendance != null ? attendance.getMarkedAt() : null)
+                    .tripEndTime(attendance != null ? attendance.getMarkedOutAt() : null)
+                    .driverName(driver != null ? driver.getName() : "—")
+                    .build();
+        }).toList();
+    }
 }

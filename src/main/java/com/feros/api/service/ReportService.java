@@ -115,4 +115,7 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
 
     // ── Daily Fleet Attendance ─────────────────────────────────────────────────
     DailyFleetAttendanceReport getDailyFleetAttendance(LocalDate date, TripScope scope);
+
+    // ── Trip Summary ───────────────────────────────────────────────────────────
+    List<TripSummaryRow> getTripSummary(LocalDate startDate, LocalDate endDate, String orderNumber);
 }
