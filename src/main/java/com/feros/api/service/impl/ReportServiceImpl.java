@@ -2444,40 +2444,36 @@ public class ReportServiceImpl implements ReportService {
 
         List<Vehicle> vehicles = vehicleRepository.findByTenantIdAndTripScopeAndIsActiveTrue(tenantId, scope);
 
-        Set<Long> presentUserIds = new HashSet<>(
-                attendanceRepository.findUserIdsWithAttendanceOnDate(
-                        tenantId, date,
-                        List.of(AttendanceApprovalStatus.APPROVED, AttendanceApprovalStatus.PENDING)));
+        // attendance-centric: same truth source as HR → Attendance → Daily Attendance
+        List<Attendance> presentRecords = attendanceRepository
+                .findByTenantIdAndDateRange(tenantId, date, date).stream()
+                .filter(a -> a.getApprovalStatus() == AttendanceApprovalStatus.APPROVED
+                          || a.getApprovalStatus() == AttendanceApprovalStatus.PENDING)
+                .toList();
 
-        // Historical assignment lookup for the queried date — not the current live pointer
-        Map<Long, VehicleStaffAssignment> vehicleDriverVsa = new HashMap<>();
-        Map<Long, VehicleStaffAssignment> vehicleCleanerVsa = new HashMap<>();
-        vehicleStaffAssignmentRepository.findOverlappingForTenant(tenantId, date, date)
-                .forEach(a -> {
-                    String role = primaryRole(a.getUser());
-                    Long vid = a.getVehicle().getId();
-                    if ("DRIVER".equals(role))        vehicleDriverVsa.put(vid, a);
-                    else if ("CLEANER".equals(role))  vehicleCleanerVsa.put(vid, a);
-                });
+        Map<Long, List<VehicleStaffAssignment>> userAssignments = buildUserAssignmentMap(tenantId, date, date);
+
+        // resolve vehicle per person using same logic as HR attendance (max assignedFrom+createdAt + swap-dedup)
+        Map<String, String> vehicleDriverMap  = new HashMap<>();
+        Map<String, String> vehicleCleanerMap = new HashMap<>();
+        for (Attendance att : presentRecords) {
+            String reg = resolveVehicleForDate(userAssignments, att.getUser().getId(), tenantId, date);
+            if ("—".equals(reg)) continue;
+            String role = primaryRole(att.getUser());
+            if ("DRIVER".equals(role))       vehicleDriverMap.put(reg,  att.getUser().getName());
+            else if ("CLEANER".equals(role)) vehicleCleanerMap.put(reg, att.getUser().getName());
+        }
 
         String scopeLabel = scope == TripScope.INTRA_STATE ? "Local" : "Out Station";
 
         List<DailyFleetAttendanceRow> rows = vehicles.stream().map(v -> {
-            Long vid = v.getId();
-            VehicleStaffAssignment driverVsa  = vehicleDriverVsa.get(vid);
-            VehicleStaffAssignment cleanerVsa = vehicleCleanerVsa.get(vid);
-
-            String driverName  = (driverVsa  != null && presentUserIds.contains(driverVsa.getUser().getId()))
-                    ? driverVsa.getUser().getName()  : "—";
-            String cleanerName = (cleanerVsa != null && presentUserIds.contains(cleanerVsa.getUser().getId()))
-                    ? cleanerVsa.getUser().getName() : "—";
-
+            String reg = v.getRegistrationNumber();
             return DailyFleetAttendanceRow.builder()
-                    .registrationNumber(v.getRegistrationNumber())
+                    .registrationNumber(reg)
                     .scope(scopeLabel)
                     .vehicleType(v.getVehicleType() != null ? v.getVehicleType().getName() : "—")
-                    .driverName(driverName)
-                    .cleanerName(cleanerName)
+                    .driverName(vehicleDriverMap.getOrDefault(reg,  "—"))
+                    .cleanerName(vehicleCleanerMap.getOrDefault(reg, "—"))
                     .build();
         }).sorted(Comparator.comparing(r -> r.getRegistrationNumber().toUpperCase())).toList();
 
