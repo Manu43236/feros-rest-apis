@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -314,8 +315,21 @@ public class ReportController {
                 Boolean.TRUE.equals(r.getIsInvoiced()) ? "Yes" : "No",
                 r.getLrStatus(), safe(r.getRemarks())
         }).toList();
-        return export("lr-register-" + startDate + "-" + endDate,
-                "LR Register — " + startDate + " to " + endDate, headers, data, format);
+        if ("pdf".equalsIgnoreCase(format)) {
+            Map<String, Long> sc = rows.stream()
+                    .collect(Collectors.groupingBy(LrRegisterRow::getLrStatus, Collectors.counting()));
+            List<String[]> summary = new java.util.ArrayList<>();
+            summary.add(new String[]{"Period", startDate + " to " + endDate});
+            summary.add(new String[]{"Total LRs", String.valueOf(rows.size())});
+            for (String s : List.of("CREATED", "WEIGHT LOADED", "IN TRANSIT", "DELIVERED", "CANCELLED")) {
+                long cnt = sc.getOrDefault(s.replace(' ', '_'), 0L);
+                if (cnt > 0) summary.add(new String[]{s, String.valueOf(cnt)});
+            }
+            byte[] pdf = ReportExportUtil.toPdf("LR Register — " + startDate + " to " + endDate, summary, headers, data);
+            return ReportExportUtil.pdfResponse("lr-register-" + startDate + "-" + endDate, pdf);
+        }
+        return ReportExportUtil.csvResponse("lr-register-" + startDate + "-" + endDate,
+                ReportExportUtil.toCsv(headers, data));
     }
 
     // ── Weight Discrepancy ────────────────────────────────────────────────────────
