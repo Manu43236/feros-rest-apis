@@ -18,4 +18,6 @@ public class TripSummaryRow {
     private LocalDateTime tripStartTime;
     private LocalDateTime tripEndTime;
     private String driverName;
+    private String lrStatus;
+    private Double durationHours;
 }

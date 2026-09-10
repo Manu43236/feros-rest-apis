@@ -2534,6 +2534,14 @@ public class ReportServiceImpl implements ReportService {
                 if (driverMap != null) attendance = driverMap.get(lr.getLrDate());
             }
 
+            java.time.LocalDateTime assignedAt = alloc != null ? alloc.getCreatedAt() : null;
+            java.time.LocalDateTime tripEnd = attendance != null ? attendance.getMarkedOutAt() : null;
+            Double durationHours = null;
+            if (assignedAt != null && tripEnd != null) {
+                long minutes = Duration.between(assignedAt, tripEnd).toMinutes();
+                durationHours = Math.round(minutes / 60.0 * 100.0) / 100.0;
+            }
+
             return TripSummaryRow.builder()
                     .orderNumber(order.getOrderNumber())
                     .orderCreatedAt(order.getCreatedAt())
@@ -2541,10 +2549,12 @@ public class ReportServiceImpl implements ReportService {
                     .lrNumber(lr.getLrNumber())
                     .lrCreatedAt(lr.getCreatedAt())
                     .registrationNumber(vehicle != null ? vehicle.getRegistrationNumber() : "—")
-                    .vehicleAssignedAt(alloc != null ? alloc.getCreatedAt() : null)
+                    .vehicleAssignedAt(assignedAt)
                     .tripStartTime(attendance != null ? attendance.getMarkedAt() : null)
-                    .tripEndTime(attendance != null ? attendance.getMarkedOutAt() : null)
+                    .tripEndTime(tripEnd)
                     .driverName(driver != null ? driver.getName() : "—")
+                    .lrStatus(lr.getLrStatus().name())
+                    .durationHours(durationHours)
                     .build();
         }).toList();
     }
