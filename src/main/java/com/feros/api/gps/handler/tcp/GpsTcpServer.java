@@ -21,7 +21,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -109,60 +108,47 @@ public class GpsTcpServer implements GpsConnectionHandler {
         log.info("GPS TCP connection from {}", remote);
         try (socket;
              BufferedReader reader = new BufferedReader(
-                     new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
-             PrintWriter writer = new PrintWriter(
-                     new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.US_ASCII), true)) {
+                     new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII))) {
 
-            // First line must be a login packet
-            String loginLine = reader.readLine();
-            if (loginLine == null || !loginLine.startsWith("$LGN")) {
-                log.warn("GPS TCP: first packet not $LGN from {} — got: {}", remote, loginLine);
-                return;
-            }
-
-            String imei = extractImei(loginLine);
-            if (imei == null) {
-                log.warn("GPS TCP: cannot extract IMEI from login: {}", loginLine);
-                return;
-            }
-
-            GpsDevice device = deviceRepo.findActiveByDeviceIdentifierEager(imei).orElse(null);
-            if (device == null) {
-                log.warn("GPS TCP: unknown IMEI {} from {}", imei, remote);
-                return;
-            }
-
-            GpsPacketParser parser = parserRegistry.getParser(device.getModel().getParserKey()).orElse(null);
-            if (parser == null) {
-                log.error("GPS TCP: no parser for key {} — IMEI {}", device.getModel().getParserKey(), imei);
-                return;
-            }
-
-            // ACK the login so device starts sending tracking packets
-            writer.println("ACK");
-
-            TcpSessionContext ctx = TcpSessionContext.builder()
-                    .device(device)
-                    .parser(parser)
-                    .remoteAddress(remote)
-                    .connectedAt(Instant.now())
-                    .build();
-
-            log.info("GPS session started — {} IMEI {}", device.getVehicle().getRegistrationNumber(), imei);
+            GpsDevice       device = null;
+            GpsPacketParser parser = null;
 
             String line;
             while ((line = reader.readLine()) != null) {
                 if (line.isBlank()) continue;
                 final String frame = line;
-                parser.parse(ctx.getDevice(), frame).ifPresent(ping -> {
-                    odometerService.accumulate(ping);  // uses liveStore.getLatest BEFORE update
-                    routeService.maybeRecord(ping);     // uses liveStore.getLastRoutePoint BEFORE update
-                    liveStore.update(ping);             // update last known position
-                    persistenceService.save(ping);      // persist to gps_pings
+
+                // Identify device from first $PVT packet (IMEI at field[6])
+                if (device == null) {
+                    String imei = extractImei(frame);
+                    if (imei == null) continue;
+
+                    device = deviceRepo.findActiveByDeviceIdentifierEager(imei).orElse(null);
+                    if (device == null) {
+                        log.warn("GPS TCP: unknown IMEI {} from {}", imei, remote);
+                        return;
+                    }
+
+                    parser = parserRegistry.getParser(device.getModel().getParserKey()).orElse(null);
+                    if (parser == null) {
+                        log.error("GPS TCP: no parser for key {} — IMEI {}", device.getModel().getParserKey(), imei);
+                        return;
+                    }
+
+                    log.info("GPS session started — {} IMEI {}", device.getVehicle().getRegistrationNumber(), imei);
+                }
+
+                final GpsDevice       dev = device;
+                final GpsPacketParser psr = parser;
+                psr.parse(dev, frame).ifPresent(ping -> {
+                    odometerService.accumulate(ping);
+                    routeService.maybeRecord(ping);
+                    liveStore.update(ping);
+                    persistenceService.save(ping);
                 });
             }
 
-            log.info("GPS session ended — IMEI {}", imei);
+            log.info("GPS session ended — {}", remote);
 
         } catch (SocketTimeoutException e) {
             log.info("GPS TCP session timeout — {}", remote);
@@ -171,13 +157,13 @@ public class GpsTcpServer implements GpsConnectionHandler {
         }
     }
 
-    // $LGN,vehicleReg,IMEI,firmware,...*checksum  →  field[2] = IMEI
-    private String extractImei(String loginLine) {
+    // $PVT,vendor,firmware,type,alertId,L/H,IMEI,...  →  field[6] = IMEI
+    private String extractImei(String line) {
         try {
-            int star = loginLine.lastIndexOf('*');
-            String stripped = star > 0 ? loginLine.substring(0, star) : loginLine;
-            String[] fields = stripped.split(",");
-            return fields.length >= 3 ? fields[2].trim() : null;
+            int star = line.lastIndexOf('*');
+            String stripped = star > 0 ? line.substring(0, star) : line;
+            String[] f = stripped.split(",");
+            return f.length > 6 ? f[6].trim() : null;
         } catch (Exception e) {
             return null;
         }
