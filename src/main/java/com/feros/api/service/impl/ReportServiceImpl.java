@@ -2514,32 +2514,17 @@ public class ReportServiceImpl implements ReportService {
                     .toList();
         }
 
-        // pre-load all attendance in range to avoid N+1 per driver
-        Map<Long, Map<LocalDate, Attendance>> attendanceByDriverAndDate = attendanceRepository
-                .findByTenantIdAndDateRange(tenantId, startDate, endDate).stream()
-                .filter(a -> a.getUser() != null)
-                .collect(Collectors.groupingBy(
-                        a -> a.getUser().getId(),
-                        Collectors.toMap(Attendance::getAttendanceDate, a -> a, (existing, dup) -> existing)));
-
         return lrs.stream().map(lr -> {
             Order order = lr.getOrder();
             OrderVehicleAllocation alloc = lr.getVehicleAllocation();
             Vehicle vehicle = alloc != null ? alloc.getVehicle() : null;
-            User driver = lr.getDriver();
 
-            Attendance attendance = null;
-            if (driver != null) {
-                Map<LocalDate, Attendance> driverMap = attendanceByDriverAndDate.get(driver.getId());
-                if (driverMap != null) attendance = driverMap.get(lr.getLrDate());
-            }
-
-            java.time.LocalDateTime assignedAt = alloc != null ? alloc.getCreatedAt() : null;
-            java.time.LocalDateTime tripEnd = attendance != null ? attendance.getMarkedOutAt() : null;
+            java.time.LocalDateTime loadedAt   = lr.getLoadedAt();
+            java.time.LocalDateTime deliveredAt = lr.getDeliveredAt();
             Double durationHours = null;
-            if (assignedAt != null && tripEnd != null) {
-                long minutes = Duration.between(assignedAt, tripEnd).toMinutes();
-                durationHours = Math.round(minutes / 60.0 * 100.0) / 100.0;
+            if (loadedAt != null && deliveredAt != null) {
+                long minutes = Duration.between(loadedAt, deliveredAt).toMinutes();
+                if (minutes >= 0) durationHours = Math.round(minutes / 60.0 * 100.0) / 100.0;
             }
 
             return TripSummaryRow.builder()
@@ -2549,10 +2534,10 @@ public class ReportServiceImpl implements ReportService {
                     .lrNumber(lr.getLrNumber())
                     .lrCreatedAt(lr.getCreatedAt())
                     .registrationNumber(vehicle != null ? vehicle.getRegistrationNumber() : "—")
-                    .vehicleAssignedAt(assignedAt)
-                    .tripStartTime(attendance != null ? attendance.getMarkedAt() : null)
-                    .tripEndTime(tripEnd)
-                    .driverName(driver != null ? driver.getName() : "—")
+                    .vehicleAssignedAt(alloc != null ? alloc.getCreatedAt() : null)
+                    .tripStartTime(loadedAt)
+                    .tripEndTime(deliveredAt)
+                    .driverName(lr.getDriver() != null ? lr.getDriver().getName() : "—")
                     .lrStatus(lr.getLrStatus().name())
                     .durationHours(durationHours)
                     .build();
