@@ -291,24 +291,27 @@ public class PayrollServiceImpl implements PayrollService {
                 if (!t.contains("present") && !t.contains("half")) continue;
                 BigDecimal factor = t.contains("half") ? new BigDecimal("0.5") : BigDecimal.ONE;
                 LocalDate date = att.getAttendanceDate();
-                for (VehicleStaffAssignment a : assignments) {
-                    if (!date.isBefore(a.getAssignedFrom())
-                            && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo()))) {
-                        boolean isCleaner = user.getRoles().stream()
-                                .anyMatch(r -> r.getName() == com.feros.api.enums.RoleName.CLEANER);
-                        if (isCleaner) {
-                            BigDecimal cp = a.getVehicle().getCleanerExtraPayPerDay();
-                            if (cp != null && cp.compareTo(BigDecimal.ZERO) > 0) {
-                                vehicleExtraPay = vehicleExtraPay.add(cp.multiply(factor));
-                            }
-                        } else {
-                            if (Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
-                                    && a.getVehicle().getExtraPayPerDay() != null) {
-                                vehicleExtraPay = vehicleExtraPay.add(
-                                        a.getVehicle().getExtraPayPerDay().multiply(factor));
-                            }
+                // mirrors attendance display: pick latest VSA by assignedFrom then createdAt
+                java.util.Optional<VehicleStaffAssignment> best = assignments.stream()
+                        .filter(a -> !date.isBefore(a.getAssignedFrom())
+                                && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo())))
+                        .max(java.util.Comparator.comparing(VehicleStaffAssignment::getAssignedFrom)
+                                .thenComparing(a -> a.getCreatedAt()));
+                if (best.isPresent()) {
+                    VehicleStaffAssignment a = best.get();
+                    boolean isCleaner = user.getRoles().stream()
+                            .anyMatch(r -> r.getName() == com.feros.api.enums.RoleName.CLEANER);
+                    if (isCleaner) {
+                        BigDecimal cp = a.getVehicle().getCleanerExtraPayPerDay();
+                        if (cp != null && cp.compareTo(BigDecimal.ZERO) > 0) {
+                            vehicleExtraPay = vehicleExtraPay.add(cp.multiply(factor));
                         }
-                        break;
+                    } else {
+                        if (Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
+                                && a.getVehicle().getExtraPayPerDay() != null) {
+                            vehicleExtraPay = vehicleExtraPay.add(
+                                    a.getVehicle().getExtraPayPerDay().multiply(factor));
+                        }
                     }
                 }
             }

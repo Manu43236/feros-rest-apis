@@ -306,23 +306,26 @@ public class PayslipPdfService {
                                 .anyMatch(r -> r.getName() == com.feros.api.enums.RoleName.CLEANER);
                         String vehicleNo = "—";
                         BigDecimal vehPay = BigDecimal.ZERO;
-                        for (com.feros.api.entity.VehicleStaffAssignment a : assignments) {
-                            if (!date.isBefore(a.getAssignedFrom())
-                                    && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo()))) {
-                                vehicleNo = a.getVehicle().getRegistrationNumber();
-                                if (isCleaner) {
-                                    BigDecimal cp = a.getVehicle().getCleanerExtraPayPerDay();
-                                    if (cp != null && cp.compareTo(BigDecimal.ZERO) > 0) {
-                                        vehPay = cp.multiply(factor).setScale(2, RoundingMode.HALF_UP);
-                                    }
-                                } else {
-                                    if (Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
-                                            && a.getVehicle().getExtraPayPerDay() != null) {
-                                        vehPay = a.getVehicle().getExtraPayPerDay()
-                                                .multiply(factor).setScale(2, RoundingMode.HALF_UP);
-                                    }
+                        // mirrors attendance display: pick latest VSA by assignedFrom then createdAt
+                        java.util.Optional<com.feros.api.entity.VehicleStaffAssignment> best = assignments.stream()
+                                .filter(a -> !date.isBefore(a.getAssignedFrom())
+                                        && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo())))
+                                .max(java.util.Comparator.comparing(com.feros.api.entity.VehicleStaffAssignment::getAssignedFrom)
+                                        .thenComparing(a -> a.getCreatedAt()));
+                        if (best.isPresent()) {
+                            com.feros.api.entity.VehicleStaffAssignment a = best.get();
+                            vehicleNo = a.getVehicle().getRegistrationNumber();
+                            if (isCleaner) {
+                                BigDecimal cp = a.getVehicle().getCleanerExtraPayPerDay();
+                                if (cp != null && cp.compareTo(BigDecimal.ZERO) > 0) {
+                                    vehPay = cp.multiply(factor).setScale(2, RoundingMode.HALF_UP);
                                 }
-                                break;
+                            } else {
+                                if (Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
+                                        && a.getVehicle().getExtraPayPerDay() != null) {
+                                    vehPay = a.getVehicle().getExtraPayPerDay()
+                                            .multiply(factor).setScale(2, RoundingMode.HALF_UP);
+                                }
                             }
                         }
 
