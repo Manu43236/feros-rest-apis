@@ -2526,7 +2526,10 @@ public class ReportServiceImpl implements ReportService {
                     .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(lr.getId(), MeterReadingType.TRIP_START)
                     .map(com.feros.api.entity.VehicleMeterReading::getRecordedAt)
                     .orElse(null);
-            java.time.LocalDateTime deliveredAt = lr.getDeliveredAt();
+            java.time.LocalDateTime deliveredAt = meterReadingRepository
+                    .findTopByLrIdAndReadingTypeAndIsActiveTrueOrderByRecordedAtAsc(lr.getId(), MeterReadingType.TRIP_END)
+                    .map(com.feros.api.entity.VehicleMeterReading::getRecordedAt)
+                    .orElse(lr.getDeliveredAt());
             Double durationHours = null;
             if (tripStart != null && deliveredAt != null) {
                 long minutes = Duration.between(tripStart, deliveredAt).toMinutes();
