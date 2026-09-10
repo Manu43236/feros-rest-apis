@@ -49,8 +49,16 @@ public class GpsTrackingController {
     public ResponseEntity<ApiResponse<List<GpsFleetItemResponse>>> getFleet() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
 
-        List<GpsFleetItemResponse> fleet = liveStore.getAllLatest().stream()
+        List<GpsPing> live = liveStore.getAllLatest().stream()
                 .filter(p -> tenantId.equals(p.getTenantId()))
+                .toList();
+
+        // ponytail: fall back to DB when live store is empty (server restart wipes memory)
+        List<GpsPing> pings = live.isEmpty()
+                ? pingRepo.findLatestPerVehicleForTenant(tenantId)
+                : live;
+
+        List<GpsFleetItemResponse> fleet = pings.stream()
                 .map(p -> {
                     String reg = vehicleRepo.findById(p.getVehicleId())
                             .map(v -> v.getRegistrationNumber()).orElse("Unknown");
