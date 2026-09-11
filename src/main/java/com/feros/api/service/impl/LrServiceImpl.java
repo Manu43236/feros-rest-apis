@@ -560,6 +560,12 @@ public class LrServiceImpl implements LrService {
         lrChargeRepository.save(charge);
     }
 
+    @Override
+    public Page<LrResponse> getLrsByVehicle(Long vehicleId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return lrRepository.findByVehicleIdPaged(vehicleId, pageable).map(this::mapToLrResponse);
+    }
+
     // ===================== MAPPERS =====================
     private LrResponse mapToLrResponse(Lr lr) {
         var allocation = lr.getVehicleAllocation();

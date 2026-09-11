@@ -25,4 +25,5 @@ public interface LrService {
     LrChargeResponse addCharge(Long lrId, LrChargeRequest request);
     List<LrChargeResponse> getCharges(Long lrId);
     void deleteCharge(Long chargeId);
+    Page<LrResponse> getLrsByVehicle(Long vehicleId, int page, int size);
 }
