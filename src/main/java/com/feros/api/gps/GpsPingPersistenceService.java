@@ -45,7 +45,7 @@ public class GpsPingPersistenceService {
     private boolean shouldSave(GpsPing ping) {
         if (ping.getAlertId() != null) return true;
         Boolean prev = lastIgnition.get(ping.getVehicleId());
-        return !Boolean.valueOf(ping.getIgnitionOn()).equals(prev);
+        return !java.util.Objects.equals(ping.getIgnitionOn(), prev);
     }
 
     private void updateLastPingAt(Long deviceId, LocalDateTime recordedAtUtc) {
