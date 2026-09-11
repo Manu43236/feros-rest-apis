@@ -126,6 +126,7 @@ public class GpsTrackingController {
                 .latitude(p.getLatitude())
                 .longitude(p.getLongitude())
                 .speedKmh(p.getSpeedKmh())
+                .heading(p.getHeading())
                 .ignitionOn(p.getIgnitionOn())
                 .lastPingIst(toIst(p.getRecordedAtUtc()))
                 .isLive(isLive(p.getRecordedAtUtc()))

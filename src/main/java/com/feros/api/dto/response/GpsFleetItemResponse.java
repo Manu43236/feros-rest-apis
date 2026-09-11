@@ -13,6 +13,7 @@ public class GpsFleetItemResponse {
     private BigDecimal latitude;
     private BigDecimal longitude;
     private BigDecimal speedKmh;
+    private Integer    heading;
     private Boolean    ignitionOn;
     private String     lastPingIst;
     private Boolean    isLive;
