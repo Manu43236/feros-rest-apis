@@ -15,6 +15,8 @@ import java.math.RoundingMode;
 @Slf4j
 public class GpsOdometerService {
 
+    private static final double WRITE_THRESHOLD_KM = 0.25; // flush every 250m
+
     private final GpsLiveStore liveStore;
     private final VehicleRepository vehicleRepo;
 
@@ -27,15 +29,20 @@ public class GpsOdometerService {
 
             if (distKm <= 0) return;
 
-            BigDecimal km = BigDecimal.valueOf(distKm).setScale(4, RoundingMode.HALF_UP);
-            vehicleRepo.findById(newPing.getVehicleId()).ifPresent(vehicle -> {
-                BigDecimal current = vehicle.getCurrentOdometerReading() != null
-                        ? vehicle.getCurrentOdometerReading() : BigDecimal.ZERO;
-                vehicle.setCurrentOdometerReading(current.add(km).setScale(2, RoundingMode.HALF_UP));
-                vehicleRepo.save(vehicle);
-                log.debug("GPS odometer updated — vehicle {} +{}km total={}km",
-                        newPing.getVehicleId(), km, vehicle.getCurrentOdometerReading());
-            });
+            BigDecimal km    = BigDecimal.valueOf(distKm).setScale(4, RoundingMode.HALF_UP);
+            BigDecimal total = liveStore.addDistance(newPing.getVehicleId(), km);
+
+            if (total.doubleValue() >= WRITE_THRESHOLD_KM) {
+                vehicleRepo.findById(newPing.getVehicleId()).ifPresent(vehicle -> {
+                    BigDecimal current = vehicle.getCurrentOdometerReading() != null
+                            ? vehicle.getCurrentOdometerReading() : BigDecimal.ZERO;
+                    vehicle.setCurrentOdometerReading(current.add(total).setScale(2, RoundingMode.HALF_UP));
+                    vehicleRepo.save(vehicle);
+                    log.debug("GPS odometer updated — vehicle {} +{}km total={}km",
+                            newPing.getVehicleId(), total, vehicle.getCurrentOdometerReading());
+                });
+                liveStore.resetPendingKm(newPing.getVehicleId());
+            }
         });
     }
 }
