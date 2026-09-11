@@ -33,6 +33,8 @@ public interface LeaseVehicleAssignmentRepository extends JpaRepository<LeaseVeh
         WHERE a.vehicle.id = :vehicleId
           AND a.isActive = true
           AND a.lease.status = com.feros.api.enums.LeaseStatus.ACTIVE
+        ORDER BY a.createdAt DESC
+        LIMIT 1
     """)
     Optional<LeaseVehicleAssignment> findByLeaseIdAndVehicleIdActive(@Param("vehicleId") Long vehicleId);
 }
