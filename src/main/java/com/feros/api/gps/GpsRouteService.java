@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class GpsRouteService {
 
-    private static final double ROUTE_POINT_MIN_METERS = 50.0;
+    private static final double ROUTE_POINT_MIN_METERS = 10.0;
     private static final double HEADING_CHANGE_DEGREES  = 15.0;
 
     private final GpsLiveStore           liveStore;
