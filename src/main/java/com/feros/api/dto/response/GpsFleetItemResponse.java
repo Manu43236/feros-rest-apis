@@ -17,4 +17,5 @@ public class GpsFleetItemResponse {
     private Boolean    ignitionOn;
     private String     lastPingIst;
     private Boolean    isLive;
+    private BigDecimal odometer;
 }

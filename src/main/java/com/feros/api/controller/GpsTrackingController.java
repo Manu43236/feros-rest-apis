@@ -59,11 +59,9 @@ public class GpsTrackingController {
                 : live;
 
         List<GpsFleetItemResponse> fleet = pings.stream()
-                .map(p -> {
-                    String reg = vehicleRepo.findById(p.getVehicleId())
-                            .map(v -> v.getRegistrationNumber()).orElse("Unknown");
-                    return toFleetItem(p, reg);
-                })
+                .map(p -> vehicleRepo.findById(p.getVehicleId())
+                        .map(v -> toFleetItem(p, v.getRegistrationNumber(), v.getCurrentOdometerReading()))
+                        .orElseGet(() -> toFleetItem(p, "Unknown", null)))
                 .toList();
 
         return ResponseEntity.ok(ApiResponse.success("Fleet positions", fleet));
@@ -119,7 +117,7 @@ public class GpsTrackingController {
                 .build();
     }
 
-    private GpsFleetItemResponse toFleetItem(GpsPing p, String reg) {
+    private GpsFleetItemResponse toFleetItem(GpsPing p, String reg, java.math.BigDecimal odometer) {
         return GpsFleetItemResponse.builder()
                 .vehicleId(p.getVehicleId())
                 .registrationNumber(reg)
@@ -130,6 +128,7 @@ public class GpsTrackingController {
                 .ignitionOn(p.getIgnitionOn())
                 .lastPingIst(toIst(p.getRecordedAtUtc()))
                 .isLive(isLive(p.getRecordedAtUtc()))
+                .odometer(odometer)
                 .build();
     }
 
