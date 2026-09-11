@@ -90,11 +90,14 @@ public class GpsTrackingController {
             @RequestParam String from,
             @RequestParam String to) {
 
-        LocalDateTime fromDt = LocalDateTime.parse(from);
-        LocalDateTime toDt   = LocalDateTime.parse(to);
+        // from/to arrive as IST (naive) — convert to UTC before querying recorded_at_utc
+        LocalDateTime fromUtc = LocalDateTime.parse(from).atZone(IST).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
+        LocalDateTime toUtc   = LocalDateTime.parse(to).atZone(IST).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
+
+        Long tenantId = SecurityUtil.getCurrentTenantId();
 
         List<GpsRoutePointResponse> route = routeRepo
-                .findByVehicleIdAndRecordedAtUtcBetweenOrderByRecordedAtUtcAsc(vehicleId, fromDt, toDt)
+                .findByVehicleIdAndTenantIdAndRecordedAtUtcBetweenOrderByRecordedAtUtcAsc(vehicleId, tenantId, fromUtc, toUtc)
                 .stream().map(this::toRouteResponse).toList();
 
         return ResponseEntity.ok(ApiResponse.success("Route points", route));

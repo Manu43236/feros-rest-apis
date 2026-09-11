@@ -8,6 +8,6 @@ import java.util.List;
 
 public interface GpsRoutePointRepository extends JpaRepository<GpsRoutePoint, Long> {
 
-    List<GpsRoutePoint> findByVehicleIdAndRecordedAtUtcBetweenOrderByRecordedAtUtcAsc(
-            Long vehicleId, LocalDateTime from, LocalDateTime to);
+    List<GpsRoutePoint> findByVehicleIdAndTenantIdAndRecordedAtUtcBetweenOrderByRecordedAtUtcAsc(
+            Long vehicleId, Long tenantId, LocalDateTime from, LocalDateTime to);
 }
