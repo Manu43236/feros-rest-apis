@@ -258,18 +258,15 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
             orderVehicleAllocationRepository.saveAll(activeOrderAllocs);
         }
 
-        // If vehicle is on an active lease — close that assignment first
-        if (statusType == VehicleStatusType.ON_LEASE) {
-            assignmentRepository.findByLeaseIdAndVehicleIdActive(vehicle.getId()).ifPresent(existing -> {
-                closeActiveSession(existing.getId(), LocalDateTime.now());
-                existing.setIsActive(false);
-                existing.setEndDate(LocalDate.now());
-                // Close open lease driver log
-                leaseDriverLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(existing.getId())
-                        .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
-                assignmentRepository.save(existing);
-            });
-        }
+        // Always close any existing active lease assignment — regardless of vehicle status
+        assignmentRepository.findByLeaseIdAndVehicleIdActive(vehicle.getId()).ifPresent(existing -> {
+            closeActiveSession(existing.getId(), LocalDateTime.now());
+            existing.setIsActive(false);
+            existing.setEndDate(LocalDate.now());
+            leaseDriverLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(existing.getId())
+                    .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
+            assignmentRepository.save(existing);
+        });
 
         StaffProfile driver = null;
         if (request.getDriverStaffId() != null) {
