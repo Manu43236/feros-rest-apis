@@ -43,7 +43,7 @@ public class GpsPingPersistenceService {
 
     // Save only on ignition state change or alert — skips identical pings
     private boolean shouldSave(GpsPing ping) {
-        if (ping.getAlertId() != null) return true;
+        if (ping.getAlertId() != null && ping.getAlertId() != 0) return true;
         Boolean prev = lastIgnition.get(ping.getVehicleId());
         return !java.util.Objects.equals(ping.getIgnitionOn(), prev);
     }
