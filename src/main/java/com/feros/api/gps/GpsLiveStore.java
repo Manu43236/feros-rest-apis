@@ -46,4 +46,10 @@ public class GpsLiveStore {
     public void setLastRoutePoint(Long vehicleId, GpsPing ping) {
         lastRoutePoint.put(vehicleId, ping);
     }
+
+    public void removeVehicle(Long vehicleId) {
+        lastPing.remove(vehicleId);
+        pendingKm.remove(vehicleId);
+        lastRoutePoint.remove(vehicleId);
+    }
 }

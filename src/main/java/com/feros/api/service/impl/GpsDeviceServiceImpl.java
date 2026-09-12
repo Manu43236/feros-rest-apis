@@ -8,6 +8,8 @@ import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.master.GpsDeviceModel;
 import com.feros.api.enums.GpsDeviceStatus;
 import com.feros.api.exception.FerosException;
+import com.feros.api.gps.GpsLiveStore;
+import com.feros.api.gps.handler.tcp.GpsTcpServer;
 import com.feros.api.repository.GpsDeviceModelRepository;
 import com.feros.api.repository.GpsDeviceRepository;
 import com.feros.api.repository.TenantRepository;
@@ -28,6 +30,8 @@ public class GpsDeviceServiceImpl implements GpsDeviceService {
     private final GpsDeviceModelRepository modelRepo;
     private final VehicleRepository vehicleRepo;
     private final TenantRepository tenantRepo;
+    private final GpsTcpServer tcpServer;
+    private final GpsLiveStore liveStore;
 
     @Override
     public List<GpsDeviceResponse> getAll() {
@@ -67,13 +71,18 @@ public class GpsDeviceServiceImpl implements GpsDeviceService {
                     "Device identifier '" + request.getDeviceIdentifier() + "' is already in use",
                     HttpStatus.CONFLICT);
             }
+            Long oldVehicleId = existing.getVehicle().getId();
             existing.setTenant(tenant);
             existing.setVehicle(vehicle);
             existing.setModel(model);
             if (request.getCredentials() != null) existing.setCredentials(request.getCredentials());
             existing.setNotes(request.getNotes());
             existing.setStatus(GpsDeviceStatus.ACTIVE);
-            return toResponse(repo.save(existing));
+            GpsDeviceResponse saved = toResponse(repo.save(existing));
+            // Evict old vehicle from live store and force TCP reconnect so next ping lands on new vehicle/tenant
+            liveStore.removeVehicle(oldVehicleId);
+            tcpServer.kickDevice(existing.getDeviceIdentifier());
+            return saved;
         }
 
         GpsDevice device = GpsDevice.builder()

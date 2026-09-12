@@ -21,6 +21,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -42,6 +44,11 @@ public class GpsTcpServer implements GpsConnectionHandler {
 
     private ServerSocket  serverSocket;
     private ExecutorService threadPool;
+    private final Set<String> staleImeis = ConcurrentHashMap.newKeySet();
+
+    public void kickDevice(String imei) {
+        staleImeis.add(imei);
+    }
 
     public GpsTcpServer(GpsParserRegistry parserRegistry,
                         GpsDeviceRepository deviceRepo,
@@ -136,6 +143,12 @@ public class GpsTcpServer implements GpsConnectionHandler {
                     }
 
                     log.info("GPS session started — {} IMEI {}", device.getVehicle().getRegistrationNumber(), imei);
+                }
+
+                // Close session if device was reassigned — it will reconnect and re-lookup from DB
+                if (staleImeis.remove(device.getDeviceIdentifier())) {
+                    log.info("GPS TCP: device {} reassigned, closing session to force reconnect", device.getDeviceIdentifier());
+                    return;
                 }
 
                 final GpsDevice       dev = device;
