@@ -61,12 +61,13 @@ public class GpsDeviceServiceImpl implements GpsDeviceService {
         java.util.Optional<GpsDevice> existingOpt = repo.findByDeviceIdentifier(request.getDeviceIdentifier().trim());
         if (existingOpt.isPresent()) {
             GpsDevice existing = existingOpt.get();
-            if (!existing.getTenant().getId().equals(tenant.getId()) ||
-                (existing.getStatus() == GpsDeviceStatus.ACTIVE)) {
+            // Block only if the device is still actively in use — INACTIVE means physically unplugged, free for any tenant
+            if (existing.getStatus() == GpsDeviceStatus.ACTIVE) {
                 throw new FerosException(
                     "Device identifier '" + request.getDeviceIdentifier() + "' is already in use",
                     HttpStatus.CONFLICT);
             }
+            existing.setTenant(tenant);
             existing.setVehicle(vehicle);
             existing.setModel(model);
             if (request.getCredentials() != null) existing.setCredentials(request.getCredentials());
