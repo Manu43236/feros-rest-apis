@@ -50,22 +50,30 @@ public class GpsDeviceServiceImpl implements GpsDeviceService {
         GpsDeviceModel model = modelRepo.findById(request.getModelId())
                 .orElseThrow(() -> new FerosException("Device model not found", HttpStatus.NOT_FOUND));
 
-        repo.findByDeviceIdentifier(request.getDeviceIdentifier().trim())
-                .ifPresent(existing -> {
-                    if (!existing.getTenant().getId().equals(tenant.getId()) ||
-                        existing.getStatus() == GpsDeviceStatus.ACTIVE) {
-                        throw new FerosException(
-                            "Device identifier '" + request.getDeviceIdentifier() + "' is already in use",
-                            HttpStatus.CONFLICT);
-                    }
-                });
-
         // Deactivate any existing active device on this vehicle (device swap)
         repo.findByVehicleIdAndTenantIdAndStatus(vehicle.getId(), tenant.getId(), GpsDeviceStatus.ACTIVE)
                 .ifPresent(old -> {
                     old.setStatus(GpsDeviceStatus.INACTIVE);
                     repo.save(old);
                 });
+
+        // Reuse existing row if same identifier already exists (avoids unique constraint on re-assignment)
+        java.util.Optional<GpsDevice> existingOpt = repo.findByDeviceIdentifier(request.getDeviceIdentifier().trim());
+        if (existingOpt.isPresent()) {
+            GpsDevice existing = existingOpt.get();
+            if (!existing.getTenant().getId().equals(tenant.getId()) ||
+                (existing.getStatus() == GpsDeviceStatus.ACTIVE)) {
+                throw new FerosException(
+                    "Device identifier '" + request.getDeviceIdentifier() + "' is already in use",
+                    HttpStatus.CONFLICT);
+            }
+            existing.setVehicle(vehicle);
+            existing.setModel(model);
+            if (request.getCredentials() != null) existing.setCredentials(request.getCredentials());
+            existing.setNotes(request.getNotes());
+            existing.setStatus(GpsDeviceStatus.ACTIVE);
+            return toResponse(repo.save(existing));
+        }
 
         GpsDevice device = GpsDevice.builder()
                 .tenant(tenant)
