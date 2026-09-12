@@ -60,8 +60,10 @@ public class GpsTrackingController {
 
         List<GpsFleetItemResponse> fleet = pings.stream()
                 .map(p -> vehicleRepo.findById(p.getVehicleId())
+                        .filter(v -> Boolean.TRUE.equals(v.getIsIot())) // only show vehicles with IoT toggle ON
                         .map(v -> toFleetItem(p, v.getRegistrationNumber(), v.getCurrentOdometerReading()))
-                        .orElseGet(() -> toFleetItem(p, "Unknown", null)))
+                        .orElse(null))
+                .filter(java.util.Objects::nonNull)
                 .toList();
 
         return ResponseEntity.ok(ApiResponse.success("Fleet positions", fleet));
