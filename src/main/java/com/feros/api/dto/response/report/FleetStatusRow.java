@@ -9,6 +9,7 @@ public class FleetStatusRow {
     private Long vehicleId;
     private String registrationNumber;
     private String vehicleType;
+    private String vehicleBodyType;
     private String currentStatus;
     /** "BREAKDOWN" or "GENERAL" — only set when currentStatus is IN_REPAIR */
     private String inRepairType;

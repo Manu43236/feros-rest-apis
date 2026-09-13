@@ -155,10 +155,13 @@ public class ReportServiceImpl implements ReportService {
         return vehicleRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
                 .map(v -> {
                     String status = v.getCurrentStatus() != null ? v.getCurrentStatus().getStatusType().name() : "UNKNOWN";
+                    String vtName = v.getVehicleType() != null ? v.getVehicleType().getName() : "—";
+                    String btName = v.getVehicleBodyType() != null ? v.getVehicleBodyType().getName() : vtName;
                     return FleetStatusRow.builder()
                             .vehicleId(v.getId())
                             .registrationNumber(v.getRegistrationNumber())
-                            .vehicleType(v.getVehicleType() != null ? v.getVehicleType().getName() : "—")
+                            .vehicleType(vtName)
+                            .vehicleBodyType(btName)
                             .currentStatus(status)
                             .inRepairType("IN_REPAIR".equals(status) ? inRepairTypeByVehicle.get(v.getId()) : null)
                             .build();
