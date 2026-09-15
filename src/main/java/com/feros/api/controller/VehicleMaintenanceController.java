@@ -5,8 +5,10 @@ import com.feros.api.dto.request.CompleteServiceRequest;
 import com.feros.api.dto.request.VehicleServiceRequest;
 import com.feros.api.dto.request.VehicleServiceTaskRequest;
 import com.feros.api.dto.response.ApiResponse;
+import com.feros.api.dto.response.ServiceAttachmentResponse;
 import com.feros.api.dto.response.ServiceVendorItemResponse;
 import com.feros.api.dto.response.VehicleServiceResponse;
+import com.feros.api.enums.ServiceAttachmentType;
 import com.feros.api.service.VehicleMaintenanceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -124,6 +126,23 @@ public class VehicleMaintenanceController {
     public ResponseEntity<ApiResponse<VehicleServiceResponse>> uploadBillDoc(
             @PathVariable Long id, @RequestParam("file") MultipartFile file) throws IOException {
         return ResponseEntity.ok(ApiResponse.success("Bill document uploaded", vehicleMaintenanceService.uploadBillDoc(id, file)));
+    }
+
+    @PostMapping("/{id}/attachments")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<ServiceAttachmentResponse>> addAttachment(
+            @PathVariable Long id,
+            @RequestParam("type") ServiceAttachmentType type,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        return ResponseEntity.ok(ApiResponse.success("Attachment added", vehicleMaintenanceService.addAttachment(id, type, file)));
+    }
+
+    @DeleteMapping("/{id}/attachments/{attachmentId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<Void>> deleteAttachment(
+            @PathVariable Long id, @PathVariable Long attachmentId) {
+        vehicleMaintenanceService.deleteAttachment(id, attachmentId);
+        return ResponseEntity.ok(ApiResponse.success("Attachment deleted", null));
     }
 
     @DeleteMapping("/{id}")

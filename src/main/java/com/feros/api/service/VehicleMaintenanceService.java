@@ -3,8 +3,10 @@ package com.feros.api.service;
 import com.feros.api.dto.request.CompleteServiceRequest;
 import com.feros.api.dto.request.VehicleServiceRequest;
 import com.feros.api.dto.request.VehicleServiceTaskRequest;
+import com.feros.api.dto.response.ServiceAttachmentResponse;
 import com.feros.api.dto.response.ServiceVendorItemResponse;
 import com.feros.api.dto.response.VehicleServiceResponse;
+import com.feros.api.enums.ServiceAttachmentType;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -22,6 +24,8 @@ public interface VehicleMaintenanceService {
     VehicleServiceResponse updateEstimatedCost(Long id, BigDecimal estimatedCost);
     VehicleServiceResponse uploadEstimateDoc(Long id, MultipartFile file) throws IOException;
     VehicleServiceResponse uploadBillDoc(Long id, MultipartFile file) throws IOException;
+    ServiceAttachmentResponse addAttachment(Long serviceId, ServiceAttachmentType type, MultipartFile file) throws IOException;
+    void deleteAttachment(Long serviceId, Long attachmentId);
     VehicleServiceResponse complete(Long id, CompleteServiceRequest request);
     VehicleServiceResponse completeTask(Long serviceId, Long taskId);
     VehicleServiceResponse assignTask(Long serviceId, Long taskId, Long mechanicId);

@@ -4,6 +4,7 @@ import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.CompleteServiceRequest;
 import com.feros.api.dto.request.VehicleServiceRequest;
 import com.feros.api.dto.request.VehicleServiceTaskRequest;
+import com.feros.api.dto.response.ServiceAttachmentResponse;
 import com.feros.api.dto.response.ServiceVendorItemResponse;
 import com.feros.api.dto.response.VehicleServiceResponse;
 import com.feros.api.dto.response.VehicleServiceTaskResponse;
@@ -11,6 +12,7 @@ import com.feros.api.entity.*;
 import com.feros.api.entity.master.ServiceTaskType;
 import com.feros.api.entity.master.TenantSettings;
 import com.feros.api.enums.BreakdownStatus;
+import com.feros.api.enums.ServiceAttachmentType;
 import com.feros.api.enums.ServiceInvoiceStatus;
 import com.feros.api.enums.ServiceInvoiceType;
 import com.feros.api.enums.ServicePartStatus;
@@ -62,6 +64,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     private final SparePartsTransactionRepository sparePartsTransactionRepository;
     private final UserRepository userRepository;
     private final ServiceVendorItemRepository serviceVendorItemRepository;
+    private final VehicleServiceAttachmentRepository vehicleServiceAttachmentRepository;
     private final NumberGeneratorService numberGenerator;
     private final NotificationService notificationService;
     private final S3Service s3Service;
@@ -467,27 +470,57 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     @Override
     @Transactional
     public VehicleServiceResponse uploadEstimateDoc(Long id, MultipartFile file) throws IOException {
-        Long tenantId = SecurityUtil.getCurrentTenantId();
-        VehicleService vs = vehicleServiceRepository
-                .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
+        addAttachment(id, ServiceAttachmentType.ESTIMATE, file);
+        VehicleService vs = vehicleServiceRepository.findById(id)
                 .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
-        String key = s3Service.uploadFile(file, "tenants/images/services/" + id + "/estimate");
-        vs.setEstimateDocUrl(key);
-        vehicleServiceRepository.save(vs);
         return mapToResponse(vs);
     }
 
     @Override
     @Transactional
     public VehicleServiceResponse uploadBillDoc(Long id, MultipartFile file) throws IOException {
+        addAttachment(id, ServiceAttachmentType.BILL, file);
+        VehicleService vs = vehicleServiceRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+        return mapToResponse(vs);
+    }
+
+    @Override
+    @Transactional
+    public ServiceAttachmentResponse addAttachment(Long serviceId, ServiceAttachmentType type, MultipartFile file) throws IOException {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         VehicleService vs = vehicleServiceRepository
-                .findByIdAndTenantIdAndIsActiveTrue(id, tenantId)
+                .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
                 .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
-        String key = s3Service.uploadFile(file, "tenants/images/services/" + id + "/bill");
-        vs.setBillDocUrl(key);
-        vehicleServiceRepository.save(vs);
-        return mapToResponse(vs);
+        String folder = type == ServiceAttachmentType.ESTIMATE ? "estimate" : "bill";
+        String key = s3Service.uploadFile(file, "tenants/images/services/" + serviceId + "/" + folder);
+        VehicleServiceAttachment attachment = VehicleServiceAttachment.builder()
+                .service(vs)
+                .type(type)
+                .url(key)
+                .build();
+        attachment = vehicleServiceAttachmentRepository.save(attachment);
+        return ServiceAttachmentResponse.builder()
+                .id(attachment.getId())
+                .type(attachment.getType())
+                .url(s3Service.getPublicUrl(attachment.getUrl()))
+                .uploadedAt(attachment.getUploadedAt())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void deleteAttachment(Long serviceId, Long attachmentId) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        vehicleServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+        VehicleServiceAttachment attachment = vehicleServiceAttachmentRepository.findById(attachmentId)
+                .orElseThrow(() -> new FerosException("Attachment not found", HttpStatus.NOT_FOUND));
+        if (!attachment.getService().getId().equals(serviceId)) {
+            throw new FerosException("Attachment does not belong to this service", HttpStatus.BAD_REQUEST);
+        }
+        vehicleServiceAttachmentRepository.delete(attachment);
     }
 
     private void createServiceInvoice(VehicleService vs, CompleteServiceRequest request) {
@@ -616,6 +649,32 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
         return "OPEN";
     }
 
+    private List<ServiceAttachmentResponse> buildAttachmentList(VehicleService vs, ServiceAttachmentType type) {
+        List<ServiceAttachmentResponse> result = new ArrayList<>();
+        // Legacy single-URL migration: include if no new-table entries exist for this type
+        boolean hasNew = vs.getAttachments().stream().anyMatch(a -> a.getType() == type);
+        if (!hasNew) {
+            String legacyUrl = type == ServiceAttachmentType.ESTIMATE ? vs.getEstimateDocUrl() : vs.getBillDocUrl();
+            if (legacyUrl != null) {
+                result.add(ServiceAttachmentResponse.builder()
+                        .id(null)
+                        .type(type)
+                        .url(s3Service.getPublicUrl(legacyUrl))
+                        .build());
+            }
+        }
+        vs.getAttachments().stream()
+                .filter(a -> a.getType() == type)
+                .sorted(java.util.Comparator.comparing(VehicleServiceAttachment::getUploadedAt))
+                .forEach(a -> result.add(ServiceAttachmentResponse.builder()
+                        .id(a.getId())
+                        .type(a.getType())
+                        .url(s3Service.getPublicUrl(a.getUrl()))
+                        .uploadedAt(a.getUploadedAt())
+                        .build()));
+        return result;
+    }
+
     private VehicleServiceResponse mapToResponse(VehicleService vs) {
         List<VehicleServiceTask> tasks = vs.getTasks() != null ? vs.getTasks() : new ArrayList<>();
 
@@ -687,6 +746,8 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .completedCost(vs.getCompletedCost())
                 .estimateDocUrl(vs.getEstimateDocUrl() != null ? s3Service.getPublicUrl(vs.getEstimateDocUrl()) : null)
                 .billDocUrl(vs.getBillDocUrl() != null ? s3Service.getPublicUrl(vs.getBillDocUrl()) : null)
+                .estimateAttachments(buildAttachmentList(vs, ServiceAttachmentType.ESTIMATE))
+                .billAttachments(buildAttachmentList(vs, ServiceAttachmentType.BILL))
                 .insuranceClaimNo(vs.getInsuranceClaimNo())
                 .insuranceClaimAmt(vs.getInsuranceClaimAmt())
                 .certificateNumber(vs.getCertificateNumber())

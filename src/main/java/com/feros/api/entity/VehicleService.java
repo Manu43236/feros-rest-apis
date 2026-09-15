@@ -120,4 +120,8 @@ public class VehicleService extends BaseEntity {
     @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default
     private List<VehicleServiceTask> tasks = new ArrayList<>();
+
+    @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @Builder.Default
+    private List<VehicleServiceAttachment> attachments = new ArrayList<>();
 }

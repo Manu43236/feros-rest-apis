@@ -1,5 +1,6 @@
 package com.feros.api.dto.response;
 
+import com.feros.api.enums.ServiceAttachmentType;
 import com.feros.api.enums.ServicePayerType;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
@@ -40,6 +41,8 @@ public class VehicleServiceResponse {
     private BigDecimal completedCost;
     private String estimateDocUrl;
     private String billDocUrl;
+    private List<ServiceAttachmentResponse> estimateAttachments;
+    private List<ServiceAttachmentResponse> billAttachments;
     private String insuranceClaimNo;
     private BigDecimal insuranceClaimAmt;
     private String certificateNumber;
