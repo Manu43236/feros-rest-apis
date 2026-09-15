@@ -514,7 +514,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     @Transactional
     public void deleteAttachment(Long serviceId, Long attachmentId) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        vehicleServiceRepository
+        VehicleService vs = vehicleServiceRepository
                 .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
                 .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
         VehicleServiceAttachment attachment = vehicleServiceAttachmentRepository.findById(attachmentId)
@@ -522,7 +522,9 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
         if (!attachment.getService().getId().equals(serviceId)) {
             throw new FerosException("Attachment does not belong to this service", HttpStatus.BAD_REQUEST);
         }
-        vehicleServiceAttachmentRepository.delete(attachment);
+        // Must remove from parent collection — orphanRemoval handles the DELETE
+        vs.getAttachments().remove(attachment);
+        vehicleServiceRepository.save(vs);
     }
 
     private void createServiceInvoice(VehicleService vs, CompleteServiceRequest request) {
