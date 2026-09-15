@@ -1,14 +1,17 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.dto.response.ServiceAttachmentResponse;
 import com.feros.api.dto.response.TechnicianSummaryResponse;
 import com.feros.api.dto.response.ServiceManagerDashboardResponse;
 import com.feros.api.entity.ServicePart;
 import com.feros.api.entity.ServiceVendorItem;
 import com.feros.api.entity.VehicleBreakdown;
 import com.feros.api.entity.VehicleService;
+import com.feros.api.entity.VehicleServiceAttachment;
 import com.feros.api.entity.VehicleServiceTask;
 import com.feros.api.enums.BreakdownStatus;
 import com.feros.api.enums.RoleName;
+import com.feros.api.enums.ServiceAttachmentType;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTaskStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
@@ -18,6 +21,7 @@ import com.feros.api.repository.StaffProfileRepository;
 import com.feros.api.repository.UserRepository;
 import com.feros.api.repository.VehicleBreakdownRepository;
 import com.feros.api.repository.VehicleServiceRepository;
+import com.feros.api.service.S3Service;
 import com.feros.api.service.ServiceManagerService;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +42,7 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
     private final StaffProfileRepository staffProfileRepository;
     private final ServicePartRepository servicePartRepository;
     private final ServiceVendorItemRepository serviceVendorItemRepository;
+    private final S3Service s3Service;
 
     @Override
     public ServiceManagerDashboardResponse getDashboard() {
@@ -215,8 +220,31 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
                 .totalCost(total.compareTo(BigDecimal.ZERO) > 0 ? total : null)
                 .estimateDocUrl(vs.getEstimateDocUrl())
                 .billDocUrl(vs.getBillDocUrl())
+                .estimateAttachments(buildAttachmentList(vs, ServiceAttachmentType.ESTIMATE))
+                .billAttachments(buildAttachmentList(vs, ServiceAttachmentType.BILL))
                 .vendorItems(vendorDtos)
                 .build();
+    }
+
+    private List<ServiceAttachmentResponse> buildAttachmentList(VehicleService vs, ServiceAttachmentType type) {
+        java.util.List<ServiceAttachmentResponse> result = new java.util.ArrayList<>();
+        boolean hasNew = vs.getAttachments().stream().anyMatch(a -> a.getType() == type);
+        if (!hasNew) {
+            String legacyUrl = type == ServiceAttachmentType.ESTIMATE ? vs.getEstimateDocUrl() : vs.getBillDocUrl();
+            if (legacyUrl != null) {
+                result.add(ServiceAttachmentResponse.builder()
+                        .id(null).type(type).url(s3Service.getPublicUrl(legacyUrl)).build());
+            }
+        }
+        vs.getAttachments().stream()
+                .filter(a -> a.getType() == type)
+                .sorted(java.util.Comparator.comparing(VehicleServiceAttachment::getUploadedAt))
+                .forEach(a -> result.add(ServiceAttachmentResponse.builder()
+                        .id(a.getId()).type(a.getType())
+                        .url(s3Service.getPublicUrl(a.getUrl()))
+                        .uploadedAt(a.getUploadedAt())
+                        .build()));
+        return result;
     }
 
     private int countAssigned(List<ServiceManagerDashboardResponse.TaskItem> tasks) {

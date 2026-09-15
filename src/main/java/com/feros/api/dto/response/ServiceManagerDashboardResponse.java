@@ -2,6 +2,7 @@ package com.feros.api.dto.response;
 
 import com.feros.api.enums.BreakdownStatus;
 import com.feros.api.enums.BreakdownType;
+import com.feros.api.enums.ServiceAttachmentType;
 import com.feros.api.enums.ServicePartStatus;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTaskStatus;
@@ -65,6 +66,8 @@ public class ServiceManagerDashboardResponse {
         private BigDecimal totalCost;
         private String estimateDocUrl;
         private String billDocUrl;
+        private List<ServiceAttachmentResponse> estimateAttachments;
+        private List<ServiceAttachmentResponse> billAttachments;
         private List<VendorItemDto> vendorItems;
         private int tasksTotal;
         private int tasksAssigned;
