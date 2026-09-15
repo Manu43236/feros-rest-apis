@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 @Getter
 @Builder
 public class TripSummaryRow {
+    private String clientName;
     private String orderNumber;
     private LocalDateTime orderCreatedAt;
     private String material;

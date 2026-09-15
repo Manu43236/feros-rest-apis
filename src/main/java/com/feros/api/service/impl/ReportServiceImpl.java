@@ -2540,6 +2540,7 @@ public class ReportServiceImpl implements ReportService {
             }
 
             return TripSummaryRow.builder()
+                    .clientName(order.getClient() != null ? order.getClient().getClientName() : "—")
                     .orderNumber(order.getOrderNumber())
                     .orderCreatedAt(order.getCreatedAt())
                     .material(order.getMaterialType() != null ? order.getMaterialType().getName() : "—")
