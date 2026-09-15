@@ -69,6 +69,7 @@ public class ReportServiceImpl implements ReportService {
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final OrderVehicleAllocationRepository orderVehicleAllocationRepository;
     private final VehicleServiceTaskRepository vehicleServiceTaskRepository;
+    private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
 
     // ── 0. Vehicle Master ──────────────────────────────────────────────────────
 
@@ -326,6 +327,7 @@ public class ReportServiceImpl implements ReportService {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         List<Attendance> records = attendanceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
         Map<Long, List<VehicleStaffAssignment>> userAssignments = buildUserAssignmentMap(tenantId, startDate, endDate);
+        Map<Long, String> leaseMap = buildLeaseDriverMap(tenantId, startDate, endDate);
 
         return records.stream().map(a -> {
             Double hoursWorked = null;
@@ -337,7 +339,7 @@ public class ReportServiceImpl implements ReportService {
                     .employeeId(a.getUser().getId())
                     .employeeName(a.getUser().getName())
                     .role(primaryRole(a.getUser()))
-                    .vehicleRegistrationNumber(resolveVehicleForDate(userAssignments, a.getUser().getId(), tenantId, a.getAttendanceDate()))
+                    .vehicleRegistrationNumber(resolveVehicleForDate(userAssignments, leaseMap, a.getUser().getId(), tenantId, a.getAttendanceDate()))
                     .attendanceDate(a.getAttendanceDate())
                     .attendanceType(a.getAttendanceType().getName())
                     .markedAt(a.getMarkedAt())
@@ -358,6 +360,7 @@ public class ReportServiceImpl implements ReportService {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         List<Attendance> records = attendanceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
         Map<Long, List<VehicleStaffAssignment>> userAssignments = buildUserAssignmentMap(tenantId, startDate, endDate);
+        Map<Long, String> leaseMap = buildLeaseDriverMap(tenantId, startDate, endDate);
         Map<Long, List<OrderStaffAllocation>> userOsaMap = orderStaffAllocationRepository
                 .findActiveInPeriodForTenant(tenantId, startDate, endDate)
                 .stream().collect(Collectors.groupingBy(sa -> sa.getUser().getId()));
@@ -388,7 +391,7 @@ public class ReportServiceImpl implements ReportService {
                     .employeeId(entry.getKey())
                     .employeeName(first.getUser().getName())
                     .role(primaryRole(first.getUser()))
-                    .vehicleRegistrationNumber(resolveVehiclesForPeriod(userAssignments, userOsaMap, entry.getKey()))
+                    .vehicleRegistrationNumber(resolveVehiclesForPeriod(userAssignments, userOsaMap, leaseMap, entry.getKey()))
                     .presentDays(present)
                     .absentDays(absent)
                     .leaveDays(leave)
@@ -794,18 +797,34 @@ public class ReportServiceImpl implements ReportService {
                 .collect(Collectors.groupingBy(a -> a.getUser().getId()));
     }
 
-    private String resolveVehicleForDate(Map<Long, List<VehicleStaffAssignment>> userAssignments, Long userId, Long tenantId, LocalDate date) {
+    private Map<Long, String> buildLeaseDriverMap(Long tenantId, LocalDate startDate, LocalDate endDate) {
+        return leaseDriverAssignmentLogRepository
+                .findOverlappingByTenantId(tenantId, startDate.atStartOfDay(), endDate.atTime(23, 59, 59))
+                .stream()
+                .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
+                .collect(Collectors.toMap(
+                        l -> l.getDriverStaff().getUser().getId(),
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber(),
+                        (a, b) -> a));
+    }
+
+    private String resolveVehicleForDate(Map<Long, List<VehicleStaffAssignment>> userAssignments,
+                                         Map<Long, String> leaseMap,
+                                         Long userId, Long tenantId, LocalDate date) {
         Optional<VehicleStaffAssignment> myVsa = userAssignments.getOrDefault(userId, List.of()).stream()
                 .filter(a -> !a.getAssignedFrom().isAfter(date) && (a.getAssignedTo() == null || !a.getAssignedTo().isBefore(date)))
                 .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom)
                         .thenComparing(VehicleStaffAssignment::getCreatedAt));
         if (myVsa.isEmpty()) {
-            // ponytail: fallback — standing assignment lapsed but driver is on an active order trip
-            return orderStaffAllocationRepository
+            // ponytail: fallback 1 — standing assignment lapsed but driver is on an active order trip
+            String fromOrder = orderStaffAllocationRepository
                     .findActiveOnDateForUser(userId, tenantId, date)
                     .stream().findFirst()
                     .map(sa -> sa.getVehicleAllocation().getVehicle().getRegistrationNumber())
-                    .orElse("—");
+                    .orElse(null);
+            if (fromOrder != null) return fromOrder;
+            // ponytail: fallback 2 — driver assigned via lease, not VSA
+            return leaseMap.getOrDefault(userId, "—");
         }
 
         Long vehicleId = myVsa.get().getVehicle().getId();
@@ -835,6 +854,7 @@ public class ReportServiceImpl implements ReportService {
 
     private String resolveVehiclesForPeriod(Map<Long, List<VehicleStaffAssignment>> userAssignments,
                                              Map<Long, List<OrderStaffAllocation>> userOsaMap,
+                                             Map<Long, String> leaseMap,
                                              Long userId) {
         LinkedHashSet<String> vehicles = new LinkedHashSet<>();
         userAssignments.getOrDefault(userId, List.of()).stream()
@@ -843,6 +863,8 @@ public class ReportServiceImpl implements ReportService {
         userOsaMap.getOrDefault(userId, List.of()).stream()
                 .map(sa -> sa.getVehicleAllocation().getVehicle().getRegistrationNumber())
                 .forEach(vehicles::add);
+        String leaseVehicle = leaseMap.get(userId);
+        if (leaseVehicle != null) vehicles.add(leaseVehicle);
         return vehicles.isEmpty() ? "—" : String.join(", ", vehicles);
     }
 
@@ -2467,12 +2489,13 @@ public class ReportServiceImpl implements ReportService {
                 .toList();
 
         Map<Long, List<VehicleStaffAssignment>> userAssignments = buildUserAssignmentMap(tenantId, date, date);
+        Map<Long, String> leaseMap = buildLeaseDriverMap(tenantId, date, date);
 
         // resolve vehicle per person using same logic as HR attendance (max assignedFrom+createdAt + swap-dedup)
         Map<String, String> vehicleDriverMap  = new HashMap<>();
         Map<String, String> vehicleCleanerMap = new HashMap<>();
         for (Attendance att : presentRecords) {
-            String reg = resolveVehicleForDate(userAssignments, att.getUser().getId(), tenantId, date);
+            String reg = resolveVehicleForDate(userAssignments, leaseMap, att.getUser().getId(), tenantId, date);
             if ("—".equals(reg)) continue;
             String role = primaryRole(att.getUser());
             if ("DRIVER".equals(role))       vehicleDriverMap.put(reg,  att.getUser().getName());

@@ -50,6 +50,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final LocationResolverService locationResolverService;
     private final StaffProfileRepository staffProfileRepository;
+    private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -278,12 +279,20 @@ public class AttendanceServiceImpl implements AttendanceService {
                                         .thenComparing(VehicleStaffAssignment::getCreatedAt))
                                 .map(a -> a.getUser().getId())
                                 .orElseThrow()));
+        Map<Long, String> leaseDriverVehicleMap = leaseDriverAssignmentLogRepository
+                .findOverlappingByTenantId(tenantId, date.atStartOfDay(), date.atTime(23, 59, 59))
+                .stream()
+                .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
+                .collect(Collectors.toMap(
+                        l -> l.getDriverStaff().getUser().getId(),
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber(),
+                        (a, b) -> a));
         Set<String> supervisorAllowedRoles = resolveSupervisorAllowedRoles(role);
         return attendanceRepository
                 .findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, date)
                 .stream()
                 .filter(a -> isVisibleToRole(a, role, supervisorAllowedRoles))
-                .map(a -> mapToResponse(a, latestForVehicle)).toList();
+                .map(a -> mapToResponse(a, latestForVehicle, leaseDriverVehicleMap)).toList();
     }
 
     private Set<String> resolveSupervisorAllowedRoles(String role) {
@@ -491,10 +500,14 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     // ===================== MAPPERS =====================
     private AttendanceResponse mapToResponse(Attendance a) {
-        return mapToResponse(a, Collections.emptyMap());
+        return mapToResponse(a, Collections.emptyMap(), Collections.emptyMap());
     }
 
     private AttendanceResponse mapToResponse(Attendance a, Map<String, Long> latestForVehicle) {
+        return mapToResponse(a, latestForVehicle, Collections.emptyMap());
+    }
+
+    private AttendanceResponse mapToResponse(Attendance a, Map<String, Long> latestForVehicle, Map<Long, String> leaseDriverVehicleMap) {
         String roleName = a.getUser().getRoles().stream()
                 .findFirst().map(r -> r.getName().name()).orElse(null);
 
@@ -530,13 +543,17 @@ public class AttendanceServiceImpl implements AttendanceService {
                             ? vsa.getVehicle().getRegistrationNumber() : null;
                 })
                 .orElse(null);
-        // ponytail: fallback — standing assignment lapsed but driver is on an active order trip
+        // ponytail: fallback 1 — standing assignment lapsed but driver is on an active order trip
         if (assignedVehicleNumber == null) {
             assignedVehicleNumber = orderStaffAllocationRepository
                     .findActiveOnDateForUser(a.getUser().getId(), a.getTenant().getId(), a.getAttendanceDate())
                     .stream().findFirst()
                     .map(sa -> sa.getVehicleAllocation().getVehicle().getRegistrationNumber())
                     .orElse(null);
+        }
+        // ponytail: fallback 2 — driver assigned via lease, no VSA record exists
+        if (assignedVehicleNumber == null) {
+            assignedVehicleNumber = leaseDriverVehicleMap.get(a.getUser().getId());
         }
 
         return AttendanceResponse.builder()
