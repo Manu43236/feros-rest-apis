@@ -14,5 +14,6 @@ public class ServiceAttachmentResponse {
     private Long id;
     private ServiceAttachmentType type;
     private String url;
+    private String label;
     private LocalDateTime uploadedAt;
 }

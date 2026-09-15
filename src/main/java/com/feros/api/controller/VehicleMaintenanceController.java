@@ -133,8 +133,9 @@ public class VehicleMaintenanceController {
     public ResponseEntity<ApiResponse<ServiceAttachmentResponse>> addAttachment(
             @PathVariable Long id,
             @RequestParam("type") ServiceAttachmentType type,
+            @RequestParam(value = "label", required = false) String label,
             @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
-        return ResponseEntity.ok(ApiResponse.success("Attachment added", vehicleMaintenanceService.addAttachment(id, type, file)));
+        return ResponseEntity.ok(ApiResponse.success("Attachment added", vehicleMaintenanceService.addAttachment(id, type, label, file)));
     }
 
     @DeleteMapping("/{id}/attachments/{attachmentId}")

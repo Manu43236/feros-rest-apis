@@ -470,7 +470,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     @Override
     @Transactional
     public VehicleServiceResponse uploadEstimateDoc(Long id, MultipartFile file) throws IOException {
-        addAttachment(id, ServiceAttachmentType.ESTIMATE, file);
+        addAttachment(id, ServiceAttachmentType.ESTIMATE, null, file);
         VehicleService vs = vehicleServiceRepository.findById(id)
                 .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
         return mapToResponse(vs);
@@ -479,7 +479,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
     @Override
     @Transactional
     public VehicleServiceResponse uploadBillDoc(Long id, MultipartFile file) throws IOException {
-        addAttachment(id, ServiceAttachmentType.BILL, file);
+        addAttachment(id, ServiceAttachmentType.BILL, null, file);
         VehicleService vs = vehicleServiceRepository.findById(id)
                 .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
         return mapToResponse(vs);
@@ -487,7 +487,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
 
     @Override
     @Transactional
-    public ServiceAttachmentResponse addAttachment(Long serviceId, ServiceAttachmentType type, MultipartFile file) throws IOException {
+    public ServiceAttachmentResponse addAttachment(Long serviceId, ServiceAttachmentType type, String label, MultipartFile file) throws IOException {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         VehicleService vs = vehicleServiceRepository
                 .findByIdAndTenantIdAndIsActiveTrue(serviceId, tenantId)
@@ -498,12 +498,14 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .service(vs)
                 .type(type)
                 .url(key)
+                .label(label != null && !label.isBlank() ? label.trim() : null)
                 .build();
         attachment = vehicleServiceAttachmentRepository.save(attachment);
         return ServiceAttachmentResponse.builder()
                 .id(attachment.getId())
                 .type(attachment.getType())
                 .url(s3Service.getPublicUrl(attachment.getUrl()))
+                .label(attachment.getLabel())
                 .uploadedAt(attachment.getUploadedAt())
                 .build();
     }
@@ -670,6 +672,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                         .id(a.getId())
                         .type(a.getType())
                         .url(s3Service.getPublicUrl(a.getUrl()))
+                        .label(a.getLabel())
                         .uploadedAt(a.getUploadedAt())
                         .build()));
         return result;

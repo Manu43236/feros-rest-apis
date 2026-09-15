@@ -24,7 +24,7 @@ public interface VehicleMaintenanceService {
     VehicleServiceResponse updateEstimatedCost(Long id, BigDecimal estimatedCost);
     VehicleServiceResponse uploadEstimateDoc(Long id, MultipartFile file) throws IOException;
     VehicleServiceResponse uploadBillDoc(Long id, MultipartFile file) throws IOException;
-    ServiceAttachmentResponse addAttachment(Long serviceId, ServiceAttachmentType type, MultipartFile file) throws IOException;
+    ServiceAttachmentResponse addAttachment(Long serviceId, ServiceAttachmentType type, String label, MultipartFile file) throws IOException;
     void deleteAttachment(Long serviceId, Long attachmentId);
     VehicleServiceResponse complete(Long id, CompleteServiceRequest request);
     VehicleServiceResponse completeTask(Long serviceId, Long taskId);

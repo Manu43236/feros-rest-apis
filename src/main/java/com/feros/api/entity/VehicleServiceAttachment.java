@@ -30,6 +30,9 @@ public class VehicleServiceAttachment {
     @Column(name = "url", length = 500, nullable = false)
     private String url;
 
+    @Column(name = "label", length = 200)
+    private String label;
+
     @Column(name = "uploaded_at")
     @Builder.Default
     private LocalDateTime uploadedAt = LocalDateTime.now();

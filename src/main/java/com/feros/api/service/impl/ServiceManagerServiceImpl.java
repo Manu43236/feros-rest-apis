@@ -242,6 +242,7 @@ public class ServiceManagerServiceImpl implements ServiceManagerService {
                 .forEach(a -> result.add(ServiceAttachmentResponse.builder()
                         .id(a.getId()).type(a.getType())
                         .url(s3Service.getPublicUrl(a.getUrl()))
+                        .label(a.getLabel())
                         .uploadedAt(a.getUploadedAt())
                         .build()));
         return result;
