@@ -519,6 +519,12 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom)
                         .thenComparing(VehicleStaffAssignment::getCreatedAt))
                 .map(vsa -> {
+                    // If unassigned today, don't show vehicle — sync with vehicle list
+                    if (vsa.getAssignedTo() != null
+                            && vsa.getAssignedTo().equals(a.getAttendanceDate())
+                            && a.getAttendanceDate().equals(TimeUtil.today())) {
+                        return null;
+                    }
                     Long latestUserId = latestForVehicle.get(vsa.getVehicle().getId() + ":" + userRole);
                     return (latestUserId == null || latestUserId.equals(a.getUser().getId()))
                             ? vsa.getVehicle().getRegistrationNumber() : null;
