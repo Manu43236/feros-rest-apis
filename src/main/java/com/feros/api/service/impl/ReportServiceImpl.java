@@ -824,6 +824,12 @@ public class ReportServiceImpl implements ReportService {
                             || (a.getAssignedFrom().isEqual(myAssignedFrom)
                                 && a.getCreatedAt() != null && myVsa.get().getCreatedAt() != null
                                 && a.getCreatedAt().isAfter(myVsa.get().getCreatedAt()))));
+        if (!swappedOut
+                && myVsa.get().getAssignedTo() != null
+                && myVsa.get().getAssignedTo().equals(date)
+                && date.equals(TimeUtil.today())) {
+            return "—";
+        }
         return swappedOut ? "—" : myVsa.get().getVehicle().getRegistrationNumber();
     }
 
