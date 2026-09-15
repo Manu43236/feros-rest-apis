@@ -43,6 +43,7 @@ class AttendanceVehicleFallbackTest {
     @Mock OrderStaffAllocationRepository orderStaffAllocationRepository;
     @Mock LocationResolverService locationResolverService;
     @Mock StaffProfileRepository staffProfileRepository;
+    @Mock LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
 
     private AttendanceServiceImpl service;
 
@@ -57,7 +58,8 @@ class AttendanceVehicleFallbackTest {
             userRepository, lrRepository, attendanceTypeRepository,
             leaveTypeRepository, s3Service, notificationService,
             vehicleRepository, vehicleStaffAssignmentRepository,
-            orderStaffAllocationRepository, locationResolverService, staffProfileRepository
+            orderStaffAllocationRepository, locationResolverService, staffProfileRepository,
+            leaseDriverAssignmentLogRepository
         );
 
         UserPrincipal principal = new UserPrincipal(ADMIN_ID, TENANT_ID, "9999999990", "ADMIN");
@@ -105,6 +107,8 @@ class AttendanceVehicleFallbackTest {
 
         // No VSAs overlap on 2026-08-02 (both for latestForVehicle map and per-user lookup)
         when(vehicleStaffAssignmentRepository.findOverlappingForTenant(TENANT_ID, date, date))
+            .thenReturn(List.of());
+        when(leaseDriverAssignmentLogRepository.findOverlappingByTenantId(eq(TENANT_ID), any(), any()))
             .thenReturn(List.of());
         when(attendanceRepository.findByTenantIdAndAttendanceDateAndIsActiveTrue(TENANT_ID, date))
             .thenReturn(List.of(att));
@@ -174,6 +178,8 @@ class AttendanceVehicleFallbackTest {
         // VSA is active — latestForVehicle map includes this driver
         when(vehicleStaffAssignmentRepository.findOverlappingForTenant(TENANT_ID, date, date))
             .thenReturn(List.of(vsa));
+        when(leaseDriverAssignmentLogRepository.findOverlappingByTenantId(eq(TENANT_ID), any(), any()))
+            .thenReturn(List.of());
         when(attendanceRepository.findByTenantIdAndAttendanceDateAndIsActiveTrue(TENANT_ID, date))
             .thenReturn(List.of(att));
         when(vehicleStaffAssignmentRepository.findOverlappingByUser(300L, TENANT_ID, date, date))
