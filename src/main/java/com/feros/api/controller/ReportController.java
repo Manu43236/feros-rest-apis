@@ -280,6 +280,16 @@ public class ReportController {
                 "Attendance Summary — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── Attendance Role Summary ───────────────────────────────────────────────────
+
+    @GetMapping("/attendance/role-summary")
+    public ResponseEntity<ApiResponse<List<AttendanceRoleSummaryRow>>> getAttendanceRoleSummary(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Attendance role summary fetched", reportService.getAttendanceRoleSummary(startDate, endDate)));
+    }
+
     // ── LR Register ──────────────────────────────────────────────────────────────
 
     @GetMapping("/trips/lr-register")

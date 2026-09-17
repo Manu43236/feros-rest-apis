@@ -70,6 +70,7 @@ public class ReportServiceImpl implements ReportService {
     private final OrderVehicleAllocationRepository orderVehicleAllocationRepository;
     private final VehicleServiceTaskRepository vehicleServiceTaskRepository;
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
+    private final UserRepository userRepository;
 
     // ── 0. Vehicle Master ──────────────────────────────────────────────────────
 
@@ -403,7 +404,49 @@ public class ReportServiceImpl implements ReportService {
         }).sorted(Comparator.comparing(AttendanceSummaryRow::getEmployeeName)).toList();
     }
 
-    // ── 9. LR Register ────────────────────────────────────────────────────────────
+    // ── 9. Attendance Role Summary ────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AttendanceRoleSummaryRow> getAttendanceRoleSummary(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        // Staff count per role (all active users, exclude SUPER_ADMIN)
+        Map<String, Integer> staffCountByRole = new LinkedHashMap<>();
+        for (String r : List.of("DRIVER", "CLEANER", "SUPERVISOR", "OFFICE_STAFF", "SERVICE_MANAGER", "TECHNICIAN", "STORE_KEEPER", "ADMIN")) {
+            staffCountByRole.put(r, 0);
+        }
+        userRepository.findAllByTenantIdAndIsActiveTrue(tenantId).forEach(u -> {
+            String role = primaryRole(u);
+            if (staffCountByRole.containsKey(role)) {
+                staffCountByRole.merge(role, 1, Integer::sum);
+            }
+        });
+
+        // Distinct user IDs with at least one PRESENT record in the period, grouped by role
+        List<Attendance> records = attendanceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+        Map<String, Set<Long>> presentedByRole = new HashMap<>();
+        for (Attendance a : records) {
+            if (a.getAttendanceType().getName().toUpperCase().contains("PRESENT")) {
+                String role = primaryRole(a.getUser());
+                presentedByRole.computeIfAbsent(role, k -> new HashSet<>()).add(a.getUser().getId());
+            }
+        }
+
+        return staffCountByRole.entrySet().stream()
+                .filter(e -> e.getValue() > 0)
+                .map(e -> {
+                    int presented = presentedByRole.getOrDefault(e.getKey(), Set.of()).size();
+                    return AttendanceRoleSummaryRow.builder()
+                            .role(e.getKey())
+                            .staffCount(e.getValue())
+                            .presented(presented)
+                            .absent(e.getValue() - presented)
+                            .build();
+                }).toList();
+    }
+
+    // ── 10. LR Register ────────────────────────────────────────────────────────────
 
     @Override
     @Transactional(readOnly = true)
