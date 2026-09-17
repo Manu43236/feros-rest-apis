@@ -285,11 +285,14 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .stream()
                 .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
                 .filter(l -> !date.equals(TimeUtil.today()) || l.getUnassignedAt() == null)
-                .sorted(Comparator.comparing(l -> l.getAssignedAt()))
+                .collect(Collectors.groupingBy(l -> l.getDriverStaff().getUser().getId()))
+                .entrySet().stream()
                 .collect(Collectors.toMap(
-                        l -> l.getDriverStaff().getUser().getId(),
-                        l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber(),
-                        (a, b) -> b));
+                        Map.Entry::getKey,
+                        e -> e.getValue().stream()
+                                .max(Comparator.comparing(LeaseDriverAssignmentLog::getAssignedAt))
+                                .map(l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber())
+                                .orElseThrow()));
         Set<String> supervisorAllowedRoles = resolveSupervisorAllowedRoles(role);
         return attendanceRepository
                 .findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, date)

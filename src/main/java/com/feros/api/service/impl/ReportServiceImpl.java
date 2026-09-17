@@ -836,11 +836,14 @@ public class ReportServiceImpl implements ReportService {
                 .findOverlappingByTenantId(tenantId, startDate.atStartOfDay(), endDate.atTime(23, 59, 59))
                 .stream()
                 .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
-                .sorted(Comparator.comparing(l -> l.getAssignedAt()))
+                .collect(Collectors.groupingBy(l -> l.getDriverStaff().getUser().getId()))
+                .entrySet().stream()
                 .collect(Collectors.toMap(
-                        l -> l.getDriverStaff().getUser().getId(),
-                        l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber(),
-                        (a, b) -> b));
+                        Map.Entry::getKey,
+                        e -> e.getValue().stream()
+                                .max(Comparator.comparing(LeaseDriverAssignmentLog::getAssignedAt))
+                                .map(l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber())
+                                .orElseThrow()));
     }
 
     private String resolveVehicleForDate(Map<Long, List<VehicleStaffAssignment>> userAssignments,
