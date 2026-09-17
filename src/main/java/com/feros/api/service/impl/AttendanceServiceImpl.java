@@ -284,10 +284,12 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .findOverlappingByTenantId(tenantId, date.atStartOfDay(), date.atTime(23, 59, 59))
                 .stream()
                 .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
+                .filter(l -> !date.equals(TimeUtil.today()) || l.getUnassignedAt() == null)
+                .sorted(Comparator.comparing(l -> l.getAssignedAt()))
                 .collect(Collectors.toMap(
                         l -> l.getDriverStaff().getUser().getId(),
                         l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber(),
-                        (a, b) -> a));
+                        (a, b) -> b));
         Set<String> supervisorAllowedRoles = resolveSupervisorAllowedRoles(role);
         return attendanceRepository
                 .findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, date)
@@ -527,18 +529,16 @@ public class AttendanceServiceImpl implements AttendanceService {
         // Resolve vehicle — role-aware swap dedup: only suppress if same role has a later assignment
         String userRole = a.getUser().getRoles().stream()
                 .findFirst().map(r -> r.getName().name()).orElse("UNKNOWN");
-        boolean[] vsaUnassignedToday = {false};
         String assignedVehicleNumber = vehicleStaffAssignmentRepository.findOverlappingByUser(
                 a.getUser().getId(), a.getTenant().getId(), a.getAttendanceDate(), a.getAttendanceDate())
                 .stream()
                 .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom)
                         .thenComparing(VehicleStaffAssignment::getCreatedAt))
                 .map(vsa -> {
-                    // If unassigned today, don't show vehicle — sync with vehicle list
+                    // If unassigned today, don't show vehicle via VSA — fall through to lease map
                     if (vsa.getAssignedTo() != null
                             && vsa.getAssignedTo().equals(a.getAttendanceDate())
                             && a.getAttendanceDate().equals(TimeUtil.today())) {
-                        vsaUnassignedToday[0] = true;
                         return null;
                     }
                     Long latestUserId = latestForVehicle.get(vsa.getVehicle().getId() + ":" + userRole);
@@ -547,7 +547,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 })
                 .orElse(null);
         // ponytail: fallback 1 — standing assignment lapsed but driver is on an active order trip
-        if (assignedVehicleNumber == null && !vsaUnassignedToday[0]) {
+        if (assignedVehicleNumber == null) {
             assignedVehicleNumber = orderStaffAllocationRepository
                     .findActiveOnDateForUser(a.getUser().getId(), a.getTenant().getId(), a.getAttendanceDate())
                     .stream().findFirst()
@@ -555,7 +555,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                     .orElse(null);
         }
         // ponytail: fallback 2 — driver assigned via lease, no VSA record exists
-        if (assignedVehicleNumber == null && !vsaUnassignedToday[0]) {
+        if (assignedVehicleNumber == null) {
             assignedVehicleNumber = leaseDriverVehicleMap.get(a.getUser().getId());
         }
 
