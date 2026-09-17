@@ -544,6 +544,13 @@ public class AttendanceServiceImpl implements AttendanceService {
                             && a.getAttendanceDate().equals(TimeUtil.today())) {
                         return null;
                     }
+                    // ponytail: lease log is more specific than a standing VSA — if lease map
+                    // points to a different vehicle (driver moved via lease swap on a historical date),
+                    // prefer the lease assignment. The today-guard above can't handle historical dates.
+                    String leaseVehicle = leaseDriverVehicleMap.get(a.getUser().getId());
+                    if (leaseVehicle != null && !leaseVehicle.equals(vsa.getVehicle().getRegistrationNumber())) {
+                        return leaseVehicle;
+                    }
                     Long latestUserId = latestForVehicle.get(vsa.getVehicle().getId() + ":" + userRole);
                     return (latestUserId == null || latestUserId.equals(a.getUser().getId()))
                             ? vsa.getVehicle().getRegistrationNumber() : null;
