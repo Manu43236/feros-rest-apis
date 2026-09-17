@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -526,6 +527,7 @@ public class AttendanceServiceImpl implements AttendanceService {
         // Resolve vehicle — role-aware swap dedup: only suppress if same role has a later assignment
         String userRole = a.getUser().getRoles().stream()
                 .findFirst().map(r -> r.getName().name()).orElse("UNKNOWN");
+        boolean[] vsaUnassignedToday = {false};
         String assignedVehicleNumber = vehicleStaffAssignmentRepository.findOverlappingByUser(
                 a.getUser().getId(), a.getTenant().getId(), a.getAttendanceDate(), a.getAttendanceDate())
                 .stream()
@@ -536,6 +538,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                     if (vsa.getAssignedTo() != null
                             && vsa.getAssignedTo().equals(a.getAttendanceDate())
                             && a.getAttendanceDate().equals(TimeUtil.today())) {
+                        vsaUnassignedToday[0] = true;
                         return null;
                     }
                     Long latestUserId = latestForVehicle.get(vsa.getVehicle().getId() + ":" + userRole);
@@ -544,7 +547,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 })
                 .orElse(null);
         // ponytail: fallback 1 — standing assignment lapsed but driver is on an active order trip
-        if (assignedVehicleNumber == null) {
+        if (assignedVehicleNumber == null && !vsaUnassignedToday[0]) {
             assignedVehicleNumber = orderStaffAllocationRepository
                     .findActiveOnDateForUser(a.getUser().getId(), a.getTenant().getId(), a.getAttendanceDate())
                     .stream().findFirst()
@@ -552,7 +555,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                     .orElse(null);
         }
         // ponytail: fallback 2 — driver assigned via lease, no VSA record exists
-        if (assignedVehicleNumber == null) {
+        if (assignedVehicleNumber == null && !vsaUnassignedToday[0]) {
             assignedVehicleNumber = leaseDriverVehicleMap.get(a.getUser().getId());
         }
 
@@ -706,6 +709,7 @@ public class AttendanceServiceImpl implements AttendanceService {
             throw new FerosException("Undo window expired — out was marked more than 10 minutes ago", HttpStatus.BAD_REQUEST);
         }
 
+        LocalDateTime markedOutAt = attendance.getMarkedOutAt();
         attendance.setMarkedOutAt(null);
         AttendanceResponse response = mapToResponse(attendanceRepository.save(attendance));
 
@@ -714,6 +718,11 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .findTopByUserIdAndTenantIdAndAssignedToAndIsActiveTrueOrderByCreatedAtDesc(
                         userId, tenantId, TimeUtil.today())
                 .ifPresent(vsa -> {
+                    // Guard: skip if VSA was closed by a lease swap, not by this mark-out
+                    if (vsa.getUnassignedAt() != null
+                            && Duration.between(vsa.getUnassignedAt(), markedOutAt).abs().toMinutes() > 5) {
+                        return;
+                    }
                     vsa.setAssignedTo(null);
                     vehicleStaffAssignmentRepository.save(vsa);
                     Vehicle v = vsa.getVehicle();

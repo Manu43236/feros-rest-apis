@@ -26,6 +26,7 @@ import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.VehicleLeaseService;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
+import com.feros.api.util.TimeUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -324,6 +325,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         leaseDriverLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(assignmentId)
                 .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
 
+        StaffProfile previousDriver = assignment.getDriverStaff();
         StaffProfile driver = null;
         if (request.getDriverStaffId() == null) {
             assignment.setDriverStaff(null);
@@ -348,6 +350,21 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
             assignment.setClientDriverName(null);
         }
         LeaseVehicleAssignment saved = assignmentRepository.save(assignment);
+        User actor = userRepository.findById(SecurityUtil.getCurrentUserId()).orElse(null);
+
+        // Close departing driver's open VSA so VSA-based attendance stays in sync
+        if (previousDriver != null && previousDriver.getUser() != null
+                && (driver == null || !previousDriver.getId().equals(driver.getId()))) {
+            vehicleStaffAssignmentRepository
+                    .findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(
+                            previousDriver.getUser().getId(), tenantId())
+                    .ifPresent(vsa -> {
+                        vsa.setAssignedTo(TimeUtil.today());
+                        vsa.setUnassignedBy(actor);
+                        vsa.setUnassignedAt(LocalDateTime.now());
+                        vehicleStaffAssignmentRepository.save(vsa);
+                    });
+        }
 
         // Write new driver log entry (only when a real driver is assigned, not client's driver)
         if (driver != null) {
@@ -355,7 +372,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                     .leaseVehicleAssignment(saved)
                     .driverStaff(driver)
                     .assignedAt(LocalDateTime.now())
-                    .assignedBy(userRepository.findById(SecurityUtil.getCurrentUserId()).orElse(null))
+                    .assignedBy(actor)
                     .tenant(tenant())
                     .build());
 
