@@ -29,7 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -284,15 +283,10 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .findOverlappingByTenantId(tenantId, date.atStartOfDay(), date.atTime(23, 59, 59))
                 .stream()
                 .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
-                .filter(l -> !date.equals(TimeUtil.today()) || l.getUnassignedAt() == null)
-                .collect(Collectors.groupingBy(l -> l.getDriverStaff().getUser().getId()))
-                .entrySet().stream()
                 .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        e -> e.getValue().stream()
-                                .max(Comparator.comparing(LeaseDriverAssignmentLog::getAssignedAt))
-                                .map(l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber())
-                                .orElseThrow()));
+                        l -> l.getDriverStaff().getUser().getId(),
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber(),
+                        (a, b) -> a));
         Set<String> supervisorAllowedRoles = resolveSupervisorAllowedRoles(role);
         return attendanceRepository
                 .findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, date)
@@ -538,18 +532,11 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom)
                         .thenComparing(VehicleStaffAssignment::getCreatedAt))
                 .map(vsa -> {
-                    // If unassigned today, don't show vehicle via VSA — fall through to lease map
+                    // If unassigned today, don't show vehicle — sync with vehicle list
                     if (vsa.getAssignedTo() != null
                             && vsa.getAssignedTo().equals(a.getAttendanceDate())
                             && a.getAttendanceDate().equals(TimeUtil.today())) {
                         return null;
-                    }
-                    // ponytail: lease log is more specific than a standing VSA — if lease map
-                    // points to a different vehicle (driver moved via lease swap on a historical date),
-                    // prefer the lease assignment. The today-guard above can't handle historical dates.
-                    String leaseVehicle = leaseDriverVehicleMap.get(a.getUser().getId());
-                    if (leaseVehicle != null && !leaseVehicle.equals(vsa.getVehicle().getRegistrationNumber())) {
-                        return leaseVehicle;
                     }
                     Long latestUserId = latestForVehicle.get(vsa.getVehicle().getId() + ":" + userRole);
                     return (latestUserId == null || latestUserId.equals(a.getUser().getId()))
@@ -719,7 +706,6 @@ public class AttendanceServiceImpl implements AttendanceService {
             throw new FerosException("Undo window expired — out was marked more than 10 minutes ago", HttpStatus.BAD_REQUEST);
         }
 
-        LocalDateTime markedOutAt = attendance.getMarkedOutAt();
         attendance.setMarkedOutAt(null);
         AttendanceResponse response = mapToResponse(attendanceRepository.save(attendance));
 
@@ -728,11 +714,6 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .findTopByUserIdAndTenantIdAndAssignedToAndIsActiveTrueOrderByCreatedAtDesc(
                         userId, tenantId, TimeUtil.today())
                 .ifPresent(vsa -> {
-                    // Guard: skip if VSA was closed by a lease swap, not by this mark-out
-                    if (vsa.getUnassignedAt() != null
-                            && Duration.between(vsa.getUnassignedAt(), markedOutAt).abs().toMinutes() > 5) {
-                        return;
-                    }
                     vsa.setAssignedTo(null);
                     vehicleStaffAssignmentRepository.save(vsa);
                     Vehicle v = vsa.getVehicle();
