@@ -166,16 +166,31 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     @Override
     public List<AttendanceResponse> getPendingAttendance() {
+        Long tenantId = getCurrentTenantId();
+        Map<Long, String> leaseMap = buildCurrentLeaseMap(tenantId);
         return attendanceRepository
-                .findByTenantIdAndApprovalStatusAndIsActiveTrue(getCurrentTenantId(), AttendanceApprovalStatus.PENDING)
-                .stream().map(this::mapToResponse).toList();
+                .findByTenantIdAndApprovalStatusAndIsActiveTrue(tenantId, AttendanceApprovalStatus.PENDING)
+                .stream().map(a -> mapToResponse(a, Collections.emptyMap(), leaseMap)).toList();
     }
 
     @Override
     public List<AttendanceResponse> getRejectedAttendance() {
+        Long tenantId = getCurrentTenantId();
+        Map<Long, String> leaseMap = buildCurrentLeaseMap(tenantId);
         return attendanceRepository
-                .findByTenantIdAndApprovalStatusAndIsActiveTrue(getCurrentTenantId(), AttendanceApprovalStatus.REJECTED)
-                .stream().map(this::mapToResponse).toList();
+                .findByTenantIdAndApprovalStatusAndIsActiveTrue(tenantId, AttendanceApprovalStatus.REJECTED)
+                .stream().map(a -> mapToResponse(a, Collections.emptyMap(), leaseMap)).toList();
+    }
+
+    private Map<Long, String> buildCurrentLeaseMap(Long tenantId) {
+        return leaseDriverAssignmentLogRepository.findAllActiveByTenantId(tenantId)
+                .stream()
+                .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null
+                        && l.getLeaseVehicleAssignment().getVehicle() != null)
+                .collect(Collectors.toMap(
+                        l -> l.getDriverStaff().getUser().getId(),
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber(),
+                        (a, b) -> a));
     }
 
     @Override
@@ -280,7 +295,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                                 .map(a -> a.getUser().getId())
                                 .orElseThrow()));
         Map<Long, String> leaseDriverVehicleMap = leaseDriverAssignmentLogRepository
-                .findOverlappingByTenantId(tenantId, date.atStartOfDay(), date.atTime(23, 59, 59))
+                .findEndOfDayActiveByTenantId(tenantId, date.atTime(23, 59, 59))
                 .stream()
                 .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
                 .collect(Collectors.toMap(
