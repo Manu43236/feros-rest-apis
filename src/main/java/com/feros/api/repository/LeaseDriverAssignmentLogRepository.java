@@ -52,6 +52,22 @@ public interface LeaseDriverAssignmentLogRepository extends JpaRepository<LeaseD
         """)
     List<LeaseDriverAssignmentLog> findAllByTenantIdForHistory(@Param("tenantId") Long tenantId);
 
+    // End-of-day active logs — driver still assigned at 23:59:59 (excludes mid-day-closed logs)
+    @Query("""
+        SELECT l FROM LeaseDriverAssignmentLog l
+        JOIN FETCH l.leaseVehicleAssignment a
+        JOIN FETCH a.vehicle
+        JOIN FETCH l.driverStaff ds
+        JOIN FETCH ds.user
+        WHERE l.tenant.id = :tenantId
+          AND l.driverStaff IS NOT NULL
+          AND l.assignedAt <= :endOfDay
+          AND (l.unassignedAt IS NULL OR l.unassignedAt > :endOfDay)
+        """)
+    List<LeaseDriverAssignmentLog> findEndOfDayActiveByTenantId(
+            @Param("tenantId") Long tenantId,
+            @Param("endOfDay") java.time.LocalDateTime endOfDay);
+
     // Logs overlapping a date range — for attendance and report vehicle resolution
     @Query("""
         SELECT l FROM LeaseDriverAssignmentLog l
