@@ -26,13 +26,12 @@ public interface LeaseDriverAssignmentLogRepository extends JpaRepository<LeaseD
             @Param("staffId") Long staffId,
             @Param("tenantId") Long tenantId);
 
-    // All active logs for a tenant (bulk load for isAssigned check + pending/rejected attendance vehicle)
+    // All active logs for a tenant (bulk load for isAssigned check)
     @Query("""
         SELECT l FROM LeaseDriverAssignmentLog l
-        LEFT JOIN FETCH l.driverStaff ds
-        LEFT JOIN FETCH ds.user
+        LEFT JOIN FETCH l.driverStaff
         LEFT JOIN FETCH l.leaseVehicleAssignment a
-        LEFT JOIN FETCH a.vehicle
+        LEFT JOIN FETCH a.lease
         WHERE l.tenant.id = :tenantId
           AND l.unassignedAt IS NULL
           AND l.driverStaff IS NOT NULL
