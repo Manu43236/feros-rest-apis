@@ -70,6 +70,7 @@ public class ReportServiceImpl implements ReportService {
     private final OrderVehicleAllocationRepository orderVehicleAllocationRepository;
     private final VehicleServiceTaskRepository vehicleServiceTaskRepository;
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
+    private final UserRepository userRepository;
 
     // ── 0. Vehicle Master ──────────────────────────────────────────────────────
 
@@ -409,24 +410,25 @@ public class ReportServiceImpl implements ReportService {
     @Transactional(readOnly = true)
     public List<AttendanceRoleSummaryRow> getAttendanceRoleSummary(LocalDate startDate, LocalDate endDate) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        List<Attendance> records = attendanceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
 
-        Map<String, Set<Long>> allByRole = new LinkedHashMap<>();
+        // Total active staff per role (source of truth for staffCount)
+        Map<String, Long> totalByRole = userRepository.findAllByTenantIdAndIsActiveTrue(tenantId).stream()
+                .collect(Collectors.groupingBy(this::primaryRole, Collectors.counting()));
+
+        // Attendance records for the date range — used only for presented count
+        List<Attendance> records = attendanceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
         Map<String, Set<Long>> presentByRole = new HashMap<>();
         for (Attendance a : records) {
-            String role = primaryRole(a.getUser());
-            Long uid = a.getUser().getId();
-            allByRole.computeIfAbsent(role, k -> new HashSet<>()).add(uid);
             if (a.getAttendanceType().getName().toUpperCase().contains("PRESENT")) {
-                presentByRole.computeIfAbsent(role, k -> new HashSet<>()).add(uid);
+                presentByRole.computeIfAbsent(primaryRole(a.getUser()), k -> new HashSet<>()).add(a.getUser().getId());
             }
         }
 
         return List.of("DRIVER", "CLEANER", "SUPERVISOR", "OFFICE_STAFF", "SERVICE_MANAGER", "TECHNICIAN", "STORE_KEEPER", "ADMIN")
                 .stream()
-                .filter(allByRole::containsKey)
+                .filter(totalByRole::containsKey)
                 .map(role -> {
-                    int staffCount = allByRole.get(role).size();
+                    int staffCount = totalByRole.get(role).intValue();
                     int presented = presentByRole.getOrDefault(role, Set.of()).size();
                     return AttendanceRoleSummaryRow.builder()
                             .role(role)
