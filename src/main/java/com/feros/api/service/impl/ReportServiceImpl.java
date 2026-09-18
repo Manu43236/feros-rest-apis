@@ -838,8 +838,12 @@ public class ReportServiceImpl implements ReportService {
                 .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
                 .collect(Collectors.toMap(
                         l -> l.getDriverStaff().getUser().getId(),
-                        l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber(),
-                        (a, b) -> a));
+                        l -> l,
+                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
+                .values().stream()
+                .collect(Collectors.toMap(
+                        l -> l.getDriverStaff().getUser().getId(),
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber()));
     }
 
     private String resolveVehicleForDate(Map<Long, List<VehicleStaffAssignment>> userAssignments,
