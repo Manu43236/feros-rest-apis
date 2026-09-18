@@ -15,4 +15,5 @@ public class AttendanceRoleSummaryRow {
     private int holiday;
     private int weekOff;
     private int absent;
+    private int noAttendance;
 }

@@ -418,13 +418,14 @@ public class ReportServiceImpl implements ReportService {
         // Attendance records for the date range — bucket by type + approval status
         List<Attendance> records = attendanceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
 
-        Map<String, Set<Long>> pendingByRole   = new HashMap<>();
-        Map<String, Set<Long>> presentByRole   = new HashMap<>();
-        Map<String, Set<Long>> halfDayByRole   = new HashMap<>();
-        Map<String, Set<Long>> leaveByRole     = new HashMap<>();
-        Map<String, Set<Long>> holidayByRole   = new HashMap<>();
-        Map<String, Set<Long>> weekOffByRole   = new HashMap<>();
-        Map<String, Set<Long>> anyRecordByRole = new HashMap<>();
+        Map<String, Set<Long>> pendingByRole      = new HashMap<>();
+        Map<String, Set<Long>> presentByRole      = new HashMap<>();
+        Map<String, Set<Long>> halfDayByRole      = new HashMap<>();
+        Map<String, Set<Long>> leaveByRole        = new HashMap<>();
+        Map<String, Set<Long>> holidayByRole      = new HashMap<>();
+        Map<String, Set<Long>> weekOffByRole      = new HashMap<>();
+        Map<String, Set<Long>> absentByRole       = new HashMap<>();
+        Map<String, Set<Long>> anyRecordByRole    = new HashMap<>();
 
         for (Attendance a : records) {
             String role = primaryRole(a.getUser());
@@ -440,6 +441,7 @@ public class ReportServiceImpl implements ReportService {
                 else if (typeName.contains("LEAVE"))   leaveByRole.computeIfAbsent(role, k -> new HashSet<>()).add(uid);
                 else if (typeName.contains("HOLIDAY")) holidayByRole.computeIfAbsent(role, k -> new HashSet<>()).add(uid);
                 else if (typeName.contains("WEEK") || typeName.contains("OFF")) weekOffByRole.computeIfAbsent(role, k -> new HashSet<>()).add(uid);
+                else if (typeName.contains("ABSENT"))  absentByRole.computeIfAbsent(role, k -> new HashSet<>()).add(uid);
             }
         }
 
@@ -458,7 +460,8 @@ public class ReportServiceImpl implements ReportService {
                             .onLeave(leaveByRole.getOrDefault(role, Set.of()).size())
                             .holiday(holidayByRole.getOrDefault(role, Set.of()).size())
                             .weekOff(weekOffByRole.getOrDefault(role, Set.of()).size())
-                            .absent(staffCount - hasRecord)
+                            .absent(absentByRole.getOrDefault(role, Set.of()).size())
+                            .noAttendance(staffCount - hasRecord)
                             .build();
                 }).toList();
     }
