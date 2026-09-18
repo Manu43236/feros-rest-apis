@@ -166,16 +166,32 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     @Override
     public List<AttendanceResponse> getPendingAttendance() {
+        Long tenantId = getCurrentTenantId();
+        Map<Long, String> leaseMap = buildActiveLeaseMap(tenantId);
         return attendanceRepository
-                .findByTenantIdAndApprovalStatusAndIsActiveTrue(getCurrentTenantId(), AttendanceApprovalStatus.PENDING)
-                .stream().map(this::mapToResponse).toList();
+                .findByTenantIdAndApprovalStatusAndIsActiveTrue(tenantId, AttendanceApprovalStatus.PENDING)
+                .stream().map(a -> mapToResponse(a, Collections.emptyMap(), leaseMap)).toList();
     }
 
     @Override
     public List<AttendanceResponse> getRejectedAttendance() {
+        Long tenantId = getCurrentTenantId();
+        Map<Long, String> leaseMap = buildActiveLeaseMap(tenantId);
         return attendanceRepository
-                .findByTenantIdAndApprovalStatusAndIsActiveTrue(getCurrentTenantId(), AttendanceApprovalStatus.REJECTED)
-                .stream().map(this::mapToResponse).toList();
+                .findByTenantIdAndApprovalStatusAndIsActiveTrue(tenantId, AttendanceApprovalStatus.REJECTED)
+                .stream().map(a -> mapToResponse(a, Collections.emptyMap(), leaseMap)).toList();
+    }
+
+    private Map<Long, String> buildActiveLeaseMap(Long tenantId) {
+        return leaseDriverAssignmentLogRepository.findAllActiveByTenantId(tenantId)
+                .stream()
+                .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null
+                        && l.getLeaseVehicleAssignment() != null
+                        && l.getLeaseVehicleAssignment().getVehicle() != null)
+                .collect(Collectors.toMap(
+                        l -> l.getDriverStaff().getUser().getId(),
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber(),
+                        (a, b) -> a));
     }
 
     @Override
@@ -285,8 +301,12 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
                 .collect(Collectors.toMap(
                         l -> l.getDriverStaff().getUser().getId(),
-                        l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber(),
-                        (a, b) -> a));
+                        l -> l,
+                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
+                .values().stream()
+                .collect(Collectors.toMap(
+                        l -> l.getDriverStaff().getUser().getId(),
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber()));
         Set<String> supervisorAllowedRoles = resolveSupervisorAllowedRoles(role);
         return attendanceRepository
                 .findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, date)
