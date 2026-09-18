@@ -152,22 +152,29 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         VehicleLease lease = fetchLease(id);
 
         validateStatusTransition(lease.getStatus(), newStatus);
-        lease.setStatus(newStatus);
 
-        // On close: close all active vehicle assignments, their sessions, and revert vehicle status
         if (newStatus == LeaseStatus.CLOSED) {
+            if (sessionRepository.existsByAssignment_Lease_IdAndIsActiveTrue(id))
+                throw new FerosException(
+                        "Cannot close lease — one or more vehicles have active sessions in progress. End all sessions first.",
+                        HttpStatus.CONFLICT);
+
+            // Auto-close open driver logs, assignments, and revert vehicle status
             List<LeaseVehicleAssignment> active = assignmentRepository
                     .findByLeaseIdOrderByStartDateAsc(id)
                     .stream().filter(a -> Boolean.TRUE.equals(a.getIsActive())).collect(Collectors.toList());
             LocalDateTime now = LocalDateTime.now();
             active.forEach(a -> {
-                closeActiveSession(a.getId(), now);
+                leaseDriverLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(a.getId())
+                        .ifPresent(log -> log.setUnassignedAt(now));
                 a.setIsActive(false);
                 a.setEndDate(LocalDate.now());
                 revertVehicleStatus(a.getVehicle());
             });
             assignmentRepository.saveAll(active);
         }
+
+        lease.setStatus(newStatus);
 
         return toResponse(leaseRepository.save(lease), assignmentRepository.countByLeaseId(id));
     }
