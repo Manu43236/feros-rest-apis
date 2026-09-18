@@ -44,7 +44,6 @@ class AttendanceVehicleFallbackTest {
     @Mock LocationResolverService locationResolverService;
     @Mock StaffProfileRepository staffProfileRepository;
     @Mock LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
-    @Mock LeaseVehicleAssignmentRepository leaseVehicleAssignmentRepository;
 
     private AttendanceServiceImpl service;
 
@@ -60,7 +59,7 @@ class AttendanceVehicleFallbackTest {
             leaveTypeRepository, s3Service, notificationService,
             vehicleRepository, vehicleStaffAssignmentRepository,
             orderStaffAllocationRepository, locationResolverService, staffProfileRepository,
-            leaseDriverAssignmentLogRepository, leaseVehicleAssignmentRepository
+            leaseDriverAssignmentLogRepository
         );
 
         UserPrincipal principal = new UserPrincipal(ADMIN_ID, TENANT_ID, "9999999990", "ADMIN");
@@ -109,7 +108,7 @@ class AttendanceVehicleFallbackTest {
         // No VSAs overlap on 2026-08-02 (both for latestForVehicle map and per-user lookup)
         when(vehicleStaffAssignmentRepository.findOverlappingForTenant(TENANT_ID, date, date))
             .thenReturn(List.of());
-        when(leaseVehicleAssignmentRepository.findAllActiveWithDriverByTenantId(TENANT_ID))
+        when(leaseDriverAssignmentLogRepository.findOverlappingByTenantId(eq(TENANT_ID), any(), any()))
             .thenReturn(List.of());
         when(attendanceRepository.findByTenantIdAndAttendanceDateAndIsActiveTrue(TENANT_ID, date))
             .thenReturn(List.of(att));
@@ -179,7 +178,7 @@ class AttendanceVehicleFallbackTest {
         // VSA is active — latestForVehicle map includes this driver
         when(vehicleStaffAssignmentRepository.findOverlappingForTenant(TENANT_ID, date, date))
             .thenReturn(List.of(vsa));
-        when(leaseVehicleAssignmentRepository.findAllActiveWithDriverByTenantId(TENANT_ID))
+        when(leaseDriverAssignmentLogRepository.findOverlappingByTenantId(eq(TENANT_ID), any(), any()))
             .thenReturn(List.of());
         when(attendanceRepository.findByTenantIdAndAttendanceDateAndIsActiveTrue(TENANT_ID, date))
             .thenReturn(List.of(att));

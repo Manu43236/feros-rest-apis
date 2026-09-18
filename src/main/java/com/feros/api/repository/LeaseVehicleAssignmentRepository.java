@@ -37,17 +37,4 @@ public interface LeaseVehicleAssignmentRepository extends JpaRepository<LeaseVeh
         LIMIT 1
     """)
     Optional<LeaseVehicleAssignment> findByLeaseIdAndVehicleIdActive(@Param("vehicleId") Long vehicleId);
-
-    // All active lease vehicle assignments for a tenant that have an own driver — for attendance vehicle resolution
-    @Query("""
-        SELECT a FROM LeaseVehicleAssignment a
-        JOIN FETCH a.vehicle
-        JOIN FETCH a.driverStaff ds
-        JOIN FETCH ds.user
-        WHERE a.lease.tenant.id = :tenantId
-          AND a.isActive = true
-          AND a.lease.status = com.feros.api.enums.LeaseStatus.ACTIVE
-          AND a.driverStaff IS NOT NULL
-    """)
-    List<LeaseVehicleAssignment> findAllActiveWithDriverByTenantId(@Param("tenantId") Long tenantId);
 }
