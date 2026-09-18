@@ -8,6 +8,11 @@ import lombok.Getter;
 public class AttendanceRoleSummaryRow {
     private String role;
     private int staffCount;
-    private int presented;
+    private int pending;
+    private int present;
+    private int halfDay;
+    private int onLeave;
+    private int holiday;
+    private int weekOff;
     private int absent;
 }

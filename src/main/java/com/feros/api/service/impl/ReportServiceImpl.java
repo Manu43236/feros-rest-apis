@@ -415,12 +415,31 @@ public class ReportServiceImpl implements ReportService {
         Map<String, Long> totalByRole = userRepository.findAllByTenantIdAndIsActiveTrue(tenantId).stream()
                 .collect(Collectors.groupingBy(this::primaryRole, Collectors.counting()));
 
-        // Attendance records for the date range — used only for presented count
+        // Attendance records for the date range — bucket by type + approval status
         List<Attendance> records = attendanceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
-        Map<String, Set<Long>> presentByRole = new HashMap<>();
+
+        Map<String, Set<Long>> pendingByRole   = new HashMap<>();
+        Map<String, Set<Long>> presentByRole   = new HashMap<>();
+        Map<String, Set<Long>> halfDayByRole   = new HashMap<>();
+        Map<String, Set<Long>> leaveByRole     = new HashMap<>();
+        Map<String, Set<Long>> holidayByRole   = new HashMap<>();
+        Map<String, Set<Long>> weekOffByRole   = new HashMap<>();
+        Map<String, Set<Long>> anyRecordByRole = new HashMap<>();
+
         for (Attendance a : records) {
-            if (a.getAttendanceType().getName().toUpperCase().contains("PRESENT")) {
-                presentByRole.computeIfAbsent(primaryRole(a.getUser()), k -> new HashSet<>()).add(a.getUser().getId());
+            String role = primaryRole(a.getUser());
+            Long uid = a.getUser().getId();
+            String typeName = a.getAttendanceType().getName().toUpperCase();
+            anyRecordByRole.computeIfAbsent(role, k -> new HashSet<>()).add(uid);
+
+            if (a.getApprovalStatus() == AttendanceApprovalStatus.PENDING) {
+                pendingByRole.computeIfAbsent(role, k -> new HashSet<>()).add(uid);
+            } else if (a.getApprovalStatus() == AttendanceApprovalStatus.APPROVED) {
+                if      (typeName.contains("PRESENT")) presentByRole.computeIfAbsent(role, k -> new HashSet<>()).add(uid);
+                else if (typeName.contains("HALF"))    halfDayByRole.computeIfAbsent(role, k -> new HashSet<>()).add(uid);
+                else if (typeName.contains("LEAVE"))   leaveByRole.computeIfAbsent(role, k -> new HashSet<>()).add(uid);
+                else if (typeName.contains("HOLIDAY")) holidayByRole.computeIfAbsent(role, k -> new HashSet<>()).add(uid);
+                else if (typeName.contains("WEEK") || typeName.contains("OFF")) weekOffByRole.computeIfAbsent(role, k -> new HashSet<>()).add(uid);
             }
         }
 
@@ -429,12 +448,17 @@ public class ReportServiceImpl implements ReportService {
                 .filter(totalByRole::containsKey)
                 .map(role -> {
                     int staffCount = totalByRole.get(role).intValue();
-                    int presented = presentByRole.getOrDefault(role, Set.of()).size();
+                    int hasRecord  = anyRecordByRole.getOrDefault(role, Set.of()).size();
                     return AttendanceRoleSummaryRow.builder()
                             .role(role)
                             .staffCount(staffCount)
-                            .presented(presented)
-                            .absent(staffCount - presented)
+                            .pending(pendingByRole.getOrDefault(role, Set.of()).size())
+                            .present(presentByRole.getOrDefault(role, Set.of()).size())
+                            .halfDay(halfDayByRole.getOrDefault(role, Set.of()).size())
+                            .onLeave(leaveByRole.getOrDefault(role, Set.of()).size())
+                            .holiday(holidayByRole.getOrDefault(role, Set.of()).size())
+                            .weekOff(weekOffByRole.getOrDefault(role, Set.of()).size())
+                            .absent(staffCount - hasRecord)
                             .build();
                 }).toList();
     }
