@@ -26,35 +26,17 @@ public interface LeaseDriverAssignmentLogRepository extends JpaRepository<LeaseD
             @Param("staffId") Long staffId,
             @Param("tenantId") Long tenantId);
 
-    // All active logs for a tenant (bulk load for isAssigned check + attendance vehicle resolution)
+    // All active logs for a tenant (bulk load for isAssigned check)
     @Query("""
         SELECT l FROM LeaseDriverAssignmentLog l
-        LEFT JOIN FETCH l.driverStaff ds
-        LEFT JOIN FETCH ds.user
+        LEFT JOIN FETCH l.driverStaff
         LEFT JOIN FETCH l.leaseVehicleAssignment a
         LEFT JOIN FETCH a.lease
-        LEFT JOIN FETCH a.vehicle
         WHERE l.tenant.id = :tenantId
           AND l.unassignedAt IS NULL
           AND l.driverStaff IS NOT NULL
         """)
     List<LeaseDriverAssignmentLog> findAllActiveByTenantId(@Param("tenantId") Long tenantId);
-
-    // End-of-day active logs — for attendance vehicle resolution (excludes mid-day-closed logs)
-    @Query("""
-        SELECT l FROM LeaseDriverAssignmentLog l
-        JOIN FETCH l.leaseVehicleAssignment a
-        JOIN FETCH a.vehicle
-        JOIN FETCH l.driverStaff ds
-        JOIN FETCH ds.user
-        WHERE l.tenant.id = :tenantId
-          AND l.driverStaff IS NOT NULL
-          AND l.assignedAt <= :endOfDay
-          AND (l.unassignedAt IS NULL OR l.unassignedAt > :endOfDay)
-        """)
-    List<LeaseDriverAssignmentLog> findEndOfDayActiveByTenantId(
-            @Param("tenantId") Long tenantId,
-            @Param("endOfDay") java.time.LocalDateTime endOfDay);
 
     // All logs for history — ordered by most recent first
     @Query("""
