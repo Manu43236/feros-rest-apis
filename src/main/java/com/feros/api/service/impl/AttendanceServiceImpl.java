@@ -51,7 +51,6 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final LocationResolverService locationResolverService;
     private final StaffProfileRepository staffProfileRepository;
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
-    private final LeaseVehicleAssignmentRepository leaseVehicleAssignmentRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -167,29 +166,16 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     @Override
     public List<AttendanceResponse> getPendingAttendance() {
-        Long tenantId = getCurrentTenantId();
-        Map<Long, String> leaseMap = buildCurrentLeaseDriverMap(tenantId);
         return attendanceRepository
-                .findByTenantIdAndApprovalStatusAndIsActiveTrue(tenantId, AttendanceApprovalStatus.PENDING)
-                .stream().map(a -> mapToResponse(a, Collections.emptyMap(), leaseMap)).toList();
+                .findByTenantIdAndApprovalStatusAndIsActiveTrue(getCurrentTenantId(), AttendanceApprovalStatus.PENDING)
+                .stream().map(this::mapToResponse).toList();
     }
 
     @Override
     public List<AttendanceResponse> getRejectedAttendance() {
-        Long tenantId = getCurrentTenantId();
-        Map<Long, String> leaseMap = buildCurrentLeaseDriverMap(tenantId);
         return attendanceRepository
-                .findByTenantIdAndApprovalStatusAndIsActiveTrue(tenantId, AttendanceApprovalStatus.REJECTED)
-                .stream().map(a -> mapToResponse(a, Collections.emptyMap(), leaseMap)).toList();
-    }
-
-    private Map<Long, String> buildCurrentLeaseDriverMap(Long tenantId) {
-        return leaseVehicleAssignmentRepository.findAllActiveWithDriverByTenantId(tenantId)
-                .stream()
-                .collect(Collectors.toMap(
-                        a -> a.getDriverStaff().getUser().getId(),
-                        a -> a.getVehicle().getRegistrationNumber(),
-                        (a, b) -> a));
+                .findByTenantIdAndApprovalStatusAndIsActiveTrue(getCurrentTenantId(), AttendanceApprovalStatus.REJECTED)
+                .stream().map(this::mapToResponse).toList();
     }
 
     @Override
@@ -293,20 +279,14 @@ public class AttendanceServiceImpl implements AttendanceService {
                                         .thenComparing(VehicleStaffAssignment::getCreatedAt))
                                 .map(a -> a.getUser().getId())
                                 .orElseThrow()));
-        // Override latestForVehicle with end-of-day active lease assignments.
-        // When a driver is swapped via the lease pathway, the old driver's VSA is not closed.
-        // This override ensures the lease-confirmed end-of-day driver wins the dedup check,
-        // suppressing any stale VSA the old driver still holds on that vehicle.
-        leaseDriverAssignmentLogRepository
-                .findEndOfDayActiveByTenantId(tenantId, date.atTime(23, 59, 59))
-                .forEach(l -> {
-                    String r = l.getDriverStaff().getUser().getRoles().stream()
-                            .findFirst().map(ro -> ro.getName().name()).orElse("DRIVER");
-                    latestForVehicle.put(
-                            l.getLeaseVehicleAssignment().getVehicle().getId() + ":" + r,
-                            l.getDriverStaff().getUser().getId());
-                });
-        Map<Long, String> leaseDriverVehicleMap = buildCurrentLeaseDriverMap(tenantId);
+        Map<Long, String> leaseDriverVehicleMap = leaseDriverAssignmentLogRepository
+                .findOverlappingByTenantId(tenantId, date.atStartOfDay(), date.atTime(23, 59, 59))
+                .stream()
+                .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
+                .collect(Collectors.toMap(
+                        l -> l.getDriverStaff().getUser().getId(),
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber(),
+                        (a, b) -> a));
         Set<String> supervisorAllowedRoles = resolveSupervisorAllowedRoles(role);
         return attendanceRepository
                 .findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, date)

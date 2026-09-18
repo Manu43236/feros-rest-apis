@@ -27,19 +27,6 @@ public interface LeaseVehicleAssignmentRepository extends JpaRepository<LeaseVeh
 
     long countByLeaseId(Long leaseId);
 
-    // Active lease vehicle assignments that have an own driver — for attendance vehicle resolution
-    @Query("""
-        SELECT a FROM LeaseVehicleAssignment a
-        JOIN FETCH a.vehicle
-        JOIN FETCH a.driverStaff ds
-        JOIN FETCH ds.user
-        WHERE a.lease.tenant.id = :tenantId
-          AND a.isActive = true
-          AND a.lease.status = com.feros.api.enums.LeaseStatus.ACTIVE
-          AND a.driverStaff IS NOT NULL
-    """)
-    List<LeaseVehicleAssignment> findAllActiveWithDriverByTenantId(@Param("tenantId") Long tenantId);
-
     // Find the active assignment for a vehicle on any active lease (for lease-to-lease transfer)
     @Query("""
         SELECT a FROM LeaseVehicleAssignment a
