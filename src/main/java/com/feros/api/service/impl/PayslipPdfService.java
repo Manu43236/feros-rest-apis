@@ -3,6 +3,7 @@ package com.feros.api.service.impl;
 import com.feros.api.entity.Payroll;
 import com.feros.api.entity.PayrollDeduction;
 import com.feros.api.entity.StaffProfile;
+import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.PayrollDeductionRepository;
 import com.feros.api.repository.PayrollRepository;
@@ -272,9 +273,10 @@ public class PayslipPdfService {
             // ── Daily Earnings Annexure — page 2 ─────────────────────────────
             if (!isMonthly) try {
                 List<com.feros.api.entity.Attendance> workedDays = attendanceRepository
-                        .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrueOrderByAttendanceDateDesc(
+                        .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrueAndApprovalStatus(
                                 payroll.getUser().getId(), tenantId,
-                                payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate())
+                                payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate(),
+                                AttendanceApprovalStatus.APPROVED)
                         .stream()
                         .filter(a -> {
                             String t = a.getAttendanceType().getName().toLowerCase();
