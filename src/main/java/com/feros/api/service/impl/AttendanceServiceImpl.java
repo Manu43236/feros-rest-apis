@@ -442,6 +442,10 @@ public class AttendanceServiceImpl implements AttendanceService {
             attendance.setLeaveType(null);
         }
 
+        attendance.setApprovalStatus(AttendanceApprovalStatus.APPROVED);
+        attendance.setApprovedBy(getCurrentUser());
+        attendance.setApprovedAt(TimeUtil.nowIst());
+
         return mapToResponse(attendanceRepository.save(attendance));
     }
 
