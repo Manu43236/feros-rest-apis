@@ -3,6 +3,9 @@ package com.feros.api.scheduler;
 import com.feros.api.entity.DailyLogDivision;
 import com.feros.api.entity.Equipment;
 import com.feros.api.entity.EquipmentDailyLog;
+import com.feros.api.entity.LeaseDailyLog;
+import com.feros.api.entity.LeaseVehicleAssignment;
+import com.feros.api.entity.LeaseVehicleSession;
 import com.feros.api.entity.MachineAssignment;
 import com.feros.api.entity.MachineWorkEntry;
 import com.feros.api.entity.WorkOrder;
@@ -11,6 +14,9 @@ import com.feros.api.enums.WorkOrderStatus;
 import com.feros.api.repository.DailyLogDivisionRepository;
 import com.feros.api.repository.EquipmentDailyLogRepository;
 import com.feros.api.repository.EquipmentRepository;
+import com.feros.api.repository.LeaseDailyLogRepository;
+import com.feros.api.repository.LeaseVehicleAssignmentRepository;
+import com.feros.api.repository.LeaseVehicleSessionRepository;
 import com.feros.api.repository.MachineAssignmentRepository;
 import com.feros.api.repository.MachineWorkEntryRepository;
 import com.feros.api.repository.WorkOrderRepository;
@@ -39,6 +45,9 @@ public class DailyLogScheduler {
     private final EquipmentDailyLogRepository dailyLogRepository;
     private final DailyLogDivisionRepository dailyLogDivisionRepository;
     private final EquipmentRepository equipmentRepository;
+    private final LeaseVehicleAssignmentRepository leaseAssignmentRepository;
+    private final LeaseVehicleSessionRepository leaseSessionRepository;
+    private final LeaseDailyLogRepository leaseDailyLogRepository;
 
     @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Kolkata")
     @Transactional
@@ -139,5 +148,50 @@ public class DailyLogScheduler {
         }
 
         log.info("[DailyLogScheduler] Completed for date: {}", yesterday);
+    }
+
+    @Scheduled(cron = "0 59 23 * * *", zone = "Asia/Kolkata")
+    @Transactional
+    public void generateLeaseDailyLogs() {
+        LocalDate today = LocalDate.now();
+        log.info("[LeaseDailyLogScheduler] Running for date: {}", today);
+
+        List<LeaseVehicleAssignment> assignments = leaseAssignmentRepository.findAllActiveOnActiveLeases();
+
+        for (LeaseVehicleAssignment assignment : assignments) {
+            if (leaseDailyLogRepository.existsByAssignmentIdAndLogDate(assignment.getId(), today)) {
+                log.debug("[LeaseDailyLogScheduler] Log already exists for assignment {} on {}, skipping", assignment.getId(), today);
+                continue;
+            }
+
+            List<LeaseVehicleSession> sessions = leaseSessionRepository
+                    .findByAssignmentIdAndIsActiveFalseAndStartTimeBetween(
+                            assignment.getId(), today.atStartOfDay(), today.plusDays(1).atStartOfDay());
+
+            if (sessions.isEmpty()) continue;
+
+            BigDecimal totalHours = sessions.stream()
+                    .map(s -> s.getHoursWorked() != null ? s.getHoursWorked() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal kmDriven = sessions.stream()
+                    .map(s -> s.getKmDriven() != null ? s.getKmDriven() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            leaseDailyLogRepository.save(LeaseDailyLog.builder()
+                    .assignment(assignment)
+                    .leaseId(assignment.getLease().getId())
+                    .logDate(today)
+                    .totalHours(totalHours.compareTo(BigDecimal.ZERO) > 0 ? totalHours : null)
+                    .kmDriven(kmDriven.compareTo(BigDecimal.ZERO) > 0 ? kmDriven : null)
+                    .sessionCount(sessions.size())
+                    .source("AUTO")
+                    .build());
+
+            log.info("[LeaseDailyLogScheduler] Created log for assignment {} on {}", assignment.getId(), today);
+        }
+
+        log.info("[LeaseDailyLogScheduler] Completed for date: {}", today);
     }
 }

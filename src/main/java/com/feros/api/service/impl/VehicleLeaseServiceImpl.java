@@ -80,8 +80,9 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     // ── List ──────────────────────────────────────────────────────────────────
 
     @Override
-    public Page<VehicleLeaseResponse> getAll(int page, int size, LeaseStatus status, Long clientId) {
-        return leaseRepository.findAllPaged(tenantId(), status, clientId, PageRequest.of(page, size))
+    public Page<VehicleLeaseResponse> getAll(int page, int size, LeaseStatus status, Long clientId, String search) {
+        String q = (search != null && !search.isBlank()) ? search.trim() : null;
+        return leaseRepository.findAllPaged(tenantId(), status, clientId, q, PageRequest.of(page, size))
                 .map(lease -> toResponse(lease, assignmentRepository.countByLeaseId(lease.getId())));
     }
 
@@ -624,7 +625,10 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     @Override
     @Transactional
     public LeaseDailyLogResponse createDailyLog(Long leaseId, Long assignmentId, LocalDate date) {
-        fetchLease(leaseId);
+        VehicleLease lease = fetchLease(leaseId);
+        if (lease.getStatus() == LeaseStatus.CLOSED)
+            throw new FerosException("Cannot add daily log to a closed lease", HttpStatus.BAD_REQUEST);
+
         LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
                 .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
 

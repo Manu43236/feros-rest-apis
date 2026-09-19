@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface VehicleLeaseService {
-    Page<VehicleLeaseResponse> getAll(int page, int size, LeaseStatus status, Long clientId);
+    Page<VehicleLeaseResponse> getAll(int page, int size, LeaseStatus status, Long clientId, String search);
     VehicleLeaseResponse getById(Long id);
     VehicleLeaseResponse create(VehicleLeaseRequest request);
     VehicleLeaseResponse update(Long id, VehicleLeaseRequest request);

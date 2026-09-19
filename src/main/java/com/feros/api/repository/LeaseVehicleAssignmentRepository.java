@@ -27,6 +27,14 @@ public interface LeaseVehicleAssignmentRepository extends JpaRepository<LeaseVeh
 
     long countByLeaseId(Long leaseId);
 
+    // All active assignments on active leases — used by daily log scheduler
+    @Query("""
+        SELECT a FROM LeaseVehicleAssignment a
+        WHERE a.isActive = true
+          AND a.lease.status = com.feros.api.enums.LeaseStatus.ACTIVE
+    """)
+    List<LeaseVehicleAssignment> findAllActiveOnActiveLeases();
+
     // Find the active assignment for a vehicle on any active lease (for lease-to-lease transfer)
     @Query("""
         SELECT a FROM LeaseVehicleAssignment a

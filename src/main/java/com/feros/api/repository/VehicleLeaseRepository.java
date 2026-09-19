@@ -25,11 +25,15 @@ public interface VehicleLeaseRepository extends JpaRepository<VehicleLease, Long
           AND vl.isActive = true
           AND (:status IS NULL OR vl.status = :status)
           AND (:clientId IS NULL OR vl.client.id = :clientId)
+          AND (:search IS NULL OR LOWER(vl.leaseNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+               OR LOWER(vl.site) LIKE LOWER(CONCAT('%', :search, '%'))
+               OR LOWER(vl.client.clientName) LIKE LOWER(CONCAT('%', :search, '%')))
         ORDER BY vl.createdAt DESC
     """)
     Page<VehicleLease> findAllPaged(
             @Param("tenantId") Long tenantId,
             @Param("status") LeaseStatus status,
             @Param("clientId") Long clientId,
+            @Param("search") String search,
             Pageable pageable);
 }
