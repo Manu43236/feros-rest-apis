@@ -259,6 +259,33 @@ public class GlobalMasterController {
         return ResponseEntity.ok(ApiResponse.success("Part category deleted successfully", null));
     }
 
+    // ===================== UNITS =====================
+    // Shared global list — Super Admin, Admin and Office Staff can all manage it.
+
+    @GetMapping("/units")
+    public ResponseEntity<ApiResponse<List<MasterResponse>>> getAllUnits() {
+        return ResponseEntity.ok(ApiResponse.success("Units fetched successfully", globalMasterService.getAllUnits()));
+    }
+
+    @PostMapping("/units")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<MasterResponse>> createUnit(@Valid @RequestBody MasterRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Unit created successfully", globalMasterService.createUnit(request)));
+    }
+
+    @PutMapping("/units/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<MasterResponse>> updateUnit(@PathVariable Long id, @Valid @RequestBody MasterRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Unit updated successfully", globalMasterService.updateUnit(id, request)));
+    }
+
+    @DeleteMapping("/units/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<Void>> deleteUnit(@PathVariable Long id) {
+        globalMasterService.deleteUnit(id);
+        return ResponseEntity.ok(ApiResponse.success("Unit deleted successfully", null));
+    }
+
     // ===================== MATERIAL TYPES =====================
     @GetMapping("/material-types")
     public ResponseEntity<ApiResponse<List<MasterResponse>>> getAllMaterialTypes() {

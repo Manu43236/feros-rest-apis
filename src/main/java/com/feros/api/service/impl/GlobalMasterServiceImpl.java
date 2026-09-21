@@ -27,6 +27,7 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
     private final VehicleBodyTypeRepository vehicleBodyTypeRepository;
     private final FuelTypeRepository fuelTypeRepository;
     private final PartCategoryRepository partCategoryRepository;
+    private final UnitRepository unitRepository;
     private final MaterialTypeRepository materialTypeRepository;
     private final DocumentTypeRepository documentTypeRepository;
     private final AttendanceTypeRepository attendanceTypeRepository;
@@ -318,6 +319,34 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
                 .orElseThrow(() -> new FerosException("Part category not found", HttpStatus.NOT_FOUND));
         category.setIsActive(false);
         partCategoryRepository.save(category);
+    }
+
+    @Override
+    public List<MasterResponse> getAllUnits() {
+        return unitRepository.findAllByIsActiveTrue()
+                .stream().map(this::mapToMasterResponse).toList();
+    }
+
+    @Override
+    public MasterResponse createUnit(MasterRequest request) {
+        Unit unit = Unit.builder().name(request.getName()).isActive(true).build();
+        return mapToMasterResponse(unitRepository.save(unit));
+    }
+
+    @Override
+    public MasterResponse updateUnit(Long id, MasterRequest request) {
+        Unit unit = unitRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Unit not found", HttpStatus.NOT_FOUND));
+        unit.setName(request.getName());
+        return mapToMasterResponse(unitRepository.save(unit));
+    }
+
+    @Override
+    public void deleteUnit(Long id) {
+        Unit unit = unitRepository.findById(id)
+                .orElseThrow(() -> new FerosException("Unit not found", HttpStatus.NOT_FOUND));
+        unit.setIsActive(false);
+        unitRepository.save(unit);
     }
 
     // ===================== MATERIAL TYPES =====================
@@ -676,6 +705,10 @@ public class GlobalMasterServiceImpl implements GlobalMasterService {
                     .isActive(e.getIsActive()).createdAt(e.getCreatedAt())
                     .updatedAt(e.getUpdatedAt()).build();
         if (entity instanceof PartCategory e)
+            return MasterResponse.builder().id(e.getId()).name(e.getName())
+                    .isActive(e.getIsActive()).createdAt(e.getCreatedAt())
+                    .updatedAt(e.getUpdatedAt()).build();
+        if (entity instanceof Unit e)
             return MasterResponse.builder().id(e.getId()).name(e.getName())
                     .isActive(e.getIsActive()).createdAt(e.getCreatedAt())
                     .updatedAt(e.getUpdatedAt()).build();

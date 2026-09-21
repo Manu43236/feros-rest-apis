@@ -59,6 +59,12 @@ public interface GlobalMasterService {
     MasterResponse updatePartCategory(Long id, MasterRequest request);
     void deletePartCategory(Long id);
 
+    // Units
+    List<MasterResponse> getAllUnits();
+    MasterResponse createUnit(MasterRequest request);
+    MasterResponse updateUnit(Long id, MasterRequest request);
+    void deleteUnit(Long id);
+
     // Material Types
     MasterResponse createMaterialType(MaterialTypeRequest request);
     MasterResponse getMaterialTypeById(Long id);
