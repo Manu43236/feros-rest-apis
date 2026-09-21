@@ -6,6 +6,7 @@ import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.MeterReadingType;
 import com.feros.api.enums.OrderStatus;
+import com.feros.api.enums.PayrollStatus;
 import com.feros.api.enums.ServiceStatus;
 import com.feros.api.enums.ServiceTriggeredBy;
 import com.feros.api.enums.OrderPaymentStatus;
@@ -2244,62 +2245,97 @@ public class ReportServiceImpl implements ReportService {
         Vehicle vehicle = vehicleRepository.findById(vehicleId)
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
 
-        List<VehicleStaffAssignment> assignments = vehicleStaffAssignmentRepository
+        // Candidate staff = anyone assigned to this vehicle in the period (role filter applied).
+        List<VehicleStaffAssignment> vehicleAssignments = vehicleStaffAssignmentRepository
                 .findByVehicleIdAndPeriod(vehicleId, tenantId, startDate, endDate);
-
         if (role != null && !role.equalsIgnoreCase("ALL")) {
-            assignments = assignments.stream()
+            vehicleAssignments = vehicleAssignments.stream()
                     .filter(a -> a.getUser().getRoles().stream()
                             .anyMatch(r -> r.getName().name().equalsIgnoreCase(role)))
                     .toList();
         }
+        Set<Long> candidateUserIds = vehicleAssignments.stream()
+                .map(a -> a.getUser().getId())
+                .collect(Collectors.toSet());
 
         List<VehiclePayrollCostRow> rows = new ArrayList<>();
-        java.math.BigDecimal total = java.math.BigDecimal.ZERO;
 
-        for (VehicleStaffAssignment assignment : assignments) {
-            Long userId = assignment.getUser().getId();
-            String userName = assignment.getUser().getName();
-            String userRole = assignment.getUser().getRoles().stream().findFirst()
-                    .map(r -> r.getName().name()).orElse("UNKNOWN");
+        // Pivot of the payslip Daily Earnings Annexure: for each PAID, daily-rate payroll of a
+        // candidate, replay the annexure day by day and keep only the days that landed on THIS
+        // vehicle. dailyPay ties out to the payslip: daily rate (x0.5 for half) + vehicle extra pay.
+        for (Long userId : candidateUserIds) {
+            List<Payroll> payrolls = payrollRepository.findAllOverlappingByUser(userId, tenantId, startDate, endDate)
+                    .stream()
+                    .filter(p -> p.getPayrollStatus() == PayrollStatus.PAID)
+                    .filter(p -> p.getSalaryType() == null || !"MONTHLY".equals(p.getSalaryType().name()))
+                    .filter(p -> p.getDailyRate() != null && p.getDailyRate().compareTo(BigDecimal.ZERO) > 0)
+                    .toList();
 
-            List<Payroll> payrolls = payrollRepository.findAllOverlappingByUser(userId, tenantId, startDate, endDate);
+            for (Payroll payroll : payrolls) {
+                LocalDate from = payroll.getPayCycleStartDate().isBefore(startDate) ? startDate : payroll.getPayCycleStartDate();
+                LocalDate to = payroll.getPayCycleEndDate().isAfter(endDate) ? endDate : payroll.getPayCycleEndDate();
+                if (from.isAfter(to)) continue;
 
-            LocalDate assignStart = assignment.getAssignedFrom().isBefore(startDate) ? startDate : assignment.getAssignedFrom();
-            LocalDate assignEnd = assignment.getAssignedTo() == null ? endDate
-                    : (assignment.getAssignedTo().isAfter(endDate) ? endDate : assignment.getAssignedTo());
+                boolean isCleaner = payroll.getUser().getRoles().stream()
+                        .anyMatch(r -> r.getName() == com.feros.api.enums.RoleName.CLEANER);
+                String userRole = payroll.getUser().getRoles().stream().findFirst()
+                        .map(r -> r.getName().name()).orElse("UNKNOWN");
 
-            if (assignStart.isAfter(assignEnd)) continue;
+                List<Attendance> workedDays = attendanceRepository
+                        .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrueAndApprovalStatus(
+                                userId, tenantId, from, to, AttendanceApprovalStatus.APPROVED)
+                        .stream()
+                        .filter(a -> {
+                            String t = a.getAttendanceType().getName().toLowerCase();
+                            return t.contains("present") || t.contains("half");
+                        })
+                        .toList();
+                if (workedDays.isEmpty()) continue;
 
-            LocalDate cursor = assignStart;
-            while (!cursor.isAfter(assignEnd)) {
-                final LocalDate day = cursor;
-                payrolls.stream()
-                        .filter(p -> !p.getPayCycleStartDate().isAfter(day) && !p.getPayCycleEndDate().isBefore(day))
-                        .findFirst()
-                        .ifPresent(p -> {
-                            java.math.BigDecimal rate = p.getDailyRate();
-                            if ((rate == null || rate.compareTo(java.math.BigDecimal.ZERO) == 0)
-                                    && p.getMonthlySalary() != null && p.getTotalDays() != null && p.getTotalDays() > 0) {
-                                rate = p.getMonthlySalary().divide(
-                                        java.math.BigDecimal.valueOf(p.getTotalDays()), 2, java.math.RoundingMode.HALF_UP);
-                            }
-                            if (rate != null && rate.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                                rows.add(VehiclePayrollCostRow.builder()
-                                        .date(day)
-                                        .vehicleNumber(vehicle.getRegistrationNumber())
-                                        .staffName(userName)
-                                        .role(userRole)
-                                        .dailyPay(rate)
-                                        .payrollStatus(p.getPayrollStatus().name())
-                                        .build());
-                            }
-                        });
-                cursor = cursor.plusDays(1);
+                List<VehicleStaffAssignment> userAssignments = vehicleStaffAssignmentRepository
+                        .findOverlappingByUser(userId, tenantId,
+                                payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
+
+                for (Attendance record : workedDays) {
+                    LocalDate day = record.getAttendanceDate();
+                    boolean isHalf = record.getAttendanceType().getName().toLowerCase().contains("half");
+                    BigDecimal factor = isHalf ? new BigDecimal("0.5") : BigDecimal.ONE;
+
+                    // Vehicle for this day = latest VSA covering it (same rule as the annexure).
+                    Optional<VehicleStaffAssignment> best = userAssignments.stream()
+                            .filter(a -> !day.isBefore(a.getAssignedFrom())
+                                    && (a.getAssignedTo() == null || !day.isAfter(a.getAssignedTo())))
+                            .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom)
+                                    .thenComparing(VehicleStaffAssignment::getCreatedAt));
+                    if (best.isEmpty() || !best.get().getVehicle().getId().equals(vehicleId)) continue;
+
+                    Vehicle dayVehicle = best.get().getVehicle();
+                    BigDecimal desPay = payroll.getDailyRate().multiply(factor).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal vehPay = BigDecimal.ZERO;
+                    if (isCleaner) {
+                        BigDecimal cp = dayVehicle.getCleanerExtraPayPerDay();
+                        if (cp != null && cp.compareTo(BigDecimal.ZERO) > 0) {
+                            vehPay = cp.multiply(factor).setScale(2, RoundingMode.HALF_UP);
+                        }
+                    } else if (Boolean.TRUE.equals(dayVehicle.getExtraPayEnabled())
+                            && dayVehicle.getExtraPayPerDay() != null) {
+                        vehPay = dayVehicle.getExtraPayPerDay().multiply(factor).setScale(2, RoundingMode.HALF_UP);
+                    }
+
+                    rows.add(VehiclePayrollCostRow.builder()
+                            .date(day)
+                            .vehicleNumber(vehicle.getRegistrationNumber())
+                            .staffName(payroll.getUser().getName())
+                            .role(userRole)
+                            .dailyPay(desPay.add(vehPay))
+                            .payrollStatus(payroll.getPayrollStatus().name())
+                            .build());
+                }
             }
         }
 
-        rows.sort(java.util.Comparator.comparing(VehiclePayrollCostRow::getDate));
+        rows.sort(Comparator.comparing(VehiclePayrollCostRow::getDate)
+                .thenComparing(VehiclePayrollCostRow::getRole));
         java.math.BigDecimal grandTotal = rows.stream()
                 .map(VehiclePayrollCostRow::getDailyPay)
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
