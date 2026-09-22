@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 public class ReportController {
 
     private final ReportService reportService;
+    private final com.feros.api.repository.TenantRepository tenantRepository;
 
     private static final String DATE_FORMAT = "yyyy-MM-dd";
 
@@ -104,7 +105,7 @@ public class ReportController {
             }
             if (breakdownInRepair > 0) summary.add(new String[]{"Breakdown In Repair", String.valueOf(breakdownInRepair)});
             if (maintenanceInRepair > 0) summary.add(new String[]{"Maintenance In Repair", String.valueOf(maintenanceInRepair)});
-            byte[] pdf = ReportExportUtil.toPdf("Fleet Status Report — " + reportDate, summary, headers, data);
+            byte[] pdf = ReportExportUtil.toPdf(tenantName(), "Fleet Status Report — " + reportDate, summary, headers, data);
             return ReportExportUtil.pdfResponse("fleet-status-" + reportDate, pdf);
         }
         return export("fleet-status-" + reportDate, "Fleet Status Report — " + reportDate, headers, data, format);
@@ -335,7 +336,7 @@ public class ReportController {
                 long cnt = sc.getOrDefault(s.replace(' ', '_'), 0L);
                 if (cnt > 0) summary.add(new String[]{s, String.valueOf(cnt)});
             }
-            byte[] pdf = ReportExportUtil.toPdf("LR Register — " + startDate + " to " + endDate, summary, headers, data);
+            byte[] pdf = ReportExportUtil.toPdf(tenantName(), "LR Register — " + startDate + " to " + endDate, summary, headers, data);
             return ReportExportUtil.pdfResponse("lr-register-" + startDate + "-" + endDate, pdf);
         }
         return ReportExportUtil.csvResponse("lr-register-" + startDate + "-" + endDate,
@@ -445,7 +446,7 @@ public class ReportController {
                 new String[]{"Cancelled",            String.valueOf(statusCounts.getOrDefault("CANCELLED", 0L))}
         );
         if ("pdf".equalsIgnoreCase(format)) {
-            byte[] pdf = ReportExportUtil.toPdf("Order Register — " + startDate + " to " + endDate, summary, headers, data);
+            byte[] pdf = ReportExportUtil.toPdf(tenantName(), "Order Register — " + startDate + " to " + endDate, summary, headers, data);
             return ReportExportUtil.pdfResponse("order-register-" + startDate + "-" + endDate, pdf);
         }
         return ReportExportUtil.csvResponse("order-register-" + startDate + "-" + endDate,
@@ -1683,9 +1684,17 @@ public class ReportController {
     private ResponseEntity<byte[]> export(String filename, String title,
                                           String[] headers, List<String[]> data, String format) {
         if ("pdf".equalsIgnoreCase(format)) {
-            return ReportExportUtil.pdfResponse(filename, ReportExportUtil.toPdf(title, headers, data));
+            return ReportExportUtil.pdfResponse(filename, ReportExportUtil.toPdf(tenantName(), title, headers, data));
         }
         return ReportExportUtil.csvResponse(filename, ReportExportUtil.toCsv(headers, data));
+    }
+
+    private String tenantName() {
+        Long tenantId = com.feros.api.util.SecurityUtil.getCurrentTenantId();
+        if (tenantId == null) return null;
+        return tenantRepository.findById(tenantId)
+                .map(com.feros.api.entity.Tenant::getCompanyName)
+                .orElse(null);
     }
 
     private String safe(Object val) {

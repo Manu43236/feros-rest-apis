@@ -31,12 +31,12 @@ public class ReportExportUtil {
         }
     }
 
-    public static byte[] toPdf(String title, String[] headers, List<String[]> rows) {
-        return toPdf(title, null, headers, rows);
+    public static byte[] toPdf(String tenantName, String title, String[] headers, List<String[]> rows) {
+        return toPdf(tenantName, title, null, headers, rows);
     }
 
     // summaryLines: e.g. [["Total Vehicles", "42"], ["Available", "10"], ...]
-    public static byte[] toPdf(String title, List<String[]> summaryLines, String[] headers, List<String[]> rows) {
+    public static byte[] toPdf(String tenantName, String title, List<String[]> summaryLines, String[] headers, List<String[]> rows) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Document doc = new Document(PageSize.A4.rotate(), 30, 30, 40, 40);
             PdfWriter writer = PdfWriter.getInstance(doc, out);
@@ -58,6 +58,15 @@ public class ReportExportUtil {
                     45);
             canvas.endText();
             canvas.restoreState();
+
+            // ── Tenant name ───────────────────────────────────────────────────
+            if (tenantName != null && !tenantName.isBlank()) {
+                Font tenantFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, Color.decode("#0F172A"));
+                Paragraph tenantPara = new Paragraph(tenantName, tenantFont);
+                tenantPara.setAlignment(Element.ALIGN_LEFT);
+                tenantPara.setSpacingAfter(2f);
+                doc.add(tenantPara);
+            }
 
             // ── Title ─────────────────────────────────────────────────────────
             Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, Color.decode("#1E3A5F"));
@@ -89,6 +98,7 @@ public class ReportExportUtil {
             PdfPTable table = new PdfPTable(headers.length);
             table.setWidthPercentage(100f);
             table.setSpacingBefore(6f);
+            table.setHeaderRows(1); // repeat the header row on every page
 
             Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Color.WHITE);
             Color headerBg = Color.decode("#1E3A5F");
