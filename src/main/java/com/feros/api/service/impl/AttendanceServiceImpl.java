@@ -299,6 +299,13 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .findOverlappingByTenantId(tenantId, date.atStartOfDay(), date.atTime(23, 59, 59))
                 .stream()
                 .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
+                // latest-assigned driver wins each vehicle — suppresses the displaced driver on a same-day swap
+                .collect(Collectors.toMap(
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getId(),
+                        l -> l,
+                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
+                .values().stream()
+                // a driver who moved between vehicles keeps only their latest vehicle
                 .collect(Collectors.toMap(
                         l -> l.getDriverStaff().getUser().getId(),
                         l -> l,
