@@ -927,8 +927,11 @@ public class ReportServiceImpl implements ReportService {
                                     && a.getCreatedAt().isAfter(myVsa.get().getCreatedAt()))));
             // A leased vehicle's DRIVER slot belongs to its lease driver — a stale VSA on that
             // vehicle is displaced (order vehicles have no lease holder, so this is a no-op for them).
+            // only the DRIVER slot is owned by the lease — a cleaner's VSA on a leased
+            // vehicle is legitimate and must not be displaced by the lease driver.
             Long leaseHolder = leaseHolderByVehicle.get(vehicleId);
-            boolean leaseDisplaced = leaseHolder != null && !leaseHolder.equals(userId);
+            boolean leaseDisplaced = leaseHolder != null && !leaseHolder.equals(userId)
+                    && "DRIVER".equals(myRole);
             boolean unassignedToday = myVsa.get().getAssignedTo() != null
                     && myVsa.get().getAssignedTo().equals(date)
                     && date.equals(TimeUtil.today());
