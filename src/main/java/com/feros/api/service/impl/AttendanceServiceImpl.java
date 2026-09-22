@@ -167,31 +167,27 @@ public class AttendanceServiceImpl implements AttendanceService {
     @Override
     public List<AttendanceResponse> getPendingAttendance() {
         Long tenantId = getCurrentTenantId();
-        Map<Long, String> leaseMap = buildActiveLeaseMap(tenantId);
+        Map<LocalDate, VehicleDayMaps> byDate = new HashMap<>();
         return attendanceRepository
                 .findByTenantIdAndApprovalStatusAndIsActiveTrue(tenantId, AttendanceApprovalStatus.PENDING)
-                .stream().map(a -> mapToResponse(a, Collections.emptyMap(), leaseMap)).toList();
+                .stream().map(a -> {
+                    VehicleDayMaps m = byDate.computeIfAbsent(
+                            a.getAttendanceDate(), d -> buildVehicleDayMaps(tenantId, d));
+                    return mapToResponse(a, m.latestForVehicle(), m.leaseDriverVehicleMap());
+                }).toList();
     }
 
     @Override
     public List<AttendanceResponse> getRejectedAttendance() {
         Long tenantId = getCurrentTenantId();
-        Map<Long, String> leaseMap = buildActiveLeaseMap(tenantId);
+        Map<LocalDate, VehicleDayMaps> byDate = new HashMap<>();
         return attendanceRepository
                 .findByTenantIdAndApprovalStatusAndIsActiveTrue(tenantId, AttendanceApprovalStatus.REJECTED)
-                .stream().map(a -> mapToResponse(a, Collections.emptyMap(), leaseMap)).toList();
-    }
-
-    private Map<Long, String> buildActiveLeaseMap(Long tenantId) {
-        return leaseDriverAssignmentLogRepository.findAllActiveByTenantId(tenantId)
-                .stream()
-                .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null
-                        && l.getLeaseVehicleAssignment() != null
-                        && l.getLeaseVehicleAssignment().getVehicle() != null)
-                .collect(Collectors.toMap(
-                        l -> l.getDriverStaff().getUser().getId(),
-                        l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber(),
-                        (a, b) -> a));
+                .stream().map(a -> {
+                    VehicleDayMaps m = byDate.computeIfAbsent(
+                            a.getAttendanceDate(), d -> buildVehicleDayMaps(tenantId, d));
+                    return mapToResponse(a, m.latestForVehicle(), m.leaseDriverVehicleMap());
+                }).toList();
     }
 
     @Override
@@ -279,8 +275,33 @@ public class AttendanceServiceImpl implements AttendanceService {
     public List<AttendanceResponse> getAttendanceByDate(LocalDate date) {
         String role = SecurityUtil.getCurrentRole();
         Long tenantId = getCurrentTenantId();
-        // "vehicleId:role" → userId of latest assignment for that role on that vehicle (role-aware swap dedup)
-        Map<String, Long> latestForVehicle = vehicleStaffAssignmentRepository
+        VehicleDayMaps maps = buildVehicleDayMaps(tenantId, date);
+        Set<String> supervisorAllowedRoles = resolveSupervisorAllowedRoles(role);
+        return attendanceRepository
+                .findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, date)
+                .stream()
+                .filter(a -> isVisibleToRole(a, role, supervisorAllowedRoles))
+                .map(a -> mapToResponse(a, maps.latestForVehicle(), maps.leaseDriverVehicleMap())).toList();
+    }
+
+    /** Both vehicle-resolution maps for a single date: the per-slot current holder (VSA + lease
+     *  overlay) and the lease-driver fallback. Shared by daily, pending and rejected views. */
+    private record VehicleDayMaps(Map<String, Long> latestForVehicle, Map<Long, String> leaseDriverVehicleMap) {}
+
+    private VehicleDayMaps buildVehicleDayMaps(Long tenantId, LocalDate date) {
+        // Lease logs overlapping the date → the latest-assigned lease driver per vehicle.
+        // A leased vehicle's driver lives here, not in VSA — so this is the truth for those vehicles.
+        Map<Long, LeaseDriverAssignmentLog> leaseWinnerByVehicle = leaseDriverAssignmentLogRepository
+                .findOverlappingByTenantId(tenantId, date.atStartOfDay(), date.atTime(23, 59, 59))
+                .stream()
+                .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
+                .collect(Collectors.toMap(
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getId(),
+                        l -> l,
+                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b));
+
+        // "vehicleId:role" → userId of the current holder of that slot (one driver + one cleaner per vehicle)
+        Map<String, Long> latestForVehicle = new HashMap<>(vehicleStaffAssignmentRepository
                 .findOverlappingForTenant(tenantId, date, date).stream()
                 .collect(Collectors.groupingBy(a -> {
                     String r = a.getUser().getRoles().stream()
@@ -294,17 +315,14 @@ public class AttendanceServiceImpl implements AttendanceService {
                                 .max(Comparator.comparing(VehicleStaffAssignment::getAssignedFrom)
                                         .thenComparing(VehicleStaffAssignment::getCreatedAt))
                                 .map(a -> a.getUser().getId())
-                                .orElseThrow()));
-        Map<Long, String> leaseDriverVehicleMap = leaseDriverAssignmentLogRepository
-                .findOverlappingByTenantId(tenantId, date.atStartOfDay(), date.atTime(23, 59, 59))
-                .stream()
-                .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
-                // latest-assigned driver wins each vehicle — suppresses the displaced driver on a same-day swap
-                .collect(Collectors.toMap(
-                        l -> l.getLeaseVehicleAssignment().getVehicle().getId(),
-                        l -> l,
-                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
-                .values().stream()
+                                .orElseThrow())));
+        // A vehicle on lease → the lease driver holds its DRIVER slot, superseding any stale VSA
+        // left open on that vehicle. Order vehicles have no lease log, so they are untouched.
+        leaseWinnerByVehicle.forEach((vehicleId, log) ->
+                latestForVehicle.put(vehicleId + ":DRIVER", log.getDriverStaff().getUser().getId()));
+
+        // userId → registration for lease drivers (fallback when a driver has no VSA of their own)
+        Map<Long, String> leaseDriverVehicleMap = leaseWinnerByVehicle.values().stream()
                 // a driver who moved between vehicles keeps only their latest vehicle
                 .collect(Collectors.toMap(
                         l -> l.getDriverStaff().getUser().getId(),
@@ -314,12 +332,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .collect(Collectors.toMap(
                         l -> l.getDriverStaff().getUser().getId(),
                         l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber()));
-        Set<String> supervisorAllowedRoles = resolveSupervisorAllowedRoles(role);
-        return attendanceRepository
-                .findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, date)
-                .stream()
-                .filter(a -> isVisibleToRole(a, role, supervisorAllowedRoles))
-                .map(a -> mapToResponse(a, latestForVehicle, leaseDriverVehicleMap)).toList();
+        return new VehicleDayMaps(latestForVehicle, leaseDriverVehicleMap);
     }
 
     private Set<String> resolveSupervisorAllowedRoles(String role) {
