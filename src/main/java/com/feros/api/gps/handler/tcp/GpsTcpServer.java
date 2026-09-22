@@ -156,7 +156,8 @@ public class GpsTcpServer implements GpsConnectionHandler {
                 psr.parse(dev, frame).ifPresent(ping -> {
                     odometerService.accumulate(ping);
                     routeService.maybeRecord(ping);
-                    liveStore.update(ping);
+                    // History replay must not move the live marker — live map shows live position only
+                    if (!Boolean.TRUE.equals(ping.getIsHistory())) liveStore.update(ping);
                     persistenceService.save(ping);
                 });
             }
