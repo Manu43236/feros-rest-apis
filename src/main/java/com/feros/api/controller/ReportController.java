@@ -1626,7 +1626,7 @@ public class ReportController {
     @GetMapping("/payroll/vehicle-cost")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<com.feros.api.dto.response.report.VehiclePayrollCostResponse>> getVehiclePayrollCost(
-            @RequestParam Long vehicleId,
+            @RequestParam(required = false) Long vehicleId,
             @RequestParam(defaultValue = "ALL") String role,
             @RequestParam String startDate,
             @RequestParam String endDate) {
@@ -1638,7 +1638,7 @@ public class ReportController {
     @GetMapping("/payroll/vehicle-cost/export")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<byte[]> exportVehiclePayrollCost(
-            @RequestParam Long vehicleId,
+            @RequestParam(required = false) Long vehicleId,
             @RequestParam(defaultValue = "ALL") String role,
             @RequestParam String startDate,
             @RequestParam String endDate,
