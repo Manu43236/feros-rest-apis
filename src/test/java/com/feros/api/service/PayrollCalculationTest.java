@@ -46,6 +46,7 @@ class PayrollCalculationTest {
     @Mock private DeductionTypeRepository deductionTypeRepository;
     @Mock private StaffProfileRepository staffProfileRepository;
     @Mock private VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    @Mock private TenantHolidayRepository tenantHolidayRepository;
     @Mock private NotificationService notificationService;
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private NumberGeneratorService numberGenerator;
@@ -61,7 +62,7 @@ class PayrollCalculationTest {
             payrollRepository, payrollDeductionRepository, salaryAdvanceRepository,
             tenantRepository, userRepository, attendanceRepository,
             deductionTypeRepository, staffProfileRepository,
-            vehicleStaffAssignmentRepository,
+            vehicleStaffAssignmentRepository, tenantHolidayRepository,
             notificationService, transactionManager, numberGenerator
         );
 
@@ -83,7 +84,7 @@ class PayrollCalculationTest {
     @Test
     @DisplayName("Daily salary: basicPay = dailyRate × (present + halfDay×0.5); leave days are unpaid")
     void generatePayroll_dailySalary_calculatesBasicPayCorrectly() {
-        stubCommonDeps(SalaryType.DAILY, null, new BigDecimal("500.00"), null);
+        stubCommonDeps(SalaryType.DAILY, null, new BigDecimal("500.00"), null, false);
         stubAttendance(20, 2, 1, 0);   // present=20, half=2, leave=1, absent=0
 
         payrollService.generatePayroll(buildRequest(
@@ -95,47 +96,51 @@ class PayrollCalculationTest {
         assertThat(saved.getGrossPay()).isEqualByComparingTo("10500.00");
     }
 
-    // ─── MONTHLY salary: required-days model ───────────────────────────────────
+    // ─── MONTHLY salary: off-days model ────────────────────────────────────────
 
     @Test
-    @DisplayName("Monthly: present >= requiredDays → full salary, no deduction")
-    void generatePayroll_monthly_meetsRequiredDays_fullSalary() {
-        stubCommonDeps(SalaryType.MONTHLY, new BigDecimal("26500.00"), null, 28);
-        stubAttendance(28, 0, 0, 0);   // present 28 = required 28 → full pay
+    @DisplayName("Monthly + skipCalendar: offs beyond allowance deducted at monthly/daysInMonth")
+    void generatePayroll_monthly_offsBeyondAllowance_deducts() {
+        // Aug 2026: 31 days, skipCalendar ON → expected 31. present 27 → offs 4.
+        stubCommonDeps(SalaryType.MONTHLY, new BigDecimal("26500.00"), null, 3, true);
+        stubAttendance(27, 0, 0, 4);
+
+        payrollService.generatePayroll(buildRequest(
+            LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, null));
+
+        Payroll saved = captureFirstSave();
+        // offs 4, allowed 3 → unpaid 1 → 26500/31 = 854.84 → basic 25645.16
+        assertThat(saved.getBasicPay()).isEqualByComparingTo("25645.16");
+        assertThat(saved.getAllowedOffDays()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("Monthly: offs within allowance → full salary")
+    void generatePayroll_monthly_offsWithinAllowance_fullSalary() {
+        stubCommonDeps(SalaryType.MONTHLY, new BigDecimal("26500.00"), null, 4, true);
+        stubAttendance(27, 0, 0, 4);   // offs 4, allowed 4 → no cut
 
         payrollService.generatePayroll(buildRequest(
             LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, null));
 
         Payroll saved = captureFirstSave();
         assertThat(saved.getBasicPay()).isEqualByComparingTo("26500.00");
-        assertThat(saved.getRequiredDays()).isEqualTo(28);
     }
 
     @Test
-    @DisplayName("Monthly: one day short of requiredDays → deduct one day at monthly/required")
-    void generatePayroll_monthly_shortByOneDay_deductsOneDay() {
-        stubCommonDeps(SalaryType.MONTHLY, new BigDecimal("26500.00"), null, 28);
-        stubAttendance(27, 0, 0, 4);   // present 27 vs required 28 → shortfall 1
+    @DisplayName("Monthly: leave counts as an off, half-day counts as 0.5")
+    void generatePayroll_monthly_leaveAndHalfCounted() {
+        // skipCalendar ON, expected 31. present 25, half 2, leave 2, absent 2.
+        stubCommonDeps(SalaryType.MONTHLY, new BigDecimal("31000.00"), null, 3, true);
+        stubAttendance(25, 2, 2, 2);
 
         payrollService.generatePayroll(buildRequest(
             LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31), null, null));
 
         Payroll saved = captureFirstSave();
-        // perDay = 26500/28 = 946.4286 → cut ×1 = 946.43 → basic = 25553.57
-        assertThat(saved.getBasicPay()).isEqualByComparingTo("25553.57");
-    }
-
-    @Test
-    @DisplayName("Monthly: requiredDays null → full salary, no deduction")
-    void generatePayroll_monthly_noRequiredDays_fullSalary() {
-        stubCommonDeps(SalaryType.MONTHLY, new BigDecimal("30000.00"), null, null);
-        stubAttendance(10, 0, 0, 5);   // present only 10, but no target set
-
-        payrollService.generatePayroll(buildRequest(
-            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31), null, null));
-
-        Payroll saved = captureFirstSave();
-        assertThat(saved.getBasicPay()).isEqualByComparingTo("30000.00");
+        // effectivePresent = 25 + 1 = 26 → offs = 31 - 26 = 5 → unpaid = 5 - 3 = 2
+        // perDay = 31000/31 = 1000 → cut 2000 → basic 29000
+        assertThat(saved.getBasicPay()).isEqualByComparingTo("29000.00");
     }
 
     // ─── Trip bonus ────────────────────────────────────────────────────────────
@@ -143,7 +148,7 @@ class PayrollCalculationTest {
     @Test
     @DisplayName("Trip bonus is added to grossPay")
     void generatePayroll_withTripBonus_addsToGrossPay() {
-        stubCommonDeps(SalaryType.DAILY, null, new BigDecimal("500.00"), null);
+        stubCommonDeps(SalaryType.DAILY, null, new BigDecimal("500.00"), null, false);
         stubAttendance(20, 0, 0, 0);
 
         payrollService.generatePayroll(buildRequest(
@@ -157,9 +162,11 @@ class PayrollCalculationTest {
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private void stubCommonDeps(SalaryType salaryType, BigDecimal monthlySalary,
-                                BigDecimal dailyRate, Integer requiredDays) {
+                                BigDecimal dailyRate, Integer allowedOffDays, boolean skipCalendar) {
         when(payrollRepository.findOverlappingPayroll(anyLong(), anyLong(), any(), any(), any()))
             .thenReturn(Optional.empty());
+        lenient().when(tenantHolidayRepository.findHolidayDatesBetween(anyLong(), any(), any()))
+            .thenReturn(java.util.Set.of());
 
         User user = new User();
         user.setId(USER_ID);
@@ -169,7 +176,8 @@ class PayrollCalculationTest {
         StaffProfile profile = new StaffProfile();
         profile.setSalaryType(salaryType);
         if (monthlySalary != null) profile.setMonthlySalary(monthlySalary);
-        profile.setRequiredDays(requiredDays);
+        profile.setAllowedOffDays(allowedOffDays);
+        profile.setSkipCalendar(skipCalendar);
         if (dailyRate != null) {
             Designation designation = new Designation();
             designation.setPayPerDay(dailyRate);

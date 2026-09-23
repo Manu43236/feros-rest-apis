@@ -63,7 +63,8 @@ public class StaffProfileResponse {
 
     private SalaryType salaryType;
     private BigDecimal monthlySalary;
-    private Integer requiredDays;
+    private Integer allowedOffDays;
+    private Boolean skipCalendar;
 
     private Boolean isActive;
     private Boolean canAccessVehicles;
