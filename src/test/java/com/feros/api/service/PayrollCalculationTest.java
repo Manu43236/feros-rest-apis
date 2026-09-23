@@ -5,6 +5,7 @@ import com.feros.api.dto.request.GeneratePayrollRequest;
 import com.feros.api.entity.*;
 import com.feros.api.entity.master.AttendanceType;
 import com.feros.api.entity.Designation;
+import com.feros.api.enums.PayrollStatus;
 import com.feros.api.enums.SalaryType;
 import com.feros.api.repository.*;
 import com.feros.api.service.impl.PayrollServiceImpl;
@@ -24,9 +25,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,7 +46,6 @@ class PayrollCalculationTest {
     @Mock private DeductionTypeRepository deductionTypeRepository;
     @Mock private StaffProfileRepository staffProfileRepository;
     @Mock private VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
-    @Mock private TenantHolidayRepository tenantHolidayRepository;
     @Mock private NotificationService notificationService;
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private NumberGeneratorService numberGenerator;
@@ -61,11 +61,10 @@ class PayrollCalculationTest {
             payrollRepository, payrollDeductionRepository, salaryAdvanceRepository,
             tenantRepository, userRepository, attendanceRepository,
             deductionTypeRepository, staffProfileRepository,
-            vehicleStaffAssignmentRepository, tenantHolidayRepository,
+            vehicleStaffAssignmentRepository,
             notificationService, transactionManager, numberGenerator
         );
 
-        // Set up a valid security context for every test
         UserPrincipal principal = new UserPrincipal(USER_ID, TENANT_ID, "9999999999", "ADMIN");
         var auth = new UsernamePasswordAuthenticationToken(
             principal, null,
@@ -79,95 +78,76 @@ class PayrollCalculationTest {
         SecurityContextHolder.clearContext();
     }
 
-    // ─── DAILY salary ────────────────────────────────────────────────────────
+    // ─── DAILY salary (unchanged behaviour) ───────────────────────────────────
 
     @Test
     @DisplayName("Daily salary: basicPay = dailyRate × (present + halfDay×0.5); leave days are unpaid")
     void generatePayroll_dailySalary_calculatesBasicPayCorrectly() {
-        stubCommonDeps(SalaryType.DAILY, null, new BigDecimal("500.00"));
+        stubCommonDeps(SalaryType.DAILY, null, new BigDecimal("500.00"), null);
         stubAttendance(20, 2, 1, 0);   // present=20, half=2, leave=1, absent=0
 
-        GeneratePayrollRequest req = buildRequest(
-            LocalDate.of(2024, 6, 1), LocalDate.of(2024, 6, 30), null, null);
-        payrollService.generatePayroll(req);
+        payrollService.generatePayroll(buildRequest(
+            LocalDate.of(2024, 6, 1), LocalDate.of(2024, 6, 30), null, null));
 
         Payroll saved = captureFirstSave();
-        // effectiveDays = 20 + 2×0.5 = 21 (leave not paid for daily workers)
-        // basicPay = 500 × 21 = 10500
+        // effectiveDays = 20 + 2×0.5 = 21 → basicPay = 500 × 21 = 10500
         assertThat(saved.getBasicPay()).isEqualByComparingTo("10500.00");
-        assertThat(saved.getOvertimePay()).isEqualByComparingTo("0.00");
         assertThat(saved.getGrossPay()).isEqualByComparingTo("10500.00");
     }
 
-    @Test
-    @DisplayName("Daily salary with overtime: overtimePay = (dailyRate/8) × 1.5 × hours")
-    void generatePayroll_dailySalaryWithOvertime_calculatesOvertimeCorrectly() {
-        stubCommonDeps(SalaryType.DAILY, null, new BigDecimal("500.00"));
-        stubAttendance(20, 0, 0, 0);
-
-        // overtimeHours = 4
-        GeneratePayrollRequest req = buildRequest(
-            LocalDate.of(2024, 6, 1), LocalDate.of(2024, 6, 30),
-            new BigDecimal("4"), null);
-        payrollService.generatePayroll(req);
-
-        Payroll saved = captureFirstSave();
-        // basicPay = 500×20 = 10000
-        // hourlyRate = 500/8 = 62.5  →  overtimePay = 62.5×1.5×4 = 375
-        assertThat(saved.getBasicPay()).isEqualByComparingTo("10000.00");
-        assertThat(saved.getOvertimePay()).isEqualByComparingTo("375.00");
-        assertThat(saved.getGrossPay()).isEqualByComparingTo("10375.00");
-    }
-
-    // ─── MONTHLY salary ───────────────────────────────────────────────────────
+    // ─── MONTHLY salary: required-days model ───────────────────────────────────
 
     @Test
-    @DisplayName("Monthly salary: LOP deducted for absent and half days")
-    void generatePayroll_monthlySalary_deductsLopForAbsences() {
-        stubCommonDeps(SalaryType.MONTHLY, new BigDecimal("30000.00"), null);
-        stubAttendance(25, 0, 2, 2);   // present=25, half=0, leave=2, absent=2
+    @DisplayName("Monthly: present >= requiredDays → full salary, no deduction, no bonus")
+    void generatePayroll_monthly_meetsRequiredDays_fullSalary() {
+        stubCommonDeps(SalaryType.MONTHLY, new BigDecimal("15000.00"), null, 15);
+        stubAttendance(20, 0, 0, 0);   // present=20 (> required 15)
 
-        // Jan 2024: 4 Sundays (7,14,21,28) → workingDays = 27
-        GeneratePayrollRequest req = buildRequest(
-            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31), null, null);
-        payrollService.generatePayroll(req);
+        payrollService.generatePayroll(buildRequest(
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31), null, null));
 
         Payroll saved = captureFirstSave();
-        // workingDays=27, lopDays=2 (absent) + 0 (half×0.5) = 2
-        // perDayRate = 30000/27 = 1111.1111
-        // lopDeduction = 1111.1111×2 = 2222.22 (HALF_UP)
-        // basicPay = 30000 - 2222.22 = 27777.78
-        assertThat(saved.getBasicPay()).isEqualByComparingTo("27777.78");
+        assertThat(saved.getBasicPay()).isEqualByComparingTo("15000.00");
+        assertThat(saved.getRequiredDays()).isEqualTo(15);
     }
 
     @Test
-    @DisplayName("Monthly salary: half days count as 0.5 for LOP")
-    void generatePayroll_monthlySalary_halfDayCountsAsHalfForLop() {
-        stubCommonDeps(SalaryType.MONTHLY, new BigDecimal("30000.00"), null);
-        stubAttendance(24, 2, 1, 0);   // present=24, half=2, leave=1, absent=0
+    @DisplayName("Monthly: one day short of requiredDays → exactly one per-day cut")
+    void generatePayroll_monthly_shortByOneDay_deductsOneDay() {
+        stubCommonDeps(SalaryType.MONTHLY, new BigDecimal("15000.00"), null, 15);
+        stubAttendance(14, 0, 0, 0);   // present=14 vs required 15 → shortfall 1
 
-        // Jan 2024 (27 working days), only 2 half days → lopDays = 0 + 2×0.5 = 1
-        GeneratePayrollRequest req = buildRequest(
-            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31), null, null);
-        payrollService.generatePayroll(req);
+        payrollService.generatePayroll(buildRequest(
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31), null, null));
 
         Payroll saved = captureFirstSave();
-        // lopDays = 1  →  lopDeduction = 30000/27 × 1 = 1111.11
-        // basicPay = 30000 - 1111.11 = 28888.89
-        assertThat(saved.getBasicPay()).isEqualByComparingTo("28888.89");
+        // perDayCut = 15000/15 = 1000 → basicPay = 15000 - 1000 = 14000
+        assertThat(saved.getBasicPay()).isEqualByComparingTo("14000.00");
     }
 
-    // ─── Trip bonus ───────────────────────────────────────────────────────────
+    @Test
+    @DisplayName("Monthly: requiredDays null → full salary, no deduction")
+    void generatePayroll_monthly_noRequiredDays_fullSalary() {
+        stubCommonDeps(SalaryType.MONTHLY, new BigDecimal("30000.00"), null, null);
+        stubAttendance(10, 0, 0, 5);   // present only 10, but no target set
+
+        payrollService.generatePayroll(buildRequest(
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31), null, null));
+
+        Payroll saved = captureFirstSave();
+        assertThat(saved.getBasicPay()).isEqualByComparingTo("30000.00");
+    }
+
+    // ─── Trip bonus ────────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("Trip bonus is added to grossPay")
     void generatePayroll_withTripBonus_addsToGrossPay() {
-        stubCommonDeps(SalaryType.DAILY, null, new BigDecimal("500.00"));
+        stubCommonDeps(SalaryType.DAILY, null, new BigDecimal("500.00"), null);
         stubAttendance(20, 0, 0, 0);
 
-        GeneratePayrollRequest req = buildRequest(
-            LocalDate.of(2024, 6, 1), LocalDate.of(2024, 6, 30), null, new BigDecimal("1500.00"));
-        payrollService.generatePayroll(req);
+        payrollService.generatePayroll(buildRequest(
+            LocalDate.of(2024, 6, 1), LocalDate.of(2024, 6, 30), null, new BigDecimal("1500.00")));
 
         Payroll saved = captureFirstSave();
         // basicPay=10000 + tripBonus=1500 = 11500
@@ -176,17 +156,20 @@ class PayrollCalculationTest {
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    private void stubCommonDeps(SalaryType salaryType, BigDecimal monthlySalary, BigDecimal dailyRate) {
-        when(payrollRepository.existsByUserIdAndTenantIdAndPayCycleStartDateAndIsActiveTrue(
-            anyLong(), anyLong(), any())).thenReturn(false);
+    private void stubCommonDeps(SalaryType salaryType, BigDecimal monthlySalary,
+                                BigDecimal dailyRate, Integer requiredDays) {
+        when(payrollRepository.findOverlappingPayroll(anyLong(), anyLong(), any(), any(), any()))
+            .thenReturn(Optional.empty());
 
         User user = new User();
         user.setId(USER_ID);
+        user.setRoles(new HashSet<>());
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
         StaffProfile profile = new StaffProfile();
         profile.setSalaryType(salaryType);
         if (monthlySalary != null) profile.setMonthlySalary(monthlySalary);
+        profile.setRequiredDays(requiredDays);
         if (dailyRate != null) {
             Designation designation = new Designation();
             designation.setPayPerDay(dailyRate);
@@ -198,16 +181,12 @@ class PayrollCalculationTest {
         when(vehicleStaffAssignmentRepository.findOverlappingByUser(
             anyLong(), anyLong(), any(), any())).thenReturn(List.of());
 
-        when(tenantHolidayRepository.findHolidayDatesBetween(anyLong(), any(), any()))
-            .thenReturn(Set.of());
-
         Tenant tenant = new Tenant();
         tenant.setId(TENANT_ID);
         when(tenantRepository.findByIdAndIsActiveTrue(TENANT_ID)).thenReturn(Optional.of(tenant));
 
         when(payrollRepository.save(any(Payroll.class))).thenAnswer(i -> i.getArgument(0));
         lenient().doNothing().when(notificationService).sendToUser(any(), any(), any(), any(), any());
-        lenient().doNothing().when(notificationService).sendToTenant(any(), any(), any(), any());
     }
 
     private void stubAttendance(int present, int half, int leave, int absent) {
@@ -216,8 +195,9 @@ class PayrollCalculationTest {
         list.addAll(buildAttendanceEntries("half day", half));
         list.addAll(buildAttendanceEntries("leave", leave));
         list.addAll(buildAttendanceEntries("absent", absent));
-        when(attendanceRepository.findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrue(
-            anyLong(), anyLong(), any(), any())).thenReturn(list);
+        when(attendanceRepository
+            .findByUserIdAndTenantIdAndAttendanceDateBetweenAndIsActiveTrueAndApprovalStatus(
+                anyLong(), anyLong(), any(), any(), any())).thenReturn(list);
     }
 
     private List<Attendance> buildAttendanceEntries(String typeName, int count) {

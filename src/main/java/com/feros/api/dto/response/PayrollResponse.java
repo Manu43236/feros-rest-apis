@@ -36,6 +36,7 @@ public class PayrollResponse {
     private SalaryType salaryType;
     private BigDecimal dailyRate;
     private BigDecimal monthlySalary;
+    private Integer requiredDays;
     private BigDecimal basicPay;
     private BigDecimal overtimePay;
     private BigDecimal tripBonus;

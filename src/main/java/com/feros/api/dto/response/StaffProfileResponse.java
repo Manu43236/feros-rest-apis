@@ -63,6 +63,7 @@ public class StaffProfileResponse {
 
     private SalaryType salaryType;
     private BigDecimal monthlySalary;
+    private Integer requiredDays;
 
     private Boolean isActive;
     private Boolean canAccessVehicles;

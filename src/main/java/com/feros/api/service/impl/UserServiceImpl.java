@@ -661,6 +661,7 @@ public class UserServiceImpl implements UserService {
                 .licenseExpiryDate(request.getLicenseExpiryDate())
                 .salaryType(request.getSalaryType() != null ? request.getSalaryType() : com.feros.api.enums.SalaryType.MONTHLY)
                 .monthlySalary(request.getMonthlySalary())
+                .requiredDays(request.getRequiredDays())
                 .isActive(true)
                 .canAccessVehicles(resolveCanAccessVehicles(request, tenant))
                 .canAccessEquipment(resolveCanAccessEquipment(request, tenant))

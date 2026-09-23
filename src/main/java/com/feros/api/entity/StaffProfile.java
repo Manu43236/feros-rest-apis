@@ -114,6 +114,11 @@ public class StaffProfile extends BaseEntity {
     @Column(name = "monthly_salary", precision = 12, scale = 2)
     private java.math.BigDecimal monthlySalary;
 
+    // Monthly staff: present days required to earn full salary. Shortfall is deducted at
+    // monthlySalary/requiredDays per day. Null/0 = no deduction. Ignored for DAILY staff.
+    @Column(name = "required_days")
+    private Integer requiredDays;
+
     @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;

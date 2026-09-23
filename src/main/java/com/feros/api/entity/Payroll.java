@@ -68,6 +68,10 @@ public class Payroll extends BaseEntity {
     @Column(name = "monthly_salary", precision = 12, scale = 2)
     private BigDecimal monthlySalary;
 
+    // Snapshot of the staff's required present days at generation time (monthly staff)
+    @Column(name = "required_days")
+    private Integer requiredDays;
+
     @Column(name = "basic_pay")
     private BigDecimal basicPay = BigDecimal.ZERO;
 
