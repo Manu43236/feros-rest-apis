@@ -114,16 +114,10 @@ public class StaffProfile extends BaseEntity {
     @Column(name = "monthly_salary", precision = 12, scale = 2)
     private java.math.BigDecimal monthlySalary;
 
-    // Monthly staff: paid days off allowed per month. Offs beyond this are deducted at
-    // monthlySalary/workingDays per day. Null = 0 allowance. Ignored for DAILY staff.
-    @Column(name = "allowed_off_days")
-    private Integer allowedOffDays;
-
-    // Monthly staff: if true, ignore the calendar entirely (no Sundays/holidays free) —
-    // every day counts as a working day. Default false. Ignored for DAILY staff.
-    @Builder.Default
-    @Column(name = "skip_calendar", nullable = false)
-    private Boolean skipCalendar = false;
+    // Monthly staff: days he must attend to earn full salary. Each day short is deducted at
+    // monthlySalary/requiredDays per day. Null/0 = no deduction. Ignored for DAILY staff.
+    @Column(name = "required_days")
+    private Integer requiredDays;
 
     @Builder.Default
     @Column(name = "is_active")

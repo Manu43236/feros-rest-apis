@@ -52,8 +52,7 @@ public class CreateUserRequest {
     // Salary
     private SalaryType salaryType;
     private BigDecimal monthlySalary;
-    private Integer allowedOffDays;
-    private Boolean skipCalendar;
+    private Integer requiredDays;
 
     // Module access
     private Boolean canAccessVehicles;

@@ -95,9 +95,7 @@ public class StaffProfileServiceImpl implements StaffProfileService {
         if (request.getSalaryType() != null)
             profile.setSalaryType(request.getSalaryType());
         profile.setMonthlySalary(request.getMonthlySalary());
-        profile.setAllowedOffDays(request.getAllowedOffDays());
-        if (request.getSkipCalendar() != null)
-            profile.setSkipCalendar(request.getSkipCalendar());
+        profile.setRequiredDays(request.getRequiredDays());
 
         if (request.getCanAccessVehicles() != null)
             profile.setCanAccessVehicles(request.getCanAccessVehicles());
@@ -389,8 +387,7 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .documents(documents)
                 .salaryType(p.getSalaryType())
                 .monthlySalary(p.getMonthlySalary())
-                .allowedOffDays(p.getAllowedOffDays())
-                .skipCalendar(p.getSkipCalendar())
+                .requiredDays(p.getRequiredDays())
                 .isActive(p.getIsActive())
                 .canAccessVehicles(p.getCanAccessVehicles() != null ? p.getCanAccessVehicles() : true)
                 .canAccessEquipment(p.getCanAccessEquipment())

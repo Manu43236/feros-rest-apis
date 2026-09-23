@@ -68,12 +68,9 @@ public class Payroll extends BaseEntity {
     @Column(name = "monthly_salary", precision = 12, scale = 2)
     private BigDecimal monthlySalary;
 
-    // Snapshot of the staff's off-day allowance + calendar mode at generation time (monthly)
-    @Column(name = "allowed_off_days")
-    private Integer allowedOffDays;
-
-    @Column(name = "skip_calendar")
-    private Boolean skipCalendar;
+    // Snapshot of the staff's required attendance days at generation time (monthly staff)
+    @Column(name = "required_days")
+    private Integer requiredDays;
 
     @Column(name = "basic_pay")
     private BigDecimal basicPay = BigDecimal.ZERO;
