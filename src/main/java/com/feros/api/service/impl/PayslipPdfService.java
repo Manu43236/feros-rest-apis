@@ -189,17 +189,33 @@ public class PayslipPdfService {
             earningsT.setWidthPercentage(100);
             addInnerHeader(earningsT, "EARNINGS", "Amount (Rs.)");
 
-            String basicDesc;
             if (isMonthly) {
-                basicDesc = "Basic Salary";
+                // Show the full monthly salary, then Loss of Pay as its own line so it's visible.
+                BigDecimal monthly = payroll.getMonthlySalary() != null
+                        ? payroll.getMonthlySalary() : payroll.getBasicPay();
+                addInnerRow(earningsT, "Basic Salary", fmt(monthly));
+
+                BigDecimal lop = monthly.subtract(payroll.getBasicPay());
+                if (lop.compareTo(BigDecimal.ZERO) > 0) {
+                    int days = (int) java.time.temporal.ChronoUnit.DAYS.between(
+                            payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate()) + 1;
+                    BigDecimal perDay = monthly.divide(BigDecimal.valueOf(days), 4, java.math.RoundingMode.HALF_UP);
+                    String offLabel = "Loss of Pay";
+                    if (perDay.compareTo(BigDecimal.ZERO) > 0) {
+                        BigDecimal offs = lop.divide(perDay, 1, java.math.RoundingMode.HALF_UP).stripTrailingZeros();
+                        offLabel = "Loss of Pay (" + offs.toPlainString() + " off"
+                                + (offs.compareTo(BigDecimal.ONE) > 0 ? "s" : "") + ")";
+                    }
+                    addInnerRow(earningsT, offLabel, "-" + fmt(lop));
+                }
             } else {
                 int hd = payroll.getHalfDays();
                 int pd = payroll.getPresentDays();
-                basicDesc = hd > 0
+                String basicDesc = hd > 0
                         ? "Basic Pay (" + pd + " days + " + hd + " half day" + (hd > 1 ? "s" : "") + " @ Rs." + fmt(payroll.getDailyRate()) + ")"
                         : "Basic Pay (" + pd + " days @ Rs." + fmt(payroll.getDailyRate()) + ")";
+                addInnerRow(earningsT, basicDesc, fmt(payroll.getBasicPay()));
             }
-            addInnerRow(earningsT, basicDesc, fmt(payroll.getBasicPay()));
 
             if (payroll.getOvertimePay() != null && payroll.getOvertimePay().compareTo(BigDecimal.ZERO) > 0)
                 addInnerRow(earningsT, "Overtime (" + payroll.getOvertimeHours() + " hrs)", fmt(payroll.getOvertimePay()));
