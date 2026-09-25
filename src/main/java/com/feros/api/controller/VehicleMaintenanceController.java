@@ -6,6 +6,7 @@ import com.feros.api.dto.request.VehicleServiceRequest;
 import com.feros.api.dto.request.VehicleServiceTaskRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.ServiceAttachmentResponse;
+import com.feros.api.dto.response.PagedVehicleServiceResponse;
 import com.feros.api.dto.response.ServiceVendorItemResponse;
 import com.feros.api.dto.response.VehicleServiceResponse;
 import com.feros.api.enums.ServiceAttachmentType;
@@ -33,6 +34,17 @@ public class VehicleMaintenanceController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
     public ResponseEntity<ApiResponse<List<VehicleServiceResponse>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success("Vehicle services fetched successfully", vehicleMaintenanceService.getAll()));
+    }
+
+    @GetMapping("/paged")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<PagedVehicleServiceResponse>> getAllPaged(
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "ALL") String status,
+            @RequestParam(required = false)    String search) {
+        return ResponseEntity.ok(ApiResponse.success("Vehicle services fetched successfully",
+                vehicleMaintenanceService.getAllPaged(page, size, status, search)));
     }
 
     @GetMapping("/vehicle/{vehicleId}")

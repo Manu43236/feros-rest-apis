@@ -4,6 +4,7 @@ import com.feros.api.dto.request.CompleteServiceRequest;
 import com.feros.api.dto.request.VehicleServiceRequest;
 import com.feros.api.dto.request.VehicleServiceTaskRequest;
 import com.feros.api.dto.response.ServiceAttachmentResponse;
+import com.feros.api.dto.response.PagedVehicleServiceResponse;
 import com.feros.api.dto.response.ServiceVendorItemResponse;
 import com.feros.api.dto.response.VehicleServiceResponse;
 import com.feros.api.enums.ServiceAttachmentType;
@@ -16,6 +17,7 @@ import java.util.List;
 public interface VehicleMaintenanceService {
     VehicleServiceResponse create(VehicleServiceRequest request);
     List<VehicleServiceResponse> getAll();
+    PagedVehicleServiceResponse getAllPaged(int page, int size, String status, String search);
     List<VehicleServiceResponse> getByVehicle(Long vehicleId);
     VehicleServiceResponse getById(Long id);
     VehicleServiceResponse start(Long id);

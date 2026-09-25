@@ -6,6 +6,7 @@ import com.feros.api.dto.request.VehicleServiceRequest;
 import com.feros.api.dto.request.VehicleServiceTaskRequest;
 import com.feros.api.dto.response.ServiceAttachmentResponse;
 import com.feros.api.dto.response.ServiceVendorItemResponse;
+import com.feros.api.dto.response.PagedVehicleServiceResponse;
 import com.feros.api.dto.response.VehicleServiceResponse;
 import com.feros.api.dto.response.VehicleServiceTaskResponse;
 import com.feros.api.entity.*;
@@ -183,6 +184,57 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
         return vehicleServiceRepository
                 .findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(tenantId)
                 .stream().map(this::mapToResponse).toList();
+    }
+
+    @Override
+    public PagedVehicleServiceResponse getAllPaged(int page, int size, String status, String search) {
+        // ponytail: paginates in-memory (loads all tenant rows, then slices) because
+        // displayStatus/totalCost are derived in Java, not SQL columns. If a tenant's
+        // service count grows large, move filtering to a SQL projection.
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<VehicleServiceResponse> all = vehicleServiceRepository
+                .findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(tenantId)
+                .stream().map(this::mapToResponse).toList();
+
+        BigDecimal totalCost = all.stream()
+                .map(r -> r.getTotalCost() == null ? BigDecimal.ZERO : r.getTotalCost())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        long inProgress = all.stream().filter(r -> "IN_PROGRESS".equals(r.getDisplayStatus())).count();
+        long dueSoon = all.stream().filter(r -> "DUE_SOON".equals(r.getDisplayStatus())).count();
+        long overdue = all.stream().filter(r -> "OVERDUE".equals(r.getDisplayStatus())).count();
+
+        String q = search == null ? "" : search.trim().toLowerCase();
+        List<VehicleServiceResponse> filtered = all.stream()
+                .filter(r -> q.isEmpty()
+                        || (r.getVehicleRegistrationNumber() != null && r.getVehicleRegistrationNumber().toLowerCase().contains(q))
+                        || (r.getServiceNumber() != null && r.getServiceNumber().toLowerCase().contains(q))
+                        || (r.getVendorName() != null && r.getVendorName().toLowerCase().contains(q)))
+                .filter(r -> status == null || status.isBlank() || "ALL".equalsIgnoreCase(status)
+                        || status.equalsIgnoreCase(r.getDisplayStatus()))
+                .toList();
+
+        int safeSize = size <= 0 ? 20 : size;
+        int total = filtered.size();
+        int totalPages = Math.max(1, (int) Math.ceil((double) total / safeSize));
+        int safePage = Math.min(Math.max(page, 0), totalPages - 1);
+        int from = safePage * safeSize;
+        int to = Math.min(from + safeSize, total);
+        List<VehicleServiceResponse> content = from >= total ? List.of() : filtered.subList(from, to);
+
+        return PagedVehicleServiceResponse.builder()
+                .content(content)
+                .page(safePage)
+                .size(safeSize)
+                .totalElements(total)
+                .totalPages(totalPages)
+                .summary(PagedVehicleServiceResponse.Summary.builder()
+                        .totalRecords(all.size())
+                        .totalCost(totalCost)
+                        .inProgress(inProgress)
+                        .dueSoon(dueSoon)
+                        .overdue(overdue)
+                        .build())
+                .build();
     }
 
     @Override
