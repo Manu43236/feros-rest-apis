@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 
 @Component
 @Slf4j
@@ -45,6 +46,11 @@ public class GpsTcpServer implements GpsConnectionHandler {
     private ServerSocket  serverSocket;
     private ExecutorService threadPool;
     private final Set<String> staleImeis = ConcurrentHashMap.newKeySet();
+
+    // ponytail: cap GPS DB work at 5 of the shared Hikari pool (20) so REST APIs never starve
+    // during a burst. True separate datasource if the fleet ever outgrows this.
+    private static final int GPS_MAX_DB_CONCURRENCY = 5;
+    private final Semaphore dbGate = new Semaphore(GPS_MAX_DB_CONCURRENCY);
 
     public void kickDevice(String imei) {
         staleImeis.add(imei);
@@ -154,11 +160,22 @@ public class GpsTcpServer implements GpsConnectionHandler {
                 final GpsDevice       dev = device;
                 final GpsPacketParser psr = parser;
                 psr.parse(dev, frame).ifPresent(ping -> {
-                    odometerService.accumulate(ping);
-                    routeService.maybeRecord(ping);
-                    // History replay must not move the live marker — live map shows live position only
-                    if (!Boolean.TRUE.equals(ping.getIsHistory())) liveStore.update(ping);
-                    persistenceService.save(ping);
+                    // Cap concurrent GPS DB work so REST APIs always keep pool connections free
+                    try {
+                        dbGate.acquire();
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    try {
+                        odometerService.accumulate(ping);
+                        routeService.maybeRecord(ping);
+                        // History replay must not move the live marker — live map shows live position only
+                        if (!Boolean.TRUE.equals(ping.getIsHistory())) liveStore.update(ping);
+                        persistenceService.save(ping);
+                    } finally {
+                        dbGate.release();
+                    }
                 });
             }
 
