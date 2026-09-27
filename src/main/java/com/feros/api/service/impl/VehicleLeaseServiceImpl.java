@@ -165,9 +165,14 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                     .findByLeaseIdOrderByStartDateAsc(id)
                     .stream().filter(a -> Boolean.TRUE.equals(a.getIsActive())).collect(Collectors.toList());
             LocalDateTime now = LocalDateTime.now();
+
+            // Release every open driver log for the lease — including ones orphaned on
+            // already-inactive assignments, which the active-only loop below would miss
+            List<LeaseDriverAssignmentLog> openLogs = leaseDriverLogRepository.findOpenByLeaseId(id);
+            openLogs.forEach(log -> log.setUnassignedAt(now));
+            leaseDriverLogRepository.saveAll(openLogs);
+
             active.forEach(a -> {
-                leaseDriverLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(a.getId())
-                        .ifPresent(log -> log.setUnassignedAt(now));
                 a.setIsActive(false);
                 a.setEndDate(LocalDate.now());
                 revertVehicleStatus(a.getVehicle());
@@ -278,8 +283,18 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
 
         StaffProfile driver = null;
         if (request.getDriverStaffId() != null) {
-            driver = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(request.getDriverStaffId(), tenantId())
+            StaffProfile resolvedDriver = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(request.getDriverStaffId(), tenantId())
                     .orElseThrow(() -> new FerosException("Driver not found", HttpStatus.NOT_FOUND));
+
+            // Block if driver is already actively assigned to another lease vehicle
+            leaseDriverLogRepository.findActiveByDriverStaffId(resolvedDriver.getId(), tenantId()).ifPresent(prevLog -> {
+                String leaseNum = prevLog.getLeaseVehicleAssignment().getLease().getLeaseNumber();
+                String vehNum = prevLog.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber();
+                throw new FerosException(
+                        resolvedDriver.getUser().getName() + " is already assigned to " + vehNum + " in lease " + leaseNum + ". Unassign them first.",
+                        HttpStatus.CONFLICT);
+            });
+            driver = resolvedDriver;
         }
 
         LeaseVehicleAssignment assignment = LeaseVehicleAssignment.builder()

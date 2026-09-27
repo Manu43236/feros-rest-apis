@@ -15,6 +15,15 @@ public interface LeaseDriverAssignmentLogRepository extends JpaRepository<LeaseD
     // Current open log for an assignment (unassigned_at is null)
     Optional<LeaseDriverAssignmentLog> findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(Long assignmentId);
 
+    // All open logs for a lease — used on lease close to release every driver,
+    // even ones orphaned on already-inactive assignments
+    @Query("""
+        SELECT l FROM LeaseDriverAssignmentLog l
+        WHERE l.leaseVehicleAssignment.lease.id = :leaseId
+          AND l.unassignedAt IS NULL
+        """)
+    List<LeaseDriverAssignmentLog> findOpenByLeaseId(@Param("leaseId") Long leaseId);
+
     // Active log for a driver across all assignments (to check isAssigned)
     @Query("""
         SELECT l FROM LeaseDriverAssignmentLog l
