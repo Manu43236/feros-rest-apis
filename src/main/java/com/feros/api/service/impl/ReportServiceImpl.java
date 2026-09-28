@@ -2610,6 +2610,29 @@ public class ReportServiceImpl implements ReportService {
         }).sorted(Comparator.comparing(TechnicianPerformanceRow::getTechnicianName)).toList();
     }
 
+    // ── Staff Directory ────────────────────────────────────────────────────────
+    @Override
+    public List<StaffDirectoryRow> getStaffDirectory() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return staffProfileRepository.findByTenantId(tenantId).stream()
+                .map(sp -> {
+                    User u = sp.getUser();
+                    String role = u.getRoles().stream()
+                            .map(r -> r.getName().name())
+                            .sorted()
+                            .collect(Collectors.joining(", "));
+                    return StaffDirectoryRow.builder()
+                            .staffId(sp.getId())
+                            .name(u.getName())
+                            .role(role.isBlank() ? "—" : role)
+                            .designation(sp.getDesignation() != null ? sp.getDesignation().getName() : "—")
+                            .joiningDate(sp.getJoiningDate() != null ? sp.getJoiningDate().toString() : "—")
+                            .build();
+                })
+                .sorted(Comparator.comparing(StaffDirectoryRow::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
     private Map<Long, StaffProfile> buildProfileMap(Long tenantId) {
         return staffProfileRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
                 .collect(Collectors.toMap(p -> p.getUser().getId(), p -> p, (a, b) -> a));

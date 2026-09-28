@@ -1014,6 +1014,25 @@ public class ReportController {
                 "Technician Performance — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── Staff Directory ────────────────────────────────────────────────────────
+
+    @GetMapping("/staff/directory")
+    public ResponseEntity<ApiResponse<List<StaffDirectoryRow>>> getStaffDirectory() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Staff directory fetched", reportService.getStaffDirectory()));
+    }
+
+    @GetMapping("/staff/directory/export")
+    public ResponseEntity<byte[]> exportStaffDirectory(
+            @RequestParam(defaultValue = "csv") String format) {
+        List<StaffDirectoryRow> rows = reportService.getStaffDirectory();
+        String[] headers = {"Name", "Role", "Designation", "Joining Date"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getName(), r.getRole(), r.getDesignation(), r.getJoiningDate()
+        }).toList();
+        return export("staff-directory", "Staff Directory", headers, data, format);
+    }
+
     // ── Document Cost Summary ─────────────────────────────────────────────────
 
     @GetMapping("/expenses/documents")
