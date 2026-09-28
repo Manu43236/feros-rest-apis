@@ -341,7 +341,11 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .findByUserIdAndIsActiveTrue(SecurityUtil.getCurrentUserId())
                 .orElse(null);
         Set<String> allowed = new HashSet<>();
-        if (profile == null || Boolean.TRUE.equals(profile.getCanAccessVehicles())) {
+        // Vehicle OR lease access manages drivers + cleaners (lease vehicles carry
+        // their own driver/cleaner crew, same as owned vehicles).
+        if (profile == null
+                || Boolean.TRUE.equals(profile.getCanAccessVehicles())
+                || Boolean.TRUE.equals(profile.getCanAccessLeases())) {
             allowed.add("DRIVER");
             allowed.add("CLEANER");
         }
