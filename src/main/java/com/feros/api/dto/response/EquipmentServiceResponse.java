@@ -36,6 +36,11 @@ public class EquipmentServiceResponse {
     private BigDecimal completedHmr;
     private LocalDateTime startedAt;
     private BigDecimal totalCost;
+    private BigDecimal estimatedCost;
+    private BigDecimal completedCost;
+    private List<ServiceAttachmentResponse> estimateAttachments;
+    private List<ServiceAttachmentResponse> billAttachments;
+    private List<ServiceVendorItemResponse> vendorItems;
     private String insuranceClaimNo;
     private BigDecimal insuranceClaimAmt;
     private String certificateNumber;

@@ -276,6 +276,74 @@ public class EquipmentController {
                 equipmentService.addTaskToService(id, serviceId, request)));
     }
 
+    // ── Service cost + attachments + vendor items (parity with vehicles) ───────
+
+    @PutMapping("/{id}/services/{serviceId}/charges")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<EquipmentServiceResponse>> updateServiceCharges(
+            @PathVariable Long id, @PathVariable Long serviceId, @RequestBody Map<String, Object> body) {
+        java.math.BigDecimal charges = body.get("estimatedCost") != null
+                ? new java.math.BigDecimal(body.get("estimatedCost").toString()) : null;
+        return ResponseEntity.ok(ApiResponse.success("Estimated cost updated",
+                equipmentService.updateEstimatedCost(id, serviceId, charges)));
+    }
+
+    @PostMapping("/{id}/services/{serviceId}/estimate-doc")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<EquipmentServiceResponse>> uploadServiceEstimateDoc(
+            @PathVariable Long id, @PathVariable Long serviceId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        return ResponseEntity.ok(ApiResponse.success("Estimate document uploaded",
+                equipmentService.uploadEstimateDoc(id, serviceId, file)));
+    }
+
+    @PostMapping("/{id}/services/{serviceId}/bill-doc")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<EquipmentServiceResponse>> uploadServiceBillDoc(
+            @PathVariable Long id, @PathVariable Long serviceId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        return ResponseEntity.ok(ApiResponse.success("Bill document uploaded",
+                equipmentService.uploadBillDoc(id, serviceId, file)));
+    }
+
+    @PostMapping("/{id}/services/{serviceId}/attachments")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<com.feros.api.dto.response.ServiceAttachmentResponse>> addServiceAttachment(
+            @PathVariable Long id, @PathVariable Long serviceId,
+            @RequestParam("type") com.feros.api.enums.ServiceAttachmentType type,
+            @RequestParam(value = "label", required = false) String label,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        return ResponseEntity.ok(ApiResponse.success("Attachment added",
+                equipmentService.addAttachment(id, serviceId, type, label, file)));
+    }
+
+    @DeleteMapping("/{id}/services/{serviceId}/attachments/{attachmentId}")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<Void>> deleteServiceAttachment(
+            @PathVariable Long id, @PathVariable Long serviceId, @PathVariable Long attachmentId) {
+        equipmentService.deleteAttachment(id, serviceId, attachmentId);
+        return ResponseEntity.ok(ApiResponse.success("Attachment deleted", null));
+    }
+
+    @PostMapping("/{id}/services/{serviceId}/vendor-items")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<com.feros.api.dto.response.ServiceVendorItemResponse>> addServiceVendorItem(
+            @PathVariable Long id, @PathVariable Long serviceId, @RequestBody Map<String, Object> body) {
+        String description = (String) body.get("description");
+        java.math.BigDecimal cost = body.get("cost") != null
+                ? new java.math.BigDecimal(body.get("cost").toString()) : null;
+        return ResponseEntity.ok(ApiResponse.success("Item added",
+                equipmentService.addVendorItem(id, serviceId, description, cost)));
+    }
+
+    @DeleteMapping("/{id}/services/{serviceId}/vendor-items/{itemId}")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    public ResponseEntity<ApiResponse<Void>> deleteServiceVendorItem(
+            @PathVariable Long id, @PathVariable Long serviceId, @PathVariable Long itemId) {
+        equipmentService.deleteVendorItem(id, serviceId, itemId);
+        return ResponseEntity.ok(ApiResponse.success("Item deleted", null));
+    }
+
     // ── Service Parts (shared spare-parts inventory) ──────────────────────────
 
     @PostMapping("/{id}/services/{serviceId}/parts")

@@ -54,6 +54,15 @@ public interface EquipmentService {
     EquipmentServiceResponse assignTaskTechnician(Long equipmentId, Long serviceId, Long taskId, Long mechanicId);
     EquipmentServiceResponse addTaskToService(Long equipmentId, Long serviceId, com.feros.api.dto.request.EquipmentServiceTaskRequest request);
 
+    // Cost + attachments + vendor items (parity with vehicles)
+    EquipmentServiceResponse updateEstimatedCost(Long equipmentId, Long serviceId, java.math.BigDecimal estimatedCost);
+    EquipmentServiceResponse uploadEstimateDoc(Long equipmentId, Long serviceId, org.springframework.web.multipart.MultipartFile file) throws java.io.IOException;
+    EquipmentServiceResponse uploadBillDoc(Long equipmentId, Long serviceId, org.springframework.web.multipart.MultipartFile file) throws java.io.IOException;
+    com.feros.api.dto.response.ServiceAttachmentResponse addAttachment(Long equipmentId, Long serviceId, com.feros.api.enums.ServiceAttachmentType type, String label, org.springframework.web.multipart.MultipartFile file) throws java.io.IOException;
+    void deleteAttachment(Long equipmentId, Long serviceId, Long attachmentId);
+    com.feros.api.dto.response.ServiceVendorItemResponse addVendorItem(Long equipmentId, Long serviceId, String description, java.math.BigDecimal cost);
+    void deleteVendorItem(Long equipmentId, Long serviceId, Long itemId);
+
     // Documents (KAN-14) — mirrors vehicle documents
     List<com.feros.api.dto.response.EquipmentDocumentResponse> getDocuments(Long equipmentId);
     com.feros.api.dto.response.EquipmentDocumentResponse addDocument(Long equipmentId, com.feros.api.dto.request.EquipmentDocumentRequest request);

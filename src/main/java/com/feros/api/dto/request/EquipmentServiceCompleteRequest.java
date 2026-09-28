@@ -11,4 +11,5 @@ import java.time.LocalDate;
 public class EquipmentServiceCompleteRequest {
     private BigDecimal completedHmr;
     private LocalDate completedDate;
+    private BigDecimal completedCost;
 }

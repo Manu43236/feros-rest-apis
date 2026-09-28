@@ -82,6 +82,18 @@ public class EquipmentServiceRecord extends BaseEntity {
     @Column(name = "total_cost", precision = 10, scale = 2)
     private BigDecimal totalCost;
 
+    @Column(name = "estimated_cost", precision = 10, scale = 2)
+    private BigDecimal estimatedCost;
+
+    @Column(name = "completed_cost", precision = 10, scale = 2)
+    private BigDecimal completedCost;
+
+    @Column(name = "estimate_doc_url", length = 500)
+    private String estimateDocUrl;
+
+    @Column(name = "bill_doc_url", length = 500)
+    private String billDocUrl;
+
     @Column(name = "insurance_claim_no", length = 100)
     private String insuranceClaimNo;
 
@@ -111,6 +123,10 @@ public class EquipmentServiceRecord extends BaseEntity {
     @OneToMany(mappedBy = "serviceRecord", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default
     private List<EquipmentServiceTask> tasks = new ArrayList<>();
+
+    @OneToMany(mappedBy = "serviceRecord", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @Builder.Default
+    private List<EquipmentServiceAttachment> attachments = new ArrayList<>();
 
     // E5 KAN-27 — breakdown log link
     @ManyToOne(fetch = FetchType.LAZY)

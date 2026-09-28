@@ -65,16 +65,28 @@ import com.feros.api.dto.request.EquipmentDocumentRequest;
 import com.feros.api.dto.response.EquipmentDocumentResponse;
 import com.feros.api.service.EquipmentService;
 import com.feros.api.service.NumberGeneratorService;
+import com.feros.api.service.S3Service;
+import com.feros.api.entity.EquipmentServiceAttachment;
+import com.feros.api.entity.EquipmentServiceVendorItem;
+import com.feros.api.enums.ServiceAttachmentType;
+import com.feros.api.dto.response.ServiceAttachmentResponse;
+import com.feros.api.dto.response.ServiceVendorItemResponse;
+import com.feros.api.repository.EquipmentServiceAttachmentRepository;
+import com.feros.api.repository.EquipmentServiceVendorItemRepository;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,6 +116,9 @@ public class EquipmentServiceImpl implements EquipmentService {
     private final EquipmentDocumentRepository equipmentDocumentRepository;
     private final DocumentTypeRepository documentTypeRepository;
     private final NumberGeneratorService numberGenerator;
+    private final S3Service s3Service;
+    private final EquipmentServiceAttachmentRepository equipmentServiceAttachmentRepository;
+    private final EquipmentServiceVendorItemRepository equipmentServiceVendorItemRepository;
 
     private Long getTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -931,6 +946,8 @@ public class EquipmentServiceImpl implements EquipmentService {
         record.setStatus(ServiceStatus.COMPLETED);
         record.setCompletedDate(completedDate);
         record.setCompletedHmr(completedHmr);
+        if (request != null && request.getCompletedCost() != null)
+            record.setCompletedCost(request.getCompletedCost());
         record.getTasks().forEach(t -> t.setStatus(com.feros.api.enums.ServiceTaskStatus.COMPLETED));
 
         // E5 KAN-28 — compute downtime and flag penalty
@@ -1278,6 +1295,28 @@ public class EquipmentServiceImpl implements EquipmentService {
                     .build();
         }).toList();
 
+        // Vendor items + response-level total (tasks + estimatedCost + vendor items), mirroring vehicle
+        List<EquipmentServiceVendorItem> vendorItemList = equipmentServiceVendorItemRepository
+                .findByServiceRecordIdOrderByIdAsc(r.getId());
+        List<ServiceVendorItemResponse> vendorItemResponses = vendorItemList.stream()
+                .map(i -> ServiceVendorItemResponse.builder()
+                        .id(i.getId())
+                        .description(i.getDescription())
+                        .cost(i.getCost())
+                        .build())
+                .toList();
+        BigDecimal vendorItemsCost = vendorItemList.stream()
+                .filter(i -> i.getCost() != null)
+                .map(EquipmentServiceVendorItem::getCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal tasksCost = r.getTasks().stream()
+                .filter(t -> t.getCost() != null)
+                .map(EquipmentServiceTask::getCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal computedTotal = tasksCost
+                .add(r.getEstimatedCost() != null ? r.getEstimatedCost() : BigDecimal.ZERO)
+                .add(vendorItemsCost);
+
         return EquipmentServiceResponse.builder()
                 .id(r.getId())
                 .equipmentId(eq.getId())
@@ -1297,7 +1336,12 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .completedDate(r.getCompletedDate())
                 .completedHmr(r.getCompletedHmr())
                 .startedAt(r.getStartedAt())
-                .totalCost(r.getTotalCost())
+                .totalCost(computedTotal)
+                .estimatedCost(r.getEstimatedCost())
+                .completedCost(r.getCompletedCost())
+                .estimateAttachments(buildAttachmentList(r, ServiceAttachmentType.ESTIMATE))
+                .billAttachments(buildAttachmentList(r, ServiceAttachmentType.BILL))
+                .vendorItems(vendorItemResponses)
                 .insuranceClaimNo(r.getInsuranceClaimNo())
                 .insuranceClaimAmt(r.getInsuranceClaimAmt())
                 .certificateNumber(r.getCertificateNumber())
@@ -1314,6 +1358,130 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .downtimeHours(r.getDowntimeHours())
                 .penaltyTriggered(r.getPenaltyTriggered())
                 .build();
+    }
+
+    // ── Cost + attachments + vendor items (parity with vehicles) ────────────────
+
+    private List<ServiceAttachmentResponse> buildAttachmentList(EquipmentServiceRecord r, ServiceAttachmentType type) {
+        List<ServiceAttachmentResponse> result = new ArrayList<>();
+        boolean hasNew = r.getAttachments().stream().anyMatch(a -> a.getType() == type);
+        if (!hasNew) {
+            String legacyUrl = type == ServiceAttachmentType.ESTIMATE ? r.getEstimateDocUrl() : r.getBillDocUrl();
+            if (legacyUrl != null) {
+                result.add(ServiceAttachmentResponse.builder()
+                        .id(null)
+                        .type(type)
+                        .url(s3Service.getPublicUrl(legacyUrl))
+                        .build());
+            }
+        }
+        r.getAttachments().stream()
+                .filter(a -> a.getType() == type)
+                .sorted(Comparator.comparing(EquipmentServiceAttachment::getUploadedAt))
+                .forEach(a -> result.add(ServiceAttachmentResponse.builder()
+                        .id(a.getId())
+                        .type(a.getType())
+                        .url(s3Service.getPublicUrl(a.getUrl()))
+                        .label(a.getLabel())
+                        .uploadedAt(a.getUploadedAt())
+                        .build()));
+        return result;
+    }
+
+    private EquipmentServiceRecord getServiceRecord(Long serviceId) {
+        return equipmentServiceRepository
+                .findByIdAndTenantIdAndIsActiveTrue(serviceId, getTenantId())
+                .orElseThrow(() -> new FerosException("Service record not found", HttpStatus.NOT_FOUND));
+    }
+
+    @Override
+    @Transactional
+    public EquipmentServiceResponse updateEstimatedCost(Long equipmentId, Long serviceId, BigDecimal estimatedCost) {
+        EquipmentServiceRecord r = getServiceRecord(serviceId);
+        r.setEstimatedCost(estimatedCost);
+        return toServiceResponse(equipmentServiceRepository.save(r));
+    }
+
+    @Override
+    @Transactional
+    public EquipmentServiceResponse uploadEstimateDoc(Long equipmentId, Long serviceId, MultipartFile file) throws IOException {
+        addAttachment(equipmentId, serviceId, ServiceAttachmentType.ESTIMATE, null, file);
+        return toServiceResponse(getServiceRecord(serviceId));
+    }
+
+    @Override
+    @Transactional
+    public EquipmentServiceResponse uploadBillDoc(Long equipmentId, Long serviceId, MultipartFile file) throws IOException {
+        addAttachment(equipmentId, serviceId, ServiceAttachmentType.BILL, null, file);
+        return toServiceResponse(getServiceRecord(serviceId));
+    }
+
+    @Override
+    @Transactional
+    public ServiceAttachmentResponse addAttachment(Long equipmentId, Long serviceId, ServiceAttachmentType type,
+            String label, MultipartFile file) throws IOException {
+        EquipmentServiceRecord r = getServiceRecord(serviceId);
+        String folder = type == ServiceAttachmentType.ESTIMATE ? "estimate" : "bill";
+        String key = s3Service.uploadFile(file, "tenants/images/equipment-services/" + serviceId + "/" + folder);
+        EquipmentServiceAttachment attachment = EquipmentServiceAttachment.builder()
+                .serviceRecord(r)
+                .type(type)
+                .url(key)
+                .label(label != null && !label.isBlank() ? label.trim() : null)
+                .build();
+        attachment = equipmentServiceAttachmentRepository.save(attachment);
+        return ServiceAttachmentResponse.builder()
+                .id(attachment.getId())
+                .type(attachment.getType())
+                .url(s3Service.getPublicUrl(attachment.getUrl()))
+                .label(attachment.getLabel())
+                .uploadedAt(attachment.getUploadedAt())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void deleteAttachment(Long equipmentId, Long serviceId, Long attachmentId) {
+        EquipmentServiceRecord r = getServiceRecord(serviceId);
+        EquipmentServiceAttachment attachment = equipmentServiceAttachmentRepository.findById(attachmentId)
+                .orElseThrow(() -> new FerosException("Attachment not found", HttpStatus.NOT_FOUND));
+        if (!attachment.getServiceRecord().getId().equals(serviceId)) {
+            throw new FerosException("Attachment does not belong to this service", HttpStatus.BAD_REQUEST);
+        }
+        // Remove from parent collection — orphanRemoval handles the DELETE
+        r.getAttachments().remove(attachment);
+        equipmentServiceRepository.save(r);
+    }
+
+    @Override
+    @Transactional
+    public ServiceVendorItemResponse addVendorItem(Long equipmentId, Long serviceId, String description, BigDecimal cost) {
+        EquipmentServiceRecord r = getServiceRecord(serviceId);
+        Tenant tenant = getTenant(getTenantId());
+        EquipmentServiceVendorItem item = EquipmentServiceVendorItem.builder()
+                .serviceRecord(r)
+                .tenant(tenant)
+                .description(description)
+                .cost(cost)
+                .build();
+        item = equipmentServiceVendorItemRepository.save(item);
+        return ServiceVendorItemResponse.builder()
+                .id(item.getId())
+                .description(item.getDescription())
+                .cost(item.getCost())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void deleteVendorItem(Long equipmentId, Long serviceId, Long itemId) {
+        Long tenantId = getTenantId();
+        EquipmentServiceVendorItem item = equipmentServiceVendorItemRepository.findById(itemId)
+                .orElseThrow(() -> new FerosException("Item not found", HttpStatus.NOT_FOUND));
+        if (!item.getServiceRecord().getId().equals(serviceId) || !item.getTenant().getId().equals(tenantId)) {
+            throw new FerosException("Item not found", HttpStatus.NOT_FOUND);
+        }
+        equipmentServiceVendorItemRepository.deleteById(itemId);
     }
 
 }
