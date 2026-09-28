@@ -2612,6 +2612,7 @@ public class ReportServiceImpl implements ReportService {
 
     // ── Staff Directory ────────────────────────────────────────────────────────
     @Override
+    @Transactional(readOnly = true)
     public List<StaffDirectoryRow> getStaffDirectory() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         return staffProfileRepository.findByTenantId(tenantId).stream()
