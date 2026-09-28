@@ -2615,7 +2615,7 @@ public class ReportServiceImpl implements ReportService {
     @Transactional(readOnly = true)
     public List<StaffDirectoryRow> getStaffDirectory() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        return staffProfileRepository.findByTenantId(tenantId).stream()
+        return staffProfileRepository.findDirectoryByTenantId(tenantId).stream()
                 .map(sp -> {
                     User u = sp.getUser();
                     String role = u.getRoles().stream()

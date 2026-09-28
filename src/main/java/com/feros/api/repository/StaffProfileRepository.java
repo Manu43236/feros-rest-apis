@@ -17,7 +17,13 @@ public interface StaffProfileRepository extends JpaRepository<StaffProfile, Long
 
     Optional<StaffProfile> findByIdAndTenantId(Long id, Long tenantId);
     List<StaffProfile> findByTenantIdAndIsActiveTrue(Long tenantId);
-    List<StaffProfile> findByTenantId(Long tenantId);
+
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT sp FROM StaffProfile sp " +
+        "JOIN FETCH sp.user " +
+        "LEFT JOIN FETCH sp.designation " +
+        "WHERE sp.tenant.id = :tenantId")
+    List<StaffProfile> findDirectoryByTenantId(@org.springframework.data.repository.query.Param("tenantId") Long tenantId);
 
     @org.springframework.data.jpa.repository.Query("SELECT sp FROM StaffProfile sp WHERE sp.user.id IN :userIds")
     List<StaffProfile> findByUserIdIn(@org.springframework.data.repository.query.Param("userIds") List<Long> userIds);
