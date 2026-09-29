@@ -19,6 +19,7 @@ public interface LrService {
     List<LrResponse> getMyLrs();
     List<LrResponse> getLrsByOrder(Long orderId);
     LrResponse updateLr(Long id, UpdateLrRequest request);
+    void deleteLr(Long id);
     LrCheckpostResponse addCheckpost(Long lrId, LrCheckpostRequest request);
     List<LrCheckpostResponse> getCheckposts(Long lrId);
     void deleteCheckpost(Long checkpostId);

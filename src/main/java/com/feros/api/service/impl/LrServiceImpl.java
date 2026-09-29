@@ -35,6 +35,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.List;
@@ -540,6 +541,39 @@ public class LrServiceImpl implements LrService {
     public List<LrChargeResponse> getCharges(Long lrId) {
         return lrChargeRepository.findByLrIdAndIsActiveTrue(lrId)
                 .stream().map(this::mapToChargeResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public void deleteLr(Long id) {
+        Lr lr = lrRepository.findByIdAndTenantIdAndIsActiveTrue(id, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("LR not found", HttpStatus.NOT_FOUND));
+
+        if (invoiceLrRepository.existsByLrIdAndIsActiveTrue(lr.getId())) {
+            throw new FerosException("LR " + lr.getLrNumber() + " is already invoiced and cannot be deleted", HttpStatus.BAD_REQUEST);
+        }
+
+        // Soft-delete staff allocations + vehicle allocation tied to this LR
+        OrderVehicleAllocation allocation = lr.getVehicleAllocation();
+        if (allocation != null) {
+            staffAllocationRepository.findByVehicleAllocationIdAndIsActiveTrue(allocation.getId())
+                    .forEach(sa -> { sa.setIsActive(false); staffAllocationRepository.save(sa); });
+            allocation.setIsActive(false);
+            vehicleAllocationRepository.save(allocation);
+        }
+
+        lr.setIsActive(false);
+        lrRepository.save(lr);
+
+        // Recalculate order fulfilled weight from remaining active LRs
+        Order order = lr.getOrder();
+        if (order != null) {
+            BigDecimal totalFulfilled = lrRepository.findByOrderIdAndIsActiveTrue(order.getId()).stream()
+                    .map(Lr::getAllocatedWeight)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            order.setTotalWeightFulfilled(totalFulfilled);
+            orderRepository.save(order);
+        }
     }
 
     @Override

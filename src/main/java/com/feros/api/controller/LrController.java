@@ -91,6 +91,13 @@ public class LrController {
                 "LR updated successfully", lrService.updateLr(id, request)));
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<Void>> deleteLr(@PathVariable Long id) {
+        lrService.deleteLr(id);
+        return ResponseEntity.ok(ApiResponse.success("LR deleted successfully", null));
+    }
+
     @PostMapping("/{id}/checkposts")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR', 'DRIVER')")
     public ResponseEntity<ApiResponse<LrCheckpostResponse>> addCheckpost(
