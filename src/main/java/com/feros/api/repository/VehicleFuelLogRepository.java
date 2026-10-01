@@ -77,4 +77,13 @@ public interface VehicleFuelLogRepository extends JpaRepository<VehicleFuelLog, 
             @Param("tenantId") Long tenantId,
             @Param("startDate") java.time.LocalDateTime startDate,
             @Param("endDate") java.time.LocalDateTime endDate);
+
+    // Latest N fuel logs (any type, newest first) — for distance-weighted mileage over recent legs
+    List<VehicleFuelLog> findByVehicleIdAndIsActiveTrueOrderByIdDesc(Long vehicleId, Pageable pageable);
+
+    // Latest fuel log of any kind — odometer/level anchor for the live fuel gauge
+    Optional<VehicleFuelLog> findFirstByVehicleIdAndIsActiveTrueOrderByIdDesc(Long vehicleId);
+
+    // Fuel log immediately preceding a given one — for per-fill (leg) mileage
+    Optional<VehicleFuelLog> findFirstByVehicleIdAndIsActiveTrueAndIdLessThanOrderByIdDesc(Long vehicleId, Long id);
 }

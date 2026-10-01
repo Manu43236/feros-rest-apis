@@ -16,6 +16,7 @@ public class FuelLogRequest {
 
     private LocalDateTime fillDate;
     private BigDecimal litresFilled;
+    private BigDecimal fuelLevelBeforeFill; // required; validated in service (0..tankCapacity)
     private BigDecimal odometerReading;
     private BigDecimal costPerLitre;
     private BigDecimal totalCost;

@@ -42,6 +42,10 @@ public class VehicleFuelLog extends BaseEntity {
     @Column(name = "litres_filled", nullable = false, precision = 10, scale = 2)
     private BigDecimal litresFilled;
 
+    // Remaining fuel in tank BEFORE this fill (required for new entries; NULL for legacy rows)
+    @Column(name = "fuel_level_before_fill", precision = 10, scale = 2)
+    private BigDecimal fuelLevelBeforeFill;
+
     @Column(name = "odometer_reading", nullable = false, precision = 10, scale = 2)
     private BigDecimal odometerReading;
 

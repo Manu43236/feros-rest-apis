@@ -58,6 +58,10 @@ public class VehicleResponse {
     private BigDecimal currentOdometerReading;
     private BigDecimal fuelTankCapacity;
     private BigDecimal currentFuelLevel;
+    // Derived (detail only) — approximate mileage + live fuel gauge
+    private BigDecimal avgMileageKmPerLitre;
+    private BigDecimal estimatedFuelLevel;
+    private BigDecimal estimatedRangeKm;
     // Finance
     private Boolean isFinanced;
     private String financerName;

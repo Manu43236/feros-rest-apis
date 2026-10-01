@@ -27,6 +27,7 @@ public class FuelLogResponse {
 
     private LocalDateTime fillDate;
     private BigDecimal litresFilled;
+    private BigDecimal fuelLevelBeforeFill;
     private BigDecimal odometerReading;
     private BigDecimal costPerLitre;
     private BigDecimal totalCost;

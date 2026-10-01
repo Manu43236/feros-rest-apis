@@ -10,6 +10,7 @@ import com.feros.api.entity.User;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.VehicleBreakdown;
 import com.feros.api.entity.VehicleDocument;
+import com.feros.api.entity.VehicleFuelLog;
 import com.feros.api.entity.VehicleImage;
 import com.feros.api.entity.VehicleStaffAssignment;
 import com.feros.api.entity.VehicleTyrePosition;
@@ -37,8 +38,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.springframework.data.domain.PageRequest;
+
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -68,6 +72,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final EquipmentRepository equipmentRepository;
     private final VehicleImageRepository vehicleImageRepository;
+    private final VehicleFuelLogRepository vehicleFuelLogRepository;
     private final LrRepository lrRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
@@ -209,6 +214,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .findByIdAndTenantId(id, getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Vehicle not found", HttpStatus.NOT_FOUND));
         VehicleResponse resp = mapToResponse(vehicle);
+        enrichFuelEstimates(resp, vehicle);
         allocationRepository.findActiveAllocationForVehicleOnDate(id, TimeUtil.today())
                 .ifPresentOrElse(alloc -> {
                     resp.setIsAssigned(true);
@@ -216,6 +222,63 @@ public class VehicleServiceImpl implements VehicleService {
                     resp.setAssignedOrderNumber(alloc.getOrder().getOrderNumber());
                 }, () -> resp.setIsAssigned(false));
         return resp;
+    }
+
+    /**
+     * Derive approximate mileage + a live fuel-gauge estimate from fuel logs (fuel-balance model).
+     * Mileage = distance-weighted over the last up-to-3 legs: Σkm ÷ Σconsumed, where a leg's
+     * consumed = afterLevel(olderLog) − remainingBeforeFill(newerLog). Detail-page only
+     * (called from getVehicleById) to keep the vehicle list N+1-free.
+     */
+    private void enrichFuelEstimates(VehicleResponse resp, Vehicle v) {
+        BigDecimal capacity = v.getFuelTankCapacity();
+        if (capacity == null) return; // feature off for vehicles without a known tank
+
+        // Last 4 logs → up to 3 legs. Newest first.
+        List<VehicleFuelLog> logs = vehicleFuelLogRepository
+                .findByVehicleIdAndIsActiveTrueOrderByIdDesc(v.getId(), PageRequest.of(0, 4));
+        BigDecimal totalKm = BigDecimal.ZERO;
+        BigDecimal totalConsumed = BigDecimal.ZERO;
+        for (int i = 0; i < logs.size() - 1; i++) {
+            VehicleFuelLog newer = logs.get(i);
+            VehicleFuelLog older = logs.get(i + 1);
+            if (newer.getOdometerReading() == null || older.getOdometerReading() == null
+                    || newer.getFuelLevelBeforeFill() == null) continue; // legacy/partial data → skip leg
+            BigDecimal olderAfter = fuelAfterLevel(older, capacity);
+            if (olderAfter == null) continue;
+            BigDecimal km = newer.getOdometerReading().subtract(older.getOdometerReading());
+            BigDecimal consumed = olderAfter.subtract(newer.getFuelLevelBeforeFill());
+            if (km.compareTo(BigDecimal.ZERO) > 0 && consumed.compareTo(BigDecimal.ZERO) > 0) {
+                totalKm = totalKm.add(km);
+                totalConsumed = totalConsumed.add(consumed);
+            }
+        }
+        BigDecimal avgMileage = totalConsumed.compareTo(BigDecimal.ZERO) > 0
+                ? totalKm.divide(totalConsumed, 2, RoundingMode.HALF_UP) : null;
+        resp.setAvgMileageKmPerLitre(avgMileage);
+
+        // Live gauge: drop currentFuelLevel by distance travelled since the last fill.
+        if (avgMileage == null || v.getCurrentFuelLevel() == null || v.getCurrentOdometerReading() == null) return;
+        VehicleFuelLog lastLog = logs.isEmpty() ? null : logs.get(0);
+        if (lastLog == null || lastLog.getOdometerReading() == null) return;
+
+        BigDecimal kmSinceFill = v.getCurrentOdometerReading().subtract(lastLog.getOdometerReading());
+        if (kmSinceFill.compareTo(BigDecimal.ZERO) < 0) kmSinceFill = BigDecimal.ZERO; // clamp odd data
+        BigDecimal burned = kmSinceFill.divide(avgMileage, 2, RoundingMode.HALF_UP);
+        BigDecimal est = v.getCurrentFuelLevel().subtract(burned);
+        if (est.compareTo(BigDecimal.ZERO) < 0) est = BigDecimal.ZERO;
+        if (est.compareTo(capacity) > 0) est = capacity;
+        resp.setEstimatedFuelLevel(est);
+        resp.setEstimatedRangeKm(est.multiply(avgMileage).setScale(1, RoundingMode.HALF_UP));
+    }
+
+    /** Fuel level after a log's fill: full tank → capacity; else remaining+litres capped; null if unknown. */
+    private BigDecimal fuelAfterLevel(VehicleFuelLog log, BigDecimal capacity) {
+        if (Boolean.TRUE.equals(log.getIsFullTank())) return capacity;
+        if (log.getFuelLevelBeforeFill() == null) return null; // legacy row, not reconstructable
+        BigDecimal l = log.getLitresFilled() != null ? log.getLitresFilled() : BigDecimal.ZERO;
+        BigDecimal sum = log.getFuelLevelBeforeFill().add(l);
+        return sum.compareTo(capacity) > 0 ? capacity : sum;
     }
 
     @Override

@@ -53,6 +53,8 @@ public class FuelLogServiceImpl implements FuelLogService {
                     .orElseThrow(() -> new FerosException("Order not found", HttpStatus.NOT_FOUND));
         }
 
+        validateRemaining(request.getFuelLevelBeforeFill(), vehicle.getFuelTankCapacity());
+
         // Auto-calculate total cost if not provided
         BigDecimal totalCost = request.getTotalCost();
         if (totalCost == null && request.getLitresFilled() != null && request.getCostPerLitre() != null) {
@@ -67,6 +69,7 @@ public class FuelLogServiceImpl implements FuelLogService {
                 .filledBy(filledBy)
                 .fillDate(request.getFillDate())
                 .litresFilled(request.getLitresFilled())
+                .fuelLevelBeforeFill(request.getFuelLevelBeforeFill())
                 .odometerReading(request.getOdometerReading())
                 .costPerLitre(request.getCostPerLitre())
                 .totalCost(totalCost)
@@ -88,23 +91,38 @@ public class FuelLogServiceImpl implements FuelLogService {
             vehicleDirty = true;
         }
         if (request.getLitresFilled() != null) {
-            if (Boolean.TRUE.equals(request.getIsFullTank())) {
-                vehicle.setCurrentFuelLevel(vehicle.getFuelTankCapacity());
-            } else {
-                BigDecimal current = vehicle.getCurrentFuelLevel() != null
-                        ? vehicle.getCurrentFuelLevel() : BigDecimal.ZERO;
-                BigDecimal updated = current.add(request.getLitresFilled());
-                if (vehicle.getFuelTankCapacity() != null
-                        && updated.compareTo(vehicle.getFuelTankCapacity()) > 0) {
-                    updated = vehicle.getFuelTankCapacity();
-                }
-                vehicle.setCurrentFuelLevel(updated);
-            }
+            // Fuel-balance model: level after this fill = remaining + litres added, capped at capacity.
+            vehicle.setCurrentFuelLevel(afterLevel(request.getFuelLevelBeforeFill(),
+                    request.getLitresFilled(), Boolean.TRUE.equals(request.getIsFullTank()),
+                    vehicle.getFuelTankCapacity()));
             vehicleDirty = true;
         }
         if (vehicleDirty) vehicleRepository.save(vehicle);
 
         return toResponse(log);
+    }
+
+    /** Remaining-before-fill is required and must sit within [0, tank capacity]. */
+    private void validateRemaining(BigDecimal remaining, BigDecimal capacity) {
+        if (remaining == null) {
+            throw new FerosException("Fuel level before filling is required", HttpStatus.BAD_REQUEST);
+        }
+        if (remaining.compareTo(BigDecimal.ZERO) < 0) {
+            throw new FerosException("Fuel level before filling cannot be negative", HttpStatus.BAD_REQUEST);
+        }
+        if (capacity != null && remaining.compareTo(capacity) > 0) {
+            throw new FerosException("Fuel level before filling exceeds tank capacity", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    /** Fuel level after a fill: full tank → capacity; otherwise remaining + litres, capped at capacity. */
+    private BigDecimal afterLevel(BigDecimal remaining, BigDecimal litres, boolean fullTank, BigDecimal capacity) {
+        if (fullTank && capacity != null) return capacity;
+        BigDecimal r = remaining != null ? remaining : BigDecimal.ZERO;
+        BigDecimal l = litres != null ? litres : BigDecimal.ZERO;
+        BigDecimal sum = r.add(l);
+        if (capacity != null && sum.compareTo(capacity) > 0) return capacity;
+        return sum;
     }
 
     @Override
@@ -141,11 +159,12 @@ public class FuelLogServiceImpl implements FuelLogService {
     public FuelLogResponse update(Long id, FuelLogRequest request) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         VehicleFuelLog log = findLog(id, tenantId);
+        Vehicle vehicle = log.getVehicle();
 
-        // Capture old values before update for vehicle adjustment
-        BigDecimal oldLitres = log.getLitresFilled();
-        boolean    oldFull   = Boolean.TRUE.equals(log.getIsFullTank());
-
+        if (request.getFuelLevelBeforeFill() != null) {
+            validateRemaining(request.getFuelLevelBeforeFill(), vehicle.getFuelTankCapacity());
+            log.setFuelLevelBeforeFill(request.getFuelLevelBeforeFill());
+        }
         if (request.getFillDate() != null)        log.setFillDate(request.getFillDate());
         if (request.getLitresFilled() != null)    log.setLitresFilled(request.getLitresFilled());
         if (request.getOdometerReading() != null) log.setOdometerReading(request.getOdometerReading());
@@ -158,25 +177,18 @@ public class FuelLogServiceImpl implements FuelLogService {
         if (request.getReceiptUrl() != null)      log.setReceiptUrl(request.getReceiptUrl());
         if (request.getNotes() != null)           log.setNotes(request.getNotes());
 
-        // Update vehicle fuel level by the difference in litres
-        Vehicle vehicle = log.getVehicle();
-        boolean newFull = Boolean.TRUE.equals(log.getIsFullTank());
-        if (newFull) {
-            vehicle.setCurrentFuelLevel(vehicle.getFuelTankCapacity());
-        } else if (log.getLitresFilled() != null) {
-            BigDecimal prev    = oldFull ? vehicle.getFuelTankCapacity() : (oldLitres != null ? oldLitres : BigDecimal.ZERO);
-            BigDecimal current = vehicle.getCurrentFuelLevel() != null ? vehicle.getCurrentFuelLevel() : BigDecimal.ZERO;
-            BigDecimal updated = current.subtract(prev).add(log.getLitresFilled());
-            if (updated.compareTo(BigDecimal.ZERO) < 0) updated = BigDecimal.ZERO;
-            if (vehicle.getFuelTankCapacity() != null && updated.compareTo(vehicle.getFuelTankCapacity()) > 0)
-                updated = vehicle.getFuelTankCapacity();
-            vehicle.setCurrentFuelLevel(updated);
-        }
+        VehicleFuelLog saved = fuelLogRepository.save(log);
+
+        // Current level is always the after-level of the latest log (single source of truth).
+        VehicleFuelLog latest = fuelLogRepository
+                .findFirstByVehicleIdAndIsActiveTrueOrderByIdDesc(vehicle.getId()).orElse(saved);
+        vehicle.setCurrentFuelLevel(afterLevel(latest.getFuelLevelBeforeFill(), latest.getLitresFilled(),
+                Boolean.TRUE.equals(latest.getIsFullTank()), vehicle.getFuelTankCapacity()));
         if (request.getOdometerReading() != null)
             vehicle.setCurrentOdometerReading(request.getOdometerReading());
         vehicleRepository.save(vehicle);
 
-        return toResponse(fuelLogRepository.save(log));
+        return toResponse(saved);
     }
 
     @Override
@@ -206,21 +218,21 @@ public class FuelLogServiceImpl implements FuelLogService {
         BigDecimal mileage    = null;
         BigDecimal kmTravelled = null;
 
-        // Calculate mileage only for full tank fills
-        if (Boolean.TRUE.equals(log.getIsFullTank()) && log.getId() != null) {
-            Optional<VehicleFuelLog> prev = fuelLogRepository
-                    .findPreviousFullTankFill(log.getVehicle().getId(), log.getId());
-
-            if (prev.isPresent() && prev.get().getOdometerReading() != null
-                    && log.getOdometerReading() != null && log.getLitresFilled() != null
-                    && log.getLitresFilled().compareTo(BigDecimal.ZERO) > 0) {
-
-                kmTravelled = log.getOdometerReading()
-                        .subtract(prev.get().getOdometerReading());
-
-                if (kmTravelled.compareTo(BigDecimal.ZERO) > 0) {
-                    mileage = kmTravelled
-                            .divide(log.getLitresFilled(), 2, RoundingMode.HALF_UP);
+        // Per-fill (leg) mileage: km since previous fill ÷ fuel consumed over that leg.
+        // consumed = afterLevel(previous fill) − remaining-before-this-fill.
+        if (log.getId() != null && log.getOdometerReading() != null && log.getFuelLevelBeforeFill() != null) {
+            VehicleFuelLog prev = fuelLogRepository
+                    .findFirstByVehicleIdAndIsActiveTrueAndIdLessThanOrderByIdDesc(
+                            log.getVehicle().getId(), log.getId()).orElse(null);
+            if (prev != null && prev.getOdometerReading() != null) {
+                BigDecimal capacity = log.getVehicle().getFuelTankCapacity();
+                BigDecimal prevAfter = afterLevel(prev.getFuelLevelBeforeFill(), prev.getLitresFilled(),
+                        Boolean.TRUE.equals(prev.getIsFullTank()), capacity);
+                BigDecimal consumed = prevAfter.subtract(log.getFuelLevelBeforeFill());
+                BigDecimal km = log.getOdometerReading().subtract(prev.getOdometerReading());
+                if (km.compareTo(BigDecimal.ZERO) > 0 && consumed.compareTo(BigDecimal.ZERO) > 0) {
+                    kmTravelled = km;
+                    mileage = km.divide(consumed, 2, RoundingMode.HALF_UP);
                 }
             }
         }
@@ -236,6 +248,7 @@ public class FuelLogServiceImpl implements FuelLogService {
                 .filledByName(log.getFilledBy().getName())
                 .fillDate(log.getFillDate())
                 .litresFilled(log.getLitresFilled())
+                .fuelLevelBeforeFill(log.getFuelLevelBeforeFill())
                 .odometerReading(log.getOdometerReading())
                 .costPerLitre(log.getCostPerLitre())
                 .totalCost(log.getTotalCost())
