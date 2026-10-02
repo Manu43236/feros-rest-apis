@@ -1,14 +1,18 @@
 package com.feros.api.service;
 
 import com.feros.api.dto.request.ActivateSubscriptionRequest;
+import com.feros.api.dto.request.AddVehicleAddonRequest;
 import com.feros.api.dto.request.ConfirmSubscriptionPaymentRequest;
 import com.feros.api.dto.request.CorrectSubscriptionRequest;
 import com.feros.api.dto.request.CreateProformaInvoiceRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
+import com.feros.api.dto.response.SubscriptionAddonResponse;
 import com.feros.api.dto.response.SubscriptionHistoryResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceSummaryResponse;
+
+import java.math.BigDecimal;
 
 import java.util.List;
 
@@ -32,4 +36,11 @@ public interface SubscriptionService {
     SubscriptionInvoiceResponse sendProformaInvoice(Long tenantId, Long invoiceId);
     SubscriptionInvoiceResponse updateProformaInvoice(Long tenantId, Long invoiceId, CreateProformaInvoiceRequest request);
     List<SubscriptionInvoiceResponse> getAllInvoices(Long tenantId, Integer year, Integer month);
+
+    // ─── Mid-cycle vehicle add-ons ──────────────────────────────────────────────
+    /** Effective slot limit = active base vehicleCount + active add-ons. Null = unlimited. */
+    Integer getEffectiveSlotLimit(Long tenantId);
+    SubscriptionAddonResponse previewAddon(Long tenantId, Integer vehicleCount, BigDecimal pricePerVehicle);
+    SubscriptionAddonResponse addVehicles(Long tenantId, AddVehicleAddonRequest request);
+    List<SubscriptionAddonResponse> getAddons(Long tenantId);
 }

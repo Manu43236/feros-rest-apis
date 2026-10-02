@@ -1,15 +1,19 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.request.ActivateSubscriptionRequest;
+import com.feros.api.dto.request.AddVehicleAddonRequest;
 import com.feros.api.dto.request.ConfirmSubscriptionPaymentRequest;
 import com.feros.api.dto.request.CorrectSubscriptionRequest;
 import com.feros.api.dto.request.CreateProformaInvoiceRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
+import com.feros.api.dto.response.SubscriptionAddonResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceSummaryResponse;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.SubscriptionHistoryResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceResponse;
+
+import java.math.BigDecimal;
 import com.feros.api.service.SubscriptionService;
 import com.feros.api.util.SecurityUtil;
 import jakarta.validation.Valid;
@@ -107,6 +111,35 @@ public class SubscriptionController {
             @Valid @RequestBody CorrectSubscriptionRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Subscription corrected",
                 subscriptionService.correctSubscription(tenantId, request)));
+    }
+
+    // ─── Mid-cycle vehicle add-ons ──────────────────────────────────────────────
+
+    @GetMapping("/{tenantId}/addon/preview")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<SubscriptionAddonResponse>> previewAddon(
+            @PathVariable Long tenantId,
+            @RequestParam Integer count,
+            @RequestParam(required = false) BigDecimal price) {
+        return ResponseEntity.ok(ApiResponse.success("Add-on preview",
+                subscriptionService.previewAddon(tenantId, count, price)));
+    }
+
+    @PostMapping("/{tenantId}/addon")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<SubscriptionAddonResponse>> addVehicles(
+            @PathVariable Long tenantId,
+            @Valid @RequestBody AddVehicleAddonRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Vehicle slots added",
+                subscriptionService.addVehicles(tenantId, request)));
+    }
+
+    @GetMapping("/{tenantId}/addons")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<List<SubscriptionAddonResponse>>> getAddons(
+            @PathVariable Long tenantId) {
+        return ResponseEntity.ok(ApiResponse.success("Add-ons fetched",
+                subscriptionService.getAddons(tenantId)));
     }
 
     @PostMapping("/{tenantId}/history/{historyId}/invoice")

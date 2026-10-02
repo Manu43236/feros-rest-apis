@@ -66,7 +66,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final VehicleBreakdownRepository vehicleBreakdownRepository;
     private final UserRepository userRepository;
     private final VehicleTyrePositionRepository tyrePositionRepository;
-    private final SubscriptionHistoryRepository subscriptionHistoryRepository;
+    private final com.feros.api.service.SubscriptionService subscriptionService;
     private final VehicleDocumentRepository vehicleDocumentRepository;
     private final DocumentTypeRepository documentTypeRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
@@ -103,24 +103,21 @@ public class VehicleServiceImpl implements VehicleService {
     public VehicleResponse createVehicle(VehicleRequest request) {
         Tenant tenant = getCurrentTenant();
 
-        // Enforce slot limit — shared pool for BOTH tenants, vehicles-only for VEHICLES_ONLY
-        subscriptionHistoryRepository.findActiveByTenantId(tenant.getId()).stream()
-                .findFirst()
-                .ifPresent(h -> {
-                    Integer totalSlots = h.getVehicleCount();
-                    if (totalSlots != null && totalSlots > 0) {
-                        long vehicles = vehicleRepository.countByTenantIdAndIsActiveTrue(tenant.getId());
-                        long combined = switch (tenant.getModuleType()) {
-                            case BOTH -> vehicles + equipmentRepository.countByTenantId(tenant.getId());
-                            default   -> vehicles; // VEHICLES_ONLY
-                        };
-                        if (combined >= totalSlots) {
-                            throw new FerosException(
-                                    "Slot limit reached (" + totalSlots + "). Contact FEROS support to upgrade.",
-                                    HttpStatus.FORBIDDEN);
-                        }
-                    }
-                });
+        // Enforce slot limit — shared pool for BOTH tenants, vehicles-only for VEHICLES_ONLY.
+        // Effective limit = active base vehicleCount + active mid-cycle add-ons.
+        Integer totalSlots = subscriptionService.getEffectiveSlotLimit(tenant.getId());
+        if (totalSlots != null && totalSlots > 0) {
+            long vehicles = vehicleRepository.countByTenantIdAndIsActiveTrue(tenant.getId());
+            long combined = switch (tenant.getModuleType()) {
+                case BOTH -> vehicles + equipmentRepository.countByTenantId(tenant.getId());
+                default   -> vehicles; // VEHICLES_ONLY
+            };
+            if (combined >= totalSlots) {
+                throw new FerosException(
+                        "Slot limit reached (" + totalSlots + "). Contact FEROS support to upgrade.",
+                        HttpStatus.FORBIDDEN);
+            }
+        }
 
         if (request.getRegistrationNumber() == null || request.getRegistrationNumber().isBlank())
             throw new FerosException("Registration number is required", HttpStatus.BAD_REQUEST);

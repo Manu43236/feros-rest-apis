@@ -2,11 +2,13 @@ package com.feros.api.service.impl;
 
 import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.ActivateSubscriptionRequest;
+import com.feros.api.dto.request.AddVehicleAddonRequest;
 import com.feros.api.dto.request.ConfirmSubscriptionPaymentRequest;
 import com.feros.api.dto.request.CorrectSubscriptionRequest;
 import com.feros.api.dto.request.CreateProformaInvoiceRequest;
 import com.feros.api.dto.request.ExtendSubscriptionRequest;
 import com.feros.api.dto.request.SuspendSubscriptionRequest;
+import com.feros.api.dto.response.SubscriptionAddonResponse;
 import com.feros.api.dto.response.SubscriptionHistoryResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceResponse;
 import com.feros.api.dto.response.SubscriptionInvoiceSummaryResponse;
@@ -43,6 +45,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final TenantRepository tenantRepository;
     private final SubscriptionHistoryRepository historyRepository;
     private final SubscriptionInvoiceRepository invoiceRepository;
+    private final SubscriptionAddonRepository addonRepository;
     private final NotificationService notificationService;
     private final SubscriptionInvoicePdfService subscriptionInvoicePdfService;
 
@@ -154,10 +157,10 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         previous.setStatus(SubscriptionStatus.RENEWED);
         historyRepository.save(previous);
 
-        // Vehicle count: new or keep previous
-        int vehicleCount = request.getVehicleCount() != null
-                ? request.getVehicleCount()
-                : (previous.getVehicleCount() != null ? previous.getVehicleCount() : 1);
+        // Vehicle count: new override, else previous base + active add-ons fold into the new base
+        int previousBase = previous.getVehicleCount() != null ? previous.getVehicleCount() : 1;
+        int foldedBase = previousBase + addonRepository.sumActiveAddonVehicleCount(previous.getId());
+        int vehicleCount = request.getVehicleCount() != null ? request.getVehicleCount() : foldedBase;
 
         // Price per vehicle: new override > previous rate > 0
         BigDecimal pricePerVehicle = request.getPricePerVehicle() != null
@@ -498,6 +501,177 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         };
     }
 
+    /** Pro-rata duration in months: whole months + remaining days / 30 (FEROS billing convention). */
+    private BigDecimal proRataMonths(LocalDate from, LocalDate to) {
+        long wholeMonths = java.time.temporal.ChronoUnit.MONTHS.between(from, to);
+        int remDays = java.time.Period.between(from.plusMonths(wholeMonths), to).getDays();
+        return BigDecimal.valueOf(wholeMonths)
+                .add(new BigDecimal(remDays).divide(new BigDecimal("30"), 4, RoundingMode.HALF_UP));
+    }
+
+    /** The single ACTIVE base subscription for a tenant (most recent). */
+    private SubscriptionHistory activeBase(Long tenantId) {
+        return historyRepository.findActiveByTenantId(tenantId).stream().findFirst().orElse(null);
+    }
+
+    // ─── Mid-cycle vehicle add-ons ──────────────────────────────────────────────
+
+    @Override
+    public Integer getEffectiveSlotLimit(Long tenantId) {
+        SubscriptionHistory base = activeBase(tenantId);
+        if (base == null || base.getVehicleCount() == null) return null; // unlimited
+        return base.getVehicleCount() + addonRepository.sumActiveAddonVehicleCount(base.getId());
+    }
+
+    @Override
+    public SubscriptionAddonResponse previewAddon(Long tenantId, Integer vehicleCount, BigDecimal pricePerVehicle) {
+        getTenant(tenantId);
+        SubscriptionHistory base = requireActiveBase(tenantId);
+        int count = (vehicleCount != null && vehicleCount > 0) ? vehicleCount : 0;
+        BigDecimal rate = resolveAddonRate(pricePerVehicle, base);
+        return computeAddon(base, count, rate, null);
+    }
+
+    @Override
+    @Transactional
+    public SubscriptionAddonResponse addVehicles(Long tenantId, AddVehicleAddonRequest request) {
+        Tenant tenant = getTenant(tenantId);
+        SubscriptionHistory base = requireActiveBase(tenantId);
+
+        int count = request.getVehicleCount();
+        BigDecimal rate = resolveAddonRate(request.getPricePerVehicle(), base);
+        SubscriptionAddonResponse calc = computeAddon(base, count, rate, null);
+
+        // Pay-now invoice (mirrors activate — confirmed, no proforma flow)
+        SubscriptionInvoice invoice = buildAddonInvoice(tenant, base, count, rate,
+                calc.getAmount(), calc.getGstAmount(), calc.getTotalAmount(), request.getPaymentRef());
+        invoiceRepository.save(invoice);
+
+        SubscriptionAddon addon = SubscriptionAddon.builder()
+                .tenant(tenant)
+                .subscriptionHistory(base)
+                .addonVehicleCount(count)
+                .pricePerVehicle(rate)
+                .effectiveFrom(TimeUtil.today())
+                .effectiveTo(base.getEndDate())
+                .amount(calc.getAmount())
+                .gstAmount(calc.getGstAmount())
+                .totalAmount(calc.getTotalAmount())
+                .paymentRef(request.getPaymentRef())
+                .invoiceId(invoice.getId())
+                .status("ACTIVE")
+                .notes(request.getNotes())
+                .createdBy(SecurityUtil.getCurrentUserId())
+                .build();
+        addon = addonRepository.save(addon);
+
+        notificationService.sendToRoles(tenant, List.of(RoleName.ADMIN), NotificationType.SUBSCRIPTION_ACTIVATED,
+                "Vehicle Slots Added",
+                count + " vehicle slot(s) have been added to your plan until " + base.getEndDate() + ".");
+
+        return toAddonResponse(addon, base);
+    }
+
+    @Override
+    public List<SubscriptionAddonResponse> getAddons(Long tenantId) {
+        SubscriptionHistory base = activeBase(tenantId);
+        if (base == null) return List.of();
+        return addonRepository.findBySubscriptionHistoryId(base.getId()).stream()
+                .map(a -> toAddonResponse(a, base))
+                .collect(Collectors.toList());
+    }
+
+    private SubscriptionHistory requireActiveBase(Long tenantId) {
+        SubscriptionHistory base = activeBase(tenantId);
+        if (base == null)
+            throw new FerosException("No active subscription to add vehicles to", HttpStatus.BAD_REQUEST);
+        if (base.getEndDate() == null)
+            throw new FerosException("Active subscription has no end date", HttpStatus.BAD_REQUEST);
+        if (!base.getEndDate().isAfter(TimeUtil.today()))
+            throw new FerosException("Active subscription has already ended", HttpStatus.BAD_REQUEST);
+        return base;
+    }
+
+    private BigDecimal resolveAddonRate(BigDecimal override, SubscriptionHistory base) {
+        if (override != null && override.compareTo(BigDecimal.ZERO) > 0) return override;
+        return base.getPricePerVehicle() != null ? base.getPricePerVehicle() : BigDecimal.ZERO;
+    }
+
+    /** Pro-rata add-on amounts for the remaining period (today → base endDate). id left null. */
+    private SubscriptionAddonResponse computeAddon(SubscriptionHistory base, int count, BigDecimal rate, Long id) {
+        LocalDate from = TimeUtil.today();
+        LocalDate to   = base.getEndDate();
+        BigDecimal months = proRataMonths(from, to);
+        BigDecimal amount = rate.multiply(BigDecimal.valueOf(count)).multiply(months)
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal gst    = amount.multiply(GST_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total  = amount.add(gst);
+        int baseCount = base.getVehicleCount() != null ? base.getVehicleCount() : 0;
+        int existingAddons = addonRepository.sumActiveAddonVehicleCount(base.getId());
+
+        return SubscriptionAddonResponse.builder()
+                .id(id)
+                .tenantId(base.getTenant().getId())
+                .subscriptionHistoryId(base.getId())
+                .addonVehicleCount(count)
+                .pricePerVehicle(rate)
+                .effectiveFrom(from)
+                .effectiveTo(to)
+                .amount(amount)
+                .gstAmount(gst)
+                .totalAmount(total)
+                .baseVehicleCount(baseCount)
+                .effectiveSlotLimit(baseCount + existingAddons + count)
+                .build();
+    }
+
+    private SubscriptionInvoice buildAddonInvoice(Tenant tenant, SubscriptionHistory base, int count,
+                                                  BigDecimal rate, BigDecimal amount, BigDecimal gst,
+                                                  BigDecimal total, String paymentRef) {
+        String invoiceNumber = "INV_FEROS_ADDON_"
+                + TimeUtil.nowIst()
+                        .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+        return SubscriptionInvoice.builder()
+                .invoiceNumber(invoiceNumber)
+                .subscriptionHistory(base)
+                .tenant(tenant)
+                .planName((base.getPlanName() != null ? base.getPlanName() : "Custom") + " — Vehicle Add-on")
+                .billingCycle(base.getBillingCycle() != null ? base.getBillingCycle().name() : null)
+                .vehicleCount(count)
+                .pricePerVehicle(rate)
+                .periodStart(TimeUtil.today())
+                .periodEnd(base.getEndDate())
+                .amount(amount)
+                .gstAmount(gst)
+                .totalAmount(total)
+                .paymentRef(paymentRef)
+                .invoiceStatus("CONFIRMED")
+                .build();
+    }
+
+    private SubscriptionAddonResponse toAddonResponse(SubscriptionAddon a, SubscriptionHistory base) {
+        int baseCount = base.getVehicleCount() != null ? base.getVehicleCount() : 0;
+        return SubscriptionAddonResponse.builder()
+                .id(a.getId())
+                .tenantId(a.getTenant().getId())
+                .subscriptionHistoryId(base.getId())
+                .addonVehicleCount(a.getAddonVehicleCount())
+                .pricePerVehicle(a.getPricePerVehicle())
+                .effectiveFrom(a.getEffectiveFrom())
+                .effectiveTo(a.getEffectiveTo())
+                .amount(a.getAmount())
+                .gstAmount(a.getGstAmount())
+                .totalAmount(a.getTotalAmount())
+                .paymentRef(a.getPaymentRef())
+                .invoiceId(a.getInvoiceId())
+                .status(a.getStatus())
+                .notes(a.getNotes())
+                .createdAt(a.getCreatedAt())
+                .baseVehicleCount(baseCount)
+                .effectiveSlotLimit(baseCount + addonRepository.sumActiveAddonVehicleCount(base.getId()))
+                .build();
+    }
+
     private void createInvoice(SubscriptionHistory history, Tenant tenant, String planName,
                                 BigDecimal totalAmount, BigDecimal amount, BigDecimal gstAmount,
                                 String paymentRef, Integer vehicleCount, BigDecimal pricePerVehicle,
@@ -648,10 +822,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         Tenant tenant = getTenant(tenantId);
 
         // Calendar month calculation: whole months + remaining days / 30
-        long wholeMonths = java.time.temporal.ChronoUnit.MONTHS.between(request.getFromDate(), request.getToDate());
-        int remDays = java.time.Period.between(request.getFromDate().plusMonths(wholeMonths), request.getToDate()).getDays();
-        BigDecimal months = BigDecimal.valueOf(wholeMonths)
-                .add(new BigDecimal(remDays).divide(new BigDecimal("30"), 4, RoundingMode.HALF_UP));
+        BigDecimal months = proRataMonths(request.getFromDate(), request.getToDate());
         BigDecimal vehicleBase = request.getRatePerVehicle()
                 .multiply(new BigDecimal(request.getVehicleCount()))
                 .multiply(months)
