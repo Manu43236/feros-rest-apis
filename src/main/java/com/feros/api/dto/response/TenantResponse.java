@@ -49,7 +49,8 @@ public class TenantResponse {
 
     // Subscription overview (populated for SA views)
     private String currentPlanName;
-    private Integer currentVehicleCount;
+    private Integer currentVehicleCount;   // effective = base + active mid-cycle add-ons
+    private Integer currentAddonCount;     // active mid-cycle add-on slots (null if none)
     private java.math.BigDecimal currentPricePerVehicle;
     private String currentBillingCycle;
     private Integer customUserLimit;

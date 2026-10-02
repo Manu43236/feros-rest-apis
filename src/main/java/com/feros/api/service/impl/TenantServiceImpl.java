@@ -55,6 +55,7 @@ public class TenantServiceImpl implements TenantService {
     private final DesignationRepository designationRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
+    private final SubscriptionAddonRepository addonRepository;
     private final UserRepository userRepository;
     private final VehicleRepository vehicleRepository;
     private final S3Service s3Service;
@@ -554,8 +555,12 @@ public class TenantServiceImpl implements TenantService {
                 .findCurrentByTenantId(tenant.getId()).orElse(null);
         String currentPlanName           = current != null ? current.getPlanName() : null;
         Integer currentVehicleCount;
+        Integer currentAddonCount = null;
         if (current != null && current.getVehicleCount() != null && current.getVehicleCount() > 0) {
-            currentVehicleCount = current.getVehicleCount();
+            // Effective count = base + active mid-cycle add-ons (same math enforcement uses)
+            int addons = addonRepository.sumActiveAddonVehicleCount(current.getId());
+            currentAddonCount = addons > 0 ? addons : null;
+            currentVehicleCount = current.getVehicleCount() + addons;
         } else {
             long fleetCount = vehicleRepository.countByTenantIdAndIsActiveTrue(tenant.getId());
             currentVehicleCount = fleetCount > 0 ? (int) fleetCount : null;
@@ -610,6 +615,7 @@ public class TenantServiceImpl implements TenantService {
                 .updatedAt(tenant.getUpdatedAt())
                 .currentPlanName(currentPlanName)
                 .currentVehicleCount(currentVehicleCount)
+                .currentAddonCount(currentAddonCount)
                 .currentPricePerVehicle(currentPpv)
                 .currentBillingCycle(currentBillingCycle)
                 .moduleType(tenant.getModuleType())
