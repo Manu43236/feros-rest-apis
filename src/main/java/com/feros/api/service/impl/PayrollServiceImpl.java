@@ -23,6 +23,7 @@ import com.feros.api.service.NotificationService;
 import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.PayrollService;
 import com.feros.api.util.NumberUtil;
+import com.feros.api.util.VehiclePayResolver;
 import com.feros.api.enums.NotificationType;
 import com.feros.api.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +61,7 @@ public class PayrollServiceImpl implements PayrollService {
     private final DeductionTypeRepository deductionTypeRepository;
     private final StaffProfileRepository staffProfileRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     private final TenantHolidayRepository tenantHolidayRepository;
     private final NotificationService notificationService;
     private final PlatformTransactionManager transactionManager;
@@ -285,35 +287,22 @@ public class PayrollServiceImpl implements PayrollService {
             List<VehicleStaffAssignment> assignments = vehicleStaffAssignmentRepository
                     .findOverlappingByUser(request.getUserId(), tenantId,
                             request.getPayCycleStartDate(), request.getPayCycleEndDate());
-            // ponytail: per-day lookup mirrors annexure — avoids double-counting on transition days
+            // Lease vehicles live in lease logs, not VSA — resolve both, lease-first (mirrors attendance)
+            List<com.feros.api.entity.LeaseDriverAssignmentLog> leaseLogs = leaseDriverAssignmentLogRepository
+                    .findOverlappingByDriverUserId(request.getUserId(), tenantId,
+                            request.getPayCycleStartDate().atStartOfDay(),
+                            request.getPayCycleEndDate().atTime(23, 59, 59));
+            boolean isCleaner = user.getRoles().stream()
+                    .anyMatch(r -> r.getName() == com.feros.api.enums.RoleName.CLEANER);
+            // per-day lookup avoids double-counting on transition days
             for (com.feros.api.entity.Attendance att : attendanceList) {
                 String t = att.getAttendanceType().getName().toLowerCase();
                 if (!t.contains("present") && !t.contains("half")) continue;
                 BigDecimal factor = t.contains("half") ? new BigDecimal("0.5") : BigDecimal.ONE;
-                LocalDate date = att.getAttendanceDate();
-                // mirrors attendance display: pick latest VSA by assignedFrom then createdAt
-                java.util.Optional<VehicleStaffAssignment> best = assignments.stream()
-                        .filter(a -> !date.isBefore(a.getAssignedFrom())
-                                && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo())))
-                        .max(java.util.Comparator.comparing(VehicleStaffAssignment::getAssignedFrom)
-                                .thenComparing(a -> a.getCreatedAt()));
-                if (best.isPresent()) {
-                    VehicleStaffAssignment a = best.get();
-                    boolean isCleaner = user.getRoles().stream()
-                            .anyMatch(r -> r.getName() == com.feros.api.enums.RoleName.CLEANER);
-                    if (isCleaner) {
-                        BigDecimal cp = a.getVehicle().getCleanerExtraPayPerDay();
-                        if (cp != null && cp.compareTo(BigDecimal.ZERO) > 0) {
-                            vehicleExtraPay = vehicleExtraPay.add(cp.multiply(factor));
-                        }
-                    } else {
-                        if (Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
-                                && a.getVehicle().getExtraPayPerDay() != null) {
-                            vehicleExtraPay = vehicleExtraPay.add(
-                                    a.getVehicle().getExtraPayPerDay().multiply(factor));
-                        }
-                    }
-                }
+                com.feros.api.entity.Vehicle vehicle = VehiclePayResolver.resolveVehicleForDay(
+                        att.getAttendanceDate(), assignments, leaseLogs);
+                vehicleExtraPay = vehicleExtraPay.add(
+                        VehiclePayResolver.vehiclePayForDay(vehicle, isCleaner, factor));
             }
         } catch (Exception e) {
             vehicleExtraPay = BigDecimal.ZERO;

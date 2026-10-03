@@ -10,7 +10,9 @@ import com.feros.api.repository.PayrollRepository;
 import com.feros.api.repository.StaffProfileRepository;
 import com.feros.api.repository.AttendanceRepository;
 import com.feros.api.repository.VehicleStaffAssignmentRepository;
+import com.feros.api.repository.LeaseDriverAssignmentLogRepository;
 import com.feros.api.util.SecurityUtil;
+import com.feros.api.util.VehiclePayResolver;
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.*;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class PayslipPdfService {
     private final StaffProfileRepository staffProfileRepository;
     private final AttendanceRepository attendanceRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
 
     private static final Color NAVY       = new Color(15, 33, 55);
     private static final Color NAVY_LIGHT = new Color(30, 58, 95);
@@ -306,6 +309,14 @@ public class PayslipPdfService {
                             vehicleStaffAssignmentRepository.findOverlappingByUser(
                                     payroll.getUser().getId(), tenantId,
                                     payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
+                    // Lease vehicles live in lease logs, not VSA — resolve both, lease-first (mirrors attendance)
+                    List<com.feros.api.entity.LeaseDriverAssignmentLog> leaseLogs =
+                            leaseDriverAssignmentLogRepository.findOverlappingByDriverUserId(
+                                    payroll.getUser().getId(), tenantId,
+                                    payroll.getPayCycleStartDate().atStartOfDay(),
+                                    payroll.getPayCycleEndDate().atTime(23, 59, 59));
+                    boolean isCleaner = payroll.getUser().getRoles().stream()
+                            .anyMatch(r -> r.getName() == com.feros.api.enums.RoleName.CLEANER);
 
                     doc.newPage();
                     doc.add(sectionLabel("DAILY EARNINGS ANNEXURE"));
@@ -320,32 +331,10 @@ public class PayslipPdfService {
                         BigDecimal factor = isHalf ? new BigDecimal("0.5") : BigDecimal.ONE;
                         BigDecimal desPay = payroll.getDailyRate().multiply(factor).setScale(2, RoundingMode.HALF_UP);
 
-                        boolean isCleaner = payroll.getUser().getRoles().stream()
-                                .anyMatch(r -> r.getName() == com.feros.api.enums.RoleName.CLEANER);
-                        String vehicleNo = "—";
-                        BigDecimal vehPay = BigDecimal.ZERO;
-                        // mirrors attendance display: pick latest VSA by assignedFrom then createdAt
-                        java.util.Optional<com.feros.api.entity.VehicleStaffAssignment> best = assignments.stream()
-                                .filter(a -> !date.isBefore(a.getAssignedFrom())
-                                        && (a.getAssignedTo() == null || !date.isAfter(a.getAssignedTo())))
-                                .max(java.util.Comparator.comparing(com.feros.api.entity.VehicleStaffAssignment::getAssignedFrom)
-                                        .thenComparing(a -> a.getCreatedAt()));
-                        if (best.isPresent()) {
-                            com.feros.api.entity.VehicleStaffAssignment a = best.get();
-                            vehicleNo = a.getVehicle().getRegistrationNumber();
-                            if (isCleaner) {
-                                BigDecimal cp = a.getVehicle().getCleanerExtraPayPerDay();
-                                if (cp != null && cp.compareTo(BigDecimal.ZERO) > 0) {
-                                    vehPay = cp.multiply(factor).setScale(2, RoundingMode.HALF_UP);
-                                }
-                            } else {
-                                if (Boolean.TRUE.equals(a.getVehicle().getExtraPayEnabled())
-                                        && a.getVehicle().getExtraPayPerDay() != null) {
-                                    vehPay = a.getVehicle().getExtraPayPerDay()
-                                            .multiply(factor).setScale(2, RoundingMode.HALF_UP);
-                                }
-                            }
-                        }
+                        com.feros.api.entity.Vehicle vehicle =
+                                VehiclePayResolver.resolveVehicleForDay(date, assignments, leaseLogs);
+                        String vehicleNo = vehicle != null ? vehicle.getRegistrationNumber() : "—";
+                        BigDecimal vehPay = VehiclePayResolver.vehiclePayForDay(vehicle, isCleaner, factor);
 
                         addAnnexureRow(annexure, isHalf,
                                 date.format(DATE_FMT),

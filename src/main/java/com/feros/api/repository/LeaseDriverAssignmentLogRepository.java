@@ -78,4 +78,23 @@ public interface LeaseDriverAssignmentLogRepository extends JpaRepository<LeaseD
             @Param("tenantId") Long tenantId,
             @Param("startDate") java.time.LocalDateTime startDate,
             @Param("endDate") java.time.LocalDateTime endDate);
+
+    // Logs overlapping a date range for ONE driver — payroll vehicle-allowance + payslip annexure.
+    // Lease vehicles never get a VSA row, so payroll must resolve them from here.
+    @Query("""
+        SELECT l FROM LeaseDriverAssignmentLog l
+        JOIN FETCH l.leaseVehicleAssignment a
+        JOIN FETCH a.vehicle
+        JOIN FETCH l.driverStaff ds
+        JOIN FETCH ds.user
+        WHERE l.tenant.id = :tenantId
+          AND ds.user.id = :userId
+          AND l.assignedAt <= :endDate
+          AND (l.unassignedAt IS NULL OR l.unassignedAt >= :startDate)
+        """)
+    List<LeaseDriverAssignmentLog> findOverlappingByDriverUserId(
+            @Param("userId") Long userId,
+            @Param("tenantId") Long tenantId,
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate);
 }

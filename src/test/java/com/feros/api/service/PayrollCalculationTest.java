@@ -46,6 +46,7 @@ class PayrollCalculationTest {
     @Mock private DeductionTypeRepository deductionTypeRepository;
     @Mock private StaffProfileRepository staffProfileRepository;
     @Mock private VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    @Mock private LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     @Mock private TenantHolidayRepository tenantHolidayRepository;
     @Mock private NotificationService notificationService;
     @Mock private PlatformTransactionManager transactionManager;
@@ -62,7 +63,8 @@ class PayrollCalculationTest {
             payrollRepository, payrollDeductionRepository, salaryAdvanceRepository,
             tenantRepository, userRepository, attendanceRepository,
             deductionTypeRepository, staffProfileRepository,
-            vehicleStaffAssignmentRepository, tenantHolidayRepository,
+            vehicleStaffAssignmentRepository, leaseDriverAssignmentLogRepository,
+            tenantHolidayRepository,
             notificationService, transactionManager, numberGenerator
         );
 
