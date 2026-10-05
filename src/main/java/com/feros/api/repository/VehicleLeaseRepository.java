@@ -28,7 +28,13 @@ public interface VehicleLeaseRepository extends JpaRepository<VehicleLease, Long
           AND (:search IS NULL OR LOWER(vl.leaseNumber) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(vl.site) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(vl.client.clientName) LIKE LOWER(CONCAT('%', :search, '%')))
-        ORDER BY vl.createdAt DESC
+        ORDER BY
+          CASE vl.status
+            WHEN com.feros.api.enums.LeaseStatus.ACTIVE THEN 0
+            WHEN com.feros.api.enums.LeaseStatus.DRAFT THEN 1
+            ELSE 2
+          END,
+          vl.createdAt DESC
     """)
     Page<VehicleLease> findAllPaged(
             @Param("tenantId") Long tenantId,
