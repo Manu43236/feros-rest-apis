@@ -155,10 +155,14 @@ public class VehicleLeaseController {
             @PathVariable Long id,
             @PathVariable Long assignmentId,
             @RequestBody(required = false) Map<String, String> body) {
-        LocalDateTime endTime = (body != null && body.containsKey("endTime"))
-                ? LocalDateTime.parse(body.get("endTime")) : null;
-        BigDecimal odometerEnd = (body != null && body.containsKey("odometerEnd"))
-                ? new BigDecimal(body.get("odometerEnd")) : null;
+        // Odometer is optional on end-session: a blank value arrives as JSON null (key present,
+        // value null) — guard on the value, not key presence, so new BigDecimal(null) can't NPE.
+        String endTimeStr = body != null ? body.get("endTime") : null;
+        LocalDateTime endTime = (endTimeStr != null && !endTimeStr.isBlank())
+                ? LocalDateTime.parse(endTimeStr) : null;
+        String odometerStr = body != null ? body.get("odometerEnd") : null;
+        BigDecimal odometerEnd = (odometerStr != null && !odometerStr.isBlank())
+                ? new BigDecimal(odometerStr) : null;
         String notes = body != null ? body.get("notes") : null;
         return ResponseEntity.ok(ApiResponse.success("Session ended",
                 vehicleLeaseService.endSession(id, assignmentId, endTime, odometerEnd, notes)));
