@@ -509,6 +509,24 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     private void setVehicleOnLease(Vehicle vehicle) {
         vehicleStatusRepository.findByStatusTypeAndIsActiveTrue(VehicleStatusType.ON_LEASE)
                 .ifPresent(vehicle::setCurrentStatus);
+
+        // A leased vehicle is staffed from the lease — release any standing normal driver/cleaner so
+        // it no longer shows them as the current driver/cleaner, and frees them to be reassigned.
+        var actor = userRepository.findById(SecurityUtil.getCurrentUserId()).orElse(null);
+        java.util.stream.Stream.of(vehicle.getCurrentDriver(), vehicle.getCurrentCleaner())
+                .filter(java.util.Objects::nonNull)
+                .forEach(staff -> vehicleStaffAssignmentRepository
+                        .findAllByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(staff.getId(), tenantId())
+                        .stream()
+                        .filter(vsa -> vsa.getVehicle().getId().equals(vehicle.getId()))
+                        .forEach(vsa -> {
+                            vsa.setAssignedTo(LocalDate.now());
+                            vsa.setUnassignedBy(actor);
+                            vsa.setUnassignedAt(LocalDateTime.now());
+                            vsa.setIsActive(false);
+                        }));
+        vehicle.setCurrentDriver(null);
+        vehicle.setCurrentCleaner(null);
     }
 
     private void revertVehicleStatus(Vehicle vehicle) {

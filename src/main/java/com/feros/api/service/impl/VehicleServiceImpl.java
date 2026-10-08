@@ -821,15 +821,21 @@ public class VehicleServiceImpl implements VehicleService {
                 .cleanerExtraPayPerDay(v.getCleanerExtraPayPerDay())
                 .tripScope(v.getTripScope())
                 .isIot(Boolean.TRUE.equals(v.getIsIot()))
-                .currentDriverId(v.getCurrentDriver() != null ? v.getCurrentDriver().getId()
-                    : (activeLease != null && activeLease.getDriverStaff() != null ? activeLease.getDriverStaff().getUser().getId() : null))
-                .currentDriverName(v.getCurrentDriver() != null ? v.getCurrentDriver().getName()
-                    : (activeLease != null && activeLease.getDriverStaff() != null ? activeLease.getDriverStaff().getUser().getName() : null))
-                .currentDriverPhone(v.getCurrentDriver() != null ? v.getCurrentDriver().getPhone()
-                    : (activeLease != null && activeLease.getDriverStaff() != null ? activeLease.getDriverStaff().getUser().getPhone() : null))
-                .currentCleanerId(v.getCurrentCleaner() != null ? v.getCurrentCleaner().getId() : null)
-                .currentCleanerName(v.getCurrentCleaner() != null ? v.getCurrentCleaner().getName() : null)
-                .currentCleanerPhone(v.getCurrentCleaner() != null ? v.getCurrentCleaner().getPhone() : null)
+                // Leased vehicle → driver comes from the LEASE (authoritative), not the standing
+                // pointer, so the list always matches the lease. Otherwise use the standing driver.
+                .currentDriverId(activeLease != null
+                    ? (activeLease.getDriverStaff() != null ? activeLease.getDriverStaff().getUser().getId() : null)
+                    : (v.getCurrentDriver() != null ? v.getCurrentDriver().getId() : null))
+                .currentDriverName(activeLease != null
+                    ? (activeLease.getDriverStaff() != null ? activeLease.getDriverStaff().getUser().getName() : activeLease.getClientDriverName())
+                    : (v.getCurrentDriver() != null ? v.getCurrentDriver().getName() : null))
+                .currentDriverPhone(activeLease != null
+                    ? (activeLease.getDriverStaff() != null ? activeLease.getDriverStaff().getUser().getPhone() : null)
+                    : (v.getCurrentDriver() != null ? v.getCurrentDriver().getPhone() : null))
+                // Leases have no cleaner slot — a leased vehicle shows no cleaner.
+                .currentCleanerId(activeLease != null ? null : (v.getCurrentCleaner() != null ? v.getCurrentCleaner().getId() : null))
+                .currentCleanerName(activeLease != null ? null : (v.getCurrentCleaner() != null ? v.getCurrentCleaner().getName() : null))
+                .currentCleanerPhone(activeLease != null ? null : (v.getCurrentCleaner() != null ? v.getCurrentCleaner().getPhone() : null))
                 .isActive(v.getIsActive())
                 .createdAt(v.getCreatedAt())
                 .updatedAt(v.getUpdatedAt())
