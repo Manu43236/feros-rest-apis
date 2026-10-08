@@ -61,6 +61,8 @@ public class PayrollServiceImpl implements PayrollService {
     private final DeductionTypeRepository deductionTypeRepository;
     private final StaffProfileRepository staffProfileRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    private final com.feros.api.service.StaffVehicleDayResolver staffVehicleDayResolver;
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PayrollServiceImpl.class);
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     private final TenantHolidayRepository tenantHolidayRepository;
     private final NotificationService notificationService;
@@ -284,14 +286,9 @@ public class PayrollServiceImpl implements PayrollService {
 
         BigDecimal vehicleExtraPay = BigDecimal.ZERO;
         try {
-            List<VehicleStaffAssignment> assignments = vehicleStaffAssignmentRepository
-                    .findOverlappingByUser(request.getUserId(), tenantId,
-                            request.getPayCycleStartDate(), request.getPayCycleEndDate());
-            // Lease vehicles live in lease logs, not VSA — resolve both, lease-first (mirrors attendance)
-            List<com.feros.api.entity.LeaseDriverAssignmentLog> leaseLogs = leaseDriverAssignmentLogRepository
-                    .findOverlappingByDriverUserId(request.getUserId(), tenantId,
-                            request.getPayCycleStartDate().atStartOfDay(),
-                            request.getPayCycleEndDate().atTime(23, 59, 59));
+            // Resolve the per-day vehicle exactly as the attendance report does, so payslip == attendance.
+            com.feros.api.service.StaffVehicleDayResolver.Context vehCtx = staffVehicleDayResolver
+                    .buildContext(tenantId, request.getPayCycleStartDate(), request.getPayCycleEndDate());
             boolean isCleaner = user.getRoles().stream()
                     .anyMatch(r -> r.getName() == com.feros.api.enums.RoleName.CLEANER);
             // per-day lookup avoids double-counting on transition days
@@ -299,12 +296,14 @@ public class PayrollServiceImpl implements PayrollService {
                 String t = att.getAttendanceType().getName().toLowerCase();
                 if (!t.contains("present") && !t.contains("half")) continue;
                 BigDecimal factor = t.contains("half") ? new BigDecimal("0.5") : BigDecimal.ONE;
-                com.feros.api.entity.Vehicle vehicle = VehiclePayResolver.resolveVehicleForDay(
-                        att.getAttendanceDate(), assignments, leaseLogs);
+                com.feros.api.entity.Vehicle vehicle = staffVehicleDayResolver.resolve(
+                        vehCtx, request.getUserId(), tenantId, att.getAttendanceDate());
                 vehicleExtraPay = vehicleExtraPay.add(
                         VehiclePayResolver.vehiclePayForDay(vehicle, isCleaner, factor));
             }
         } catch (Exception e) {
+            log.warn("Vehicle allowance resolution failed for user {} cycle {}..{} — defaulting to 0",
+                    request.getUserId(), request.getPayCycleStartDate(), request.getPayCycleEndDate(), e);
             vehicleExtraPay = BigDecimal.ZERO;
         }
         vehicleExtraPay = vehicleExtraPay.setScale(2, RoundingMode.HALF_UP);

@@ -46,6 +46,7 @@ class PayrollCalculationTest {
     @Mock private DeductionTypeRepository deductionTypeRepository;
     @Mock private StaffProfileRepository staffProfileRepository;
     @Mock private VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    @Mock private StaffVehicleDayResolver staffVehicleDayResolver;
     @Mock private LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     @Mock private TenantHolidayRepository tenantHolidayRepository;
     @Mock private NotificationService notificationService;
@@ -63,7 +64,7 @@ class PayrollCalculationTest {
             payrollRepository, payrollDeductionRepository, salaryAdvanceRepository,
             tenantRepository, userRepository, attendanceRepository,
             deductionTypeRepository, staffProfileRepository,
-            vehicleStaffAssignmentRepository, leaseDriverAssignmentLogRepository,
+            vehicleStaffAssignmentRepository, staffVehicleDayResolver, leaseDriverAssignmentLogRepository,
             tenantHolidayRepository,
             notificationService, transactionManager, numberGenerator
         );
@@ -188,8 +189,13 @@ class PayrollCalculationTest {
         when(staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(USER_ID, TENANT_ID))
             .thenReturn(Optional.of(profile));
 
-        when(vehicleStaffAssignmentRepository.findOverlappingByUser(
-            anyLong(), anyLong(), any(), any())).thenReturn(List.of());
+        // Vehicle resolution now goes through StaffVehicleDayResolver; these tests don't assert
+        // vehicle allowance, so resolve to no vehicle (₹0 allowance) — same net as before.
+        lenient().when(staffVehicleDayResolver.buildContext(anyLong(), any(), any()))
+            .thenReturn(new StaffVehicleDayResolver.Context(
+                java.util.Map.of(), java.util.Map.of(), java.util.Map.of()));
+        lenient().when(staffVehicleDayResolver.resolve(any(), anyLong(), anyLong(), any()))
+            .thenReturn(null);
 
         Tenant tenant = new Tenant();
         tenant.setId(TENANT_ID);

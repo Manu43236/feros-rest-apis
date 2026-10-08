@@ -37,6 +37,8 @@ public class PayslipPdfService {
     private final AttendanceRepository attendanceRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
+    private final com.feros.api.service.StaffVehicleDayResolver staffVehicleDayResolver;
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PayslipPdfService.class);
 
     private static final Color NAVY       = new Color(15, 33, 55);
     private static final Color NAVY_LIGHT = new Color(30, 58, 95);
@@ -305,16 +307,9 @@ public class PayslipPdfService {
                         .toList();
 
                 if (!workedDays.isEmpty()) {
-                    List<com.feros.api.entity.VehicleStaffAssignment> assignments =
-                            vehicleStaffAssignmentRepository.findOverlappingByUser(
-                                    payroll.getUser().getId(), tenantId,
-                                    payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
-                    // Lease vehicles live in lease logs, not VSA — resolve both, lease-first (mirrors attendance)
-                    List<com.feros.api.entity.LeaseDriverAssignmentLog> leaseLogs =
-                            leaseDriverAssignmentLogRepository.findOverlappingByDriverUserId(
-                                    payroll.getUser().getId(), tenantId,
-                                    payroll.getPayCycleStartDate().atStartOfDay(),
-                                    payroll.getPayCycleEndDate().atTime(23, 59, 59));
+                    // Resolve the per-day vehicle exactly as the attendance report (and payroll) does.
+                    com.feros.api.service.StaffVehicleDayResolver.Context vehCtx = staffVehicleDayResolver
+                            .buildContext(tenantId, payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate());
                     boolean isCleaner = payroll.getUser().getRoles().stream()
                             .anyMatch(r -> r.getName() == com.feros.api.enums.RoleName.CLEANER);
 
@@ -331,8 +326,8 @@ public class PayslipPdfService {
                         BigDecimal factor = isHalf ? new BigDecimal("0.5") : BigDecimal.ONE;
                         BigDecimal desPay = payroll.getDailyRate().multiply(factor).setScale(2, RoundingMode.HALF_UP);
 
-                        com.feros.api.entity.Vehicle vehicle =
-                                VehiclePayResolver.resolveVehicleForDay(date, assignments, leaseLogs);
+                        com.feros.api.entity.Vehicle vehicle = staffVehicleDayResolver.resolve(
+                                vehCtx, payroll.getUser().getId(), tenantId, date);
                         String vehicleNo = vehicle != null ? vehicle.getRegistrationNumber() : "—";
                         BigDecimal vehPay = VehiclePayResolver.vehiclePayForDay(vehicle, isCleaner, factor);
 
@@ -345,7 +340,10 @@ public class PayslipPdfService {
                     }
                     doc.add(annexure);
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.warn("Payslip annexure resolution failed for payroll {} — annexure skipped",
+                        payroll.getId(), e);
+            }
 
             // ── Footer ───────────────────────────────────────────────────────
             Paragraph footer = new Paragraph(
