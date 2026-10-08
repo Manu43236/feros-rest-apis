@@ -38,7 +38,15 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(FerosException.class)
-    public ResponseEntity<ApiResponse<Void>> handleFerosException(FerosException ex) {
+    public ResponseEntity<?> handleFerosException(FerosException ex) {
+        // Carry the optional machine-readable code in `data` so the client can branch
+        // (e.g. SWAPPABLE_CONFLICT → offer Swap, HARD_BLOCK → message only).
+        if (ex.getCode() != null) {
+            return ResponseEntity
+                    .status(ex.getStatus())
+                    .body(new ApiResponse<>(false, ex.getMessage(),
+                            java.util.Map.of("code", ex.getCode())));
+        }
         return ResponseEntity
                 .status(ex.getStatus())
                 .body(ApiResponse.error(ex.getMessage()));

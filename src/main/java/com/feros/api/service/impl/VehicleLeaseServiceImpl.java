@@ -41,6 +41,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import com.feros.api.enums.AttendanceApprovalStatus;
+import com.feros.api.util.TimeUtil;
 import java.util.stream.Collectors;
 
 @Service
@@ -64,6 +66,8 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final UserRepository userRepository;
+    private final com.feros.api.repository.AttendanceRepository attendanceRepository;
+    private final com.feros.api.service.StaffAssignmentGuard staffAssignmentGuard;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
 
@@ -354,6 +358,26 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         } else {
             final StaffProfile resolvedDriver = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(request.getDriverStaffId(), tenantId())
                     .orElseThrow(() -> new FerosException("Driver not found", HttpStatus.NOT_FOUND));
+
+            Long driverUserId = resolvedDriver.getUser().getId();
+            String driverName = resolvedDriver.getUser().getName();
+            Long leaseVehicleId = assignment.getVehicle().getId();
+
+            // One-vehicle rule (cross-system): require attendance today, never pull a driver off live
+            // work, and either swap them off their current normal/order vehicle or block.
+            if (!attendanceRepository.existsByUserIdAndTenantIdAndAttendanceDateAndApprovalStatusInAndIsActiveTrue(
+                    driverUserId, tenantId(), TimeUtil.today(),
+                    List.of(AttendanceApprovalStatus.PENDING, AttendanceApprovalStatus.APPROVED))) {
+                throw new FerosException(driverName + " has not marked attendance today and cannot be assigned.",
+                        HttpStatus.BAD_REQUEST);
+            }
+            staffAssignmentGuard.assertNotInProgress(driverUserId, tenantId(), driverName);
+            if (request.isSwap()) {
+                staffAssignmentGuard.releaseNormalAndOrder(driverUserId, tenantId(),
+                        userRepository.findById(SecurityUtil.getCurrentUserId()).orElse(null), leaseVehicleId);
+            } else {
+                staffAssignmentGuard.assertNotOnNormalOrOrder(driverUserId, tenantId(), leaseVehicleId, driverName);
+            }
 
             // Block if driver is already actively assigned to a different lease vehicle
             leaseDriverLogRepository.findActiveByDriverStaffId(resolvedDriver.getId(), tenantId()).ifPresent(prevLog -> {

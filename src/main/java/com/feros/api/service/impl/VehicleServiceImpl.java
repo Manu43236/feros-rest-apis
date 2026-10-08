@@ -70,6 +70,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final VehicleDocumentRepository vehicleDocumentRepository;
     private final DocumentTypeRepository documentTypeRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
+    private final com.feros.api.service.StaffAssignmentGuard staffAssignmentGuard;
     private final EquipmentRepository equipmentRepository;
     private final VehicleImageRepository vehicleImageRepository;
     private final VehicleFuelLogRepository vehicleFuelLogRepository;
@@ -860,6 +861,12 @@ public class VehicleServiceImpl implements VehicleService {
         if (!isDriver)
             throw new FerosException("Selected user is not a driver", HttpStatus.BAD_REQUEST);
 
+        // One-vehicle rule (cross-system): a leased vehicle's driver comes from the lease, and a driver
+        // who is on a lease or has live work can't be grabbed here.
+        staffAssignmentGuard.assertVehicleNotLeased(vehicleId);
+        staffAssignmentGuard.assertNotOnLease(userId, tenantId, driver.getName());
+        staffAssignmentGuard.assertNotInProgress(userId, tenantId, driver.getName());
+
         if (vehicleRepository.existsByCurrentDriver_IdAndIdNot(userId, vehicleId))
             throw new FerosException("This driver is already assigned to another vehicle", HttpStatus.CONFLICT);
 
@@ -1019,6 +1026,11 @@ public class VehicleServiceImpl implements VehicleService {
                 .anyMatch(r -> r.getName() == RoleName.CLEANER);
         if (!isCleaner)
             throw new FerosException("Selected user is not a cleaner", HttpStatus.BAD_REQUEST);
+
+        // One-vehicle rule (cross-system): leased vehicles are staffed from the lease; a cleaner with
+        // live work can't be grabbed here. (Cleaners never hold a lease, so no on-lease case.)
+        staffAssignmentGuard.assertVehicleNotLeased(vehicleId);
+        staffAssignmentGuard.assertNotInProgress(userId, tenantId, cleaner.getName());
 
         if (vehicleRepository.existsByCurrentCleaner_IdAndIdNot(userId, vehicleId))
             throw new FerosException("This cleaner is already assigned to another vehicle", HttpStatus.CONFLICT);

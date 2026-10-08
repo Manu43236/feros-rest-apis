@@ -51,6 +51,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final OrderVehicleAllocationRepository vehicleAllocationRepository;
     private final OrderStaffAllocationRepository staffAllocationRepository;
+    private final com.feros.api.service.StaffAssignmentGuard staffAssignmentGuard;
     private final TenantRepository tenantRepository;
     private final ClientRepository clientRepository;
     private final MaterialTypeRepository materialTypeRepository;
@@ -717,6 +718,10 @@ public class OrderServiceImpl implements OrderService {
         boolean currentlyAssigned = !staffAllocationRepository.findActiveAllocationsForUser(request.getUserId(), activeStatuses).isEmpty();
         if (currentlyAssigned)
             throw new FerosException("This " + role.getName().name().toLowerCase() + " is currently assigned to another order and is not available.", HttpStatus.CONFLICT);
+
+        // One-vehicle rule (cross-system): also block if the staff member is on a lease or mid-session.
+        staffAssignmentGuard.assertNotOnLease(request.getUserId(), tenantId, user.getName());
+        staffAssignmentGuard.assertNotInProgress(request.getUserId(), tenantId, user.getName());
 
         // Cancel any existing active allocation of the same role for this vehicle (swap scenario)
         // Also close the displaced user's VehicleStaffAssignment history record

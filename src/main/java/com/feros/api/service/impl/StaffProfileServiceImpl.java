@@ -28,6 +28,7 @@ import java.util.List;
 public class StaffProfileServiceImpl implements StaffProfileService {
 
     private final StaffProfileRepository staffProfileRepository;
+    private final com.feros.api.service.StaffAssignmentGuard staffAssignmentGuard;
     private final StaffDocumentRepository staffDocumentRepository;
     private final VehicleDocumentRepository vehicleDocumentRepository;
     private final VehicleImageRepository vehicleImageRepository;
@@ -144,9 +145,14 @@ public class StaffProfileServiceImpl implements StaffProfileService {
         List<StaffProfile> profiles = equipmentOnly
                 ? staffProfileRepository.findByTenantIdAndIsActiveTrueAndCanAccessEquipmentTrue(tenantId)
                 : staffProfileRepository.findByTenantIdAndIsActiveTrue(tenantId);
+        java.util.Map<Long, String> busyByUser = staffAssignmentGuard.currentVehicleByUser(tenantId);
         return profiles.stream()
                 .filter(p -> userRepository.existsById(p.getUser().getId()))
-                .map(this::mapToProfileResponse)
+                .map(p -> {
+                    StaffProfileResponse r = mapToProfileResponse(p);
+                    r.setCurrentVehicle(busyByUser.get(p.getUser().getId()));
+                    return r;
+                })
                 .toList();
     }
 

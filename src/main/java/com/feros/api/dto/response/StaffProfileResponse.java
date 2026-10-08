@@ -20,6 +20,8 @@ public class StaffProfileResponse {
     private String userPhone;
     private String roleName;
     private Long tenantId;
+    /** Vehicle the staff member is currently on (normal/order/lease), for the "busy" marker. Null = free. */
+    private String currentVehicle;
 
     private Long designationId;
     private String designationName;
