@@ -2,6 +2,7 @@ package com.feros.api.service;
 
 import com.feros.api.entity.*;
 import com.feros.api.enums.RoleName;
+import com.feros.api.repository.LeaseCleanerAssignmentLogRepository;
 import com.feros.api.repository.LeaseDriverAssignmentLogRepository;
 import com.feros.api.repository.OrderStaffAllocationRepository;
 import com.feros.api.repository.VehicleStaffAssignmentRepository;
@@ -31,6 +32,7 @@ class StaffVehicleDayResolverTest {
 
     @Mock VehicleStaffAssignmentRepository vsaRepository;
     @Mock LeaseDriverAssignmentLogRepository leaseLogRepository;
+    @Mock LeaseCleanerAssignmentLogRepository leaseCleanerLogRepository;
     @Mock OrderStaffAllocationRepository orderStaffAllocationRepository;
 
     StaffVehicleDayResolver resolver;
@@ -41,7 +43,7 @@ class StaffVehicleDayResolverTest {
 
     @BeforeEach
     void setUp() {
-        resolver = new StaffVehicleDayResolver(vsaRepository, leaseLogRepository, orderStaffAllocationRepository);
+        resolver = new StaffVehicleDayResolver(vsaRepository, leaseLogRepository, leaseCleanerLogRepository, orderStaffAllocationRepository);
         when(orderStaffAllocationRepository.findActiveOnDateForUser(anyLong(), anyLong(), any()))
                 .thenReturn(List.of());
     }
@@ -56,7 +58,8 @@ class StaffVehicleDayResolverTest {
         var ctx = new StaffVehicleDayResolver.Context(
                 Map.of(UID, List.of(vsa)),
                 Map.of(UID, ts5428),   // collapsed lease vehicle for Ramana = phantom TS5428
-                Map.of(2L, UID));      // TS5428 held by Ramana
+                Map.of(2L, UID),       // TS5428 held by Ramana
+                Map.of());
 
         // VSA covers the day and WL3553 isn't leased (no holder) → VSA wins; the phantom lease is never consulted.
         assertThat(resolver.resolve(ctx, UID, T, DATE)).isEqualTo(wl3553);
@@ -66,7 +69,7 @@ class StaffVehicleDayResolverTest {
     @DisplayName("pure-lease driver (no VSA) → falls back to the lease vehicle")
     void pureLease_returnsLeaseVehicle() {
         Vehicle ts5428 = vehicle(2L, "AP39TS5428");
-        var ctx = new StaffVehicleDayResolver.Context(Map.of(), Map.of(UID, ts5428), Map.of(2L, UID));
+        var ctx = new StaffVehicleDayResolver.Context(Map.of(), Map.of(UID, ts5428), Map.of(2L, UID), Map.of());
         assertThat(resolver.resolve(ctx, UID, T, DATE)).isEqualTo(ts5428);
     }
 
@@ -79,7 +82,7 @@ class StaffVehicleDayResolverTest {
         OrderStaffAllocation osa = OrderStaffAllocation.builder().vehicleAllocation(ova).build();
         when(orderStaffAllocationRepository.findActiveOnDateForUser(UID, T, DATE)).thenReturn(List.of(osa));
 
-        var ctx = new StaffVehicleDayResolver.Context(Map.of(), Map.of(), Map.of());
+        var ctx = new StaffVehicleDayResolver.Context(Map.of(), Map.of(), Map.of(), Map.of());
         assertThat(resolver.resolve(ctx, UID, T, DATE)).isEqualTo(ord);
     }
 
@@ -91,7 +94,7 @@ class StaffVehicleDayResolverTest {
         VehicleStaffAssignment theirs = vsa(driver(200L), a, DATE.minusDays(1), null); // later assignedFrom
 
         var ctx = new StaffVehicleDayResolver.Context(
-                Map.of(UID, List.of(mine), 200L, List.of(theirs)), Map.of(), Map.of());
+                Map.of(UID, List.of(mine), 200L, List.of(theirs)), Map.of(), Map.of(), Map.of());
         assertThat(resolver.resolve(ctx, UID, T, DATE)).isNull();
     }
 
@@ -101,18 +104,47 @@ class StaffVehicleDayResolverTest {
         Vehicle a = vehicle(1L, "A");
         VehicleStaffAssignment mine = vsa(driver(UID), a, DATE.minusDays(5), null);
         var ctx = new StaffVehicleDayResolver.Context(
-                Map.of(UID, List.of(mine)), Map.of(), Map.of(1L, 999L)); // A held by user 999
+                Map.of(UID, List.of(mine)), Map.of(), Map.of(1L, 999L), Map.of()); // A held by user 999
         assertThat(resolver.resolve(ctx, UID, T, DATE)).isNull();
     }
 
     @Test
     @DisplayName("nothing covers the day → null (no vehicle allowance)")
     void nothing_returnsNull() {
-        var ctx = new StaffVehicleDayResolver.Context(Map.of(), Map.of(), Map.of());
+        var ctx = new StaffVehicleDayResolver.Context(Map.of(), Map.of(), Map.of(), Map.of());
+        assertThat(resolver.resolve(ctx, UID, T, DATE)).isNull();
+    }
+
+    @Test
+    @DisplayName("pure-lease CLEANER (no VSA) → falls back to the lease vehicle (4th Context map)")
+    void pureLeaseCleaner_returnsLeaseVehicle() {
+        Vehicle ts5428 = vehicle(2L, "AP39TS5428");
+        // cleaner's lease vehicle is merged into leaseVehicleByUser; cleaner holder map drives displacement
+        var ctx = new StaffVehicleDayResolver.Context(Map.of(), Map.of(UID, ts5428), Map.of(), Map.of(2L, UID));
+        assertThat(resolver.resolve(ctx, UID, T, DATE)).isEqualTo(ts5428);
+    }
+
+    @Test
+    @DisplayName("lease-displacement CLEANER: VSA on a vehicle held by another lease cleaner → falls through")
+    void leaseDisplacedCleaner_fallsThrough() {
+        Vehicle a = vehicle(1L, "A");
+        VehicleStaffAssignment mine = vsa(cleaner(UID), a, DATE.minusDays(5), null);
+        // A held (via lease cleaner log) by user 999 → cleaner holder map, not the driver one
+        var ctx = new StaffVehicleDayResolver.Context(
+                Map.of(UID, List.of(mine)), Map.of(), Map.of(), Map.of(1L, 999L));
         assertThat(resolver.resolve(ctx, UID, T, DATE)).isNull();
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
+
+    private static User cleaner(Long id) {
+        Role r = new Role();
+        r.setName(RoleName.CLEANER);
+        User u = new User();
+        u.setId(id);
+        u.setRoles(Set.of(r));
+        return u;
+    }
 
     private static User driver(Long id) {
         Role r = new Role();

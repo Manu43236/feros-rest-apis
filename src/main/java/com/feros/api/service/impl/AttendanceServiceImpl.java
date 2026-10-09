@@ -51,6 +51,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final LocationResolverService locationResolverService;
     private final StaffProfileRepository staffProfileRepository;
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
+    private final com.feros.api.repository.LeaseCleanerAssignmentLogRepository leaseCleanerAssignmentLogRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -321,7 +322,19 @@ public class AttendanceServiceImpl implements AttendanceService {
         leaseWinnerByVehicle.forEach((vehicleId, log) ->
                 latestForVehicle.put(vehicleId + ":DRIVER", log.getDriverStaff().getUser().getId()));
 
-        // userId → registration for lease drivers (fallback when a driver has no VSA of their own)
+        // Same for the CLEANER slot of a leased vehicle (independent of the driver slot).
+        Map<Long, LeaseCleanerAssignmentLog> leaseCleanerWinnerByVehicle = leaseCleanerAssignmentLogRepository
+                .findOverlappingByTenantId(tenantId, date.atStartOfDay(), date.atTime(23, 59, 59))
+                .stream()
+                .filter(l -> l.getCleanerStaff() != null && l.getCleanerStaff().getUser() != null)
+                .collect(Collectors.toMap(
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getId(),
+                        l -> l,
+                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b));
+        leaseCleanerWinnerByVehicle.forEach((vehicleId, log) ->
+                latestForVehicle.put(vehicleId + ":CLEANER", log.getCleanerStaff().getUser().getId()));
+
+        // userId → registration for lease drivers + cleaners (fallback when they have no VSA of their own)
         Map<Long, String> leaseDriverVehicleMap = leaseWinnerByVehicle.values().stream()
                 // a driver who moved between vehicles keeps only their latest vehicle
                 .collect(Collectors.toMap(
@@ -332,6 +345,15 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .collect(Collectors.toMap(
                         l -> l.getDriverStaff().getUser().getId(),
                         l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber()));
+        leaseCleanerWinnerByVehicle.values().stream()
+                .collect(Collectors.toMap(
+                        l -> l.getCleanerStaff().getUser().getId(),
+                        l -> l,
+                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
+                .values()
+                .forEach(l -> leaseDriverVehicleMap.putIfAbsent(
+                        l.getCleanerStaff().getUser().getId(),
+                        l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber()));
         return new VehicleDayMaps(latestForVehicle, leaseDriverVehicleMap);
     }
 

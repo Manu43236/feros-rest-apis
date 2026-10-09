@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.dto.request.AssignCleanerRequest;
 import com.feros.api.dto.request.AssignDivisionRequest;
 import com.feros.api.dto.request.AssignDriverRequest;
 import com.feros.api.dto.request.LeaseSessionStartRequest;
@@ -62,6 +63,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     private final NumberGeneratorService numberGenerator;
     private final NotificationService notificationService;
     private final LeaseDriverAssignmentLogRepository leaseDriverLogRepository;
+    private final LeaseCleanerAssignmentLogRepository leaseCleanerLogRepository;
     private final OrderVehicleAllocationRepository orderVehicleAllocationRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
@@ -176,6 +178,10 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
             openLogs.forEach(log -> log.setUnassignedAt(now));
             leaseDriverLogRepository.saveAll(openLogs);
 
+            List<LeaseCleanerAssignmentLog> openCleanerLogs = leaseCleanerLogRepository.findOpenByLeaseId(id);
+            openCleanerLogs.forEach(log -> log.setUnassignedAt(now));
+            leaseCleanerLogRepository.saveAll(openCleanerLogs);
+
             active.forEach(a -> {
                 a.setIsActive(false);
                 a.setEndDate(LocalDate.now());
@@ -282,6 +288,8 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
             existing.setEndDate(LocalDate.now());
             leaseDriverLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(existing.getId())
                     .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
+            leaseCleanerLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(existing.getId())
+                    .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
             assignmentRepository.save(existing);
         });
 
@@ -301,11 +309,29 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
             driver = resolvedDriver;
         }
 
+        StaffProfile cleaner = null;
+        if (request.getCleanerStaffId() != null) {
+            StaffProfile resolvedCleaner = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(request.getCleanerStaffId(), tenantId())
+                    .orElseThrow(() -> new FerosException("Cleaner not found", HttpStatus.NOT_FOUND));
+
+            // Block if cleaner is already actively assigned to another lease vehicle
+            leaseCleanerLogRepository.findActiveByCleanerStaffId(resolvedCleaner.getId(), tenantId()).ifPresent(prevLog -> {
+                String leaseNum = prevLog.getLeaseVehicleAssignment().getLease().getLeaseNumber();
+                String vehNum = prevLog.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber();
+                throw new FerosException(
+                        resolvedCleaner.getUser().getName() + " is already assigned to " + vehNum + " in lease " + leaseNum + ". Unassign them first.",
+                        HttpStatus.CONFLICT);
+            });
+            cleaner = resolvedCleaner;
+        }
+
         LeaseVehicleAssignment assignment = LeaseVehicleAssignment.builder()
                 .lease(lease)
                 .vehicle(vehicle)
                 .driverStaff(driver)
                 .clientDriverName(driver == null ? request.getClientDriverName() : null)
+                .cleanerStaff(cleaner)
+                .clientCleanerName(cleaner == null ? request.getClientCleanerName() : null)
                 .ratePerVehicle(request.getRatePerVehicle())
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
@@ -326,6 +352,17 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
             leaseDriverLogRepository.save(LeaseDriverAssignmentLog.builder()
                     .leaseVehicleAssignment(saved)
                     .driverStaff(driver)
+                    .assignedAt(LocalDateTime.now())
+                    .assignedBy(userRepository.findById(SecurityUtil.getCurrentUserId()).orElse(null))
+                    .tenant(tenant())
+                    .build());
+        }
+
+        // Write initial cleaner log if cleaner provided
+        if (cleaner != null) {
+            leaseCleanerLogRepository.save(LeaseCleanerAssignmentLog.builder()
+                    .leaseVehicleAssignment(saved)
+                    .cleanerStaff(cleaner)
                     .assignedAt(LocalDateTime.now())
                     .assignedBy(userRepository.findById(SecurityUtil.getCurrentUserId()).orElse(null))
                     .tenant(tenant())
@@ -417,6 +454,86 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
 
     @Override
     @Transactional
+    public LeaseVehicleAssignmentResponse assignCleaner(Long leaseId, Long assignmentId, AssignCleanerRequest request) {
+        fetchLease(leaseId);
+        LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
+                .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
+
+        // Block cleaner change if session is currently active
+        sessionRepository.findByAssignmentIdAndIsActiveTrue(assignmentId).ifPresent(s -> {
+            throw new FerosException("End the active session before changing the cleaner.", HttpStatus.CONFLICT);
+        });
+
+        // Close previous cleaner log entry
+        leaseCleanerLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(assignmentId)
+                .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
+
+        StaffProfile cleaner = null;
+        if (request.getCleanerStaffId() == null) {
+            assignment.setCleanerStaff(null);
+            assignment.setClientCleanerName(request.getClientCleanerName());
+        } else {
+            final StaffProfile resolvedCleaner = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(request.getCleanerStaffId(), tenantId())
+                    .orElseThrow(() -> new FerosException("Cleaner not found", HttpStatus.NOT_FOUND));
+
+            Long cleanerUserId = resolvedCleaner.getUser().getId();
+            String cleanerName = resolvedCleaner.getUser().getName();
+            Long leaseVehicleId = assignment.getVehicle().getId();
+
+            // One-vehicle rule (cross-system): require attendance today, never pull a cleaner off live
+            // work, and either swap them off their current normal/order vehicle or block.
+            if (!attendanceRepository.existsByUserIdAndTenantIdAndAttendanceDateAndApprovalStatusInAndIsActiveTrue(
+                    cleanerUserId, tenantId(), TimeUtil.today(),
+                    List.of(AttendanceApprovalStatus.PENDING, AttendanceApprovalStatus.APPROVED))) {
+                throw new FerosException(cleanerName + " has not marked attendance today and cannot be assigned.",
+                        HttpStatus.BAD_REQUEST);
+            }
+            staffAssignmentGuard.assertNotInProgress(cleanerUserId, tenantId(), cleanerName);
+            if (request.isSwap()) {
+                staffAssignmentGuard.releaseNormalAndOrder(cleanerUserId, tenantId(),
+                        userRepository.findById(SecurityUtil.getCurrentUserId()).orElse(null), leaseVehicleId);
+            } else {
+                staffAssignmentGuard.assertNotOnNormalOrOrder(cleanerUserId, tenantId(), leaseVehicleId, cleanerName);
+            }
+
+            // Block if cleaner is already actively assigned to a different lease vehicle
+            leaseCleanerLogRepository.findActiveByCleanerStaffId(resolvedCleaner.getId(), tenantId()).ifPresent(prevLog -> {
+                if (!prevLog.getLeaseVehicleAssignment().getId().equals(assignmentId)) {
+                    String leaseNum = prevLog.getLeaseVehicleAssignment().getLease().getLeaseNumber();
+                    String vehNum = prevLog.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber();
+                    throw new FerosException(
+                            resolvedCleaner.getUser().getName() + " is already assigned to " + vehNum + " in lease " + leaseNum + ". Unassign them first.",
+                            HttpStatus.CONFLICT);
+                }
+            });
+
+            cleaner = resolvedCleaner;
+            assignment.setCleanerStaff(cleaner);
+            assignment.setClientCleanerName(null);
+        }
+        LeaseVehicleAssignment saved = assignmentRepository.save(assignment);
+
+        // Write new cleaner log entry (only when a real cleaner is assigned, not client's cleaner)
+        if (cleaner != null) {
+            leaseCleanerLogRepository.save(LeaseCleanerAssignmentLog.builder()
+                    .leaseVehicleAssignment(saved)
+                    .cleanerStaff(cleaner)
+                    .assignedAt(LocalDateTime.now())
+                    .assignedBy(userRepository.findById(SecurityUtil.getCurrentUserId()).orElse(null))
+                    .tenant(tenant())
+                    .build());
+
+            notificationService.sendToUser(saved.getLease().getTenant(), cleaner.getUser(),
+                    NotificationType.LEASE_CLEANER_ASSIGNED,
+                    "Vehicle Assigned to You",
+                    "You have been assigned to " + saved.getVehicle().getRegistrationNumber()
+                            + " for lease " + saved.getLease().getLeaseNumber() + ".");
+        }
+        return toAssignmentResponse(saved);
+    }
+
+    @Override
+    @Transactional
     public LeaseVehicleAssignmentResponse assignDivision(Long leaseId, Long assignmentId, AssignDivisionRequest request) {
         fetchLease(leaseId);
         LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
@@ -444,8 +561,10 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         if (sessionRepository.findByAssignmentIdAndIsActiveTrue(assignmentId).isPresent())
             throw new FerosException("Cannot close vehicle — driver has an active session in progress. End the session first.", HttpStatus.CONFLICT);
 
-        // Close driver assignment log so the driver's dashboard no longer shows On Lease
+        // Close driver + cleaner assignment logs so their dashboards no longer show On Lease
         leaseDriverLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(assignmentId)
+                .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
+        leaseCleanerLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(assignmentId)
                 .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
 
         assignment.setIsActive(false);
@@ -803,6 +922,8 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     private LeaseVehicleAssignmentResponse toAssignmentResponse(LeaseVehicleAssignment a) {
         String driverName = a.getDriverStaff() != null ? a.getDriverStaff().getUser().getName() : null;
         Long driverStaffId = a.getDriverStaff() != null ? a.getDriverStaff().getUser().getId() : null;
+        String cleanerName = a.getCleanerStaff() != null ? a.getCleanerStaff().getUser().getName() : null;
+        Long cleanerStaffId = a.getCleanerStaff() != null ? a.getCleanerStaff().getUser().getId() : null;
         String vehicleType = a.getVehicle().getVehicleType() != null
                 ? a.getVehicle().getVehicleType().getName() : null;
 
@@ -815,6 +936,9 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .driverStaffId(driverStaffId)
                 .driverName(driverName)
                 .clientDriverName(a.getClientDriverName())
+                .cleanerStaffId(cleanerStaffId)
+                .cleanerName(cleanerName)
+                .clientCleanerName(a.getClientCleanerName())
                 .ratePerVehicle(a.getRatePerVehicle())
                 .startDate(a.getStartDate())
                 .endDate(a.getEndDate())

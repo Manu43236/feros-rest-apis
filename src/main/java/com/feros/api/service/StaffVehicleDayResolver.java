@@ -1,9 +1,11 @@
 package com.feros.api.service;
 
+import com.feros.api.entity.LeaseCleanerAssignmentLog;
 import com.feros.api.entity.LeaseDriverAssignmentLog;
 import com.feros.api.entity.User;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.entity.VehicleStaffAssignment;
+import com.feros.api.repository.LeaseCleanerAssignmentLogRepository;
 import com.feros.api.repository.LeaseDriverAssignmentLogRepository;
 import com.feros.api.repository.OrderStaffAllocationRepository;
 import com.feros.api.repository.VehicleStaffAssignmentRepository;
@@ -34,12 +36,16 @@ public class StaffVehicleDayResolver {
 
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
+    private final LeaseCleanerAssignmentLogRepository leaseCleanerAssignmentLogRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
 
-    /** Tenant-wide maps, built once per run and reused for every (user, date) resolution. */
+    /** Tenant-wide maps, built once per run and reused for every (user, date) resolution.
+     *  {@code leaseVehicleByUser} covers both lease drivers and lease cleaners (userIds never collide);
+     *  holder maps are kept per-role so a cleaner's VSA is only displaced by the lease <em>cleaner</em>. */
     public record Context(Map<Long, List<VehicleStaffAssignment>> userAssignments,
                           Map<Long, Vehicle> leaseVehicleByUser,
-                          Map<Long, Long> leaseHolderByVehicle) {}
+                          Map<Long, Long> leaseHolderByVehicle,
+                          Map<Long, Long> leaseCleanerHolderByVehicle) {}
 
     public Context buildContext(Long tenantId, LocalDate startDate, LocalDate endDate) {
         Map<Long, List<VehicleStaffAssignment>> userAssignments = vehicleStaffAssignmentRepository
@@ -81,7 +87,42 @@ public class StaffVehicleDayResolver {
                         l -> l.getDriverStaff().getUser().getId(),
                         l -> l.getLeaseVehicleAssignment().getVehicle()));
 
-        return new Context(userAssignments, leaseVehicleByUser, leaseHolderByVehicle);
+        // Same three maps for lease cleaners — a lease vehicle never gets a VSA row, so the cleaner's
+        // attendance/payroll vehicle must resolve from here exactly like the driver's.
+        List<LeaseCleanerAssignmentLog> cleanerLogs = leaseCleanerAssignmentLogRepository
+                .findOverlappingByTenantId(tenantId, startDate.atStartOfDay(), endDate.atTime(23, 59, 59))
+                .stream()
+                .filter(l -> l.getCleanerStaff() != null && l.getCleanerStaff().getUser() != null)
+                .toList();
+
+        Map<Long, Long> leaseCleanerHolderByVehicle = cleanerLogs.stream()
+                .collect(Collectors.toMap(
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getId(),
+                        l -> l,
+                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
+                .values().stream()
+                .collect(Collectors.toMap(
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getId(),
+                        l -> l.getCleanerStaff().getUser().getId()));
+
+        // Merge each lease cleaner's latest vehicle into leaseVehicleByUser (userIds never collide
+        // with lease drivers — a given user is one or the other).
+        cleanerLogs.stream()
+                .collect(Collectors.toMap(
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getId(),
+                        l -> l,
+                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
+                .values().stream()
+                .collect(Collectors.toMap(
+                        l -> l.getCleanerStaff().getUser().getId(),
+                        l -> l,
+                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
+                .values()
+                .forEach(l -> leaseVehicleByUser.putIfAbsent(
+                        l.getCleanerStaff().getUser().getId(),
+                        l.getLeaseVehicleAssignment().getVehicle()));
+
+        return new Context(userAssignments, leaseVehicleByUser, leaseHolderByVehicle, leaseCleanerHolderByVehicle);
     }
 
     /** The vehicle this user was on for {@code date}, or null (== "—"). Verbatim port of
@@ -108,9 +149,11 @@ public class StaffVehicleDayResolver {
                                 || (a.getAssignedFrom().isEqual(myAssignedFrom)
                                     && a.getCreatedAt() != null && myVsa.get().getCreatedAt() != null
                                     && a.getCreatedAt().isAfter(myVsa.get().getCreatedAt()))));
-            Long leaseHolder = ctx.leaseHolderByVehicle().get(vehicleId);
+            Long leaseHolder = "CLEANER".equals(myRole)
+                    ? ctx.leaseCleanerHolderByVehicle().get(vehicleId)
+                    : ctx.leaseHolderByVehicle().get(vehicleId);
             boolean leaseDisplaced = leaseHolder != null && !leaseHolder.equals(userId)
-                    && "DRIVER".equals(myRole);
+                    && ("DRIVER".equals(myRole) || "CLEANER".equals(myRole));
             boolean unassignedToday = myVsa.get().getAssignedTo() != null
                     && myVsa.get().getAssignedTo().equals(date)
                     && date.equals(TimeUtil.today());

@@ -71,6 +71,7 @@ public class ReportServiceImpl implements ReportService {
     private final OrderVehicleAllocationRepository orderVehicleAllocationRepository;
     private final VehicleServiceTaskRepository vehicleServiceTaskRepository;
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
+    private final com.feros.api.repository.LeaseCleanerAssignmentLogRepository leaseCleanerAssignmentLogRepository;
     private final UserRepository userRepository;
 
     // ── 0. Vehicle Master ──────────────────────────────────────────────────────
@@ -331,6 +332,7 @@ public class ReportServiceImpl implements ReportService {
         Map<Long, List<VehicleStaffAssignment>> userAssignments = buildUserAssignmentMap(tenantId, startDate, endDate);
         Map<Long, String> leaseMap = buildLeaseDriverMap(tenantId, startDate, endDate);
         Map<Long, Long> leaseHolderByVehicle = buildLeaseHolderByVehicle(tenantId, startDate, endDate);
+        Map<Long, Long> leaseCleanerHolderByVehicle = buildLeaseCleanerHolderByVehicle(tenantId, startDate, endDate);
 
         return records.stream().map(a -> {
             Double hoursWorked = null;
@@ -342,7 +344,7 @@ public class ReportServiceImpl implements ReportService {
                     .employeeId(a.getUser().getId())
                     .employeeName(a.getUser().getName())
                     .role(primaryRole(a.getUser()))
-                    .vehicleRegistrationNumber(resolveVehicleForDate(userAssignments, leaseMap, leaseHolderByVehicle, a.getUser().getId(), tenantId, a.getAttendanceDate()))
+                    .vehicleRegistrationNumber(resolveVehicleForDate(userAssignments, leaseMap, leaseHolderByVehicle, leaseCleanerHolderByVehicle, a.getUser().getId(), tenantId, a.getAttendanceDate()))
                     .attendanceDate(a.getAttendanceDate())
                     .attendanceType(a.getAttendanceType().getName())
                     .markedAt(a.getMarkedAt())
@@ -863,7 +865,7 @@ public class ReportServiceImpl implements ReportService {
     }
 
     private Map<Long, String> buildLeaseDriverMap(Long tenantId, LocalDate startDate, LocalDate endDate) {
-        return leaseDriverAssignmentLogRepository
+        Map<Long, String> map = leaseDriverAssignmentLogRepository
                 .findOverlappingByTenantId(tenantId, startDate.atStartOfDay(), endDate.atTime(23, 59, 59))
                 .stream()
                 .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
@@ -882,6 +884,27 @@ public class ReportServiceImpl implements ReportService {
                 .collect(Collectors.toMap(
                         l -> l.getDriverStaff().getUser().getId(),
                         l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber()));
+
+        // Merge lease cleaners' latest vehicle (userIds never collide with lease drivers) so a
+        // pure-lease cleaner resolves to their lease vehicle exactly like a driver does (fallback 2).
+        leaseCleanerAssignmentLogRepository
+                .findOverlappingByTenantId(tenantId, startDate.atStartOfDay(), endDate.atTime(23, 59, 59))
+                .stream()
+                .filter(l -> l.getCleanerStaff() != null && l.getCleanerStaff().getUser() != null)
+                .collect(Collectors.toMap(
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getId(),
+                        l -> l,
+                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
+                .values().stream()
+                .collect(Collectors.toMap(
+                        l -> l.getCleanerStaff().getUser().getId(),
+                        l -> l,
+                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
+                .values()
+                .forEach(l -> map.putIfAbsent(
+                        l.getCleanerStaff().getUser().getId(),
+                        l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber()));
+        return map;
     }
 
     // vehicleId → userId of the current lease driver holding that vehicle in the period
@@ -900,9 +923,26 @@ public class ReportServiceImpl implements ReportService {
                         l -> l.getDriverStaff().getUser().getId()));
     }
 
+    // vehicleId → userId of the current lease CLEANER holding that vehicle in the period
+    private Map<Long, Long> buildLeaseCleanerHolderByVehicle(Long tenantId, LocalDate startDate, LocalDate endDate) {
+        return leaseCleanerAssignmentLogRepository
+                .findOverlappingByTenantId(tenantId, startDate.atStartOfDay(), endDate.atTime(23, 59, 59))
+                .stream()
+                .filter(l -> l.getCleanerStaff() != null && l.getCleanerStaff().getUser() != null)
+                .collect(Collectors.toMap(
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getId(),
+                        l -> l,
+                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
+                .values().stream()
+                .collect(Collectors.toMap(
+                        l -> l.getLeaseVehicleAssignment().getVehicle().getId(),
+                        l -> l.getCleanerStaff().getUser().getId()));
+    }
+
     private String resolveVehicleForDate(Map<Long, List<VehicleStaffAssignment>> userAssignments,
                                          Map<Long, String> leaseMap,
                                          Map<Long, Long> leaseHolderByVehicle,
+                                         Map<Long, Long> leaseCleanerHolderByVehicle,
                                          Long userId, Long tenantId, LocalDate date) {
         Optional<VehicleStaffAssignment> myVsa = userAssignments.getOrDefault(userId, List.of()).stream()
                 .filter(a -> !a.getAssignedFrom().isAfter(date) && (a.getAssignedTo() == null || !a.getAssignedTo().isBefore(date)))
@@ -925,13 +965,15 @@ public class ReportServiceImpl implements ReportService {
                                 || (a.getAssignedFrom().isEqual(myAssignedFrom)
                                     && a.getCreatedAt() != null && myVsa.get().getCreatedAt() != null
                                     && a.getCreatedAt().isAfter(myVsa.get().getCreatedAt()))));
-            // A leased vehicle's DRIVER slot belongs to its lease driver — a stale VSA on that
-            // vehicle is displaced (order vehicles have no lease holder, so this is a no-op for them).
-            // only the DRIVER slot is owned by the lease — a cleaner's VSA on a leased
-            // vehicle is legitimate and must not be displaced by the lease driver.
-            Long leaseHolder = leaseHolderByVehicle.get(vehicleId);
+            // A leased vehicle's DRIVER slot belongs to its lease driver, its CLEANER slot to its
+            // lease cleaner — a stale VSA on that slot is displaced (order vehicles have no lease
+            // holder, so this is a no-op for them). The two slots are independent: a lease driver
+            // never displaces a cleaner's VSA, and vice-versa.
+            Long leaseHolder = "CLEANER".equals(myRole)
+                    ? leaseCleanerHolderByVehicle.get(vehicleId)
+                    : leaseHolderByVehicle.get(vehicleId);
             boolean leaseDisplaced = leaseHolder != null && !leaseHolder.equals(userId)
-                    && "DRIVER".equals(myRole);
+                    && ("DRIVER".equals(myRole) || "CLEANER".equals(myRole));
             boolean unassignedToday = myVsa.get().getAssignedTo() != null
                     && myVsa.get().getAssignedTo().equals(date)
                     && date.equals(TimeUtil.today());
@@ -2658,12 +2700,13 @@ public class ReportServiceImpl implements ReportService {
         Map<Long, List<VehicleStaffAssignment>> userAssignments = buildUserAssignmentMap(tenantId, date, date);
         Map<Long, String> leaseMap = buildLeaseDriverMap(tenantId, date, date);
         Map<Long, Long> leaseHolderByVehicle = buildLeaseHolderByVehicle(tenantId, date, date);
+        Map<Long, Long> leaseCleanerHolderByVehicle = buildLeaseCleanerHolderByVehicle(tenantId, date, date);
 
         // resolve vehicle per person using same logic as HR attendance (max assignedFrom+createdAt + swap-dedup)
         Map<String, String> vehicleDriverMap  = new HashMap<>();
         Map<String, String> vehicleCleanerMap = new HashMap<>();
         for (Attendance att : presentRecords) {
-            String reg = resolveVehicleForDate(userAssignments, leaseMap, leaseHolderByVehicle, att.getUser().getId(), tenantId, date);
+            String reg = resolveVehicleForDate(userAssignments, leaseMap, leaseHolderByVehicle, leaseCleanerHolderByVehicle, att.getUser().getId(), tenantId, date);
             if ("—".equals(reg)) continue;
             String role = primaryRole(att.getUser());
             if ("DRIVER".equals(role))       vehicleDriverMap.put(reg,  att.getUser().getName());

@@ -1,5 +1,6 @@
 package com.feros.api.controller;
 
+import com.feros.api.dto.request.AssignCleanerRequest;
 import com.feros.api.dto.request.AssignDivisionRequest;
 import com.feros.api.dto.request.AssignDriverRequest;
 import com.feros.api.dto.request.LeaseSessionStartRequest;
@@ -105,6 +106,16 @@ public class VehicleLeaseController {
             @RequestBody AssignDriverRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Driver assigned",
                 vehicleLeaseService.assignDriver(id, assignmentId, request)));
+    }
+
+    @PutMapping("/{id}/vehicles/{assignmentId}/cleaner")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<LeaseVehicleAssignmentResponse>> assignCleaner(
+            @PathVariable Long id,
+            @PathVariable Long assignmentId,
+            @RequestBody AssignCleanerRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Cleaner assigned",
+                vehicleLeaseService.assignCleaner(id, assignmentId, request)));
     }
 
     @PutMapping("/{id}/vehicles/{assignmentId}/division")

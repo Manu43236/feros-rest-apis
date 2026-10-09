@@ -35,6 +35,14 @@ public class LeaseVehicleAssignment extends BaseEntity {
     @Column(name = "client_driver_name")
     private String clientDriverName;
 
+    // Optional — null when client provides their own cleaner
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cleaner_staff_id")
+    private StaffProfile cleanerStaff;
+
+    @Column(name = "client_cleaner_name")
+    private String clientCleanerName;
+
     @Column(name = "rate_per_vehicle", precision = 12, scale = 2, nullable = false)
     private BigDecimal ratePerVehicle;
 

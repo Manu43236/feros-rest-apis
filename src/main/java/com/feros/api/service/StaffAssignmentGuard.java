@@ -5,6 +5,7 @@ import com.feros.api.entity.Vehicle;
 import com.feros.api.enums.StaffAllocationStatus;
 import com.feros.api.enums.VehicleAllocationStatus;
 import com.feros.api.exception.FerosException;
+import com.feros.api.repository.LeaseCleanerAssignmentLogRepository;
 import com.feros.api.repository.LeaseDriverAssignmentLogRepository;
 import com.feros.api.repository.LeaseVehicleAssignmentRepository;
 import com.feros.api.repository.LeaseVehicleSessionRepository;
@@ -51,6 +52,7 @@ public class StaffAssignmentGuard {
     private final VehicleStaffAssignmentRepository vsaRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final LeaseDriverAssignmentLogRepository leaseLogRepository;
+    private final LeaseCleanerAssignmentLogRepository leaseCleanerLogRepository;
     private final LeaseVehicleAssignmentRepository leaseAssignmentRepository;
     private final LeaseVehicleSessionRepository leaseSessionRepository;
     private final StaffProfileRepository staffProfileRepository;
@@ -73,6 +75,11 @@ public class StaffAssignmentGuard {
                 map.put(l.getDriverStaff().getUser().getId(),
                         l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber() + " · lease");
         });
+        leaseCleanerLogRepository.findAllActiveByTenantId(tenantId).forEach(l -> {
+            if (l.getCleanerStaff() != null && l.getCleanerStaff().getUser() != null)
+                map.put(l.getCleanerStaff().getUser().getId(),
+                        l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber() + " · lease");
+        });
         return map;
     }
 
@@ -81,9 +88,12 @@ public class StaffAssignmentGuard {
     /** If the staff member is an active lease driver, a message naming that leased vehicle. */
     public Optional<String> activeLeaseVehicle(Long userId, Long tenantId) {
         return staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(userId, tenantId)
-                .flatMap(sp -> leaseLogRepository.findActiveByDriverStaffId(sp.getId(), tenantId))
-                .map(l -> l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber()
-                        + " (lease " + l.getLeaseVehicleAssignment().getLease().getLeaseNumber() + ")");
+                .flatMap(sp -> leaseLogRepository.findActiveByDriverStaffId(sp.getId(), tenantId)
+                        .map(l -> l.getLeaseVehicleAssignment())
+                        .or(() -> leaseCleanerLogRepository.findActiveByCleanerStaffId(sp.getId(), tenantId)
+                                .map(l -> l.getLeaseVehicleAssignment())))
+                .map(a -> a.getVehicle().getRegistrationNumber()
+                        + " (lease " + a.getLease().getLeaseNumber() + ")");
     }
 
     /** If on an open normal assignment or active order trip on a DIFFERENT vehicle, a message naming it. */
@@ -117,11 +127,12 @@ public class StaffAssignmentGuard {
         if (order.isPresent()) return order;
 
         return staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(userId, tenantId)
-                .flatMap(sp -> leaseLogRepository.findActiveByDriverStaffId(sp.getId(), tenantId))
-                .filter(l -> leaseSessionRepository
-                        .findByAssignmentIdAndIsActiveTrue(l.getLeaseVehicleAssignment().getId()).isPresent())
-                .map(l -> "an active lease session on "
-                        + l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber());
+                .flatMap(sp -> leaseLogRepository.findActiveByDriverStaffId(sp.getId(), tenantId)
+                        .map(l -> l.getLeaseVehicleAssignment())
+                        .or(() -> leaseCleanerLogRepository.findActiveByCleanerStaffId(sp.getId(), tenantId)
+                                .map(l -> l.getLeaseVehicleAssignment())))
+                .filter(a -> leaseSessionRepository.findByAssignmentIdAndIsActiveTrue(a.getId()).isPresent())
+                .map(a -> "an active lease session on " + a.getVehicle().getRegistrationNumber());
     }
 
     // ── Asserts (throw 409 with a branch code) ─────────────────────────────────────────────

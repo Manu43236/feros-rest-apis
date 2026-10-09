@@ -17,6 +17,9 @@ public class LeaseVehicleAssignmentRequest {
     private Long driverStaffId;
     private String clientDriverName;
 
+    private Long cleanerStaffId;
+    private String clientCleanerName;
+
     @NotNull(message = "Rate per vehicle is required")
     private BigDecimal ratePerVehicle;
 
