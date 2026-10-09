@@ -59,4 +59,18 @@ public interface LeaseCleanerAssignmentLogRepository extends JpaRepository<Lease
             @Param("tenantId") Long tenantId,
             @Param("startDate") java.time.LocalDateTime startDate,
             @Param("endDate") java.time.LocalDateTime endDate);
+
+    // All logs for history — ordered by most recent first
+    @Query("""
+        SELECT l FROM LeaseCleanerAssignmentLog l
+        LEFT JOIN FETCH l.leaseVehicleAssignment a
+        LEFT JOIN FETCH a.lease
+        LEFT JOIN FETCH a.vehicle
+        LEFT JOIN FETCH l.cleanerStaff cs
+        LEFT JOIN FETCH cs.user
+        LEFT JOIN FETCH l.assignedBy
+        WHERE l.tenant.id = :tenantId
+        ORDER BY l.assignedAt DESC
+        """)
+    List<LeaseCleanerAssignmentLog> findAllByTenantIdForHistory(@Param("tenantId") Long tenantId);
 }

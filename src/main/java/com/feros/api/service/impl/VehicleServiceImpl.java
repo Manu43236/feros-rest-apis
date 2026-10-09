@@ -77,6 +77,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final LrRepository lrRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
+    private final com.feros.api.repository.LeaseCleanerAssignmentLogRepository leaseCleanerAssignmentLogRepository;
     private final LeaseVehicleAssignmentRepository leaseVehicleAssignmentRepository;
 
     private Long getCurrentTenantId() {
@@ -1244,6 +1245,36 @@ public class VehicleServiceImpl implements VehicleService {
             Long userId = driverUser != null ? driverUser.getId() : null;
             String userName = driverUser != null ? driverUser.getName() : null;
             String userRole = driverUser != null ? driverUser.getRoles().stream().findFirst()
+                    .map(r -> r.getName().name()).orElse(null) : null;
+
+            events.add(com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
+                    .id(l.getId()).vehicleId(vehicleId).vehicleRegistrationNumber(regNum)
+                    .userId(userId).userName(userName).userRole(userRole)
+                    .type("LEASE_ASSIGNMENT").action("Assigned")
+                    .actionByName(l.getAssignedBy() != null ? l.getAssignedBy().getName() : null)
+                    .actionAt(l.getAssignedAt()).leaseNumber(leaseNum).build());
+
+            if (l.getUnassignedAt() != null) {
+                events.add(com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
+                        .id(l.getId()).vehicleId(vehicleId).vehicleRegistrationNumber(regNum)
+                        .userId(userId).userName(userName).userRole(userRole)
+                        .type("LEASE_ASSIGNMENT").action("Unassigned")
+                        .actionByName(null).actionAt(l.getUnassignedAt()).leaseNumber(leaseNum).build());
+            }
+        }
+
+        // Merge lease cleaner assignment logs
+        for (com.feros.api.entity.LeaseCleanerAssignmentLog l :
+                leaseCleanerAssignmentLogRepository.findAllByTenantIdForHistory(tenantId)) {
+            com.feros.api.entity.StaffProfile sp = l.getCleanerStaff();
+            com.feros.api.entity.User cleanerUser = sp != null ? sp.getUser() : null;
+            com.feros.api.entity.LeaseVehicleAssignment lva = l.getLeaseVehicleAssignment();
+            String regNum = lva != null && lva.getVehicle() != null ? lva.getVehicle().getRegistrationNumber() : null;
+            Long vehicleId = lva != null && lva.getVehicle() != null ? lva.getVehicle().getId() : null;
+            String leaseNum = lva != null && lva.getLease() != null ? lva.getLease().getLeaseNumber() : null;
+            Long userId = cleanerUser != null ? cleanerUser.getId() : null;
+            String userName = cleanerUser != null ? cleanerUser.getName() : null;
+            String userRole = cleanerUser != null ? cleanerUser.getRoles().stream().findFirst()
                     .map(r -> r.getName().name()).orElse(null) : null;
 
             events.add(com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
