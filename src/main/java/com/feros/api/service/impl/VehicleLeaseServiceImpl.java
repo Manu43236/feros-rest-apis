@@ -268,9 +268,11 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                             .findAllByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(
                                     sa.getUser().getId(), tenantId())
                             .forEach(vsa -> {
+                                // Close the VSA (date it), but keep is_active=true so the staff
+                                // still shows on the past days this assignment legitimately covered.
+                                // is_active is not date-scoped — voiding it erases history.
                                 vsa.setAssignedTo(LocalDate.now());
                                 vsa.setUnassignedAt(LocalDateTime.now());
-                                vsa.setIsActive(false);
                             });
                 }
                 ova.setAllocationStatus(VehicleAllocationStatus.CANCELLED);
@@ -639,10 +641,11 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                         .stream()
                         .filter(vsa -> vsa.getVehicle().getId().equals(vehicle.getId()))
                         .forEach(vsa -> {
+                            // Close the VSA (date it), but keep is_active=true — voiding it would
+                            // retroactively remove the staff from every past day it covered.
                             vsa.setAssignedTo(LocalDate.now());
                             vsa.setUnassignedBy(actor);
                             vsa.setUnassignedAt(LocalDateTime.now());
-                            vsa.setIsActive(false);
                         }));
         vehicle.setCurrentDriver(null);
         vehicle.setCurrentCleaner(null);
