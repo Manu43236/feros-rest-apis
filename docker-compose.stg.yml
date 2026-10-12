@@ -1,0 +1,80 @@
+# Staging stack — mirror of prod, isolated names/volume/network so it can run
+# independently (ideally on a SEPARATE EC2; see note at bottom).
+# Place on the staging box as: /home/ubuntu/feros-stg/docker-compose.yml
+# Container names match the CI: web deploy-stg.yml reloads `feros_stg_nginx`.
+
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: feros_stg_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-feros_db}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:3307:3306"   # 3307 on host → avoids clashing with prod if same box
+    volumes:
+      - mysql_stg_data:/var/lib/mysql   # SEPARATE volume — never shares prod data
+    networks:
+      - feros_stg_net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: ${API_IMAGE}            # ghcr.io/manu43236/feros-rest-apis:stg (set by CI into .env)
+    container_name: feros_stg_api
+    restart: unless-stopped
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306                # internal container port (compose network)
+      DB_NAME: ${DB_NAME:-feros_db}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+      JAVA_TOOL_OPTIONS: -Duser.timezone=Asia/Kolkata
+    # GPS TCP 2024: staging usually doesn't take the live iTriangle stream.
+    # If you DO want it and this is a SEPARATE box, uncomment; on a shared box it
+    # would clash with prod's 2024.
+    # ports:
+    #   - "2024:2024"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - feros_stg_net
+
+  nginx:
+    image: nginx:alpine
+    container_name: feros_stg_nginx
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8082:80"   # 8082 on host → host reverse-proxy/Cloudflare maps stg.console.feros.in here
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /home/ubuntu/feros-stg-web/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - api
+    networks:
+      - feros_stg_net
+
+volumes:
+  mysql_stg_data:
+
+networks:
+  feros_stg_net:
+    driver: bridge
+
+# ── Capacity note ──────────────────────────────────────────────────────────────
+# Prod EC2 is a RAM-starved t3.small. A second full stack (MySQL + JVM + nginx)
+# on the SAME box will OOM. Run staging on its own instance (a t3.small/t3.micro
+# is fine for staging), OR resize to t3.medium+ before co-hosting. The CI already
+# targets a separate STG_EC2_HOST, so a dedicated instance is the intended design.

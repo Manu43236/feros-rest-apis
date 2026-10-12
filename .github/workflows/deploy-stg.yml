@@ -25,6 +25,9 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Write Firebase service account
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > src/main/resources/firebase-service-account.json
+
       - name: Build JAR
         run: mvn package -DskipTests -q
 
@@ -50,6 +53,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Copy config files to Stg EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.STG_EC2_HOST }}
+          username: ${{ secrets.STG_EC2_USER }}
+          key: ${{ secrets.STG_EC2_SSH_KEY }}
+          port: 1995
+          source: "docker-compose.stg.yml,nginx.conf"
+          target: /home/ubuntu/feros-stg
+
       - name: Deploy on Stg EC2
         uses: appleboy/ssh-action@v1.0.3
         env:
@@ -63,9 +76,11 @@ jobs:
           port: 1995
           envs: API_IMAGE,GHCR_TOKEN,GHCR_ACTOR
           script: |
+            set -e
             sudo mkdir -p /home/ubuntu/feros-stg-web/dist
             sudo chown -R ubuntu:ubuntu /home/ubuntu/feros-stg-web
             cd /home/ubuntu/feros-stg
+            mv -f docker-compose.stg.yml docker-compose.yml
             echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
             sudo sed -i '/^API_IMAGE=/d' .env 2>/dev/null; echo "API_IMAGE=$API_IMAGE" | sudo tee -a .env
             sudo docker compose pull api
