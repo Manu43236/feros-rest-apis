@@ -61,6 +61,10 @@ public class LeaseVehicleSession extends BaseEntity {
     @Column(name = "is_active")
     private Boolean isActive;
 
+    // Shift this session belongs to (shift-duty leases only) — for per-shift km/hours reporting
+    @Column(name = "lease_shift_id")
+    private Long leaseShiftId;
+
     @Column(name = "notes")
     private String notes;
 }

@@ -87,6 +87,10 @@ public class Payroll extends BaseEntity {
     @Column(name = "vehicle_extra_pay")
     private BigDecimal vehicleExtraPay = BigDecimal.ZERO;
 
+    // Lease shift earnings — replaces the daily rate on shift days (own component, not folded into basic)
+    @Column(name = "shift_pay")
+    private BigDecimal shiftPay = BigDecimal.ZERO;
+
     @Column(name = "gross_pay")
     private BigDecimal grossPay = BigDecimal.ZERO;
 

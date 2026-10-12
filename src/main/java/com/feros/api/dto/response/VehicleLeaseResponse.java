@@ -7,6 +7,7 @@ import lombok.Getter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Builder
@@ -22,6 +23,8 @@ public class VehicleLeaseResponse {
     private RateType rateType;
     private LeaseStatus status;
     private String notes;
+    private Boolean shiftDuty;
+    private List<LeaseShiftResponse> shifts;
     private long vehicleCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

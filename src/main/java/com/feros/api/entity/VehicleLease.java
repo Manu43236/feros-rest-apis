@@ -53,6 +53,11 @@ public class VehicleLease extends BaseEntity {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    // Shift-duty lease: work runs in defined shift windows (see LeaseShift); crew + pay are per-shift.
+    @Column(name = "shift_duty")
+    @Builder.Default
+    private Boolean shiftDuty = false;
+
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;

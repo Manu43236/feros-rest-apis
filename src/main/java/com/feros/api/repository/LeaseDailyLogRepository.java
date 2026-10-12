@@ -11,4 +11,5 @@ import java.util.List;
 public interface LeaseDailyLogRepository extends JpaRepository<LeaseDailyLog, Long> {
     List<LeaseDailyLog> findByLeaseIdOrderByLogDateDesc(Long leaseId);
     boolean existsByAssignmentIdAndLogDate(Long assignmentId, LocalDate logDate);
+    java.util.Optional<LeaseDailyLog> findByAssignmentIdAndLogDate(Long assignmentId, LocalDate logDate);
 }

@@ -118,6 +118,26 @@ public class VehicleLeaseController {
                 vehicleLeaseService.assignCleaner(id, assignmentId, request)));
     }
 
+    @PutMapping("/{id}/vehicles/{assignmentId}/shift-assignments")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<com.feros.api.dto.response.LeaseShiftAssignmentResponse>> assignShift(
+            @PathVariable Long id,
+            @PathVariable Long assignmentId,
+            @Valid @RequestBody com.feros.api.dto.request.ShiftAssignmentRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Shift assigned",
+                vehicleLeaseService.assignShift(id, assignmentId, request)));
+    }
+
+    @GetMapping("/{id}/shift-assignments")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<com.feros.api.dto.response.LeaseShiftAssignmentResponse>>> getShiftAssignments(
+            @PathVariable Long id,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success("Shift assignments",
+                vehicleLeaseService.getShiftAssignments(id, from, to)));
+    }
+
     @PutMapping("/{id}/vehicles/{assignmentId}/division")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<LeaseVehicleAssignmentResponse>> assignDivision(

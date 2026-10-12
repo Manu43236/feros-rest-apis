@@ -1,11 +1,13 @@
 package com.feros.api.dto.request;
 
 import com.feros.api.enums.RateType;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Setter
@@ -25,4 +27,10 @@ public class VehicleLeaseRequest {
     private RateType rateType;
 
     private String notes;
+
+    // Shift-duty lease: when true, work runs in the defined shift windows below (crew + pay per shift)
+    private Boolean shiftDuty;
+
+    @Valid
+    private List<ShiftDefinitionRequest> shifts;
 }

@@ -39,6 +39,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ReportServiceImpl implements ReportService {
 
+    private final com.feros.api.service.LeaseShiftPayResolver leaseShiftPayResolver;
+    private final com.feros.api.repository.LeaseShiftAssignmentRepository leaseShiftAssignmentRepository;
     private final VehicleRepository vehicleRepository;
     private final VehicleFuelLogRepository fuelLogRepository;
     private final VehicleMeterReadingRepository meterReadingRepository;
@@ -333,6 +335,7 @@ public class ReportServiceImpl implements ReportService {
         Map<Long, String> leaseMap = buildLeaseDriverMap(tenantId, startDate, endDate);
         Map<Long, Long> leaseHolderByVehicle = buildLeaseHolderByVehicle(tenantId, startDate, endDate);
         Map<Long, Long> leaseCleanerHolderByVehicle = buildLeaseCleanerHolderByVehicle(tenantId, startDate, endDate);
+        com.feros.api.service.LeaseShiftPayResolver.Context shiftCtx = leaseShiftPayResolver.buildContext(tenantId, startDate, endDate);
 
         return records.stream().map(a -> {
             Double hoursWorked = null;
@@ -344,7 +347,7 @@ public class ReportServiceImpl implements ReportService {
                     .employeeId(a.getUser().getId())
                     .employeeName(a.getUser().getName())
                     .role(primaryRole(a.getUser()))
-                    .vehicleRegistrationNumber(resolveVehicleForDate(userAssignments, leaseMap, leaseHolderByVehicle, leaseCleanerHolderByVehicle, a.getUser().getId(), tenantId, a.getAttendanceDate()))
+                    .vehicleRegistrationNumber(resolveVehicleForDate(userAssignments, leaseMap, leaseHolderByVehicle, leaseCleanerHolderByVehicle, shiftCtx, a.getUser().getId(), tenantId, a.getAttendanceDate()))
                     .attendanceDate(a.getAttendanceDate())
                     .attendanceType(a.getAttendanceType().getName())
                     .markedAt(a.getMarkedAt())
@@ -943,6 +946,7 @@ public class ReportServiceImpl implements ReportService {
                                          Map<Long, String> leaseMap,
                                          Map<Long, Long> leaseHolderByVehicle,
                                          Map<Long, Long> leaseCleanerHolderByVehicle,
+                                         com.feros.api.service.LeaseShiftPayResolver.Context shiftCtx,
                                          Long userId, Long tenantId, LocalDate date) {
         Optional<VehicleStaffAssignment> myVsa = userAssignments.getOrDefault(userId, List.of()).stream()
                 .filter(a -> !a.getAssignedFrom().isAfter(date) && (a.getAssignedTo() == null || !a.getAssignedTo().isBefore(date)))
@@ -992,8 +996,12 @@ public class ReportServiceImpl implements ReportService {
                 .map(sa -> sa.getVehicleAllocation().getVehicle().getRegistrationNumber())
                 .orElse(null);
         if (fromOrder != null) return fromOrder;
-        // ponytail: fallback 2 — driver assigned via lease, not VSA
-        return leaseMap.getOrDefault(userId, "—");
+        // ponytail: fallback 2 — driver assigned via standing lease log, not VSA
+        String fromLease = leaseMap.get(userId);
+        if (fromLease != null) return fromLease;
+        // fallback 3 — shift-duty lease: date-exact shift assignment (no VSA, no standing log)
+        com.feros.api.entity.Vehicle shiftVeh = leaseShiftPayResolver.vehicle(shiftCtx, userId, date);
+        return shiftVeh != null ? shiftVeh.getRegistrationNumber() : "—";
     }
 
     private String resolveVehiclesForPeriod(Map<Long, List<VehicleStaffAssignment>> userAssignments,
@@ -2340,6 +2348,8 @@ public class ReportServiceImpl implements ReportService {
         }
 
         List<VehiclePayrollCostRow> rows = new ArrayList<>();
+        com.feros.api.service.LeaseShiftPayResolver.Context shiftCtx =
+                leaseShiftPayResolver.buildContext(tenantId, startDate, endDate);
 
         // Pivot of the payslip Daily Earnings Annexure: replay each PAID daily-rate payroll day by
         // day and keep the days on the requested vehicle (or all vehicles when none is given).
@@ -2382,6 +2392,31 @@ public class ReportServiceImpl implements ReportService {
                 boolean isHalf = record.getAttendanceType().getName().toLowerCase().contains("half");
                 BigDecimal factor = isHalf ? new BigDecimal("0.5") : BigDecimal.ONE;
 
+                // Lease shift day: the earning is the shift pay (not the daily rate) and the vehicle
+                // comes from the shift assignment (shift leases have no VSA). Mirrors payroll.
+                if (leaseShiftPayResolver.isShiftDay(shiftCtx, userId, day)) {
+                    Vehicle sv = leaseShiftPayResolver.vehicle(shiftCtx, userId, day);
+                    if (sv == null) continue;
+                    if (vehicleId != null && !sv.getId().equals(vehicleId)) continue;
+                    BigDecimal shiftDesPay = leaseShiftPayResolver.shiftPay(shiftCtx, userId, day)
+                            .multiply(factor).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal shiftVehPay = BigDecimal.ZERO;
+                    if (isCleaner) {
+                        BigDecimal cp = sv.getCleanerExtraPayPerDay();
+                        if (cp != null && cp.compareTo(BigDecimal.ZERO) > 0)
+                            shiftVehPay = cp.multiply(factor).setScale(2, RoundingMode.HALF_UP);
+                    } else if (Boolean.TRUE.equals(sv.getExtraPayEnabled()) && sv.getExtraPayPerDay() != null) {
+                        shiftVehPay = sv.getExtraPayPerDay().multiply(factor).setScale(2, RoundingMode.HALF_UP);
+                    }
+                    rows.add(VehiclePayrollCostRow.builder()
+                            .date(day).vehicleNumber(sv.getRegistrationNumber())
+                            .staffName(payroll.getUser().getName()).role(userRole)
+                            .dailyPay(shiftDesPay.add(shiftVehPay))
+                            .payrollStatus(payroll.getPayrollStatus().name())
+                            .build());
+                    continue;
+                }
+
                 // Vehicle for this day = latest VSA covering it (same rule as the annexure).
                 Optional<VehicleStaffAssignment> best = userAssignments.stream()
                         .filter(a -> !day.isBefore(a.getAssignedFrom())
@@ -2412,6 +2447,26 @@ public class ReportServiceImpl implements ReportService {
                         .dailyPay(desPay.add(vehPay))
                         .payrollStatus(payroll.getPayrollStatus().name())
                         .build());
+            }
+        }
+
+        // Client-provided shifts (null staff) cost the tenant nothing, but must still be VISIBLE on
+        // the vehicle so "every rupee shows" — emit a ₹0 line for each.
+        boolean wantDriver = role == null || role.equalsIgnoreCase("ALL") || role.equalsIgnoreCase("DRIVER");
+        boolean wantCleaner = role == null || role.equalsIgnoreCase("ALL") || role.equalsIgnoreCase("CLEANER");
+        for (com.feros.api.entity.LeaseShiftAssignment sa :
+                leaseShiftAssignmentRepository.findOverlappingByTenantId(tenantId, startDate, endDate)) {
+            Vehicle v = sa.getLeaseVehicleAssignment().getVehicle();
+            if (vehicleId != null && !v.getId().equals(vehicleId)) continue;
+            if (sa.getDriverStaff() == null && wantDriver) {
+                rows.add(VehiclePayrollCostRow.builder().date(sa.getWorkDate())
+                        .vehicleNumber(v.getRegistrationNumber()).staffName("Client's driver").role("DRIVER")
+                        .dailyPay(BigDecimal.ZERO).payrollStatus("—").build());
+            }
+            if (sa.getCleanerStaff() == null && wantCleaner) {
+                rows.add(VehiclePayrollCostRow.builder().date(sa.getWorkDate())
+                        .vehicleNumber(v.getRegistrationNumber()).staffName("Client's cleaner").role("CLEANER")
+                        .dailyPay(BigDecimal.ZERO).payrollStatus("—").build());
             }
         }
 
@@ -2701,12 +2756,13 @@ public class ReportServiceImpl implements ReportService {
         Map<Long, String> leaseMap = buildLeaseDriverMap(tenantId, date, date);
         Map<Long, Long> leaseHolderByVehicle = buildLeaseHolderByVehicle(tenantId, date, date);
         Map<Long, Long> leaseCleanerHolderByVehicle = buildLeaseCleanerHolderByVehicle(tenantId, date, date);
+        com.feros.api.service.LeaseShiftPayResolver.Context shiftCtx = leaseShiftPayResolver.buildContext(tenantId, date, date);
 
         // resolve vehicle per person using same logic as HR attendance (max assignedFrom+createdAt + swap-dedup)
         Map<String, String> vehicleDriverMap  = new HashMap<>();
         Map<String, String> vehicleCleanerMap = new HashMap<>();
         for (Attendance att : presentRecords) {
-            String reg = resolveVehicleForDate(userAssignments, leaseMap, leaseHolderByVehicle, leaseCleanerHolderByVehicle, att.getUser().getId(), tenantId, date);
+            String reg = resolveVehicleForDate(userAssignments, leaseMap, leaseHolderByVehicle, leaseCleanerHolderByVehicle, shiftCtx, att.getUser().getId(), tenantId, date);
             if ("—".equals(reg)) continue;
             String role = primaryRole(att.getUser());
             if ("DRIVER".equals(role))       vehicleDriverMap.put(reg,  att.getUser().getName());

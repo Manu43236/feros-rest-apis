@@ -47,6 +47,7 @@ class PayrollCalculationTest {
     @Mock private StaffProfileRepository staffProfileRepository;
     @Mock private VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     @Mock private StaffVehicleDayResolver staffVehicleDayResolver;
+    @Mock private LeaseShiftPayResolver leaseShiftPayResolver;
     @Mock private LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     @Mock private TenantHolidayRepository tenantHolidayRepository;
     @Mock private NotificationService notificationService;
@@ -64,7 +65,7 @@ class PayrollCalculationTest {
             payrollRepository, payrollDeductionRepository, salaryAdvanceRepository,
             tenantRepository, userRepository, attendanceRepository,
             deductionTypeRepository, staffProfileRepository,
-            vehicleStaffAssignmentRepository, staffVehicleDayResolver, leaseDriverAssignmentLogRepository,
+            vehicleStaffAssignmentRepository, staffVehicleDayResolver, leaseShiftPayResolver, leaseDriverAssignmentLogRepository,
             tenantHolidayRepository,
             notificationService, transactionManager, numberGenerator
         );
@@ -97,6 +98,30 @@ class PayrollCalculationTest {
         // effectiveDays = 20 + 2×0.5 = 21 → basicPay = 500 × 21 = 10500
         assertThat(saved.getBasicPay()).isEqualByComparingTo("10500.00");
         assertThat(saved.getGrossPay()).isEqualByComparingTo("10500.00");
+    }
+
+    @Test
+    @DisplayName("Daily + lease shifts: shift pay REPLACES the daily rate on shift days (10×500 + 5×750 = 8750)")
+    void generatePayroll_dailyWithShiftDays_shiftReplacesDaily() {
+        stubCommonDeps(SalaryType.DAILY, null, new BigDecimal("500.00"), null, false);
+        stubAttendance(15, 0, 0, 0);   // 15 present days: 10 normal + 5 shift
+
+        // Mark the first 5 attendance dates (2024-01-01..05) as ₹750 shift days.
+        for (int i = 0; i < 5; i++) {
+            LocalDate d = LocalDate.of(2024, 1, 1).plusDays(i);
+            when(leaseShiftPayResolver.isShiftDay(any(), org.mockito.ArgumentMatchers.eq(USER_ID),
+                    org.mockito.ArgumentMatchers.eq(d))).thenReturn(true);
+            when(leaseShiftPayResolver.shiftPay(any(), org.mockito.ArgumentMatchers.eq(USER_ID),
+                    org.mockito.ArgumentMatchers.eq(d))).thenReturn(new BigDecimal("750"));
+        }
+
+        payrollService.generatePayroll(buildRequest(
+            LocalDate.of(2024, 6, 1), LocalDate.of(2024, 6, 30), null, null));
+
+        Payroll saved = captureFirstSave();
+        assertThat(saved.getBasicPay()).isEqualByComparingTo("5000.00");   // 10 normal × 500
+        assertThat(saved.getShiftPay()).isEqualByComparingTo("3750.00");   // 5 shifts × 750
+        assertThat(saved.getGrossPay()).isEqualByComparingTo("8750.00");
     }
 
     // ─── MONTHLY salary: off-days model ────────────────────────────────────────
@@ -193,9 +218,15 @@ class PayrollCalculationTest {
         // vehicle allowance, so resolve to no vehicle (₹0 allowance) — same net as before.
         lenient().when(staffVehicleDayResolver.buildContext(anyLong(), any(), any()))
             .thenReturn(new StaffVehicleDayResolver.Context(
-                java.util.Map.of(), java.util.Map.of(), java.util.Map.of(), java.util.Map.of()));
+                java.util.Map.of(), java.util.Map.of(), java.util.Map.of(), java.util.Map.of(),
+                new LeaseShiftPayResolver.Context(java.util.Map.of())));
         lenient().when(staffVehicleDayResolver.resolve(any(), anyLong(), anyLong(), any()))
             .thenReturn(null);
+
+        // No shift days in these tests → basic pay unchanged (regression-safe).
+        lenient().when(leaseShiftPayResolver.buildContext(anyLong(), any(), any()))
+            .thenReturn(new LeaseShiftPayResolver.Context(java.util.Map.of()));
+        lenient().when(leaseShiftPayResolver.isShiftDay(any(), anyLong(), any())).thenReturn(false);
 
         Tenant tenant = new Tenant();
         tenant.setId(TENANT_ID);

@@ -56,6 +56,8 @@ public class DriverDashboardResponse {
         // Active session info (null if no session running)
         private Long activeSessionId;
         private java.time.LocalDateTime sessionStartTime;
+        // Shift-duty lease only: e.g. "Shift 2 · 21:00–09:00" (null for normal leases)
+        private String shiftLabel;
     }
 
     @Data

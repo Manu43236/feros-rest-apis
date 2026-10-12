@@ -228,6 +228,9 @@ public class PayslipPdfService {
                 addInnerRow(earningsT, "Trip Bonus", fmt(payroll.getTripBonus()));
             if (payroll.getVehicleExtraPay() != null && payroll.getVehicleExtraPay().compareTo(BigDecimal.ZERO) > 0)
                 addInnerRow(earningsT, "Vehicle Allowance", fmt(payroll.getVehicleExtraPay()));
+            // Lease shift earnings — shift pay replaces the daily rate on shift days, shown as its own line
+            if (payroll.getShiftPay() != null && payroll.getShiftPay().compareTo(BigDecimal.ZERO) > 0)
+                addInnerRow(earningsT, "Lease Shift Earnings", fmt(payroll.getShiftPay()));
 
             addInnerTotal(earningsT, "GROSS PAY", fmt(payroll.getGrossPay()), SUCCESS);
 

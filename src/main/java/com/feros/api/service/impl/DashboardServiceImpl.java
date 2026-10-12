@@ -47,6 +47,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final StaffDocumentRepository staffDocumentRepository;
     private final LrRepository lrRepository;
     private final VehicleBreakdownRepository vehicleBreakdownRepository;
+    private final com.feros.api.repository.LeaseShiftAssignmentRepository leaseShiftAssignmentRepository;
     private final NotificationRepository notificationRepository;
     private final VehicleMeterReadingRepository vehicleMeterReadingRepository;
     private final TenantSettingsRepository tenantSettingsRepository;
@@ -342,6 +343,37 @@ public class DashboardServiceImpl implements DashboardService {
                         .sessionStartTime(activeSession != null ? activeSession.getStartTime() : null)
                         .build();
             }).orElse(null);
+
+            // Shift-duty lease: no standing driver log exists — resolve today's shift assignment so
+            // the shift driver still sees the active lease and can start/end their session.
+            if (activeLease == null) {
+                activeLease = staffProfileRepository.findByUserId(userId)
+                    .map(sp -> leaseShiftAssignmentRepository
+                            .findByDriverStaffIdAndWorkDate(sp.getId(), TimeUtil.today()))
+                    .filter(list -> !list.isEmpty())
+                    .map(list -> list.get(0))
+                    .map(sa -> {
+                        var va = sa.getLeaseVehicleAssignment();
+                        var lease = va.getLease();
+                        var shift = sa.getLeaseShift();
+                        var activeSession = leaseVehicleSessionRepository
+                                .findByAssignmentIdAndIsActiveTrue(va.getId()).orElse(null);
+                        return DriverDashboardResponse.ActiveLease.builder()
+                                .leaseId(lease.getId())
+                                .assignmentId(va.getId())
+                                .leaseNumber(lease.getLeaseNumber())
+                                .clientName(lease.getClient().getClientName())
+                                .vehicleNumber(va.getVehicle().getRegistrationNumber())
+                                .divisionName(va.getDivisionName())
+                                .lastOdometer(va.getVehicle().getCurrentOdometerReading())
+                                .activeSessionId(activeSession != null ? activeSession.getId() : null)
+                                .sessionStartTime(activeSession != null ? activeSession.getStartTime() : null)
+                                .shiftLabel("Shift " + shift.getShiftNumber() + " · "
+                                        + shift.getStartTime() + "–" + shift.getEndTime())
+                                .build();
+                    })
+                    .orElse(null);
+            }
         }
 
         return DriverDashboardResponse.builder()

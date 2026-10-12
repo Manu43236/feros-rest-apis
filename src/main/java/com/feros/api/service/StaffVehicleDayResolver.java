@@ -38,6 +38,7 @@ public class StaffVehicleDayResolver {
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     private final LeaseCleanerAssignmentLogRepository leaseCleanerAssignmentLogRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
+    private final LeaseShiftPayResolver leaseShiftPayResolver;
 
     /** Tenant-wide maps, built once per run and reused for every (user, date) resolution.
      *  {@code leaseVehicleByUser} covers both lease drivers and lease cleaners (userIds never collide);
@@ -45,7 +46,8 @@ public class StaffVehicleDayResolver {
     public record Context(Map<Long, List<VehicleStaffAssignment>> userAssignments,
                           Map<Long, Vehicle> leaseVehicleByUser,
                           Map<Long, Long> leaseHolderByVehicle,
-                          Map<Long, Long> leaseCleanerHolderByVehicle) {}
+                          Map<Long, Long> leaseCleanerHolderByVehicle,
+                          LeaseShiftPayResolver.Context shiftCtx) {}
 
     public Context buildContext(Long tenantId, LocalDate startDate, LocalDate endDate) {
         Map<Long, List<VehicleStaffAssignment>> userAssignments = vehicleStaffAssignmentRepository
@@ -122,7 +124,11 @@ public class StaffVehicleDayResolver {
                         l.getCleanerStaff().getUser().getId(),
                         l.getLeaseVehicleAssignment().getVehicle()));
 
-        return new Context(userAssignments, leaseVehicleByUser, leaseHolderByVehicle, leaseCleanerHolderByVehicle);
+        // Shift-duty leases have no VSA and no standing lease log — the shift assignment is the only
+        // record placing the person on a vehicle for the day (date-exact, night shift on start date).
+        LeaseShiftPayResolver.Context shiftCtx = leaseShiftPayResolver.buildContext(tenantId, startDate, endDate);
+
+        return new Context(userAssignments, leaseVehicleByUser, leaseHolderByVehicle, leaseCleanerHolderByVehicle, shiftCtx);
     }
 
     /** The vehicle this user was on for {@code date}, or null (== "—"). Verbatim port of
@@ -169,8 +175,11 @@ public class StaffVehicleDayResolver {
                 .map(sa -> sa.getVehicleAllocation().getVehicle())
                 .orElse(null);
         if (fromOrder != null) return fromOrder;
-        // fallback 2 — assigned via lease, not VSA
-        return ctx.leaseVehicleByUser().get(userId);
+        // fallback 2 — assigned via standing lease log, not VSA
+        Vehicle fromLease = ctx.leaseVehicleByUser().get(userId);
+        if (fromLease != null) return fromLease;
+        // fallback 3 — shift-duty lease: date-exact shift assignment
+        return leaseShiftPayResolver.vehicle(ctx.shiftCtx(), userId, date);
     }
 
     /** Verbatim copy of ReportServiceImpl.primaryRole so resolution logic is byte-for-byte identical. */

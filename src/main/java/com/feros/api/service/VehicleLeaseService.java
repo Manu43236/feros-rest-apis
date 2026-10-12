@@ -34,6 +34,12 @@ public interface VehicleLeaseService {
     LeaseVehicleAssignmentResponse assignCleaner(Long leaseId, Long assignmentId, AssignCleanerRequest request);
     List<LeaseVehicleAssignmentResponse> getVehicles(Long leaseId);
 
+    // Shift-duty leases — per-day, per-shift crew assignment
+    com.feros.api.dto.response.LeaseShiftAssignmentResponse assignShift(
+            Long leaseId, Long assignmentId, com.feros.api.dto.request.ShiftAssignmentRequest request);
+    List<com.feros.api.dto.response.LeaseShiftAssignmentResponse> getShiftAssignments(
+            Long leaseId, LocalDate from, LocalDate to);
+
     LeaseBillingResponse getBilling(Long leaseId);
 
     // Sessions

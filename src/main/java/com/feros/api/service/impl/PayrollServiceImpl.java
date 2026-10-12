@@ -62,6 +62,7 @@ public class PayrollServiceImpl implements PayrollService {
     private final StaffProfileRepository staffProfileRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final com.feros.api.service.StaffVehicleDayResolver staffVehicleDayResolver;
+    private final com.feros.api.service.LeaseShiftPayResolver leaseShiftPayResolver;
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PayrollServiceImpl.class);
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     private final TenantHolidayRepository tenantHolidayRepository;
@@ -210,6 +211,7 @@ public class PayrollServiceImpl implements PayrollService {
         absentDays += Math.max(0, totalDays - markedDays);
 
         BigDecimal basicPay;
+        BigDecimal shiftPaySum = BigDecimal.ZERO;   // lease shift earnings (own component)
         BigDecimal resolvedDailyRate = null;
         BigDecimal resolvedMonthlySalary = null;
         Integer resolvedAllowedOffDays = null;
@@ -261,8 +263,24 @@ public class PayrollServiceImpl implements PayrollService {
             BigDecimal effectiveDays = BigDecimal.valueOf(presentDays)
                     .add(BigDecimal.valueOf(halfDays).multiply(new BigDecimal("0.5")));
 
+            // Lease shift days: the shift's snapshotted pay REPLACES the daily rate on those days.
+            // basic = daily rate × (effective non-shift days); shiftPay = Σ shift pay (own component).
+            BigDecimal shiftEffectiveDays = BigDecimal.ZERO;
+            com.feros.api.service.LeaseShiftPayResolver.Context shiftCtx = leaseShiftPayResolver
+                    .buildContext(tenantId, request.getPayCycleStartDate(), request.getPayCycleEndDate());
+            for (com.feros.api.entity.Attendance a : attendanceList) {
+                String t = a.getAttendanceType().getName().toLowerCase();
+                if (!t.contains("present") && !t.contains("half")) continue;
+                if (!leaseShiftPayResolver.isShiftDay(shiftCtx, request.getUserId(), a.getAttendanceDate())) continue;
+                BigDecimal factor = t.contains("half") ? new BigDecimal("0.5") : BigDecimal.ONE;
+                shiftPaySum = shiftPaySum.add(
+                        leaseShiftPayResolver.shiftPay(shiftCtx, request.getUserId(), a.getAttendanceDate()).multiply(factor));
+                shiftEffectiveDays = shiftEffectiveDays.add(factor);
+            }
+            shiftPaySum = shiftPaySum.setScale(2, RoundingMode.HALF_UP);
+
             basicPay = resolvedDailyRate
-                    .multiply(effectiveDays)
+                    .multiply(effectiveDays.subtract(shiftEffectiveDays).max(BigDecimal.ZERO))
                     .setScale(2, RoundingMode.HALF_UP);
         }
 
@@ -308,7 +326,7 @@ public class PayrollServiceImpl implements PayrollService {
         }
         vehicleExtraPay = vehicleExtraPay.setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal grossPay = basicPay.add(overtimePay).add(tripBonus).add(vehicleExtraPay);
+        BigDecimal grossPay = basicPay.add(overtimePay).add(tripBonus).add(vehicleExtraPay).add(shiftPaySum);
 
         Payroll payroll = Payroll.builder()
                 .tenant(getCurrentTenant())
@@ -331,6 +349,7 @@ public class PayrollServiceImpl implements PayrollService {
                 .overtimePay(overtimePay)
                 .tripBonus(tripBonus)
                 .vehicleExtraPay(vehicleExtraPay)
+                .shiftPay(shiftPaySum)
                 .grossPay(grossPay)
                 .totalDeductions(BigDecimal.ZERO)
                 .netPay(grossPay)
@@ -802,6 +821,7 @@ public class PayrollServiceImpl implements PayrollService {
                 .overtimePay(p.getOvertimePay())
                 .tripBonus(p.getTripBonus())
                 .vehicleExtraPay(p.getVehicleExtraPay())
+                .shiftPay(p.getShiftPay())
                 .grossPay(p.getGrossPay())
                 .totalDeductions(p.getTotalDeductions())
                 .netPay(p.getNetPay())

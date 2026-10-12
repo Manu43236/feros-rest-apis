@@ -5,6 +5,7 @@ import com.feros.api.dto.request.AssignDivisionRequest;
 import com.feros.api.dto.request.AssignDriverRequest;
 import com.feros.api.dto.request.LeaseSessionStartRequest;
 import com.feros.api.dto.request.LeaseVehicleAssignmentRequest;
+import com.feros.api.dto.request.ShiftDefinitionRequest;
 import com.feros.api.dto.request.VehicleLeaseRequest;
 import com.feros.api.dto.response.LeaseBillingResponse;
 import com.feros.api.dto.response.LeaseDailyLogResponse;
@@ -64,6 +65,9 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     private final NotificationService notificationService;
     private final LeaseDriverAssignmentLogRepository leaseDriverLogRepository;
     private final LeaseCleanerAssignmentLogRepository leaseCleanerLogRepository;
+    private final com.feros.api.repository.LeaseShiftRepository leaseShiftRepository;
+    private final com.feros.api.repository.LeaseShiftAssignmentRepository leaseShiftAssignmentRepository;
+    private final com.feros.api.repository.AttendanceTypeRepository attendanceTypeRepository;
     private final OrderVehicleAllocationRepository orderVehicleAllocationRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
@@ -118,9 +122,11 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .endDate(request.getEndDate())
                 .rateType(request.getRateType())
                 .notes(request.getNotes())
+                .shiftDuty(Boolean.TRUE.equals(request.getShiftDuty()))
                 .build();
 
         VehicleLease saved = leaseRepository.save(lease);
+        persistShifts(saved, request);
         notificationService.sendToRoles(t, List.of(RoleName.ADMIN, RoleName.OFFICE_STAFF, RoleName.SUPERVISOR),
                 NotificationType.LEASE_CREATED,
                 "New Vehicle Lease",
@@ -147,8 +153,14 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         lease.setEndDate(request.getEndDate());
         lease.setRateType(request.getRateType());
         lease.setNotes(request.getNotes());
+        if (request.getShiftDuty() != null) lease.setShiftDuty(request.getShiftDuty());
 
-        return toResponse(leaseRepository.save(lease), assignmentRepository.countByLeaseId(id));
+        VehicleLease saved = leaseRepository.save(lease);
+        // Re-defining shifts replaces the set (forward-only pay lives on the assignment snapshots,
+        // so already-worked days are unaffected by redefining the lease's shift windows).
+        if (request.getShifts() != null) persistShifts(saved, request);
+
+        return toResponse(saved, assignmentRepository.countByLeaseId(id));
     }
 
     // ── Status ────────────────────────────────────────────────────────────────
@@ -227,6 +239,151 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         fetchLease(leaseId);
         return assignmentRepository.findByLeaseIdOrderByStartDateAsc(leaseId)
                 .stream().map(this::toAssignmentResponse).collect(Collectors.toList());
+    }
+
+    // ── Shift assignment (shift-duty leases) ────────────────────────────────────
+
+    @Override
+    @Transactional
+    public com.feros.api.dto.response.LeaseShiftAssignmentResponse assignShift(
+            Long leaseId, Long assignmentId, com.feros.api.dto.request.ShiftAssignmentRequest request) {
+        fetchLease(leaseId);
+        LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
+                .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
+        com.feros.api.entity.LeaseShift shift = leaseShiftRepository.findById(request.getShiftId())
+                .orElseThrow(() -> new FerosException("Shift not found", HttpStatus.NOT_FOUND));
+        if (!shift.getLease().getId().equals(leaseId))
+            throw new FerosException("Shift does not belong to this lease", HttpStatus.BAD_REQUEST);
+
+        StaffProfile driver = resolveShiftStaff(request.getDriverStaffId(), shift, request.getWorkDate(), false);
+        StaffProfile cleaner = resolveShiftStaff(request.getCleanerStaffId(), shift, request.getWorkDate(), true);
+
+        // Upsert on (assignment, shift, workDate)
+        LeaseShiftAssignment row = leaseShiftAssignmentRepository
+                .findByLeaseVehicleAssignmentIdAndLeaseShiftIdAndWorkDate(assignmentId, shift.getId(), request.getWorkDate())
+                .orElseGet(() -> LeaseShiftAssignment.builder()
+                        .leaseVehicleAssignment(assignment)
+                        .leaseShift(shift)
+                        .workDate(request.getWorkDate())
+                        .tenant(tenant())
+                        .build());
+        row.setDriverStaff(driver);
+        row.setCleanerStaff(cleaner);
+        // Snapshot the shift pay at assignment time → later pay edits are forward-only
+        row.setDriverPaySnapshot(driver != null ? shift.getDriverPay() : null);
+        row.setCleanerPaySnapshot(cleaner != null ? shift.getCleanerPay() : null);
+        row.setAssignedAt(LocalDateTime.now());
+        row.setAssignedBy(userRepository.findById(SecurityUtil.getCurrentUserId()).orElse(null));
+        LeaseShiftAssignment saved = leaseShiftAssignmentRepository.save(row);
+
+        // Decision A: anchor attendance to the shift's start date so attendance == payroll date.
+        ensureAttendance(driver, request.getWorkDate());
+        ensureAttendance(cleaner, request.getWorkDate());
+
+        notifyShift(assignment, shift, driver, request.getWorkDate());
+        notifyShift(assignment, shift, cleaner, request.getWorkDate());
+        return toShiftAssignmentResponse(saved);
+    }
+
+    @Override
+    public List<com.feros.api.dto.response.LeaseShiftAssignmentResponse> getShiftAssignments(
+            Long leaseId, LocalDate from, LocalDate to) {
+        fetchLease(leaseId);
+        return leaseShiftAssignmentRepository.findByLeaseIdAndWorkDateBetween(leaseId, from, to)
+                .stream().map(this::toShiftAssignmentResponse).collect(Collectors.toList());
+    }
+
+    /** Resolve a staff id to a profile (null = client's own), and reject a time-overlapping shift the
+     *  same day. isCleaner picks which side of existing rows to check. */
+    private StaffProfile resolveShiftStaff(Long staffUserId, com.feros.api.entity.LeaseShift shift,
+                                           LocalDate workDate, boolean isCleaner) {
+        if (staffUserId == null) return null; // client's own
+        StaffProfile sp = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(staffUserId, tenantId())
+                .orElseThrow(() -> new FerosException((isCleaner ? "Cleaner" : "Driver") + " not found", HttpStatus.NOT_FOUND));
+
+        List<LeaseShiftAssignment> sameDay = isCleaner
+                ? leaseShiftAssignmentRepository.findByCleanerStaffIdAndWorkDate(sp.getId(), workDate)
+                : leaseShiftAssignmentRepository.findByDriverStaffIdAndWorkDate(sp.getId(), workDate);
+        for (LeaseShiftAssignment other : sameDay) {
+            if (other.getLeaseShift().getId().equals(shift.getId())) continue; // same slot = re-assign
+            if (windowsOverlap(shift, other.getLeaseShift()))
+                throw new FerosException(
+                        sp.getUser().getName() + " is already on an overlapping shift on " + workDate + ".",
+                        HttpStatus.CONFLICT);
+        }
+        return sp;
+    }
+
+    private boolean windowsOverlap(com.feros.api.entity.LeaseShift a, com.feros.api.entity.LeaseShift b) {
+        return intervalsOverlap(toIntervals(a), toIntervals(b));
+    }
+
+    private static List<int[]> toIntervals(com.feros.api.entity.LeaseShift s) {
+        int from = s.getStartTime().toSecondOfDay() / 60;
+        int to = s.getEndTime().toSecondOfDay() / 60;
+        List<int[]> out = new java.util.ArrayList<>();
+        if (from < to) out.add(new int[]{from, to});
+        else { out.add(new int[]{from, 1440}); out.add(new int[]{0, to}); }
+        return out;
+    }
+
+    private static boolean intervalsOverlap(List<int[]> xs, List<int[]> ys) {
+        for (int[] a : xs) for (int[] b : ys) if (a[0] < b[1] && b[0] < a[1]) return true;
+        return false;
+    }
+
+    /** Decision A: ensure a present attendance exists on workDate (PENDING if newly created).
+     *  Never downgrades an existing record; approval still gates payroll. No-op for client staff. */
+    private void ensureAttendance(StaffProfile staff, LocalDate workDate) {
+        if (staff == null) return;
+        Long userId = staff.getUser().getId();
+        if (attendanceRepository.findByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(userId, tenantId(), workDate).isPresent())
+            return;
+        com.feros.api.entity.master.AttendanceType present = attendanceTypeRepository.findByNameIgnoreCase("PRESENT")
+                .orElseThrow(() -> new FerosException("PRESENT attendance type not configured.", HttpStatus.NOT_FOUND));
+        User currentUser = userRepository.findById(SecurityUtil.getCurrentUserId()).orElse(null);
+        attendanceRepository.save(com.feros.api.entity.Attendance.builder()
+                .tenant(tenant())
+                .user(staff.getUser())
+                .attendanceDate(workDate)
+                .attendanceType(present)
+                .markedBy(currentUser)
+                .markedAt(LocalDateTime.now())
+                .approvalStatus(com.feros.api.enums.AttendanceApprovalStatus.PENDING)
+                .isActive(true)
+                .build());
+    }
+
+    private void notifyShift(LeaseVehicleAssignment assignment, com.feros.api.entity.LeaseShift shift,
+                             StaffProfile staff, LocalDate workDate) {
+        if (staff == null) return;
+        notificationService.sendToUser(assignment.getLease().getTenant(), staff.getUser(),
+                NotificationType.LEASE_DRIVER_ASSIGNED,
+                "Shift Assigned to You",
+                "Shift " + shift.getShiftNumber() + " · " + shift.getStartTime() + "–" + shift.getEndTime()
+                        + " on " + assignment.getVehicle().getRegistrationNumber() + ", " + workDate + ".");
+    }
+
+    private com.feros.api.dto.response.LeaseShiftAssignmentResponse toShiftAssignmentResponse(LeaseShiftAssignment a) {
+        return com.feros.api.dto.response.LeaseShiftAssignmentResponse.builder()
+                .id(a.getId())
+                .assignmentId(a.getLeaseVehicleAssignment().getId())
+                .vehicleId(a.getLeaseVehicleAssignment().getVehicle().getId())
+                .registrationNumber(a.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber())
+                .shiftId(a.getLeaseShift().getId())
+                .shiftNumber(a.getLeaseShift().getShiftNumber())
+                .startTime(a.getLeaseShift().getStartTime())
+                .endTime(a.getLeaseShift().getEndTime())
+                .workDate(a.getWorkDate())
+                .driverStaffId(a.getDriverStaff() != null ? a.getDriverStaff().getUser().getId() : null)
+                .driverName(a.getDriverStaff() != null ? a.getDriverStaff().getUser().getName() : null)
+                .clientDriver(a.getDriverStaff() == null)
+                .cleanerStaffId(a.getCleanerStaff() != null ? a.getCleanerStaff().getUser().getId() : null)
+                .cleanerName(a.getCleanerStaff() != null ? a.getCleanerStaff().getUser().getName() : null)
+                .clientCleaner(a.getCleanerStaff() == null)
+                .driverPay(a.getDriverPaySnapshot())
+                .cleanerPay(a.getCleanerPaySnapshot())
+                .build();
     }
 
     @Override
@@ -754,7 +911,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         if ("DRIVER".equals(SecurityUtil.getCurrentRole())) {
             StaffProfile self = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(SecurityUtil.getCurrentUserId(), tenantId())
                     .orElseThrow(() -> new FerosException("Staff profile not found", HttpStatus.NOT_FOUND));
-            if (assignment.getDriverStaff() == null || !assignment.getDriverStaff().getId().equals(self.getId()))
+            if (!isAssignedDriver(assignment, session, self))
                 throw new FerosException("You are not the assigned driver for this vehicle.", HttpStatus.FORBIDDEN);
         }
 
@@ -780,7 +937,46 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         }
         if (notes != null) session.setNotes(notes);
 
-        return toSessionResponse(sessionRepository.save(session));
+        LeaseVehicleSession savedSession = sessionRepository.save(session);
+        // Recompute the daily log for the session's START date so a night session (started today,
+        // closed tomorrow) rolls into TODAY — the 23:59 scheduler misses it because it's still active.
+        recomputeDailyLog(assignment, savedSession.getStartTime().toLocalDate());
+        return toSessionResponse(savedSession);
+    }
+
+    /** True if this driver owns the session: for shift-duty leases that means a shift assignment on
+     *  the session's start date for this vehicle; otherwise the standing lease driver. */
+    private boolean isAssignedDriver(LeaseVehicleAssignment assignment, LeaseVehicleSession session, StaffProfile self) {
+        if (Boolean.TRUE.equals(assignment.getLease().getShiftDuty())) {
+            return leaseShiftAssignmentRepository
+                    .findByDriverStaffIdAndWorkDate(self.getId(), session.getStartTime().toLocalDate())
+                    .stream().anyMatch(a -> a.getLeaseVehicleAssignment().getId().equals(assignment.getId()));
+        }
+        return assignment.getDriverStaff() != null && assignment.getDriverStaff().getId().equals(self.getId());
+    }
+
+    /** Upsert the one-per-day roll-up from this assignment's completed sessions started on logDate. */
+    private void recomputeDailyLog(LeaseVehicleAssignment assignment, LocalDate logDate) {
+        List<LeaseVehicleSession> sessions = sessionRepository
+                .findByAssignmentIdAndIsActiveFalseAndStartTimeBetween(
+                        assignment.getId(), logDate.atStartOfDay(), logDate.plusDays(1).atStartOfDay());
+        if (sessions.isEmpty()) return;
+        BigDecimal totalHours = sessions.stream()
+                .map(s -> s.getHoursWorked() != null ? s.getHoursWorked() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal kmDriven = sessions.stream()
+                .map(s -> s.getKmDriven() != null ? s.getKmDriven() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+        LeaseDailyLog log = dailyLogRepository
+                .findByAssignmentIdAndLogDate(assignment.getId(), logDate)
+                .orElseGet(() -> LeaseDailyLog.builder()
+                        .assignment(assignment).leaseId(assignment.getLease().getId())
+                        .logDate(logDate).source("AUTO").build());
+        log.setTotalHours(totalHours.compareTo(BigDecimal.ZERO) > 0 ? totalHours : null);
+        log.setKmDriven(kmDriven.compareTo(BigDecimal.ZERO) > 0 ? kmDriven : null);
+        log.setSessionCount(sessions.size());
+        if (log.getNotes() == null) log.setNotes("Auto-updated from " + sessions.size() + " session(s)");
+        dailyLogRepository.save(log);
     }
 
     @Override
@@ -904,6 +1100,19 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     }
 
     private VehicleLeaseResponse toResponse(VehicleLease lease, long vehicleCount) {
+        List<com.feros.api.dto.response.LeaseShiftResponse> shifts =
+                Boolean.TRUE.equals(lease.getShiftDuty())
+                        ? leaseShiftRepository.findByLeaseIdOrderByShiftNumberAsc(lease.getId()).stream()
+                                .map(s -> com.feros.api.dto.response.LeaseShiftResponse.builder()
+                                        .id(s.getId())
+                                        .shiftNumber(s.getShiftNumber())
+                                        .startTime(s.getStartTime())
+                                        .endTime(s.getEndTime())
+                                        .driverPay(s.getDriverPay())
+                                        .cleanerPay(s.getCleanerPay())
+                                        .build())
+                                .collect(Collectors.toList())
+                        : List.of();
         return VehicleLeaseResponse.builder()
                 .id(lease.getId())
                 .tenantId(lease.getTenant().getId())
@@ -916,10 +1125,75 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .rateType(lease.getRateType())
                 .status(lease.getStatus())
                 .notes(lease.getNotes())
+                .shiftDuty(Boolean.TRUE.equals(lease.getShiftDuty()))
+                .shifts(shifts)
                 .vehicleCount(vehicleCount)
                 .createdAt(lease.getCreatedAt())
                 .updatedAt(lease.getUpdatedAt())
                 .build();
+    }
+
+    // ── Shift definitions ───────────────────────────────────────────────────────
+
+    private static final int MAX_SHIFTS = 4;
+
+    /** Replace the lease's shift windows from the request. Validates count (≤4), non-overlap
+     *  (midnight-crossing allowed), and non-negative pay. No-op shift list when shiftDuty is off. */
+    private void persistShifts(VehicleLease lease, VehicleLeaseRequest request) {
+        leaseShiftRepository.deleteByLeaseId(lease.getId());
+        if (!Boolean.TRUE.equals(lease.getShiftDuty())) return;
+
+        List<ShiftDefinitionRequest> defs = request.getShifts();
+        if (defs == null || defs.isEmpty())
+            throw new FerosException("A shift-duty lease needs at least one shift.", HttpStatus.BAD_REQUEST);
+        if (defs.size() > MAX_SHIFTS)
+            throw new FerosException("A lease can have at most " + MAX_SHIFTS + " shifts.", HttpStatus.BAD_REQUEST);
+
+        for (ShiftDefinitionRequest d : defs) {
+            if (d.getStartTime().equals(d.getEndTime()))
+                throw new FerosException("Shift start and end time cannot be the same.", HttpStatus.BAD_REQUEST);
+            if (d.getDriverPay() == null || d.getDriverPay().signum() < 0)
+                throw new FerosException("Shift driver pay must be zero or more.", HttpStatus.BAD_REQUEST);
+            if (d.getCleanerPay() != null && d.getCleanerPay().signum() < 0)
+                throw new FerosException("Shift cleaner pay must be zero or more.", HttpStatus.BAD_REQUEST);
+        }
+        assertNoOverlap(defs);
+
+        Tenant t = lease.getTenant();
+        for (ShiftDefinitionRequest d : defs) {
+            leaseShiftRepository.save(com.feros.api.entity.LeaseShift.builder()
+                    .lease(lease)
+                    .shiftNumber(d.getShiftNumber())
+                    .startTime(d.getStartTime())
+                    .endTime(d.getEndTime())
+                    .driverPay(d.getDriverPay())
+                    .cleanerPay(d.getCleanerPay())
+                    .tenant(t)
+                    .build());
+        }
+    }
+
+    /** Two shift windows overlap if their minute-of-day intervals intersect. A window with
+     *  start > end wraps midnight and becomes two intervals: [start,1440) and [0,end). */
+    public static void assertNoOverlap(List<ShiftDefinitionRequest> defs) {
+        List<int[]> intervals = new java.util.ArrayList<>();
+        for (ShiftDefinitionRequest d : defs) {
+            int s = d.getStartTime().toSecondOfDay() / 60;
+            int e = d.getEndTime().toSecondOfDay() / 60;
+            if (s < e) {
+                intervals.add(new int[]{s, e});
+            } else { // wraps midnight
+                intervals.add(new int[]{s, 1440});
+                intervals.add(new int[]{0, e});
+            }
+        }
+        for (int i = 0; i < intervals.size(); i++) {
+            for (int j = i + 1; j < intervals.size(); j++) {
+                int[] a = intervals.get(i), b = intervals.get(j);
+                if (a[0] < b[1] && b[0] < a[1])
+                    throw new FerosException("Shift time windows cannot overlap.", HttpStatus.BAD_REQUEST);
+            }
+        }
     }
 
     private LeaseVehicleAssignmentResponse toAssignmentResponse(LeaseVehicleAssignment a) {
