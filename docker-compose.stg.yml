@@ -57,7 +57,7 @@ services:
     container_name: feros_stg_nginx
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8082:80"   # 8082 on host → host reverse-proxy/Cloudflare maps stg.console.feros.in here
+      - "8082:80"   # public on 8082 for direct-IP staging access (http://<elastic-ip>:8082). SG must allow 8082. Rebind to 127.0.0.1:8082 once Cloudflare/host-proxy fronts it.
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - /home/ubuntu/feros-stg-web/dist:/usr/share/nginx/html:ro
