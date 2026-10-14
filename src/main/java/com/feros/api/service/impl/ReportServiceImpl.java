@@ -2786,9 +2786,9 @@ public class ReportServiceImpl implements ReportService {
                     shiftRegs.add(reg);
                     leaseRegs.add(reg);
                     if (a.getDriverStaff() != null && a.getDriverStaff().getUser() != null)
-                        shiftDriverByVehicle.merge(reg, "S" + sn + " " + a.getDriverStaff().getUser().getName(), (o, n) -> o + " · " + n);
+                        shiftDriverByVehicle.merge(reg, "S" + sn + " " + a.getDriverStaff().getUser().getName(), (o, n) -> o + "\n" + n);
                     if (a.getCleanerStaff() != null && a.getCleanerStaff().getUser() != null)
-                        shiftCleanerByVehicle.merge(reg, "S" + sn + " " + a.getCleanerStaff().getUser().getName(), (o, n) -> o + " · " + n);
+                        shiftCleanerByVehicle.merge(reg, "S" + sn + " " + a.getCleanerStaff().getUser().getName(), (o, n) -> o + "\n" + n);
                 });
         // Standing-lease (non-shift) vehicles are leases too — tag them
         Map<Long, String> regByVehicleId = vehicles.stream()
