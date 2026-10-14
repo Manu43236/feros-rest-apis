@@ -360,6 +360,15 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         return intervalsOverlap(toIntervals(a), toIntervals(b));
     }
 
+    /** True if the shift's window covers the current (IST) time — night shift crosses midnight. */
+    private boolean shiftCoversNow(com.feros.api.entity.LeaseShift s) {
+        java.time.LocalTime now = TimeUtil.nowIst().toLocalTime();
+        java.time.LocalTime st = s.getStartTime(), en = s.getEndTime();
+        return st.isBefore(en)
+                ? (!now.isBefore(st) && now.isBefore(en))
+                : (!now.isBefore(st) || now.isBefore(en));
+    }
+
     private static List<int[]> toIntervals(com.feros.api.entity.LeaseShift s) {
         int from = s.getStartTime().toSecondOfDay() / 60;
         int to = s.getEndTime().toSecondOfDay() / 60;
@@ -899,10 +908,15 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                     .orElseThrow(() -> new FerosException("Staff profile not found", HttpStatus.NOT_FOUND));
             boolean ok = Boolean.TRUE.equals(lease.getShiftDuty())
                     ? leaseShiftAssignmentRepository.findByDriverStaffIdAndWorkDate(self.getId(), TimeUtil.today())
-                            .stream().anyMatch(a -> a.getLeaseVehicleAssignment().getId().equals(assignmentId))
+                            .stream().anyMatch(a -> a.getLeaseVehicleAssignment().getId().equals(assignmentId)
+                                    && shiftCoversNow(a.getLeaseShift()))
                     : assignment.getDriverStaff() != null && assignment.getDriverStaff().getId().equals(self.getId());
             if (!ok)
-                throw new FerosException("You are not assigned to this vehicle today.", HttpStatus.FORBIDDEN);
+                throw new FerosException(
+                        Boolean.TRUE.equals(lease.getShiftDuty())
+                                ? "You can only start a session during your shift window."
+                                : "You are not assigned to this vehicle today.",
+                        HttpStatus.FORBIDDEN);
             resolvedDriverStaffId = SecurityUtil.getCurrentUserId();
         }
 
@@ -1014,9 +1028,10 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
      *  the session's start date for this vehicle; otherwise the standing lease driver. */
     private boolean isAssignedDriver(LeaseVehicleAssignment assignment, LeaseVehicleSession session, StaffProfile self) {
         if (Boolean.TRUE.equals(assignment.getLease().getShiftDuty())) {
-            return leaseShiftAssignmentRepository
-                    .findByDriverStaffIdAndWorkDate(self.getId(), session.getStartTime().toLocalDate())
-                    .stream().anyMatch(a -> a.getLeaseVehicleAssignment().getId().equals(assignment.getId()));
+            // Shift lease: only the driver who STARTED this session may end it (not any shift driver that
+            // day) — otherwise an off-shift driver could end the current shift driver's running session.
+            return session.getDriverStaffId() != null
+                    && session.getDriverStaffId().equals(self.getUser().getId());
         }
         return assignment.getDriverStaff() != null && assignment.getDriverStaff().getId().equals(self.getId());
     }
