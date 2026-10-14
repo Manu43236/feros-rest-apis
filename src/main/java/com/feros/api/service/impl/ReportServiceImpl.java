@@ -2771,14 +2771,41 @@ public class ReportServiceImpl implements ReportService {
 
         String scopeLabel = scope == TripScope.INTRA_STATE ? "Local" : "Out Station";
 
+        // Shift-lease vehicles carry a crew PER SHIFT, not one per vehicle — list them all
+        // ("S1 <name> · S2 <name> …"), driver and cleaner independently. Closed leases ignored.
+        Map<String, String> shiftDriverByVehicle = new HashMap<>();
+        Map<String, String> shiftCleanerByVehicle = new HashMap<>();
+        java.util.Set<String> shiftRegs = new java.util.HashSet<>();
+        java.util.Set<String> leaseRegs = new java.util.HashSet<>();
+        leaseShiftAssignmentRepository.findOverlappingByTenantId(tenantId, date, date).stream()
+                .filter(a -> a.getLeaseVehicleAssignment().getLease().getStatus() != com.feros.api.enums.LeaseStatus.CLOSED)
+                .sorted(Comparator.comparingInt(a -> a.getLeaseShift().getShiftNumber()))
+                .forEach(a -> {
+                    String reg = a.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber();
+                    int sn = a.getLeaseShift().getShiftNumber();
+                    shiftRegs.add(reg);
+                    leaseRegs.add(reg);
+                    if (a.getDriverStaff() != null && a.getDriverStaff().getUser() != null)
+                        shiftDriverByVehicle.merge(reg, "S" + sn + " " + a.getDriverStaff().getUser().getName(), (o, n) -> o + " · " + n);
+                    if (a.getCleanerStaff() != null && a.getCleanerStaff().getUser() != null)
+                        shiftCleanerByVehicle.merge(reg, "S" + sn + " " + a.getCleanerStaff().getUser().getName(), (o, n) -> o + " · " + n);
+                });
+        // Standing-lease (non-shift) vehicles are leases too — tag them
+        Map<Long, String> regByVehicleId = vehicles.stream()
+                .collect(Collectors.toMap(Vehicle::getId, Vehicle::getRegistrationNumber, (x, y) -> x));
+        java.util.stream.Stream.concat(leaseHolderByVehicle.keySet().stream(), leaseCleanerHolderByVehicle.keySet().stream())
+                .map(regByVehicleId::get).filter(Objects::nonNull).forEach(leaseRegs::add);
+
         List<DailyFleetAttendanceRow> rows = vehicles.stream().map(v -> {
             String reg = v.getRegistrationNumber();
+            boolean shiftVeh = shiftRegs.contains(reg);
             return DailyFleetAttendanceRow.builder()
                     .registrationNumber(reg)
                     .scope(scopeLabel)
                     .vehicleType(v.getVehicleType() != null ? v.getVehicleType().getName() : "—")
-                    .driverName(vehicleDriverMap.getOrDefault(reg,  "—"))
-                    .cleanerName(vehicleCleanerMap.getOrDefault(reg, "—"))
+                    .driverName(shiftVeh ? shiftDriverByVehicle.getOrDefault(reg, "—") : vehicleDriverMap.getOrDefault(reg,  "—"))
+                    .cleanerName(shiftVeh ? shiftCleanerByVehicle.getOrDefault(reg, "—") : vehicleCleanerMap.getOrDefault(reg, "—"))
+                    .isLease(leaseRegs.contains(reg))
                     .build();
         }).sorted(Comparator.comparing(r -> r.getRegistrationNumber().toUpperCase())).toList();
 
