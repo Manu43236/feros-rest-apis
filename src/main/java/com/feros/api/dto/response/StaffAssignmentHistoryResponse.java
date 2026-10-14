@@ -20,4 +20,5 @@ public class StaffAssignmentHistoryResponse {
     private String type; // "VEHICLE_ASSIGNMENT" | "ORDER_ALLOCATION" | "LEASE_ASSIGNMENT"
     private String orderNumber;
     private String leaseNumber;
+    private String shiftLabel; // "Shift 1 (05:00–17:00) · 14 Oct" for shift-lease rows, else null
 }

@@ -36,6 +36,7 @@ public class AttendanceResponse {
     private String approvedByName;
     private LocalDateTime approvedAt;
     private String assignedVehicleNumber;
+    private String shiftLabel;          // "Shift 1 (05:00–17:00)" for shift-lease crew, else null
     private String selfieUrl;
     private Double latitude;
     private Double longitude;

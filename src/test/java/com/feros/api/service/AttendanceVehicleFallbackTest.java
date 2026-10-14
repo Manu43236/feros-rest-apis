@@ -45,6 +45,7 @@ class AttendanceVehicleFallbackTest {
     @Mock StaffProfileRepository staffProfileRepository;
     @Mock LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     @Mock com.feros.api.repository.LeaseCleanerAssignmentLogRepository leaseCleanerAssignmentLogRepository;
+    @Mock com.feros.api.repository.LeaseShiftAssignmentRepository leaseShiftAssignmentRepository;
 
     private AttendanceServiceImpl service;
 
@@ -60,7 +61,8 @@ class AttendanceVehicleFallbackTest {
             leaveTypeRepository, s3Service, notificationService,
             vehicleRepository, vehicleStaffAssignmentRepository,
             orderStaffAllocationRepository, locationResolverService, staffProfileRepository,
-            leaseDriverAssignmentLogRepository, leaseCleanerAssignmentLogRepository
+            leaseDriverAssignmentLogRepository, leaseCleanerAssignmentLogRepository,
+            leaseShiftAssignmentRepository
         );
 
         UserPrincipal principal = new UserPrincipal(ADMIN_ID, TENANT_ID, "9999999990", "ADMIN");

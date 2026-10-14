@@ -78,6 +78,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     private final com.feros.api.repository.LeaseCleanerAssignmentLogRepository leaseCleanerAssignmentLogRepository;
+    private final com.feros.api.repository.LeaseShiftAssignmentRepository leaseShiftAssignmentRepository;
     private final LeaseVehicleAssignmentRepository leaseVehicleAssignmentRepository;
 
     private Long getCurrentTenantId() {
@@ -1290,6 +1291,38 @@ public class VehicleServiceImpl implements VehicleService {
                         .userId(userId).userName(userName).userRole(userRole)
                         .type("LEASE_ASSIGNMENT").action("Unassigned")
                         .actionByName(null).actionAt(l.getUnassignedAt()).leaseNumber(leaseNum).build());
+            }
+        }
+
+        // Merge shift-lease assignments (crew lives only in LeaseShiftAssignment, per vehicle×shift×day).
+        // ponytail: last 90 days only — shift rows are per-day, unbounded load would flood the log.
+        // One "Assigned" event per row; shift + date carried in shiftLabel. Collapse later if noisy.
+        java.time.LocalDate histFrom = java.time.LocalDate.now().minusDays(90);
+        java.time.format.DateTimeFormatter dFmt = java.time.format.DateTimeFormatter.ofPattern("dd MMM");
+        for (com.feros.api.entity.LeaseShiftAssignment sa :
+                leaseShiftAssignmentRepository.findOverlappingByTenantId(tenantId, histFrom, java.time.LocalDate.now())) {
+            com.feros.api.entity.LeaseVehicleAssignment lva = sa.getLeaseVehicleAssignment();
+            String regNum = lva != null && lva.getVehicle() != null ? lva.getVehicle().getRegistrationNumber() : null;
+            Long vehicleId = lva != null && lva.getVehicle() != null ? lva.getVehicle().getId() : null;
+            String leaseNum = lva != null && lva.getLease() != null ? lva.getLease().getLeaseNumber() : null;
+            com.feros.api.entity.LeaseShift s = sa.getLeaseShift();
+            String label = "Shift " + s.getShiftNumber()
+                    + " (" + String.format("%02d:%02d", s.getStartTime().getHour(), s.getStartTime().getMinute())
+                    + "–" + String.format("%02d:%02d", s.getEndTime().getHour(), s.getEndTime().getMinute()) + ") · "
+                    + sa.getWorkDate().format(dFmt);
+            String actionBy = sa.getAssignedBy() != null ? sa.getAssignedBy().getName() : null;
+
+            for (com.feros.api.entity.StaffProfile sp :
+                    java.util.Arrays.asList(sa.getDriverStaff(), sa.getCleanerStaff())) {
+                com.feros.api.entity.User u = sp != null ? sp.getUser() : null;
+                if (u == null) continue;
+                String userRole = u.getRoles().stream().findFirst().map(r -> r.getName().name()).orElse(null);
+                events.add(com.feros.api.dto.response.StaffAssignmentHistoryResponse.builder()
+                        .id(sa.getId()).vehicleId(vehicleId).vehicleRegistrationNumber(regNum)
+                        .userId(u.getId()).userName(u.getName()).userRole(userRole)
+                        .type("LEASE_ASSIGNMENT").action("Assigned")
+                        .actionByName(actionBy).actionAt(sa.getAssignedAt())
+                        .leaseNumber(leaseNum).shiftLabel(label).build());
             }
         }
 

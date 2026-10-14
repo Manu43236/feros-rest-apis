@@ -52,6 +52,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final StaffProfileRepository staffProfileRepository;
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     private final com.feros.api.repository.LeaseCleanerAssignmentLogRepository leaseCleanerAssignmentLogRepository;
+    private final com.feros.api.repository.LeaseShiftAssignmentRepository leaseShiftAssignmentRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -174,7 +175,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .stream().map(a -> {
                     VehicleDayMaps m = byDate.computeIfAbsent(
                             a.getAttendanceDate(), d -> buildVehicleDayMaps(tenantId, d));
-                    return mapToResponse(a, m.latestForVehicle(), m.leaseDriverVehicleMap());
+                    return mapToResponse(a, m.latestForVehicle(), m.leaseDriverVehicleMap(), m.shiftByUser());
                 }).toList();
     }
 
@@ -187,7 +188,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .stream().map(a -> {
                     VehicleDayMaps m = byDate.computeIfAbsent(
                             a.getAttendanceDate(), d -> buildVehicleDayMaps(tenantId, d));
-                    return mapToResponse(a, m.latestForVehicle(), m.leaseDriverVehicleMap());
+                    return mapToResponse(a, m.latestForVehicle(), m.leaseDriverVehicleMap(), m.shiftByUser());
                 }).toList();
     }
 
@@ -282,12 +283,27 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .findByTenantIdAndAttendanceDateAndIsActiveTrue(tenantId, date)
                 .stream()
                 .filter(a -> isVisibleToRole(a, role, supervisorAllowedRoles))
-                .map(a -> mapToResponse(a, maps.latestForVehicle(), maps.leaseDriverVehicleMap())).toList();
+                .map(a -> mapToResponse(a, maps.latestForVehicle(), maps.leaseDriverVehicleMap(), maps.shiftByUser())).toList();
     }
 
-    /** Both vehicle-resolution maps for a single date: the per-slot current holder (VSA + lease
-     *  overlay) and the lease-driver fallback. Shared by daily, pending and rejected views. */
-    private record VehicleDayMaps(Map<String, Long> latestForVehicle, Map<Long, String> leaseDriverVehicleMap) {}
+    /** Vehicle-resolution maps for a single date: the per-slot current holder (VSA + lease overlay),
+     *  the standing lease-driver fallback, and the shift-lease fallback. Shared by daily/pending/rejected. */
+    private record VehicleDayMaps(Map<String, Long> latestForVehicle, Map<Long, String> leaseDriverVehicleMap,
+                                  Map<Long, ShiftInfo> shiftByUser) {}
+
+    /** A shift-lease crew member's vehicle + shift label for a given day. */
+    private record ShiftInfo(String vehicleReg, String label) {}
+
+    private static String shiftLabel(com.feros.api.entity.LeaseShift s) {
+        return "Shift " + s.getShiftNumber()
+                + " (" + String.format("%02d:%02d", s.getStartTime().getHour(), s.getStartTime().getMinute())
+                + "–" + String.format("%02d:%02d", s.getEndTime().getHour(), s.getEndTime().getMinute()) + ")";
+    }
+
+    private static void mergeShift(Map<Long, ShiftInfo> m, Long userId, String reg, String label) {
+        m.merge(userId, new ShiftInfo(reg, label),
+                (old, add) -> new ShiftInfo(old.vehicleReg(), old.label() + ", " + add.label()));
+    }
 
     private VehicleDayMaps buildVehicleDayMaps(Long tenantId, LocalDate date) {
         // Lease logs overlapping the date → the latest-assigned lease driver per vehicle.
@@ -354,7 +370,20 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .forEach(l -> leaseDriverVehicleMap.putIfAbsent(
                         l.getCleanerStaff().getUser().getId(),
                         l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber()));
-        return new VehicleDayMaps(latestForVehicle, leaseDriverVehicleMap);
+
+        // Shift-duty leases: crew lives only in LeaseShiftAssignment (no VSA, no standing lease log).
+        // workDate == the shift's start date == the attendance date (night shift credited to start date).
+        Map<Long, ShiftInfo> shiftByUser = new HashMap<>();
+        for (com.feros.api.entity.LeaseShiftAssignment sa :
+                leaseShiftAssignmentRepository.findOverlappingByTenantId(tenantId, date, date)) {
+            String reg = sa.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber();
+            String label = shiftLabel(sa.getLeaseShift());
+            if (sa.getDriverStaff() != null && sa.getDriverStaff().getUser() != null)
+                mergeShift(shiftByUser, sa.getDriverStaff().getUser().getId(), reg, label);
+            if (sa.getCleanerStaff() != null && sa.getCleanerStaff().getUser() != null)
+                mergeShift(shiftByUser, sa.getCleanerStaff().getUser().getId(), reg, label);
+        }
+        return new VehicleDayMaps(latestForVehicle, leaseDriverVehicleMap, shiftByUser);
     }
 
     private Set<String> resolveSupervisorAllowedRoles(String role) {
@@ -570,14 +599,16 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     // ===================== MAPPERS =====================
     private AttendanceResponse mapToResponse(Attendance a) {
-        return mapToResponse(a, Collections.emptyMap(), Collections.emptyMap());
+        return mapToResponse(a, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
     }
 
     private AttendanceResponse mapToResponse(Attendance a, Map<String, Long> latestForVehicle) {
-        return mapToResponse(a, latestForVehicle, Collections.emptyMap());
+        return mapToResponse(a, latestForVehicle, Collections.emptyMap(), Collections.emptyMap());
     }
 
-    private AttendanceResponse mapToResponse(Attendance a, Map<String, Long> latestForVehicle, Map<Long, String> leaseDriverVehicleMap) {
+    private AttendanceResponse mapToResponse(Attendance a, Map<String, Long> latestForVehicle,
+                                             Map<Long, String> leaseDriverVehicleMap,
+                                             Map<Long, ShiftInfo> shiftByUser) {
         String roleName = a.getUser().getRoles().stream()
                 .findFirst().map(r -> r.getName().name()).orElse(null);
 
@@ -625,8 +656,14 @@ public class AttendanceServiceImpl implements AttendanceService {
         if (assignedVehicleNumber == null) {
             assignedVehicleNumber = leaseDriverVehicleMap.get(a.getUser().getId());
         }
+        // fallback 3 — shift-duty lease: crew lives only in LeaseShiftAssignment for this date
+        ShiftInfo shift = shiftByUser.get(a.getUser().getId());
+        if (assignedVehicleNumber == null && shift != null) {
+            assignedVehicleNumber = shift.vehicleReg();
+        }
 
         return AttendanceResponse.builder()
+                .shiftLabel(shift != null ? shift.label() : null)
                 .id(a.getId())
                 .userId(a.getUser().getId())
                 .userName(a.getUser().getName())
