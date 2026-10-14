@@ -243,7 +243,7 @@ public class ReportController {
         String[] headers = {"Date", "Employee", "Role", "Vehicle", "Type", "Mark In", "Mark Out", "Hours", "Approval", "Leave Type", "Remarks"};
         List<String[]> data = rows.stream().map(r -> new String[]{
                 r.getAttendanceDate().toString(), r.getEmployeeName(), r.getRole(),
-                safe(r.getVehicleRegistrationNumber()), r.getAttendanceType(),
+                leaseVehicleLabel(r), r.getAttendanceType(),
                 r.getMarkedAt() != null ? r.getMarkedAt().toLocalTime().toString() : "—",
                 r.getMarkedOutAt() != null ? r.getMarkedOutAt().toLocalTime().toString() : "—",
                 r.getHoursWorked() != null ? r.getHoursWorked() + " h" : "—",
@@ -1718,5 +1718,13 @@ public class ReportController {
 
     private String safe(Object val) {
         return val != null ? val.toString() : "—";
+    }
+
+    /** Vehicle cell for the daily register export — tags lease vehicles and appends the shift window. */
+    private String leaseVehicleLabel(AttendanceDailyRow r) {
+        StringBuilder sb = new StringBuilder(safe(r.getVehicleRegistrationNumber()));
+        if (r.isLease()) sb.append(" (Lease)");
+        if (r.getShiftLabel() != null) sb.append(" · ").append(r.getShiftLabel());
+        return sb.toString();
     }
 }

@@ -337,17 +337,38 @@ public class ReportServiceImpl implements ReportService {
         Map<Long, Long> leaseCleanerHolderByVehicle = buildLeaseCleanerHolderByVehicle(tenantId, startDate, endDate);
         com.feros.api.service.LeaseShiftPayResolver.Context shiftCtx = leaseShiftPayResolver.buildContext(tenantId, startDate, endDate);
 
+        // Per-(user, date) shift label for the register, from non-closed shift leases.
+        Map<String, String> shiftLabelByUserDate = new HashMap<>();
+        leaseShiftAssignmentRepository.findOverlappingByTenantId(tenantId, startDate, endDate).stream()
+                .filter(sa -> sa.getLeaseVehicleAssignment().getLease().getStatus() != com.feros.api.enums.LeaseStatus.CLOSED)
+                .forEach(sa -> {
+                    var s = sa.getLeaseShift();
+                    String label = "Shift " + s.getShiftNumber()
+                            + " (" + String.format("%02d:%02d", s.getStartTime().getHour(), s.getStartTime().getMinute())
+                            + "–" + String.format("%02d:%02d", s.getEndTime().getHour(), s.getEndTime().getMinute()) + ")";
+                    java.util.function.BiConsumer<com.feros.api.entity.StaffProfile, java.time.LocalDate> add = (sp, d) -> {
+                        if (sp != null && sp.getUser() != null)
+                            shiftLabelByUserDate.merge(sp.getUser().getId() + ":" + d, label, (o, n) -> o + ", " + n);
+                    };
+                    add.accept(sa.getDriverStaff(), sa.getWorkDate());
+                    add.accept(sa.getCleanerStaff(), sa.getWorkDate());
+                });
+
         return records.stream().map(a -> {
             Double hoursWorked = null;
             if (a.getMarkedAt() != null && a.getMarkedOutAt() != null) {
                 long minutes = Duration.between(a.getMarkedAt(), a.getMarkedOutAt()).toMinutes();
                 hoursWorked = Math.round(minutes / 60.0 * 100.0) / 100.0;
             }
+            String shiftLabel = shiftLabelByUserDate.get(a.getUser().getId() + ":" + a.getAttendanceDate());
+            boolean onLease = shiftLabel != null || leaseMap.containsKey(a.getUser().getId());
             return AttendanceDailyRow.builder()
                     .employeeId(a.getUser().getId())
                     .employeeName(a.getUser().getName())
                     .role(primaryRole(a.getUser()))
                     .vehicleRegistrationNumber(resolveVehicleForDate(userAssignments, leaseMap, leaseHolderByVehicle, leaseCleanerHolderByVehicle, shiftCtx, a.getUser().getId(), tenantId, a.getAttendanceDate()))
+                    .isLease(onLease)
+                    .shiftLabel(shiftLabel)
                     .attendanceDate(a.getAttendanceDate())
                     .attendanceType(a.getAttendanceType().getName())
                     .markedAt(a.getMarkedAt())

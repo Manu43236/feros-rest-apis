@@ -13,6 +13,8 @@ public class AttendanceDailyRow {
     private String employeeName;
     private String role;
     private String vehicleRegistrationNumber;
+    private boolean isLease;      // staff is on a lease (shift or standing) that day → show "Lease" tag
+    private String shiftLabel;    // "Shift 1 (05:00–17:00)" for shift-lease staff, else null
     private LocalDate attendanceDate;
     private String attendanceType;
     private LocalDateTime markedAt;

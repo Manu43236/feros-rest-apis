@@ -43,6 +43,9 @@ class LeaseShiftAssignmentTest {
     @Mock UserRepository userRepository;
     @Mock TenantRepository tenantRepository;
     @Mock com.feros.api.service.NotificationService notificationService;
+    @Mock com.feros.api.repository.LeaseDriverAssignmentLogRepository leaseDriverLogRepository;
+    @Mock com.feros.api.repository.LeaseCleanerAssignmentLogRepository leaseCleanerLogRepository;
+    @Mock com.feros.api.service.StaffAssignmentGuard staffAssignmentGuard;
 
     @InjectMocks VehicleLeaseServiceImpl service;
 

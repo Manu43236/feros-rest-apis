@@ -349,9 +349,11 @@ public class DashboardServiceImpl implements DashboardService {
             if (activeLease == null) {
                 activeLease = staffProfileRepository.findByUserId(userId)
                     .map(sp -> leaseShiftAssignmentRepository
-                            .findByDriverStaffIdAndWorkDate(sp.getId(), TimeUtil.today()))
+                            .findByDriverStaffIdAndWorkDate(sp.getId(), TimeUtil.today()).stream()
+                            .filter(a -> a.getLeaseVehicleAssignment().getLease().getStatus() != com.feros.api.enums.LeaseStatus.CLOSED)
+                            .toList())
                     .filter(list -> !list.isEmpty())
-                    .map(list -> list.get(0))
+                    .map(this::pickCurrentShift)
                     .map(sa -> {
                         var va = sa.getLeaseVehicleAssignment();
                         var lease = va.getLease();
@@ -391,6 +393,24 @@ public class DashboardServiceImpl implements DashboardService {
                 .assignedOrder(assignedOrder)
                 .activeLease(activeLease)
                 .build();
+    }
+
+    /** From a driver's shift rows today, the shift whose window covers now (night shift crosses midnight);
+     *  otherwise the earliest by start time. Replaces a naive get(0) so the right shift is shown. */
+    private com.feros.api.entity.LeaseShiftAssignment pickCurrentShift(
+            java.util.List<com.feros.api.entity.LeaseShiftAssignment> list) {
+        java.time.LocalTime now = TimeUtil.nowIst().toLocalTime();
+        for (var a : list) {
+            java.time.LocalTime st = a.getLeaseShift().getStartTime();
+            java.time.LocalTime en = a.getLeaseShift().getEndTime();
+            boolean covers = st.isBefore(en)
+                    ? (!now.isBefore(st) && now.isBefore(en))
+                    : (!now.isBefore(st) || now.isBefore(en)); // crosses midnight
+            if (covers) return a;
+        }
+        return list.stream()
+                .min(java.util.Comparator.comparing(a -> a.getLeaseShift().getStartTime()))
+                .orElse(list.get(0));
     }
 
     @Override

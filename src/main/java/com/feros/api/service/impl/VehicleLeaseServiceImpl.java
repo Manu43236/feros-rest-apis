@@ -194,6 +194,12 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
             openCleanerLogs.forEach(log -> log.setUnassignedAt(now));
             leaseCleanerLogRepository.saveAll(openCleanerLogs);
 
+            // Shift-duty leases: drop shift assignments from the close date forward so a closed lease
+            // can never pin a driver/cleaner or block their reassignment. Past days are kept for payroll.
+            List<LeaseShiftAssignment> futureShifts = leaseShiftAssignmentRepository
+                    .findByLeaseIdAndWorkDateBetween(id, now.toLocalDate(), now.toLocalDate().plusYears(5));
+            leaseShiftAssignmentRepository.deleteAll(futureShifts);
+
             active.forEach(a -> {
                 a.setIsActive(false);
                 a.setEndDate(LocalDate.now());
@@ -267,6 +273,15 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                         .workDate(request.getWorkDate())
                         .tenant(tenant())
                         .build());
+        StaffProfile oldDriver = row.getDriverStaff();
+        StaffProfile oldCleaner = row.getCleanerStaff();
+
+        // One-vehicle rule (unassign-first) — only for a NEWLY-assigned person (not a no-op re-save):
+        // a shift driver/cleaner must not be open on a DIFFERENT vehicle via a standing lease, VSA,
+        // order, or in-progress work. Shift↔shift is governed by resolveShiftStaff's time-overlap check.
+        if (isChangedStaff(oldDriver, driver)) assertShiftStaffFree(driver, assignment.getVehicle().getId());
+        if (isChangedStaff(oldCleaner, cleaner)) assertShiftStaffFree(cleaner, assignment.getVehicle().getId());
+
         row.setDriverStaff(driver);
         row.setCleanerStaff(cleaner);
         // Snapshot the shift pay at assignment time → later pay edits are forward-only
@@ -279,6 +294,10 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         // Decision A: anchor attendance to the shift's start date so attendance == payroll date.
         ensureAttendance(driver, request.getWorkDate());
         ensureAttendance(cleaner, request.getWorkDate());
+        // Item 4: a replaced crew member with no remaining shift that day loses their auto-marked,
+        // still-unapproved attendance (approved records are never touched).
+        clearStrayShiftAttendance(oldDriver, driver, request.getWorkDate());
+        clearStrayShiftAttendance(oldCleaner, cleaner, request.getWorkDate());
 
         notifyShift(assignment, shift, driver, request.getWorkDate());
         notifyShift(assignment, shift, cleaner, request.getWorkDate());
@@ -291,6 +310,29 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         fetchLease(leaseId);
         return leaseShiftAssignmentRepository.findByLeaseIdAndWorkDateBetween(leaseId, from, to)
                 .stream().map(this::toShiftAssignmentResponse).collect(Collectors.toList());
+    }
+
+    /** Enforce the one-vehicle rule for a shift crew member: not in-progress elsewhere, and not open on
+     *  a DIFFERENT vehicle via a standing lease log / VSA / active order. Null = client's own (no-op). */
+    private void assertShiftStaffFree(StaffProfile sp, Long vehicleId) {
+        if (sp == null) return;
+        Long userId = sp.getUser().getId();
+        String name = sp.getUser().getName();
+        staffAssignmentGuard.assertNotInProgress(userId, tenantId(), name);
+        java.util.function.Consumer<LeaseVehicleAssignment> block = va -> {
+            throw new FerosException(name + " is already assigned to "
+                    + va.getVehicle().getRegistrationNumber() + " (lease " + va.getLease().getLeaseNumber()
+                    + "). Unassign them first.", HttpStatus.CONFLICT);
+        };
+        leaseDriverLogRepository.findActiveByDriverStaffId(sp.getId(), tenantId())
+                .map(LeaseDriverAssignmentLog::getLeaseVehicleAssignment)
+                .filter(va -> !va.getVehicle().getId().equals(vehicleId))
+                .ifPresent(block);
+        leaseCleanerLogRepository.findActiveByCleanerStaffId(sp.getId(), tenantId())
+                .map(LeaseCleanerAssignmentLog::getLeaseVehicleAssignment)
+                .filter(va -> !va.getVehicle().getId().equals(vehicleId))
+                .ifPresent(block);
+        staffAssignmentGuard.assertNotOnNormalOrOrder(userId, tenantId(), vehicleId, name);
     }
 
     /** Resolve a staff id to a profile (null = client's own), and reject a time-overlapping shift the
@@ -352,6 +394,25 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                 .approvalStatus(com.feros.api.enums.AttendanceApprovalStatus.PENDING)
                 .isActive(true)
                 .build());
+    }
+
+    private static boolean isChangedStaff(StaffProfile old, StaffProfile neu) {
+        return neu != null && (old == null || !old.getId().equals(neu.getId()));
+    }
+
+    /** When a shift's crew member is replaced and has no remaining shift that day, retire the present
+     *  record the shift auto-created for them — but only if still unapproved. Approved attendance is
+     *  payroll truth and is never touched. Soft delete (is_active=false) so it's reversible. */
+    private void clearStrayShiftAttendance(StaffProfile old, StaffProfile neu, LocalDate date) {
+        if (old == null || (neu != null && old.getId().equals(neu.getId()))) return;
+        boolean stillOnShift =
+                !leaseShiftAssignmentRepository.findByDriverStaffIdAndWorkDate(old.getId(), date).isEmpty()
+             || !leaseShiftAssignmentRepository.findByCleanerStaffIdAndWorkDate(old.getId(), date).isEmpty();
+        if (stillOnShift) return;
+        attendanceRepository.findByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(
+                        old.getUser().getId(), tenantId(), date)
+                .filter(a -> a.getApprovalStatus() == com.feros.api.enums.AttendanceApprovalStatus.PENDING)
+                .ifPresent(a -> { a.setIsActive(false); attendanceRepository.save(a); });
     }
 
     private void notifyShift(LeaseVehicleAssignment assignment, com.feros.api.entity.LeaseShift shift,
@@ -818,7 +879,7 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
     @Override
     @Transactional
     public LeaseVehicleSessionResponse startSession(Long leaseId, Long assignmentId, LeaseSessionStartRequest request) {
-        fetchLease(leaseId);
+        VehicleLease lease = fetchLease(leaseId);
         LeaseVehicleAssignment assignment = assignmentRepository.findByIdAndLeaseId(assignmentId, leaseId)
                 .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
 
@@ -829,18 +890,32 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         if (startTime.isAfter(LocalDateTime.now()))
             throw new FerosException("Start time cannot be in the future", HttpStatus.BAD_REQUEST);
 
-        // Close any currently active session
-        closeActiveSession(assignmentId, startTime);
-
-        // When called by a DRIVER — auto-fill from their own profile, verify ownership
+        // When called by a DRIVER — verify they're assigned to this vehicle TODAY, then record them.
+        // Shift leases have no vehicle-level driver, so validate against today's shift crew (handover model:
+        // any of today's shift drivers on this vehicle may start; the active session auto-closes below).
         Long resolvedDriverStaffId = request.getDriverStaffId();
         if ("DRIVER".equals(SecurityUtil.getCurrentRole())) {
             StaffProfile self = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(SecurityUtil.getCurrentUserId(), tenantId())
                     .orElseThrow(() -> new FerosException("Staff profile not found", HttpStatus.NOT_FOUND));
-            if (assignment.getDriverStaff() == null || !assignment.getDriverStaff().getId().equals(self.getId()))
-                throw new FerosException("You are not the assigned driver for this vehicle.", HttpStatus.FORBIDDEN);
+            boolean ok = Boolean.TRUE.equals(lease.getShiftDuty())
+                    ? leaseShiftAssignmentRepository.findByDriverStaffIdAndWorkDate(self.getId(), TimeUtil.today())
+                            .stream().anyMatch(a -> a.getLeaseVehicleAssignment().getId().equals(assignmentId))
+                    : assignment.getDriverStaff() != null && assignment.getDriverStaff().getId().equals(self.getId());
+            if (!ok)
+                throw new FerosException("You are not assigned to this vehicle today.", HttpStatus.FORBIDDEN);
             resolvedDriverStaffId = SecurityUtil.getCurrentUserId();
         }
+
+        // Odometer start: request → last closed session's odometerEnd → assignment's odometerAtStart
+        BigDecimal odometerStart = request.getOdometerStart();
+        if (odometerStart == null) {
+            odometerStart = sessionRepository
+                    .findFirstByAssignmentIdAndIsActiveFalseAndOdometerEndNotNullOrderByEndTimeDesc(assignmentId)
+                    .map(LeaseVehicleSession::getOdometerEnd)
+                    .orElse(assignment.getOdometerAtStart());
+        }
+        // Handover: close any active session, carrying the odometer forward for continuity
+        closeActiveSession(assignmentId, startTime, odometerStart);
 
         // Resolve driver name if own staff
         String driverName = null;
@@ -861,15 +936,6 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
                     .orElseThrow(() -> new FerosException("Division not found", HttpStatus.NOT_FOUND));
             divisionId = division.getId();
             divisionName = division.getName();
-        }
-
-        // Odometer start: use request value → last session's odometerEnd → assignment's odometerAtStart
-        BigDecimal odometerStart = request.getOdometerStart();
-        if (odometerStart == null) {
-            odometerStart = sessionRepository
-                    .findFirstByAssignmentIdAndIsActiveFalseAndOdometerEndNotNullOrderByEndTimeDesc(assignmentId)
-                    .map(LeaseVehicleSession::getOdometerEnd)
-                    .orElse(assignment.getOdometerAtStart());
         }
 
         LeaseVehicleSession session = LeaseVehicleSession.builder()
@@ -1062,9 +1128,16 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
 
     // Close the active session for an assignment at the given time
     private void closeActiveSession(Long assignmentId, LocalDateTime at) {
+        closeActiveSession(assignmentId, at, null);
+    }
+
+    /** Close the active session; on a handover carry the new session's start odometer onto the old
+     *  session's end so the vehicle's distance stays continuous. */
+    private void closeActiveSession(Long assignmentId, LocalDateTime at, BigDecimal odometerEnd) {
         sessionRepository.findByAssignmentIdAndIsActiveTrue(assignmentId).ifPresent(s -> {
             s.setEndTime(at);
             s.setHoursWorked(computeHours(s.getStartTime(), at));
+            if (odometerEnd != null && s.getOdometerEnd() == null) s.setOdometerEnd(odometerEnd);
             s.setIsActive(false);
             sessionRepository.save(s);
         });

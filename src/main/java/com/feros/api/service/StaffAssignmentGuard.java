@@ -51,6 +51,7 @@ public class StaffAssignmentGuard {
 
     private final VehicleStaffAssignmentRepository vsaRepository;
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
+    private final com.feros.api.repository.LeaseShiftAssignmentRepository leaseShiftAssignmentRepository;
     private final LeaseDriverAssignmentLogRepository leaseLogRepository;
     private final LeaseCleanerAssignmentLogRepository leaseCleanerLogRepository;
     private final LeaseVehicleAssignmentRepository leaseAssignmentRepository;
@@ -80,6 +81,16 @@ public class StaffAssignmentGuard {
                 map.put(l.getCleanerStaff().getUser().getId(),
                         l.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber() + " · lease");
         });
+        // Shift-duty crew (today) are busy too — no standing log exists for them.
+        leaseShiftAssignmentRepository.findOverlappingByTenantId(tenantId, today, today).stream()
+                .filter(a -> a.getLeaseVehicleAssignment().getLease().getStatus() != com.feros.api.enums.LeaseStatus.CLOSED)
+                .forEach(a -> {
+                    String reg = a.getLeaseVehicleAssignment().getVehicle().getRegistrationNumber();
+                    if (a.getDriverStaff() != null && a.getDriverStaff().getUser() != null)
+                        map.put(a.getDriverStaff().getUser().getId(), reg + " · shift");
+                    if (a.getCleanerStaff() != null && a.getCleanerStaff().getUser() != null)
+                        map.put(a.getCleanerStaff().getUser().getId(), reg + " · shift");
+                });
         return map;
     }
 
@@ -91,9 +102,22 @@ public class StaffAssignmentGuard {
                 .flatMap(sp -> leaseLogRepository.findActiveByDriverStaffId(sp.getId(), tenantId)
                         .map(l -> l.getLeaseVehicleAssignment())
                         .or(() -> leaseCleanerLogRepository.findActiveByCleanerStaffId(sp.getId(), tenantId)
-                                .map(l -> l.getLeaseVehicleAssignment())))
+                                .map(l -> l.getLeaseVehicleAssignment()))
+                        .or(() -> activeShiftAssignment(sp.getId())))
                 .map(a -> a.getVehicle().getRegistrationNumber()
                         + " (lease " + a.getLease().getLeaseNumber() + ")");
+    }
+
+    /** A shift-duty crew member's leased vehicle for today (non-closed lease), if any. Shift crew have
+     *  no standing log, so order/normal-assign flows must detect them here to honour the one-vehicle rule. */
+    private Optional<com.feros.api.entity.LeaseVehicleAssignment> activeShiftAssignment(Long staffProfileId) {
+        java.time.LocalDate today = TimeUtil.today();
+        return java.util.stream.Stream.concat(
+                        leaseShiftAssignmentRepository.findByDriverStaffIdAndWorkDate(staffProfileId, today).stream(),
+                        leaseShiftAssignmentRepository.findByCleanerStaffIdAndWorkDate(staffProfileId, today).stream())
+                .map(com.feros.api.entity.LeaseShiftAssignment::getLeaseVehicleAssignment)
+                .filter(va -> va.getLease().getStatus() != com.feros.api.enums.LeaseStatus.CLOSED)
+                .findFirst();
     }
 
     /** If on an open normal assignment or active order trip on a DIFFERENT vehicle, a message naming it. */

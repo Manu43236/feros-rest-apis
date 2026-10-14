@@ -663,7 +663,9 @@ public class AttendanceServiceImpl implements AttendanceService {
         }
 
         return AttendanceResponse.builder()
-                .shiftLabel(shift != null ? shift.label() : null)
+                // Only label when the shown vehicle IS the shift's vehicle — never pin a shift label
+                // onto a vehicle resolved from a VSA/order/standing-lease source.
+                .shiftLabel(shift != null && shift.vehicleReg().equals(assignedVehicleNumber) ? shift.label() : null)
                 .id(a.getId())
                 .userId(a.getUser().getId())
                 .userName(a.getUser().getName())
