@@ -56,8 +56,11 @@ public class DriverDashboardResponse {
         // Active session info (null if no session running)
         private Long activeSessionId;
         private java.time.LocalDateTime sessionStartTime;
+        private String activeSessionDriverName;   // who is on the running session (for "in use by…")
+        private boolean activeSessionMine;         // the running session was started by this driver → may End
         // Shift-duty lease only: e.g. "Shift 2 · 21:00–09:00" (null for normal leases)
         private String shiftLabel;
+        private boolean canStartSession;           // this driver's shift covers now → may Start / take over
     }
 
     @Data

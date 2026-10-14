@@ -341,6 +341,9 @@ public class DashboardServiceImpl implements DashboardService {
                         .lastOdometer(va.getVehicle().getCurrentOdometerReading())
                         .activeSessionId(activeSession != null ? activeSession.getId() : null)
                         .sessionStartTime(activeSession != null ? activeSession.getStartTime() : null)
+                        .activeSessionDriverName(activeSession != null ? activeSession.getDriverName() : null)
+                        .activeSessionMine(activeSession == null || userId.equals(activeSession.getDriverStaffId()))
+                        .canStartSession(true) // standing lease driver can always start
                         .build();
             }).orElse(null);
 
@@ -360,6 +363,14 @@ public class DashboardServiceImpl implements DashboardService {
                         var shift = sa.getLeaseShift();
                         var activeSession = leaseVehicleSessionRepository
                                 .findByAssignmentIdAndIsActiveTrue(va.getId()).orElse(null);
+                        // Can start only while this driver's shift covers now (matches startSession guard).
+                        java.time.LocalTime nowT = TimeUtil.nowIst().toLocalTime();
+                        java.time.LocalTime st = shift.getStartTime(), en = shift.getEndTime();
+                        boolean coversNow = st.isBefore(en)
+                                ? (!nowT.isBefore(st) && nowT.isBefore(en))
+                                : (!nowT.isBefore(st) || nowT.isBefore(en));
+                        boolean sessionMine = activeSession != null
+                                && userId.equals(activeSession.getDriverStaffId());
                         return DriverDashboardResponse.ActiveLease.builder()
                                 .leaseId(lease.getId())
                                 .assignmentId(va.getId())
@@ -370,8 +381,11 @@ public class DashboardServiceImpl implements DashboardService {
                                 .lastOdometer(va.getVehicle().getCurrentOdometerReading())
                                 .activeSessionId(activeSession != null ? activeSession.getId() : null)
                                 .sessionStartTime(activeSession != null ? activeSession.getStartTime() : null)
+                                .activeSessionDriverName(activeSession != null ? activeSession.getDriverName() : null)
+                                .activeSessionMine(sessionMine)
                                 .shiftLabel("Shift " + shift.getShiftNumber() + " · "
                                         + shift.getStartTime() + "–" + shift.getEndTime())
+                                .canStartSession(coversNow)
                                 .build();
                     })
                     .orElse(null);
