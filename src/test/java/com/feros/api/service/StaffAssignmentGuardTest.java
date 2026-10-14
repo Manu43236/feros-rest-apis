@@ -32,6 +32,7 @@ class StaffAssignmentGuardTest {
 
     @Mock VehicleStaffAssignmentRepository vsaRepository;
     @Mock OrderStaffAllocationRepository orderStaffAllocationRepository;
+    @Mock com.feros.api.repository.LeaseShiftAssignmentRepository leaseShiftAssignmentRepository;
     @Mock LeaseDriverAssignmentLogRepository leaseLogRepository;
     @Mock LeaseCleanerAssignmentLogRepository leaseCleanerLogRepository;
     @Mock LeaseVehicleAssignmentRepository leaseAssignmentRepository;
@@ -47,8 +48,9 @@ class StaffAssignmentGuardTest {
 
     @BeforeEach
     void setUp() {
-        guard = new StaffAssignmentGuard(vsaRepository, orderStaffAllocationRepository, leaseLogRepository,
-                leaseCleanerLogRepository, leaseAssignmentRepository, leaseSessionRepository, staffProfileRepository, vehicleRepository);
+        guard = new StaffAssignmentGuard(vsaRepository, orderStaffAllocationRepository, leaseShiftAssignmentRepository,
+                leaseLogRepository, leaseCleanerLogRepository, leaseAssignmentRepository, leaseSessionRepository,
+                staffProfileRepository, vehicleRepository);
         // default "free" everywhere unless a test overrides
         when(vsaRepository.findByUserIdAndTenantIdAndAssignedToIsNullAndIsActiveTrue(anyLong(), anyLong()))
                 .thenReturn(Optional.empty());
