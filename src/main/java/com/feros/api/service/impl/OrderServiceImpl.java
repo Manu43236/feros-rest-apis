@@ -1057,6 +1057,24 @@ public class OrderServiceImpl implements OrderService {
             throw new FerosException("Payment mode is required", HttpStatus.BAD_REQUEST);
         }
 
+        // Cap: advance + payment + deductions can never exceed the order value.
+        BigDecimal orderValue = order.getTotalFreightAmount() != null
+                ? order.getTotalFreightAmount() : BigDecimal.ZERO;
+        if (orderValue.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new FerosException("Order value is not set — cannot record payments or deductions",
+                    HttpStatus.BAD_REQUEST);
+        }
+        BigDecimal settled = orderPaymentRepository
+                .findByOrderIdAndIsActiveTrueOrderByTxnDateAscIdAsc(orderId).stream()
+                .map(e -> e.getAmount() != null ? e.getAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal remaining = orderValue.subtract(settled);
+        if (request.getAmount().compareTo(remaining) > 0) {
+            throw new FerosException(
+                    "Amount exceeds the remaining balance of " + remaining.stripTrailingZeros().toPlainString(),
+                    HttpStatus.BAD_REQUEST);
+        }
+
         OrderPayment entry = OrderPayment.builder()
                 .tenant(order.getTenant())
                 .order(order)
