@@ -17,6 +17,7 @@ import com.feros.api.entity.master.MaterialType;
 import com.feros.api.entity.master.State;
 import com.feros.api.enums.AttendanceApprovalStatus;
 import com.feros.api.enums.BillingOn;
+import com.feros.api.enums.FreightRateType;
 import com.feros.api.enums.RoleName;
 import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.OrderPaymentStatus;
@@ -169,6 +170,8 @@ public class OrderServiceImpl implements OrderService {
         if (request.getRouteId() != null)
             order.setRoute(routeRepository.findByIdAndTenantId(request.getRouteId(), tenant.getId())
                     .orElseThrow(() -> new FerosException("Route not found", HttpStatus.NOT_FOUND)));
+
+        order.setTotalFreightAmount(computeOrderValue(order));
 
         Order savedOrder = orderRepository.save(order);
         notificationService.sendToRoles(savedOrder.getTenant(), List.of(RoleName.SUPERVISOR, RoleName.OFFICE_STAFF, RoleName.ADMIN),
@@ -371,6 +374,8 @@ public class OrderServiceImpl implements OrderService {
         if (request.getRouteId() != null)
             order.setRoute(routeRepository.findByIdAndTenantId(request.getRouteId(), getCurrentTenantId())
                     .orElseThrow(() -> new FerosException("Route not found", HttpStatus.NOT_FOUND)));
+
+        order.setTotalFreightAmount(computeOrderValue(order));
 
         return mapToOrderResponse(orderRepository.save(order));
     }
@@ -1035,6 +1040,26 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new FerosException("Order not found", HttpStatus.NOT_FOUND));
     }
 
+    /**
+     * The billed value of an order, derived from rate × weight (PER_TON),
+     * rate × route km (PER_KM), or the trip rate (PER_TRIP). Used for display,
+     * the settlement balance, and the payment cap.
+     */
+    private BigDecimal computeOrderValue(Order o) {
+        BigDecimal rate = o.getFreightRate() != null ? o.getFreightRate() : BigDecimal.ZERO;
+        FreightRateType type = o.getFreightRateType();
+        if (type == FreightRateType.PER_TON) {
+            BigDecimal w = o.getTotalWeight() != null ? o.getTotalWeight() : BigDecimal.ZERO;
+            return rate.multiply(w);
+        }
+        if (type == FreightRateType.PER_KM) {
+            BigDecimal km = (o.getRoute() != null && o.getRoute().getDistanceInKm() != null)
+                    ? o.getRoute().getDistanceInKm() : BigDecimal.ZERO;
+            return rate.multiply(km);
+        }
+        return rate; // PER_TRIP / fallback — single-trip base rate
+    }
+
     @Override
     @Transactional(readOnly = true)
     public OrderSettlementResponse getOrderSettlement(Long orderId) {
@@ -1058,8 +1083,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Cap: advance + payment + deductions can never exceed the order value.
-        BigDecimal orderValue = order.getTotalFreightAmount() != null
-                ? order.getTotalFreightAmount() : BigDecimal.ZERO;
+        BigDecimal orderValue = computeOrderValue(order);
         if (orderValue.compareTo(BigDecimal.ZERO) <= 0) {
             throw new FerosException("Order value is not set — cannot record payments or deductions",
                     HttpStatus.BAD_REQUEST);
@@ -1118,7 +1142,7 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal advance = sum(entries, OrderPaymentType.ADVANCE);
         BigDecimal paid = sum(entries, OrderPaymentType.PAYMENT);
         BigDecimal deductions = sum(entries, OrderPaymentType.DEDUCTION);
-        BigDecimal orderValue = order.getTotalFreightAmount() != null ? order.getTotalFreightAmount() : BigDecimal.ZERO;
+        BigDecimal orderValue = computeOrderValue(order);
         BigDecimal received = advance.add(paid);
         BigDecimal balance = orderValue.subtract(received).subtract(deductions);
 
@@ -1150,7 +1174,7 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal advance = sum(entries, OrderPaymentType.ADVANCE);
         BigDecimal paid = sum(entries, OrderPaymentType.PAYMENT);
         BigDecimal deductions = sum(entries, OrderPaymentType.DEDUCTION);
-        BigDecimal orderValue = order.getTotalFreightAmount() != null ? order.getTotalFreightAmount() : BigDecimal.ZERO;
+        BigDecimal orderValue = computeOrderValue(order);
         BigDecimal received = advance.add(paid);
 
         return OrderSettlementResponse.builder()
@@ -1216,7 +1240,7 @@ public class OrderServiceImpl implements OrderService {
                 .freightRateType(o.getFreightRateType())
                 .freightRate(o.getFreightRate())
                 .billingOn(o.getBillingOn())
-                .totalFreightAmount(o.getTotalFreightAmount())
+                .totalFreightAmount(computeOrderValue(o))
                 .orderStatus(o.getOrderStatus())
                 .orderPaymentStatus(o.getOrderPaymentStatus())
                 .specialInstructions(o.getSpecialInstructions())
