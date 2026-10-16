@@ -75,6 +75,7 @@ public class OrderServiceImpl implements OrderService {
     private final NotificationService notificationService;
     private final NumberGeneratorService numberGenerator;
     private final OrderPaymentRepository orderPaymentRepository;
+    private final com.feros.api.service.OrderItemService orderItemService;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -127,7 +128,11 @@ public class OrderServiceImpl implements OrderService {
                 .findByIdAndTenantIdAndIsActiveTrue(request.getClientId(), tenant.getId())
                 .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
 
-        MaterialType materialType = resolveMaterialType(request);
+        // Multi-material: primary material = first manifest line; otherwise the single material field.
+        boolean multi = orderItemService.isMulti(request.getIsMultiMaterial(), request.getItems());
+        MaterialType materialType = multi
+                ? orderItemService.primaryMaterial(request.getItems())
+                : resolveMaterialType(request);
 
         City sourceCity = cityRepository.findById(request.getSourceCityId())
                 .orElseThrow(() -> new FerosException("Source city not found", HttpStatus.NOT_FOUND));
@@ -164,6 +169,7 @@ public class OrderServiceImpl implements OrderService {
                 .specialInstructions(request.getSpecialInstructions())
                 .remarks(request.getRemarks())
                 .isPol(false)
+                .isMultiMaterial(multi)
                 .isActive(true)
                 .build();
 
@@ -174,6 +180,7 @@ public class OrderServiceImpl implements OrderService {
         order.setTotalFreightAmount(computeOrderValue(order));
 
         Order savedOrder = orderRepository.save(order);
+        if (multi) orderItemService.replaceItems(savedOrder, tenant, request.getItems());
         notificationService.sendToRoles(savedOrder.getTenant(), List.of(RoleName.SUPERVISOR, RoleName.OFFICE_STAFF, RoleName.ADMIN),
                 NotificationType.ORDER_CREATED,
                 "New Order Created",
@@ -341,7 +348,10 @@ public class OrderServiceImpl implements OrderService {
                 .findByIdAndTenantIdAndIsActiveTrue(request.getClientId(), getCurrentTenantId())
                 .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
 
-        MaterialType materialType = resolveMaterialType(request);
+        boolean multi = orderItemService.isMulti(request.getIsMultiMaterial(), request.getItems());
+        MaterialType materialType = multi
+                ? orderItemService.primaryMaterial(request.getItems())
+                : resolveMaterialType(request);
 
         City sourceCity = cityRepository.findById(request.getSourceCityId())
                 .orElseThrow(() -> new FerosException("Source city not found", HttpStatus.NOT_FOUND));
@@ -357,6 +367,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setClient(client);
         order.setMaterialType(materialType);
+        order.setIsMultiMaterial(multi);
         order.setTotalWeight(request.getTotalWeight());
         order.setExpectedDeliveryDate(request.getExpectedDeliveryDate());
         order.setSourceAddress(request.getSourceAddress());
@@ -377,7 +388,11 @@ public class OrderServiceImpl implements OrderService {
 
         order.setTotalFreightAmount(computeOrderValue(order));
 
-        return mapToOrderResponse(orderRepository.save(order));
+        Order saved = orderRepository.save(order);
+        if (multi) orderItemService.replaceItems(saved, saved.getTenant(), request.getItems());
+        else orderItemService.clearItems(saved);
+
+        return mapToOrderResponse(saved);
     }
 
     @Override
@@ -1249,6 +1264,8 @@ public class OrderServiceImpl implements OrderService {
                 .createdByName(o.getCreatedBy().getName())
                 .vehicleAllocations(vehicleAllocations)
                 .isPol(o.getIsPol())
+                .isMultiMaterial(o.getIsMultiMaterial())
+                .items(orderItemService.toResponses(o.getId()))
                 .isActive(o.getIsActive())
                 .createdAt(o.getCreatedAt())
                 .updatedAt(o.getUpdatedAt())

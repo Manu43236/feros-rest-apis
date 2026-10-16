@@ -55,6 +55,12 @@ public class UpdatePostOrderLogRequest {
     private String specialInstructions;
     private String remarks;
 
+    // Multi-material (cargo manifest) — same semantics as OrderRequest.
+    private Boolean isMultiMaterial;
+
+    @Valid
+    private List<OrderItemRequest> items;
+
     // Each entry: id present = update existing LR; id null = create new LR
     @Valid
     private List<PolLrUpdateRequest> lrs;

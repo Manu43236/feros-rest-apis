@@ -2,12 +2,14 @@ package com.feros.api.dto.request;
 
 import com.feros.api.enums.BillingOn;
 import com.feros.api.enums.FreightRateType;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Setter
@@ -54,4 +56,12 @@ public class OrderRequest {
     private BillingOn billingOn;
     private String specialInstructions;
     private String remarks;
+
+    // Multi-material (cargo manifest). When true, items[] drives the manifest and
+    // line 1 becomes the primary material/weight above. When false/null, the single
+    // material fields above are used exactly as before.
+    private Boolean isMultiMaterial;
+
+    @Valid
+    private List<OrderItemRequest> items;
 }

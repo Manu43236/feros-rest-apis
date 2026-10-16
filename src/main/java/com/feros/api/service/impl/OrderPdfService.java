@@ -1,6 +1,7 @@
 package com.feros.api.service.impl;
 
 import com.feros.api.dto.response.OrderResponse;
+import com.feros.api.dto.response.OrderItemResponse;
 import com.feros.api.dto.response.VehicleAllocationResponse;
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.*;
@@ -84,6 +85,36 @@ public class OrderPdfService {
                     order.getBillingOn() != null
                             ? order.getBillingOn().name().replace("_", " ") : "—", bold8, reg7);
             doc.add(freight);
+
+            // ── Materials manifest (multi-material orders only) ────────────
+            if (Boolean.TRUE.equals(order.getIsMultiMaterial())
+                    && order.getItems() != null && !order.getItems().isEmpty()) {
+                PdfPTable manifestHeader = new PdfPTable(1);
+                manifestHeader.setWidthPercentage(100);
+                manifestHeader.setSpacingAfter(3);
+                PdfPCell mHdr = new PdfPCell(
+                        new Phrase("Materials", new Font(Font.HELVETICA, 6, Font.BOLD, Color.WHITE)));
+                mHdr.setBackgroundColor(GRAY);
+                mHdr.setPadding(3);
+                mHdr.setBorder(Rectangle.NO_BORDER);
+                manifestHeader.addCell(mHdr);
+                doc.add(manifestHeader);
+
+                PdfPTable items = new PdfPTable(new float[]{0.6f, 3f, 1.2f, 1.2f});
+                items.setWidthPercentage(100);
+                items.setSpacingAfter(6);
+                addAllocCell(items, "#", bold8);
+                addAllocCell(items, "Material", bold8);
+                addAllocCell(items, "Quantity", bold8);
+                addAllocCell(items, "Unit", bold8);
+                for (OrderItemResponse it : order.getItems()) {
+                    addAllocCell(items, String.valueOf(it.getLineNo()), reg7);
+                    addAllocCell(items, str(it.getMaterialName()), reg7);
+                    addAllocCell(items, it.getQuantity() != null ? it.getQuantity().toPlainString() : "—", reg7);
+                    addAllocCell(items, str(it.getUnitName()), reg7);
+                }
+                doc.add(items);
+            }
 
             // ── Vehicle Allocations ───────────────────────────────────────
             List<VehicleAllocationResponse> allocs = order.getVehicleAllocations();

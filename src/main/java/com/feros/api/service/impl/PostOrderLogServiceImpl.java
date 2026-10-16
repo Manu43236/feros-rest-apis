@@ -52,6 +52,7 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
     private final NumberGeneratorService numberGenerator;
     private final NotificationService notificationService;
     private final InvoiceLrRepository invoiceLrRepository;
+    private final com.feros.api.service.OrderItemService orderItemService;
 
     @Override
     @Transactional
@@ -68,7 +69,10 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
         Client client = clientRepository.findByIdAndTenantIdAndIsActiveTrue(request.getClientId(), tenant.getId())
                 .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
 
-        MaterialType materialType = resolveMaterialType(request, tenant);
+        boolean multi = orderItemService.isMulti(request.getIsMultiMaterial(), request.getItems());
+        MaterialType materialType = multi
+                ? orderItemService.primaryMaterial(request.getItems())
+                : resolveMaterialType(request, tenant);
 
         City sourceCity = cityRepository.findById(request.getSourceCityId())
                 .orElseThrow(() -> new FerosException("Source city not found", HttpStatus.NOT_FOUND));
@@ -130,6 +134,7 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
                 .specialInstructions(request.getSpecialInstructions())
                 .remarks(request.getRemarks())
                 .isPol(true)
+                .isMultiMaterial(multi)
                 .isActive(true)
                 .build();
 
@@ -139,6 +144,7 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
         }
 
         Order savedOrder = orderRepository.save(order);
+        if (multi) orderItemService.replaceItems(savedOrder, tenant, request.getItems());
 
         for (PolLrRequest lrReq : request.getLrs()) {
             Vehicle vehicle = vehicleRepository.findByIdAndTenantIdAndIsActiveTrue(lrReq.getVehicleId(), tenant.getId())
@@ -261,7 +267,10 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
         Client client = clientRepository.findByIdAndTenantIdAndIsActiveTrue(request.getClientId(), tenant.getId())
                 .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
 
-        MaterialType materialType = resolveUpdateMaterialType(request, tenant);
+        boolean multi = orderItemService.isMulti(request.getIsMultiMaterial(), request.getItems());
+        MaterialType materialType = multi
+                ? orderItemService.primaryMaterial(request.getItems())
+                : resolveUpdateMaterialType(request, tenant);
 
         City sourceCity = cityRepository.findById(request.getSourceCityId())
                 .orElseThrow(() -> new FerosException("Source city not found", HttpStatus.NOT_FOUND));
@@ -300,6 +309,7 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
         // Update order header fields
         order.setClient(client);
         order.setMaterialType(materialType);
+        order.setIsMultiMaterial(multi);
         order.setTotalWeight(request.getTotalWeight());
         order.setOrderDate(request.getOrderDate());
         order.setSourceAddress(request.getSourceAddress());
@@ -462,6 +472,8 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
         }
 
         Order savedOrder = orderRepository.save(order);
+        if (multi) orderItemService.replaceItems(savedOrder, tenant, request.getItems());
+        else orderItemService.clearItems(savedOrder);
         return mapToOrderResponse(orderRepository.findById(savedOrder.getId()).orElse(savedOrder));
     }
 
@@ -546,6 +558,8 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
                 .createdByName(o.getCreatedBy().getName())
                 .vehicleAllocations(vehicleAllocations)
                 .isPol(o.getIsPol())
+                .isMultiMaterial(o.getIsMultiMaterial())
+                .items(orderItemService.toResponses(o.getId()))
                 .isActive(o.getIsActive())
                 .createdAt(o.getCreatedAt())
                 .updatedAt(o.getUpdatedAt())

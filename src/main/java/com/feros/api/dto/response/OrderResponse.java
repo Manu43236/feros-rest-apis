@@ -64,6 +64,8 @@ public class OrderResponse {
     private List<VehicleAllocationResponse> vehicleAllocations;
 
     private Boolean isPol;
+    private Boolean isMultiMaterial;
+    private List<OrderItemResponse> items;
     private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -118,6 +118,9 @@ public class Order extends BaseEntity {
     @Column(name = "is_pol")
     private Boolean isPol = false;
 
+    @Column(name = "is_multi_material")
+    private Boolean isMultiMaterial = false;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 }

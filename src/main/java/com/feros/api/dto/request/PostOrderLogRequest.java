@@ -56,6 +56,12 @@ public class PostOrderLogRequest {
     private String specialInstructions;
     private String remarks;
 
+    // Multi-material (cargo manifest) — same semantics as OrderRequest.
+    private Boolean isMultiMaterial;
+
+    @Valid
+    private List<OrderItemRequest> items;
+
     @NotEmpty(message = "At least one LR is required")
     @Valid
     private List<PolLrRequest> lrs;
