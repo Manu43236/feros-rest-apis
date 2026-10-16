@@ -3,10 +3,12 @@ package com.feros.api.controller;
 import com.feros.api.dto.request.AssignStaffRequest;
 import com.feros.api.dto.request.AssignVehicleRequest;
 import com.feros.api.dto.request.OrderRequest;
+import com.feros.api.dto.request.OrderPaymentRequest;
 import com.feros.api.dto.request.PostOrderLogRequest;
 import com.feros.api.dto.request.UpdatePostOrderLogRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.OrderResponse;
+import com.feros.api.dto.response.OrderSettlementResponse;
 import com.feros.api.dto.response.StaffAllocationResponse;
 import com.feros.api.dto.response.VehicleAllocationResponse;
 import com.feros.api.dto.response.VehicleAssignmentHistoryResponse;
@@ -107,6 +109,30 @@ public class OrderController {
             @PathVariable Long id, @RequestParam OrderPaymentStatus status) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Payment status updated successfully", orderService.updatePaymentStatus(id, status)));
+    }
+
+    // ---- Order settlement ledger (advance / payment / deduction) — V1 enhancement ----
+    @GetMapping("/{id}/settlement")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<OrderSettlementResponse>> getOrderSettlement(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Settlement fetched successfully", orderService.getOrderSettlement(id)));
+    }
+
+    @PostMapping("/{id}/payments")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<OrderSettlementResponse>> addOrderPayment(
+            @PathVariable Long id, @Valid @RequestBody OrderPaymentRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Payment recorded successfully", orderService.addOrderPayment(id, request)));
+    }
+
+    @DeleteMapping("/{id}/payments/{paymentId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<OrderSettlementResponse>> deleteOrderPayment(
+            @PathVariable Long id, @PathVariable Long paymentId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Payment entry deleted successfully", orderService.deleteOrderPayment(id, paymentId)));
     }
 
     @DeleteMapping("/{id}/allocations/{allocationId}")

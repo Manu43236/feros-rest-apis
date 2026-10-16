@@ -3,7 +3,9 @@ package com.feros.api.service;
 import com.feros.api.dto.request.AssignStaffRequest;
 import com.feros.api.dto.request.AssignVehicleRequest;
 import com.feros.api.dto.request.OrderRequest;
+import com.feros.api.dto.request.OrderPaymentRequest;
 import com.feros.api.dto.response.OrderResponse;
+import com.feros.api.dto.response.OrderSettlementResponse;
 import com.feros.api.dto.response.StaffAllocationResponse;
 import com.feros.api.dto.response.VehicleAllocationResponse;
 import com.feros.api.dto.response.VehicleAssignmentHistoryResponse;
@@ -28,4 +30,9 @@ public interface OrderService {
     OrderResponse updatePaymentStatus(Long id, OrderPaymentStatus paymentStatus);
     List<VehicleAssignmentHistoryResponse> getVehicleAllocationHistory(Long vehicleId);
     List<VehicleAssignmentHistoryResponse> getAllVehicleAllocationHistory();
+
+    // Order-level settlement ledger (advance / payment / deduction) — V1 enhancement
+    OrderSettlementResponse getOrderSettlement(Long orderId);
+    OrderSettlementResponse addOrderPayment(Long orderId, OrderPaymentRequest request);
+    OrderSettlementResponse deleteOrderPayment(Long orderId, Long paymentId);
 }

@@ -4,7 +4,10 @@ import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.AssignStaffRequest;
 import com.feros.api.dto.request.AssignVehicleRequest;
 import com.feros.api.dto.request.OrderRequest;
+import com.feros.api.dto.request.OrderPaymentRequest;
 import com.feros.api.dto.response.OrderResponse;
+import com.feros.api.dto.response.OrderPaymentResponse;
+import com.feros.api.dto.response.OrderSettlementResponse;
 import com.feros.api.dto.response.StaffAllocationResponse;
 import com.feros.api.dto.response.VehicleAllocationResponse;
 import com.feros.api.dto.response.VehicleAssignmentHistoryResponse;
@@ -17,6 +20,9 @@ import com.feros.api.enums.BillingOn;
 import com.feros.api.enums.RoleName;
 import com.feros.api.enums.LrStatus;
 import com.feros.api.enums.OrderPaymentStatus;
+import com.feros.api.enums.OrderPaymentType;
+import com.feros.api.enums.DeductionReason;
+import com.feros.api.enums.PaymentMode;
 import com.feros.api.enums.OrderStatus;
 import com.feros.api.enums.StaffAllocationStatus;
 import com.feros.api.enums.VehicleAllocationStatus;
@@ -67,6 +73,7 @@ public class OrderServiceImpl implements OrderService {
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final NotificationService notificationService;
     private final NumberGeneratorService numberGenerator;
+    private final OrderPaymentRepository orderPaymentRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -1016,6 +1023,144 @@ public class OrderServiceImpl implements OrderService {
                 .assignedAt(a.getCreatedAt())
                 .unassignedByName(a.getUnassignedBy() != null ? a.getUnassignedBy().getName() : null)
                 .unassignedAt(a.getUnassignedAt())
+                .build();
+    }
+
+    // ===================== ORDER SETTLEMENT LEDGER (V1 enhancement) =====================
+    // Order-level advance / payment / deduction. Additive: independent of the invoice
+    // flow, and only ever touches orderPaymentStatus (never orderStatus/allocations).
+
+    private Order getOrderOrThrow(Long orderId) {
+        return orderRepository.findByIdAndTenantIdAndIsActiveTrue(orderId, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Order not found", HttpStatus.NOT_FOUND));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderSettlementResponse getOrderSettlement(Long orderId) {
+        return buildSettlement(getOrderOrThrow(orderId));
+    }
+
+    @Override
+    @Transactional
+    public OrderSettlementResponse addOrderPayment(Long orderId, OrderPaymentRequest request) {
+        Order order = getOrderOrThrow(orderId);
+
+        if (order.getOrderStatus() == OrderStatus.CANCELLED) {
+            throw new FerosException("Cannot record money on a cancelled order", HttpStatus.BAD_REQUEST);
+        }
+        if (request.getType() == OrderPaymentType.DEDUCTION) {
+            if (request.getDeductionReason() == null) {
+                throw new FerosException("Deduction reason is required", HttpStatus.BAD_REQUEST);
+            }
+        } else if (request.getPaymentMode() == null) {
+            throw new FerosException("Payment mode is required", HttpStatus.BAD_REQUEST);
+        }
+
+        OrderPayment entry = OrderPayment.builder()
+                .tenant(order.getTenant())
+                .order(order)
+                .type(request.getType())
+                .amount(request.getAmount())
+                .txnDate(request.getTxnDate())
+                .paymentMode(request.getType() == OrderPaymentType.DEDUCTION ? null : request.getPaymentMode())
+                .deductionReason(request.getType() == OrderPaymentType.DEDUCTION ? request.getDeductionReason() : null)
+                .remarks(request.getRemarks())
+                .createdBy(getCurrentUser())
+                .isActive(true)
+                .build();
+        orderPaymentRepository.save(entry);
+
+        recomputePaymentStatus(order);
+        return buildSettlement(order);
+    }
+
+    @Override
+    @Transactional
+    public OrderSettlementResponse deleteOrderPayment(Long orderId, Long paymentId) {
+        Order order = getOrderOrThrow(orderId);
+        OrderPayment entry = orderPaymentRepository
+                .findByIdAndTenantIdAndIsActiveTrue(paymentId, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Payment entry not found", HttpStatus.NOT_FOUND));
+        if (!entry.getOrder().getId().equals(order.getId())) {
+            throw new FerosException("Payment entry does not belong to this order", HttpStatus.BAD_REQUEST);
+        }
+        entry.setIsActive(false);
+        orderPaymentRepository.save(entry);
+
+        recomputePaymentStatus(order);
+        return buildSettlement(order);
+    }
+
+    /** Derive orderPaymentStatus from the ledger. Does NOT touch orderStatus or allocations. */
+    private void recomputePaymentStatus(Order order) {
+        List<OrderPayment> entries = orderPaymentRepository
+                .findByOrderIdAndIsActiveTrueOrderByTxnDateAscIdAsc(order.getId());
+
+        BigDecimal advance = sum(entries, OrderPaymentType.ADVANCE);
+        BigDecimal paid = sum(entries, OrderPaymentType.PAYMENT);
+        BigDecimal deductions = sum(entries, OrderPaymentType.DEDUCTION);
+        BigDecimal orderValue = order.getTotalFreightAmount() != null ? order.getTotalFreightAmount() : BigDecimal.ZERO;
+        BigDecimal received = advance.add(paid);
+        BigDecimal balance = orderValue.subtract(received).subtract(deductions);
+
+        OrderPaymentStatus status;
+        if (balance.compareTo(BigDecimal.ZERO) <= 0 && received.compareTo(BigDecimal.ZERO) > 0) {
+            status = deductions.compareTo(BigDecimal.ZERO) > 0 ? OrderPaymentStatus.SETTLED : OrderPaymentStatus.PAID;
+        } else if (received.compareTo(BigDecimal.ZERO) <= 0) {
+            status = OrderPaymentStatus.UNPAID;
+        } else if (paid.compareTo(BigDecimal.ZERO) <= 0) {
+            status = OrderPaymentStatus.ADVANCE_PAID;
+        } else {
+            status = OrderPaymentStatus.PARTIALLY_PAID;
+        }
+        order.setOrderPaymentStatus(status);
+        orderRepository.save(order);
+    }
+
+    private BigDecimal sum(List<OrderPayment> entries, OrderPaymentType type) {
+        return entries.stream()
+                .filter(e -> e.getType() == type)
+                .map(e -> e.getAmount() != null ? e.getAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private OrderSettlementResponse buildSettlement(Order order) {
+        List<OrderPayment> entries = orderPaymentRepository
+                .findByOrderIdAndIsActiveTrueOrderByTxnDateAscIdAsc(order.getId());
+
+        BigDecimal advance = sum(entries, OrderPaymentType.ADVANCE);
+        BigDecimal paid = sum(entries, OrderPaymentType.PAYMENT);
+        BigDecimal deductions = sum(entries, OrderPaymentType.DEDUCTION);
+        BigDecimal orderValue = order.getTotalFreightAmount() != null ? order.getTotalFreightAmount() : BigDecimal.ZERO;
+        BigDecimal received = advance.add(paid);
+
+        return OrderSettlementResponse.builder()
+                .orderId(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .orderValue(orderValue)
+                .totalAdvance(advance)
+                .totalPaid(paid)
+                .totalReceived(received)
+                .totalDeductions(deductions)
+                .balance(orderValue.subtract(received).subtract(deductions))
+                .paymentStatus(order.getOrderPaymentStatus())
+                .entries(entries.stream().map(this::mapToOrderPaymentResponse).toList())
+                .build();
+    }
+
+    private OrderPaymentResponse mapToOrderPaymentResponse(OrderPayment e) {
+        return OrderPaymentResponse.builder()
+                .id(e.getId())
+                .type(e.getType())
+                .amount(e.getAmount())
+                .txnDate(e.getTxnDate())
+                .paymentMode(e.getPaymentMode())
+                .deductionReason(e.getDeductionReason())
+                .remarks(e.getRemarks())
+                .createdById(e.getCreatedBy() != null ? e.getCreatedBy().getId() : null)
+                .createdByName(e.getCreatedBy() != null ? e.getCreatedBy().getName() : null)
+                .createdAt(e.getCreatedAt())
                 .build();
     }
 
