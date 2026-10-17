@@ -510,8 +510,12 @@ public class OrderServiceImpl implements OrderService {
                 HttpStatus.CONFLICT);
         }
 
-        // Validate allocated weight doesn't exceed 1.5x vehicle capacity
-        if (vehicle.getCapacityInTons() != null) {
+        // Validate allocated quantity doesn't exceed 1.5x vehicle capacity — only meaningful
+        // when the order is measured in Tons (vehicle capacity is expressed in tons). For
+        // other units (bags, litres, packets…) the capacity comparison is skipped.
+        boolean unitIsTons = order.getUnit() == null
+                || "Tons".equalsIgnoreCase(order.getUnit().getName());
+        if (unitIsTons && vehicle.getCapacityInTons() != null) {
             BigDecimal maxAllowed = vehicle.getCapacityInTons()
                     .multiply(new BigDecimal("1.5"));
             if (request.getAllocatedWeight().compareTo(maxAllowed) > 0) {
@@ -522,12 +526,13 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // Validate allocated weight doesn't exceed remaining order weight
+        // Validate allocated quantity doesn't exceed remaining order quantity (unit-agnostic)
         BigDecimal remaining = order.getTotalWeight().subtract(order.getTotalWeightFulfilled());
         if (request.getAllocatedWeight().compareTo(remaining) > 0) {
+            String u = order.getUnitLabel();
             throw new FerosException(
-                    "Allocated weight (" + request.getAllocatedWeight() +
-                    "T) exceeds remaining weight (" + remaining + "T)", HttpStatus.BAD_REQUEST);
+                    "Allocated quantity (" + request.getAllocatedWeight() + " " + u +
+                    ") exceeds remaining (" + remaining + " " + u + ")", HttpStatus.BAD_REQUEST);
         }
 
         OrderVehicleAllocation allocation = OrderVehicleAllocation.builder()
