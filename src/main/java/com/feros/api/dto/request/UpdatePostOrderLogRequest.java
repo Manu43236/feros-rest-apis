@@ -30,6 +30,9 @@ public class UpdatePostOrderLogRequest {
     @NotNull(message = "Total weight is required")
     private BigDecimal totalWeight;
 
+    // Unit of measure for totalWeight (single-material). Null → Tons.
+    private Long unitId;
+
     @NotNull(message = "Order date is required")
     private LocalDate orderDate;
 

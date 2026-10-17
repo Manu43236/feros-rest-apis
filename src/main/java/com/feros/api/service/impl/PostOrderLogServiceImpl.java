@@ -53,6 +53,7 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
     private final NotificationService notificationService;
     private final InvoiceLrRepository invoiceLrRepository;
     private final com.feros.api.service.OrderItemService orderItemService;
+    private final com.feros.api.repository.UnitRepository unitRepository;
 
     @Override
     @Transactional
@@ -122,6 +123,7 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
                 .billingPartyClient(resolvePartyOrNull(request.getBillingPartyClientId(), tenant.getId()))
                 .materialType(materialType)
                 .totalWeight(request.getTotalWeight())
+                .unit(resolveUnitOrNull(request.getUnitId()))
                 .totalWeightFulfilled(totalFulfilled)
                 .sourceAddress(request.getSourceAddress())
                 .sourceCity(sourceCity)
@@ -317,6 +319,7 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
         order.setMaterialType(materialType);
         order.setIsMultiMaterial(multi);
         order.setTotalWeight(request.getTotalWeight());
+        order.setUnit(resolveUnitOrNull(request.getUnitId()));
         order.setOrderDate(request.getOrderDate());
         order.setSourceAddress(request.getSourceAddress());
         order.setSourceCity(sourceCity);
@@ -542,6 +545,8 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
                 .consigneeClientName(o.getConsigneeClient() != null ? o.getConsigneeClient().getClientName() : null)
                 .billingPartyClientId(o.getEffectiveBillingClient().getId())
                 .billingPartyClientName(o.getEffectiveBillingClient().getClientName())
+                .unitId(o.getUnit() != null ? o.getUnit().getId() : null)
+                .unitName(o.getUnitLabel())
                 .materialTypeId(o.getMaterialType().getId())
                 .materialTypeName(o.getMaterialType().getName())
                 .totalWeight(o.getTotalWeight())
@@ -583,5 +588,11 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
         if (clientId == null) return null;
         return clientRepository.findByIdAndTenantIdAndIsActiveTrue(clientId, tenantId)
                 .orElseThrow(() -> new FerosException("Party client not found", HttpStatus.NOT_FOUND));
+    }
+
+    private com.feros.api.entity.master.Unit resolveUnitOrNull(Long unitId) {
+        if (unitId == null) return null;
+        return unitRepository.findById(unitId)
+                .orElseThrow(() -> new FerosException("Unit not found", HttpStatus.NOT_FOUND));
     }
 }

@@ -80,6 +80,17 @@ public class Order extends BaseEntity {
     @Column(name = "total_weight", nullable = false)
     private BigDecimal totalWeight;
 
+    // Unit of measure for the quantity above (single-material orders). Null → Tons (legacy).
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "unit_id")
+    private com.feros.api.entity.master.Unit unit;
+
+    // Display label for the quantity unit; "Tons" when unset (backward-compatible).
+    @Transient
+    public String getUnitLabel() {
+        return unit != null ? unit.getName() : "Tons";
+    }
+
     @Column(name = "total_weight_fulfilled")
     private BigDecimal totalWeightFulfilled = BigDecimal.ZERO;
 

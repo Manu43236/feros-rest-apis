@@ -531,6 +531,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .orderNumber(order.getOrderNumber())
                 .vehicleRegistrationNumber(lr.getVehicleAllocation().getVehicle().getRegistrationNumber())
                 .materialTypeName(order.getMaterialType() != null ? order.getMaterialType().getName() : null)
+                .unitName(order.getUnitLabel())
                 .billingWeight(billingWeight)
                 .freightRateType(order.getFreightRateType() != null ? order.getFreightRateType().name() : null)
                 .freightRate(order.getFreightRate())

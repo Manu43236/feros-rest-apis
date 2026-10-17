@@ -42,6 +42,10 @@ public class OrderResponse {
     private BigDecimal totalWeightFulfilled;
     private BigDecimal remainingWeight;
 
+    // Unit of measure. unitId null when using the default; unitName always a label ("Tons" default).
+    private Long unitId;
+    private String unitName;
+
     private String sourceAddress;
     private Long sourceCityId;
     private String sourceCityName;

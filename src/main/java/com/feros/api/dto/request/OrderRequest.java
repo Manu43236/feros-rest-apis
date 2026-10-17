@@ -32,6 +32,9 @@ public class OrderRequest {
     @NotNull(message = "Total weight is required")
     private BigDecimal totalWeight;
 
+    // Unit of measure for totalWeight (single-material). Null → Tons.
+    private Long unitId;
+
     private LocalDate orderDate;
     private LocalDate expectedDeliveryDate;
 

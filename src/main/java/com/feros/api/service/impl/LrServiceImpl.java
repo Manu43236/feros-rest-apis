@@ -622,6 +622,7 @@ public class LrServiceImpl implements LrService {
                 .clientName(lr.getOrder().getClient().getClientName())
                 .billingClientId(lr.getOrder().getEffectiveBillingClient().getId())
                 .billingClientName(lr.getOrder().getEffectiveBillingClient().getClientName())
+                .unitName(lr.getOrder().getUnitLabel())
                 .materialTypeName(lr.getOrder().getMaterialType() != null ?
                         lr.getOrder().getMaterialType().getName() : null)
                 .fromCity(lr.getOrder().getSourceCity() != null ? lr.getOrder().getSourceCity().getName() : null)

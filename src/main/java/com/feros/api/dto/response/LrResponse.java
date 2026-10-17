@@ -36,6 +36,8 @@ public class LrResponse {
     private String billingClientName;
 
     private String materialTypeName;
+    // Unit of measure for the weight fields below (order's unit; "Tons" default).
+    private String unitName;
 
     private String fromCity;
     private String fromState;

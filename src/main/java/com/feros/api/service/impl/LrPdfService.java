@@ -248,7 +248,7 @@ public class LrPdfService {
             // Header row 1 (spanning)
             th(table, "No. of\nPackage");
             th(table, "Material");
-            table.addCell(span2Header("Weight"));
+            table.addCell(span2Header("Weight (" + order.getUnitLabel() + ")"));
             th(table, "Rate");
             table.addCell(span2Header("Freight"));
             th(table, "Remarks");
@@ -274,11 +274,11 @@ public class LrPdfService {
             int fPs = freightAmt.subtract(BigDecimal.valueOf(fRs))
                     .multiply(BigDecimal.valueOf(100)).setScale(0, RoundingMode.HALF_UP).intValue();
 
-            String rateTypeStr = order.getFreightRateType().name().equals("PER_TON") ? "/ TON" : "/ TRIP";
+            String rateTypeStr = order.getFreightRateType().name().equals("PER_TON") ? "/ " + order.getUnitLabel() : "/ TRIP";
             String rateText    = "Rs. " + fmt(order.getFreightRate()) + " " + rateTypeStr;
             String material    = order.getMaterialType() != null ? order.getMaterialType().getName() : "—";
-            String actualWtStr = loadedWt.compareTo(BigDecimal.ZERO) > 0 ? fmt(loadedWt) + " T" : "—";
-            String billedWtStr = billedWt.compareTo(BigDecimal.ZERO) > 0 ? fmt(billedWt) + " T" : "—";
+            String actualWtStr = loadedWt.compareTo(BigDecimal.ZERO) > 0 ? fmt(loadedWt) : "—";
+            String billedWtStr = billedWt.compareTo(BigDecimal.ZERO) > 0 ? fmt(billedWt) : "—";
 
             // Data row
             td(table, "1",         Element.ALIGN_CENTER, reg7);

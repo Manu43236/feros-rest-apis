@@ -76,6 +76,7 @@ public class OrderServiceImpl implements OrderService {
     private final NumberGeneratorService numberGenerator;
     private final OrderPaymentRepository orderPaymentRepository;
     private final com.feros.api.service.OrderItemService orderItemService;
+    private final com.feros.api.repository.UnitRepository unitRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -158,6 +159,7 @@ public class OrderServiceImpl implements OrderService {
                 .billingPartyClient(resolveClientOrNull(request.getBillingPartyClientId(), tenant.getId()))
                 .materialType(materialType)
                 .totalWeight(request.getTotalWeight())
+                .unit(resolveUnitOrNull(request.getUnitId()))
                 .totalWeightFulfilled(BigDecimal.ZERO)
                 .sourceAddress(request.getSourceAddress())
                 .sourceCity(sourceCity)
@@ -375,6 +377,7 @@ public class OrderServiceImpl implements OrderService {
         order.setMaterialType(materialType);
         order.setIsMultiMaterial(multi);
         order.setTotalWeight(request.getTotalWeight());
+        order.setUnit(resolveUnitOrNull(request.getUnitId()));
         order.setExpectedDeliveryDate(request.getExpectedDeliveryDate());
         order.setSourceAddress(request.getSourceAddress());
         order.setSourceCity(sourceCity);
@@ -1228,6 +1231,13 @@ public class OrderServiceImpl implements OrderService {
     }
 
     // ===================== MAPPERS =====================
+    // Resolves an optional unit by id; null id → null (defaults to Tons at display time).
+    private com.feros.api.entity.master.Unit resolveUnitOrNull(Long unitId) {
+        if (unitId == null) return null;
+        return unitRepository.findById(unitId)
+                .orElseThrow(() -> new FerosException("Unit not found", HttpStatus.NOT_FOUND));
+    }
+
     // Resolves an optional party client by id; null id → null (no party set).
     private Client resolveClientOrNull(Long clientId, Long tenantId) {
         if (clientId == null) return null;
@@ -1259,6 +1269,8 @@ public class OrderServiceImpl implements OrderService {
                 .totalWeight(o.getTotalWeight())
                 .totalWeightFulfilled(o.getTotalWeightFulfilled())
                 .remainingWeight(o.getTotalWeight().subtract(o.getTotalWeightFulfilled()).setScale(2, java.math.RoundingMode.HALF_UP))
+                .unitId(o.getUnit() != null ? o.getUnit().getId() : null)
+                .unitName(o.getUnitLabel())
                 .sourceAddress(o.getSourceAddress())
                 .sourceCityId(o.getSourceCity().getId())
                 .sourceCityName(o.getSourceCity().getName())
