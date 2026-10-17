@@ -117,6 +117,9 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
                 .orderDate(request.getOrderDate())
                 .createdBy(createdBy)
                 .client(client)
+                .consignorClient(resolvePartyOrNull(request.getConsignorClientId(), tenant.getId()))
+                .consigneeClient(resolvePartyOrNull(request.getConsigneeClientId(), tenant.getId()))
+                .billingPartyClient(resolvePartyOrNull(request.getBillingPartyClientId(), tenant.getId()))
                 .materialType(materialType)
                 .totalWeight(request.getTotalWeight())
                 .totalWeightFulfilled(totalFulfilled)
@@ -308,6 +311,9 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
 
         // Update order header fields
         order.setClient(client);
+        order.setConsignorClient(resolvePartyOrNull(request.getConsignorClientId(), tenant.getId()));
+        order.setConsigneeClient(resolvePartyOrNull(request.getConsigneeClientId(), tenant.getId()));
+        order.setBillingPartyClient(resolvePartyOrNull(request.getBillingPartyClientId(), tenant.getId()));
         order.setMaterialType(materialType);
         order.setIsMultiMaterial(multi);
         order.setTotalWeight(request.getTotalWeight());
@@ -530,6 +536,12 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
                 .orderDate(o.getOrderDate())
                 .clientId(o.getClient().getId())
                 .clientName(o.getClient().getClientName())
+                .consignorClientId(o.getConsignorClient() != null ? o.getConsignorClient().getId() : null)
+                .consignorClientName(o.getConsignorClient() != null ? o.getConsignorClient().getClientName() : null)
+                .consigneeClientId(o.getConsigneeClient() != null ? o.getConsigneeClient().getId() : null)
+                .consigneeClientName(o.getConsigneeClient() != null ? o.getConsigneeClient().getClientName() : null)
+                .billingPartyClientId(o.getEffectiveBillingClient().getId())
+                .billingPartyClientName(o.getEffectiveBillingClient().getClientName())
                 .materialTypeId(o.getMaterialType().getId())
                 .materialTypeName(o.getMaterialType().getName())
                 .totalWeight(o.getTotalWeight())
@@ -564,5 +576,12 @@ public class PostOrderLogServiceImpl implements PostOrderLogService {
                 .createdAt(o.getCreatedAt())
                 .updatedAt(o.getUpdatedAt())
                 .build();
+    }
+
+    // Resolves an optional party client by id; null id → null (no party set).
+    private Client resolvePartyOrNull(Long clientId, Long tenantId) {
+        if (clientId == null) return null;
+        return clientRepository.findByIdAndTenantIdAndIsActiveTrue(clientId, tenantId)
+                .orElseThrow(() -> new FerosException("Party client not found", HttpStatus.NOT_FOUND));
     }
 }

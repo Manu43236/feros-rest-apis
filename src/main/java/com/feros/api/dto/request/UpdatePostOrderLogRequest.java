@@ -18,6 +18,12 @@ public class UpdatePostOrderLogRequest {
     @NotNull(message = "Client is required")
     private Long clientId;
 
+    // Party details (optional). clientId = placing client; billingPartyClientId = who is
+    // billed (null → bill the placing client).
+    private Long consignorClientId;
+    private Long consigneeClientId;
+    private Long billingPartyClientId;
+
     private Long materialTypeId;
     private String customMaterialName;
 

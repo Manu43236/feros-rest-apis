@@ -51,6 +51,28 @@ public class Order extends BaseEntity {
     @JoinColumn(name = "client_id", nullable = false)
     private Client client;
 
+    // Party details (add-on). `client` above = the placing client (who booked the order).
+    // All three below are nullable. When empty: invoice bills the placing client and the LR
+    // falls back to legacy behaviour (consignee = client, consignor = source city).
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "consignor_client_id")
+    private Client consignorClient;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "consignee_client_id")
+    private Client consigneeClient;
+
+    // Who the invoice is billed to. Null → bill the placing `client`.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "billing_party_client_id")
+    private Client billingPartyClient;
+
+    // Effective billing party = explicit billing client, else the placing client.
+    @Transient
+    public Client getEffectiveBillingClient() {
+        return billingPartyClient != null ? billingPartyClient : client;
+    }
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "material_type_id", nullable = false)
     private MaterialType materialType;

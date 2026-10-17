@@ -153,6 +153,9 @@ public class OrderServiceImpl implements OrderService {
                 .expectedDeliveryDate(request.getExpectedDeliveryDate())
                 .createdBy(createdBy)
                 .client(client)
+                .consignorClient(resolveClientOrNull(request.getConsignorClientId(), tenant.getId()))
+                .consigneeClient(resolveClientOrNull(request.getConsigneeClientId(), tenant.getId()))
+                .billingPartyClient(resolveClientOrNull(request.getBillingPartyClientId(), tenant.getId()))
                 .materialType(materialType)
                 .totalWeight(request.getTotalWeight())
                 .totalWeightFulfilled(BigDecimal.ZERO)
@@ -366,6 +369,9 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new FerosException("Destination state not found", HttpStatus.NOT_FOUND));
 
         order.setClient(client);
+        order.setConsignorClient(resolveClientOrNull(request.getConsignorClientId(), getCurrentTenantId()));
+        order.setConsigneeClient(resolveClientOrNull(request.getConsigneeClientId(), getCurrentTenantId()));
+        order.setBillingPartyClient(resolveClientOrNull(request.getBillingPartyClientId(), getCurrentTenantId()));
         order.setMaterialType(materialType);
         order.setIsMultiMaterial(multi);
         order.setTotalWeight(request.getTotalWeight());
@@ -1222,6 +1228,13 @@ public class OrderServiceImpl implements OrderService {
     }
 
     // ===================== MAPPERS =====================
+    // Resolves an optional party client by id; null id → null (no party set).
+    private Client resolveClientOrNull(Long clientId, Long tenantId) {
+        if (clientId == null) return null;
+        return clientRepository.findByIdAndTenantIdAndIsActiveTrue(clientId, tenantId)
+                .orElseThrow(() -> new FerosException("Party client not found", HttpStatus.NOT_FOUND));
+    }
+
     private OrderResponse mapToOrderResponse(Order o) {
         List<VehicleAllocationResponse> vehicleAllocations = vehicleAllocationRepository
                 .findByOrderIdAndIsActiveTrue(o.getId())
@@ -1235,6 +1248,12 @@ public class OrderServiceImpl implements OrderService {
                 .expectedDeliveryDate(o.getExpectedDeliveryDate())
                 .clientId(o.getClient().getId())
                 .clientName(o.getClient().getClientName())
+                .consignorClientId(o.getConsignorClient() != null ? o.getConsignorClient().getId() : null)
+                .consignorClientName(o.getConsignorClient() != null ? o.getConsignorClient().getClientName() : null)
+                .consigneeClientId(o.getConsigneeClient() != null ? o.getConsigneeClient().getId() : null)
+                .consigneeClientName(o.getConsigneeClient() != null ? o.getConsigneeClient().getClientName() : null)
+                .billingPartyClientId(o.getEffectiveBillingClient().getId())
+                .billingPartyClientName(o.getEffectiveBillingClient().getClientName())
                 .materialTypeId(o.getMaterialType().getId())
                 .materialTypeName(o.getMaterialType().getName())
                 .totalWeight(o.getTotalWeight())

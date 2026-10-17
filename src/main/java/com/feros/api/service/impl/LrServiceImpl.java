@@ -620,6 +620,8 @@ public class LrServiceImpl implements LrService {
                         vehicle.getVehicleType().getName() : null)
                 .clientId(lr.getOrder().getClient().getId())
                 .clientName(lr.getOrder().getClient().getClientName())
+                .billingClientId(lr.getOrder().getEffectiveBillingClient().getId())
+                .billingClientName(lr.getOrder().getEffectiveBillingClient().getClientName())
                 .materialTypeName(lr.getOrder().getMaterialType() != null ?
                         lr.getOrder().getMaterialType().getName() : null)
                 .fromCity(lr.getOrder().getSourceCity() != null ? lr.getOrder().getSourceCity().getName() : null)

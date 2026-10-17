@@ -18,6 +18,12 @@ public class OrderRequest {
     @NotNull(message = "Client is required")
     private Long clientId;
 
+    // Party details (optional). clientId = placing client; billingPartyClientId = who is
+    // billed (null → bill the placing client).
+    private Long consignorClientId;
+    private Long consigneeClientId;
+    private Long billingPartyClientId;
+
     // Either materialTypeId (existing master) or customMaterialName (free-text "Other") must be provided
     private Long materialTypeId;
 

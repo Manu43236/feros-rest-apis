@@ -58,12 +58,27 @@ public class InvoiceResponse {
     private String transportHsnSac;
     private String tenantInvoiceDescription;
 
-    // Client details (for print)
+    // Client details (for print) — this is the BILL-TO (billing party)
     private String clientGstin;
     private String clientAddress;
     private String clientCity;
     private String clientState;
     private String clientPincode;
+
+    // Consignor / Consignee address blocks. Uniform across the invoice's LRs; null when
+    // not set or when the invoice mixes different parties (then see per-LR line items).
+    private String consignorName;
+    private String consignorGstin;
+    private String consignorAddress;
+    private String consignorCity;
+    private String consignorState;
+    private String consignorPincode;
+    private String consigneeName;
+    private String consigneeGstin;
+    private String consigneeAddress;
+    private String consigneeCity;
+    private String consigneeState;
+    private String consigneePincode;
 
     private List<InvoiceLrResponse> lrItems;
     private List<InvoicePaymentResponse> payments;

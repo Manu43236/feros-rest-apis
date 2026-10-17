@@ -127,26 +127,50 @@ public class LrPdfService {
             PdfPCell left = new PdfPCell();
             left.setBorder(Rectangle.BOX); left.setBorderColor(NAVY); left.setPadding(5);
 
-            // Consignor
+            // Consignor — party client if set, else source city (legacy fallback)
             left.addElement(new Paragraph("Consignor's Name & Address", bold8));
-            String consignorLine = fromCity.isEmpty() ? "—" : fromCity + (fromState.isEmpty() ? "" : ", " + fromState);
-            Paragraph consignorVal = new Paragraph(consignorLine, bold8Navy);
+            Client consignor = order.getConsignorClient();
+            String consignorName = consignor != null
+                    ? consignor.getClientName()
+                    : (fromCity.isEmpty() ? "—" : fromCity + (fromState.isEmpty() ? "" : ", " + fromState));
+            Paragraph consignorVal = new Paragraph(consignorName, bold8Navy);
             consignorVal.setSpacingBefore(3);
             left.addElement(consignorVal);
-            if (order.getSourceAddress() != null && !order.getSourceAddress().isBlank())
+            if (consignor != null) {
+                if (consignor.getAddress() != null && !consignor.getAddress().isBlank())
+                    left.addElement(new Paragraph(consignor.getAddress(), gray6));
+                if (consignor.getGstin() != null && !consignor.getGstin().isBlank())
+                    left.addElement(new Paragraph("GSTIN: " + consignor.getGstin(), gray6));
+            } else if (order.getSourceAddress() != null && !order.getSourceAddress().isBlank()) {
                 left.addElement(new Paragraph(order.getSourceAddress(), gray6));
+            }
 
-            // Consignee
+            // Consignee — party client if set, else billing client (legacy fallback)
             Paragraph consigneeLabel = new Paragraph("Consignee Name & Address", bold8);
             consigneeLabel.setSpacingBefore(7);
             left.addElement(consigneeLabel);
-            Paragraph consigneeVal = new Paragraph(order.getClient().getClientName(), bold8Navy);
+            Client consignee = order.getConsigneeClient() != null ? order.getConsigneeClient() : order.getClient();
+            Paragraph consigneeVal = new Paragraph(consignee.getClientName(), bold8Navy);
             consigneeVal.setSpacingBefore(3);
             left.addElement(consigneeVal);
-            String consigneeCityLine = toCity.isEmpty() ? "" : toCity + (toState.isEmpty() ? "" : ", " + toState);
-            if (!consigneeCityLine.isEmpty()) left.addElement(new Paragraph(consigneeCityLine, gray6));
-            if (order.getDestinationAddress() != null && !order.getDestinationAddress().isBlank())
-                left.addElement(new Paragraph(order.getDestinationAddress(), gray6));
+            if (order.getConsigneeClient() != null) {
+                if (consignee.getAddress() != null && !consignee.getAddress().isBlank())
+                    left.addElement(new Paragraph(consignee.getAddress(), gray6));
+                if (consignee.getGstin() != null && !consignee.getGstin().isBlank())
+                    left.addElement(new Paragraph("GSTIN: " + consignee.getGstin(), gray6));
+            } else {
+                String consigneeCityLine = toCity.isEmpty() ? "" : toCity + (toState.isEmpty() ? "" : ", " + toState);
+                if (!consigneeCityLine.isEmpty()) left.addElement(new Paragraph(consigneeCityLine, gray6));
+                if (order.getDestinationAddress() != null && !order.getDestinationAddress().isBlank())
+                    left.addElement(new Paragraph(order.getDestinationAddress(), gray6));
+            }
+
+            // Freight payable by (billing party = client)
+            Paragraph payableBy = new Paragraph();
+            payableBy.setSpacingBefore(7);
+            payableBy.add(new Chunk("Freight Payable By  ", bold8));
+            payableBy.add(new Chunk(order.getEffectiveBillingClient().getClientName(), bold8Navy));
+            left.addElement(payableBy);
 
             // From → To
             Paragraph fromTo = new Paragraph();

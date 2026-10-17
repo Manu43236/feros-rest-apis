@@ -26,6 +26,15 @@ public class OrderResponse {
     private Long clientId;
     private String clientName;
 
+    // Party details. clientId = placing client.
+    private Long consignorClientId;
+    private String consignorClientName;
+    private Long consigneeClientId;
+    private String consigneeClientName;
+    // Billing party (who is invoiced). Falls back to clientId when not explicitly set.
+    private Long billingPartyClientId;
+    private String billingPartyClientName;
+
     private Long materialTypeId;
     private String materialTypeName;
 

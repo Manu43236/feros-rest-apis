@@ -93,8 +93,8 @@ public class InvoiceServiceImpl implements InvoiceService {
             Lr lr = lrRepository.findByIdAndTenantIdAndIsActiveTrue(lrId, tenantId)
                     .orElseThrow(() -> new FerosException("LR " + lrId + " not found",
                             HttpStatus.NOT_FOUND));
-            if (!lr.getOrder().getClient().getId().equals(client.getId())) {
-                throw new FerosException("LR " + lrId + " does not belong to this client",
+            if (!lr.getOrder().getEffectiveBillingClient().getId().equals(client.getId())) {
+                throw new FerosException("LR " + lrId + " is not billed to this client",
                         HttpStatus.BAD_REQUEST);
             }
             lrs.add(lr);
@@ -407,11 +407,29 @@ public class InvoiceServiceImpl implements InvoiceService {
         return invoiceLrRepository.findActiveLrIds(getCurrentTenantId());
     }
 
+    // Returns the single distinct consignor/consignee client across the invoice's LRs, or
+    // null if any LR lacks it or they differ (invoice mixes parties → use per-LR lines).
+    private com.feros.api.entity.Client uniformParty(
+            List<com.feros.api.entity.InvoiceLr> lrs, boolean consignor) {
+        java.util.Set<Long> ids = new java.util.HashSet<>();
+        com.feros.api.entity.Client found = null;
+        for (com.feros.api.entity.InvoiceLr il : lrs) {
+            com.feros.api.entity.Client c = consignor
+                    ? il.getOrder().getConsignorClient()
+                    : il.getOrder().getConsigneeClient();
+            if (c == null) return null;
+            if (ids.add(c.getId())) found = c;
+        }
+        return ids.size() == 1 ? found : null;
+    }
+
     // ===================== MAPPERS =====================
     private InvoiceResponse mapToInvoiceResponse(Invoice inv) {
-        List<InvoiceLrResponse> lrItems = invoiceLrRepository
-                .findByInvoiceIdAndIsActiveTrue(inv.getId())
-                .stream().map(this::mapToInvoiceLrResponse).toList();
+        List<com.feros.api.entity.InvoiceLr> invLrs = invoiceLrRepository
+                .findByInvoiceIdAndIsActiveTrue(inv.getId());
+        List<InvoiceLrResponse> lrItems = invLrs.stream().map(this::mapToInvoiceLrResponse).toList();
+        com.feros.api.entity.Client consignor = uniformParty(invLrs, true);
+        com.feros.api.entity.Client consignee = uniformParty(invLrs, false);
 
         List<InvoicePaymentResponse> payments = invoicePaymentRepository
                 .findByInvoiceIdAndIsActiveTrue(inv.getId())
@@ -459,6 +477,19 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .clientCity(cl.getCity() != null ? cl.getCity().getName() : null)
                 .clientState(cl.getState() != null ? cl.getState().getName() : null)
                 .clientPincode(cl.getPincode())
+                // Consignor / Consignee (uniform across the invoice's LRs, else null)
+                .consignorName(consignor != null ? consignor.getClientName() : null)
+                .consignorGstin(consignor != null ? consignor.getGstin() : null)
+                .consignorAddress(consignor != null ? consignor.getAddress() : null)
+                .consignorCity(consignor != null && consignor.getCity() != null ? consignor.getCity().getName() : null)
+                .consignorState(consignor != null && consignor.getState() != null ? consignor.getState().getName() : null)
+                .consignorPincode(consignor != null ? consignor.getPincode() : null)
+                .consigneeName(consignee != null ? consignee.getClientName() : null)
+                .consigneeGstin(consignee != null ? consignee.getGstin() : null)
+                .consigneeAddress(consignee != null ? consignee.getAddress() : null)
+                .consigneeCity(consignee != null && consignee.getCity() != null ? consignee.getCity().getName() : null)
+                .consigneeState(consignee != null && consignee.getState() != null ? consignee.getState().getName() : null)
+                .consigneePincode(consignee != null ? consignee.getPincode() : null)
                 .totalAmount(inv.getTotalAmount())
                 .advanceAdjusted(inv.getAdvanceAdjusted())
                 .creditNoteAdjusted(inv.getCreditNoteAdjusted())

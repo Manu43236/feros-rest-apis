@@ -30,6 +30,11 @@ public class LrResponse {
     private Long clientId;
     private String clientName;
 
+    // Billing party for this LR (order's billing client, else the placing client).
+    // The invoice LR picker groups by this, not by clientId.
+    private Long billingClientId;
+    private String billingClientName;
+
     private String materialTypeName;
 
     private String fromCity;
