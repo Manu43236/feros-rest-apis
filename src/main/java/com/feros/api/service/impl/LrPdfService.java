@@ -248,7 +248,7 @@ public class LrPdfService {
             // Header row 1 (spanning)
             th(table, "No. of\nPackage");
             th(table, "Material");
-            table.addCell(span2Header("Weight (" + order.getUnitLabel() + ")"));
+            table.addCell(span2Header("Quantity (" + order.getUnitLabel() + ")"));
             th(table, "Rate");
             table.addCell(span2Header("Freight"));
             th(table, "Remarks");

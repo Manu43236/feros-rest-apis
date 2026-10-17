@@ -606,6 +606,10 @@ public class LrServiceImpl implements LrService {
         Vehicle vehicle = allocation != null ? allocation.getVehicle() : null;
         Long invoiceId     = invoiceLrRepository.findInvoiceIdsByLrId(lr.getId()).stream().findFirst().orElse(null);
         String invoiceNumber = invoiceLrRepository.findInvoiceNumbersByLrId(lr.getId()).stream().findFirst().orElse(null);
+        // Overload (loaded vs vehicle capacity) is a tons-only concept — suppress it when the
+        // order is measured in a non-weight unit (bags, litres…), where it's unknowable.
+        boolean unitIsTons = lr.getOrder().getUnit() == null
+                || "Tons".equalsIgnoreCase(lr.getOrder().getUnit().getName());
         return LrResponse.builder()
                 .id(lr.getId())
                 .tenantId(lr.getTenant().getId())
@@ -633,10 +637,10 @@ public class LrServiceImpl implements LrService {
                 .vehicleCapacity(lr.getVehicleCapacity())
                 .allocatedWeight(lr.getAllocatedWeight())
                 .loadedWeight(lr.getLoadedWeight())
-                .overloadWeight(lr.getOverloadWeight())
+                .overloadWeight(unitIsTons ? lr.getOverloadWeight() : null)
                 .deliveredWeight(lr.getDeliveredWeight())
                 .weightVariance(lr.getWeightVariance())
-                .isOverloaded(lr.getIsOverloaded())
+                .isOverloaded(unitIsTons ? lr.getIsOverloaded() : Boolean.FALSE)
                 .loadedAt(lr.getLoadedAt())
                 .deliveredAt(lr.getDeliveredAt())
                 .currentVehicleOdometer(vehicle != null
