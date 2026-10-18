@@ -44,9 +44,11 @@ public class OrderController {
             @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false)    String search,
-            @RequestParam(required = false)    OrderStatus status) {
+            @RequestParam(required = false)    OrderStatus status,
+            @RequestParam(required = false)    Boolean live,
+            @RequestParam(required = false)    Boolean isPol) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Orders fetched successfully", orderService.getAllOrders(page, size, search, status)));
+                "Orders fetched successfully", orderService.getAllOrders(page, size, search, status, live, isPol)));
     }
 
     @GetMapping("/{id}")

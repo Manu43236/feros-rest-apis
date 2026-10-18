@@ -18,7 +18,7 @@ import java.util.List;
 public interface OrderService {
     OrderResponse createOrder(OrderRequest request);
     OrderResponse getOrderById(Long id);
-    Page<OrderResponse> getAllOrders(int page, int size, String search, OrderStatus status);
+    Page<OrderResponse> getAllOrders(int page, int size, String search, OrderStatus status, Boolean live, Boolean isPol);
     OrderResponse updateOrder(Long id, OrderRequest request);
     void cancelOrder(Long id);
     VehicleAllocationResponse assignVehicle(Long orderId, AssignVehicleRequest request);

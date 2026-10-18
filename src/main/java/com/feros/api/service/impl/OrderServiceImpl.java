@@ -202,17 +202,21 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public Page<OrderResponse> getAllOrders(int page, int size, String search, OrderStatus status) {
+    public Page<OrderResponse> getAllOrders(int page, int size, String search, OrderStatus status, Boolean live, Boolean isPol) {
         Long tenantId = getCurrentTenantId();
         String role = SecurityUtil.getCurrentRole();
 
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
 
-        Specification<Order> spec = buildOrderSpec(tenantId, role, search, status);
+        Specification<Order> spec = buildOrderSpec(tenantId, role, search, status, live, isPol);
         return orderRepository.findAll(spec, pageable).map(this::mapToOrderResponse);
     }
 
-    private Specification<Order> buildOrderSpec(Long tenantId, String role, String search, OrderStatus status) {
+    // Orders that are still in play — not delivered, completed, or cancelled.
+    private static final java.util.List<OrderStatus> CLOSED_STATUSES =
+        java.util.List.of(OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED);
+
+    private Specification<Order> buildOrderSpec(Long tenantId, String role, String search, OrderStatus status, Boolean live, Boolean isPol) {
         return (root, query, cb) -> {
             var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
 
@@ -232,6 +236,14 @@ public class OrderServiceImpl implements OrderService {
 
             if (status != null) {
                 predicates.add(cb.equal(root.get("orderStatus"), status));
+            }
+
+            if (Boolean.TRUE.equals(live)) {
+                predicates.add(cb.not(root.get("orderStatus").in(CLOSED_STATUSES)));
+            }
+
+            if (Boolean.TRUE.equals(isPol)) {
+                predicates.add(cb.isTrue(root.get("isPol")));
             }
 
             if (search != null && !search.isBlank()) {
