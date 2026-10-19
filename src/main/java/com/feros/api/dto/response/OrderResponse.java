@@ -75,6 +75,7 @@ public class OrderResponse {
     private String createdByName;
 
     private List<VehicleAllocationResponse> vehicleAllocations;
+    private AllocationSummaryResponse allocationSummary;
 
     private Boolean isPol;
     private Boolean isMultiMaterial;

@@ -31,6 +31,8 @@ import com.feros.api.enums.VehicleStatusType;
 import com.feros.api.exception.FerosException;
 import com.feros.api.repository.*;
 import com.feros.api.repository.LrRepository;
+import com.feros.api.repository.InvoiceLrRepository;
+import com.feros.api.dto.response.AllocationSummaryResponse;
 import com.feros.api.service.NotificationService;
 import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.OrderService;
@@ -70,6 +72,7 @@ public class OrderServiceImpl implements OrderService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final LrRepository lrRepository;
+    private final InvoiceLrRepository invoiceLrRepository;
     private final AttendanceRepository attendanceRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final NotificationService notificationService;
@@ -1311,6 +1314,7 @@ public class OrderServiceImpl implements OrderService {
                 .createdById(o.getCreatedBy().getId())
                 .createdByName(o.getCreatedBy().getName())
                 .vehicleAllocations(vehicleAllocations)
+                .allocationSummary(buildAllocationSummary(o.getId()))
                 .isPol(o.getIsPol())
                 .isMultiMaterial(o.getIsMultiMaterial())
                 .items(orderItemService.toResponses(o.getId()))
@@ -1318,6 +1322,36 @@ public class OrderServiceImpl implements OrderService {
                 .createdAt(o.getCreatedAt())
                 .updatedAt(o.getUpdatedAt())
                 .build();
+    }
+
+    // Breakdown of an order's vehicle allocations by stage. Includes soft-deleted
+    // CANCELLED/BREAKDOWN rows (not in the active list) so the cancelled count is honest.
+    // ponytail: per-order query + per-delivered-allocation invoiced check — same N+1 shape the
+    // list mapper already has; batch into one grouped query only if order lists get slow.
+    private AllocationSummaryResponse buildAllocationSummary(Long orderId) {
+        int allocated = 0, inTrip = 0, delivered = 0, invoiced = 0, cancelled = 0;
+        for (OrderVehicleAllocation a : vehicleAllocationRepository.findByOrderId(orderId)) {
+            switch (a.getAllocationStatus()) {
+                case ALLOCATED -> allocated++;
+                case LR_CREATED, IN_TRANSIT -> inTrip++;
+                case DELIVERED -> {
+                    if (isAllocationInvoiced(a.getId())) invoiced++;
+                    else delivered++;
+                }
+                case CANCELLED, BREAKDOWN -> cancelled++;
+            }
+        }
+        return AllocationSummaryResponse.builder()
+                .allocated(allocated).inTrip(inTrip).delivered(delivered)
+                .invoiced(invoiced).cancelled(cancelled)
+                .total(allocated + inTrip + delivered + invoiced + cancelled)
+                .build();
+    }
+
+    // True when any of the allocation's LRs sit on an active invoice.
+    private boolean isAllocationInvoiced(Long allocationId) {
+        return lrRepository.findAllByVehicleAllocationId(allocationId).stream()
+                .anyMatch(lr -> invoiceLrRepository.existsByLrIdAndIsActiveTrue(lr.getId()));
     }
 
     private VehicleAllocationResponse mapToVehicleAllocationResponse(OrderVehicleAllocation a) {
