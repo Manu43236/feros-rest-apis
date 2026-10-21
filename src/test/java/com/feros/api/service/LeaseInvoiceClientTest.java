@@ -75,6 +75,7 @@ class LeaseInvoiceClientTest {
 
         try (MockedStatic<SecurityUtil> sec = mockStatic(SecurityUtil.class)) {
             sec.when(SecurityUtil::getCurrentTenantId).thenReturn(TENANT);
+            when(invoiceRepository.findInvoicedAssignments(CLIENT, TENANT, from, to)).thenReturn(List.of());
             when(leaseRepository.findByClient_IdAndTenantIdAndIsActiveTrue(CLIENT, TENANT))
                     .thenReturn(List.of(l1, l2));
             when(assignmentRepository.findByLeaseIdOrderByStartDateAsc(10L))
@@ -90,6 +91,61 @@ class LeaseInvoiceClientTest {
             // DAILY_SHIFT = rate * days (10 days)
             assertThat(lines).extracting(LeaseInvoicePrefillResponse::getSuggestedAmount)
                     .containsExactlyInAnyOrder(new BigDecimal("10000.00"), new BigDecimal("5000.00"));
+            assertThat(lines).allSatisfy(l -> assertThat(l.isAlreadyInvoiced()).isFalse());
+        }
+    }
+
+    @Test
+    @DisplayName("prefillByClient flags a vehicle already invoiced (non-cancelled) for the period")
+    void prefillByClient_marksAlreadyInvoiced() {
+        VehicleLease l1 = lease(10L, "LSE-1");
+        LocalDate from = LocalDate.of(2026, 1, 1);
+        LocalDate to = LocalDate.of(2026, 1, 10);
+
+        try (MockedStatic<SecurityUtil> sec = mockStatic(SecurityUtil.class)) {
+            sec.when(SecurityUtil::getCurrentTenantId).thenReturn(TENANT);
+            // assignment 100 already billed on LSEINV-9; assignment 101 free
+            when(invoiceRepository.findInvoicedAssignments(CLIENT, TENANT, from, to))
+                    .thenReturn(java.util.Collections.singletonList(new Object[]{100L, "LSEINV/26-27/0009"}));
+            when(leaseRepository.findByClient_IdAndTenantIdAndIsActiveTrue(CLIENT, TENANT)).thenReturn(List.of(l1));
+            when(assignmentRepository.findByLeaseIdOrderByStartDateAsc(10L)).thenReturn(List.of(
+                    assignment(100L, l1, "AP01AA1111", new BigDecimal("1000")),
+                    assignment(101L, l1, "AP01BB2222", new BigDecimal("500"))));
+
+            List<LeaseInvoicePrefillResponse> lines = service.prefillByClient(CLIENT, from, to);
+
+            LeaseInvoicePrefillResponse locked = lines.stream().filter(l -> l.getAssignmentId().equals(100L)).findFirst().orElseThrow();
+            LeaseInvoicePrefillResponse free   = lines.stream().filter(l -> l.getAssignmentId().equals(101L)).findFirst().orElseThrow();
+            assertThat(locked.isAlreadyInvoiced()).isTrue();
+            assertThat(locked.getInvoicedInvoiceNumber()).isEqualTo("LSEINV/26-27/0009");
+            assertThat(free.isAlreadyInvoiced()).isFalse();
+        }
+    }
+
+    @Test
+    @DisplayName("createForClient rejects a vehicle already invoiced for the period")
+    void createForClient_rejectsDoubleInvoice() {
+        LeaseInvoiceClientRequest req = new LeaseInvoiceClientRequest();
+        req.setClientId(CLIENT);
+        req.setInvoiceDate(LocalDate.of(2026, 1, 11));
+        req.setBillingPeriodStart(LocalDate.of(2026, 1, 1));
+        req.setBillingPeriodEnd(LocalDate.of(2026, 1, 10));
+        LeaseInvoiceItemRequest i1 = new LeaseInvoiceItemRequest();
+        i1.setLeaseVehicleAssignmentId(100L); i1.setRegistrationNumber("AP01AA1111");
+        i1.setDays(10); i1.setRate(new BigDecimal("1000")); i1.setAmount(new BigDecimal("10000"));
+        req.setItems(List.of(i1));
+
+        try (MockedStatic<SecurityUtil> sec = mockStatic(SecurityUtil.class)) {
+            sec.when(SecurityUtil::getCurrentTenantId).thenReturn(TENANT);
+            Client c = Client.builder().id(CLIENT).clientName("Acme").build();
+            when(clientRepository.findByIdAndTenantIdAndIsActiveTrue(CLIENT, TENANT)).thenReturn(java.util.Optional.of(c));
+            when(invoiceRepository.findInvoicedAssignments(CLIENT, TENANT, req.getBillingPeriodStart(), req.getBillingPeriodEnd()))
+                    .thenReturn(java.util.Collections.singletonList(new Object[]{100L, "LSEINV/26-27/0009"}));
+
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.createForClient(req))
+                    .isInstanceOf(com.feros.api.exception.FerosException.class)
+                    .hasMessageContaining("already invoiced");
+            verify(invoiceRepository, never()).save(any());
         }
     }
 
@@ -118,6 +174,7 @@ class LeaseInvoiceClientTest {
             Client c = Client.builder().id(CLIENT).clientName("Acme").build();
             when(tenantRepository.findByIdAndIsActiveTrue(TENANT)).thenReturn(java.util.Optional.of(t));
             when(clientRepository.findByIdAndTenantIdAndIsActiveTrue(CLIENT, TENANT)).thenReturn(java.util.Optional.of(c));
+            when(invoiceRepository.findInvoicedAssignments(eq(CLIENT), eq(TENANT), any(), any())).thenReturn(List.of());
             when(numberGenerator.generateFY(anyLong(), eq(NumberUtil.Type.LSEINV))).thenReturn("LSEINV/26-27/0001");
             when(invoiceRepository.save(any(LeaseInvoice.class))).thenAnswer(inv -> inv.getArgument(0));
 

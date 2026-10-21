@@ -19,4 +19,9 @@ public class LeaseInvoicePrefillResponse {
     private BigDecimal rate;
     private BigDecimal suggestedAmount;
     private String rateType; // DAILY_SHIFT / MONTHLY
+
+    // True when this lease-vehicle is already on a non-cancelled invoice overlapping the period.
+    @lombok.Builder.Default
+    private boolean alreadyInvoiced = false;
+    private String invoicedInvoiceNumber; // the invoice it's already billed on
 }

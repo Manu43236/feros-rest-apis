@@ -28,7 +28,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -67,19 +69,31 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
     @Override
     public List<LeaseInvoicePrefillResponse> prefill(Long leaseId, LocalDate from, LocalDate to) {
         VehicleLease lease = fetchLease(leaseId);
-        return prefillLinesForLease(lease, from, to);
+        Map<Long, String> invoiced = invoicedAssignmentMap(lease.getClient().getId(), from, to);
+        return prefillLinesForLease(lease, from, to, invoiced);
     }
 
     @Override
     public List<LeaseInvoicePrefillResponse> prefillByClient(Long clientId, LocalDate from, LocalDate to) {
+        Map<Long, String> invoiced = invoicedAssignmentMap(clientId, from, to);
         return leaseRepository.findByClient_IdAndTenantIdAndIsActiveTrue(clientId, tenantId())
                 .stream()
-                .flatMap(lease -> prefillLinesForLease(lease, from, to).stream())
+                .flatMap(lease -> prefillLinesForLease(lease, from, to, invoiced).stream())
                 .collect(Collectors.toList());
     }
 
+    // assignmentId -> invoiceNumber for lease-vehicles already billed (non-cancelled) in the period.
+    private Map<Long, String> invoicedAssignmentMap(Long clientId, LocalDate from, LocalDate to) {
+        Map<Long, String> map = new HashMap<>();
+        for (Object[] row : invoiceRepository.findInvoicedAssignments(clientId, tenantId(), from, to)) {
+            map.putIfAbsent((Long) row[0], (String) row[1]);
+        }
+        return map;
+    }
+
     // Shared: build prefill lines for one lease's overlapping vehicle assignments.
-    private List<LeaseInvoicePrefillResponse> prefillLinesForLease(VehicleLease lease, LocalDate from, LocalDate to) {
+    private List<LeaseInvoicePrefillResponse> prefillLinesForLease(
+            VehicleLease lease, LocalDate from, LocalDate to, Map<Long, String> invoiced) {
         return assignmentRepository.findByLeaseIdOrderByStartDateAsc(lease.getId()).stream()
                 .filter(a -> !a.getStartDate().isAfter(to)
                         && (a.getEndDate() == null || !a.getEndDate().isBefore(from)))
@@ -90,6 +104,7 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
                     BigDecimal amount = calculateAmount(lease.getRateType(), days, a.getRatePerVehicle());
                     String vehicleType = a.getVehicle().getVehicleType() != null
                             ? a.getVehicle().getVehicleType().getName() : null;
+                    String invoicedNumber = invoiced.get(a.getId());
 
                     return LeaseInvoicePrefillResponse.builder()
                             .leaseId(lease.getId())
@@ -103,6 +118,8 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
                             .rate(a.getRatePerVehicle())
                             .suggestedAmount(amount)
                             .rateType(lease.getRateType().name())
+                            .alreadyInvoiced(invoicedNumber != null)
+                            .invoicedInvoiceNumber(invoicedNumber)
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -147,6 +164,21 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
 
         Client client = clientRepository.findByIdAndTenantIdAndIsActiveTrue(req.getClientId(), tenantId())
                 .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
+
+        // Guard: a lease-vehicle already billed (non-cancelled) in this period can't be invoiced again.
+        Map<Long, String> invoiced = invoicedAssignmentMap(
+                req.getClientId(), req.getBillingPeriodStart(), req.getBillingPeriodEnd());
+        for (LeaseInvoiceItemRequest item : req.getItems()) {
+            String existing = item.getLeaseVehicleAssignmentId() != null
+                    ? invoiced.get(item.getLeaseVehicleAssignmentId()) : null;
+            if (existing != null) {
+                throw new FerosException(
+                        (item.getRegistrationNumber() != null ? item.getRegistrationNumber() + " is" : "A vehicle is")
+                                + " already invoiced for this period on " + existing,
+                        HttpStatus.BAD_REQUEST);
+            }
+        }
+
         Tenant t = tenant();
 
         LeaseInvoice invoice = LeaseInvoice.builder()
