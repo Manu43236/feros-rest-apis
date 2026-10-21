@@ -19,6 +19,8 @@ public interface VehicleLeaseRepository extends JpaRepository<VehicleLease, Long
 
     List<VehicleLease> findByStatusAndIsActiveTrue(LeaseStatus status);
 
+    List<VehicleLease> findByClient_IdAndTenantIdAndIsActiveTrue(Long clientId, Long tenantId);
+
     @Query("""
         SELECT vl FROM VehicleLease vl
         WHERE vl.tenant.id = :tenantId

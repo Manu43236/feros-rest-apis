@@ -1,5 +1,6 @@
 package com.feros.api.service.impl;
 
+import com.feros.api.dto.request.LeaseInvoiceClientRequest;
 import com.feros.api.dto.request.LeaseInvoiceItemRequest;
 import com.feros.api.dto.request.LeaseInvoiceRequest;
 import com.feros.api.dto.response.LeaseInvoiceItemResponse;
@@ -9,6 +10,7 @@ import com.feros.api.entity.*;
 import com.feros.api.enums.EquipmentInvoiceStatus;
 import com.feros.api.enums.RateType;
 import com.feros.api.exception.FerosException;
+import com.feros.api.repository.ClientRepository;
 import com.feros.api.repository.LeaseInvoiceRepository;
 import com.feros.api.repository.LeaseVehicleAssignmentRepository;
 import com.feros.api.repository.TenantRepository;
@@ -37,6 +39,7 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
     private final VehicleLeaseRepository leaseRepository;
     private final LeaseVehicleAssignmentRepository assignmentRepository;
     private final TenantRepository tenantRepository;
+    private final ClientRepository clientRepository;
     private final NumberGeneratorService numberGenerator;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
@@ -64,10 +67,20 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
     @Override
     public List<LeaseInvoicePrefillResponse> prefill(Long leaseId, LocalDate from, LocalDate to) {
         VehicleLease lease = fetchLease(leaseId);
-        List<LeaseVehicleAssignment> assignments =
-                assignmentRepository.findByLeaseIdOrderByStartDateAsc(leaseId);
+        return prefillLinesForLease(lease, from, to);
+    }
 
-        return assignments.stream()
+    @Override
+    public List<LeaseInvoicePrefillResponse> prefillByClient(Long clientId, LocalDate from, LocalDate to) {
+        return leaseRepository.findByClient_IdAndTenantIdAndIsActiveTrue(clientId, tenantId())
+                .stream()
+                .flatMap(lease -> prefillLinesForLease(lease, from, to).stream())
+                .collect(Collectors.toList());
+    }
+
+    // Shared: build prefill lines for one lease's overlapping vehicle assignments.
+    private List<LeaseInvoicePrefillResponse> prefillLinesForLease(VehicleLease lease, LocalDate from, LocalDate to) {
+        return assignmentRepository.findByLeaseIdOrderByStartDateAsc(lease.getId()).stream()
                 .filter(a -> !a.getStartDate().isAfter(to)
                         && (a.getEndDate() == null || !a.getEndDate().isBefore(from)))
                 .map(a -> {
@@ -79,6 +92,8 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
                             ? a.getVehicle().getVehicleType().getName() : null;
 
                     return LeaseInvoicePrefillResponse.builder()
+                            .leaseId(lease.getId())
+                            .leaseNumber(lease.getLeaseNumber())
                             .assignmentId(a.getId())
                             .registrationNumber(a.getVehicle().getRegistrationNumber())
                             .vehicleType(vehicleType)
@@ -98,10 +113,7 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
     @Override
     @Transactional
     public LeaseInvoiceResponse create(Long leaseId, LeaseInvoiceRequest req) {
-        if (req.getBillingPeriodEnd().isAfter(LocalDate.now()))
-            throw new FerosException("Billing period end cannot be in the future", HttpStatus.BAD_REQUEST);
-        if (req.getBillingPeriodEnd().isBefore(req.getBillingPeriodStart()))
-            throw new FerosException("Billing period end must be after start", HttpStatus.BAD_REQUEST);
+        validatePeriod(req.getBillingPeriodStart(), req.getBillingPeriodEnd());
 
         VehicleLease lease = fetchLease(leaseId);
         Tenant t = tenant();
@@ -121,8 +133,52 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
                 .notes(req.getNotes())
                 .build();
 
+        addItems(invoice, req.getItems());
+        computeTotals(invoice);
+        return toResponse(invoiceRepository.save(invoice));
+    }
+
+    // ── Create (client-level, spans multiple leases) ────────────────────────────
+
+    @Override
+    @Transactional
+    public LeaseInvoiceResponse createForClient(LeaseInvoiceClientRequest req) {
+        validatePeriod(req.getBillingPeriodStart(), req.getBillingPeriodEnd());
+
+        Client client = clientRepository.findByIdAndTenantIdAndIsActiveTrue(req.getClientId(), tenantId())
+                .orElseThrow(() -> new FerosException("Client not found", HttpStatus.NOT_FOUND));
+        Tenant t = tenant();
+
+        LeaseInvoice invoice = LeaseInvoice.builder()
+                .tenant(t)
+                .lease(null) // client-level: lines span multiple leases
+                .client(client)
+                .invoiceNumber(numberGenerator.generateFY(t.getId(), NumberUtil.Type.LSEINV))
+                .invoiceDate(req.getInvoiceDate())
+                .dueDate(req.getDueDate())
+                .billingPeriodStart(req.getBillingPeriodStart())
+                .billingPeriodEnd(req.getBillingPeriodEnd())
+                .cgstPercentage(nvl(req.getCgstPercentage()))
+                .sgstPercentage(nvl(req.getSgstPercentage()))
+                .igstPercentage(nvl(req.getIgstPercentage()))
+                .notes(req.getNotes())
+                .build();
+
+        addItems(invoice, req.getItems());
+        computeTotals(invoice);
+        return toResponse(invoiceRepository.save(invoice));
+    }
+
+    private void validatePeriod(LocalDate start, LocalDate end) {
+        if (end.isAfter(LocalDate.now()))
+            throw new FerosException("Billing period end cannot be in the future", HttpStatus.BAD_REQUEST);
+        if (end.isBefore(start))
+            throw new FerosException("Billing period end must be after start", HttpStatus.BAD_REQUEST);
+    }
+
+    private void addItems(LeaseInvoice invoice, List<LeaseInvoiceItemRequest> items) {
         int sortOrder = 0;
-        for (LeaseInvoiceItemRequest itemReq : req.getItems()) {
+        for (LeaseInvoiceItemRequest itemReq : items) {
             BigDecimal amount = itemReq.getAmount() != null
                     ? itemReq.getAmount().setScale(2, RoundingMode.HALF_UP)
                     : (itemReq.getRate() != null && itemReq.getDays() != null
@@ -141,9 +197,6 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
                     .build());
             sortOrder++;
         }
-
-        computeTotals(invoice);
-        return toResponse(invoiceRepository.save(invoice));
     }
 
     // ── Read ──────────────────────────────────────────────────────────────────
@@ -242,8 +295,8 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
         return LeaseInvoiceResponse.builder()
                 .id(inv.getId())
                 .invoiceNumber(inv.getInvoiceNumber())
-                .leaseId(lease.getId())
-                .leaseNumber(lease.getLeaseNumber())
+                .leaseId(lease != null ? lease.getId() : null)
+                .leaseNumber(lease != null ? lease.getLeaseNumber() : null)
                 .clientId(client.getId())
                 .clientName(client.getClientName())
                 .invoiceDate(inv.getInvoiceDate())

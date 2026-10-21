@@ -21,8 +21,10 @@ public class LeaseInvoice extends BaseEntity {
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
 
+    // Nullable: null when the invoice is created client-level across multiple leases
+    // (each LeaseInvoiceItem still carries its own leaseVehicleAssignmentId + registrationNumber).
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "lease_id", nullable = false)
+    @JoinColumn(name = "lease_id")
     private VehicleLease lease;
 
     @ManyToOne(fetch = FetchType.LAZY)

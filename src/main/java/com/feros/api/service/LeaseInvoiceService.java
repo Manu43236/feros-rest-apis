@@ -1,5 +1,6 @@
 package com.feros.api.service;
 
+import com.feros.api.dto.request.LeaseInvoiceClientRequest;
 import com.feros.api.dto.request.LeaseInvoiceRequest;
 import com.feros.api.dto.response.LeaseInvoicePrefillResponse;
 import com.feros.api.dto.response.LeaseInvoiceResponse;
@@ -11,7 +12,9 @@ import java.util.List;
 public interface LeaseInvoiceService {
     List<LeaseInvoiceResponse> getAll();
     List<LeaseInvoicePrefillResponse> prefill(Long leaseId, LocalDate from, LocalDate to);
+    List<LeaseInvoicePrefillResponse> prefillByClient(Long clientId, LocalDate from, LocalDate to);
     LeaseInvoiceResponse create(Long leaseId, LeaseInvoiceRequest request);
+    LeaseInvoiceResponse createForClient(LeaseInvoiceClientRequest request);
     List<LeaseInvoiceResponse> getByLease(Long leaseId);
     LeaseInvoiceResponse getById(Long id);
     LeaseInvoiceResponse updateStatus(Long id, EquipmentInvoiceStatus status);

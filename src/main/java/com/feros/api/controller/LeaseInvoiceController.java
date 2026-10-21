@@ -1,5 +1,6 @@
 package com.feros.api.controller;
 
+import com.feros.api.dto.request.LeaseInvoiceClientRequest;
 import com.feros.api.dto.request.LeaseInvoiceRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.LeaseInvoicePrefillResponse;
@@ -46,6 +47,26 @@ public class LeaseInvoiceController {
             @Valid @RequestBody LeaseInvoiceRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Invoice created",
                 invoiceService.create(leaseId, request)));
+    }
+
+    // ── Client-level invoice endpoints (spans multiple leases) ──────────────────
+
+    @GetMapping("/api/v1/vehicle-leases/invoices/prefill")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<LeaseInvoicePrefillResponse>>> prefillByClient(
+            @RequestParam Long clientId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success("Prefill computed",
+                invoiceService.prefillByClient(clientId, from, to)));
+    }
+
+    @PostMapping("/api/v1/vehicle-leases/invoices")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<LeaseInvoiceResponse>> createForClient(
+            @Valid @RequestBody LeaseInvoiceClientRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Invoice created",
+                invoiceService.createForClient(request)));
     }
 
     @GetMapping("/api/v1/vehicle-leases/{leaseId}/invoices")

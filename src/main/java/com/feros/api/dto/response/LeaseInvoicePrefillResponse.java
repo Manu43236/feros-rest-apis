@@ -8,6 +8,8 @@ import java.time.LocalDate;
 
 @Getter @Builder
 public class LeaseInvoicePrefillResponse {
+    private Long leaseId;       // for grouping in client-level prefill
+    private String leaseNumber; // for grouping in client-level prefill
     private Long assignmentId;
     private String registrationNumber;
     private String vehicleType;
