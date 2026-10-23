@@ -176,7 +176,7 @@ public class LrServiceImpl implements LrService {
 
     @Override
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public Page<LrResponse> getAllLrs(int page, int size, String search, LrStatus status) {
+    public Page<LrResponse> getAllLrs(int page, int size, String search, LrStatus status, Long clientId) {
         Long tenantId = getCurrentTenantId();
         String role = SecurityUtil.getCurrentRole();
         Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
@@ -186,7 +186,7 @@ public class LrServiceImpl implements LrService {
                     .map(this::mapToLrResponse);
         }
         String searchParam = (search != null && !search.isBlank()) ? search.trim() : null;
-        return lrRepository.findAllPaged(tenantId, status, searchParam, pageable)
+        return lrRepository.findAllPaged(tenantId, status, clientId, searchParam, pageable)
                 .map(this::mapToLrResponse);
     }
 

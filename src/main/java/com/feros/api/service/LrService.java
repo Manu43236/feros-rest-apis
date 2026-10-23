@@ -15,7 +15,7 @@ import java.util.List;
 public interface LrService {
     LrResponse createLr(CreateLrRequest request);
     LrResponse getLrById(Long id);
-    Page<LrResponse> getAllLrs(int page, int size, String search, LrStatus status);
+    Page<LrResponse> getAllLrs(int page, int size, String search, LrStatus status, Long clientId);
     List<LrResponse> getMyLrs();
     List<LrResponse> getLrsByOrder(Long orderId);
     LrResponse updateLr(Long id, UpdateLrRequest request);

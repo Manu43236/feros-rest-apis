@@ -16,12 +16,20 @@ import java.util.Optional;
 public interface LrRepository extends JpaRepository<Lr, Long> {
     List<Lr> findByTenantIdAndIsActiveTrue(Long tenantId);
 
-    @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true " +
+    @Query("SELECT l FROM Lr l " +
+           "LEFT JOIN l.order o " +
+           "LEFT JOIN o.billingPartyClient bpc " +
+           "LEFT JOIN o.client oc " +
+           "WHERE l.tenant.id = :tenantId AND l.isActive = true " +
            "AND (:status IS NULL OR l.lrStatus = :status) " +
+           // Effective billing client = billing party if set, else placing client. LEFT JOINs keep
+           // LRs whose order has no separate billing party from being dropped when :clientId is null.
+           "AND (:clientId IS NULL OR COALESCE(bpc.id, oc.id) = :clientId) " +
            "AND (:search IS NULL OR LOWER(l.lrNumber) LIKE LOWER(CONCAT('%',:search,'%')) " +
            "OR LOWER(l.vehicleAllocation.vehicle.registrationNumber) LIKE LOWER(CONCAT('%',:search,'%')))")
     Page<Lr> findAllPaged(@Param("tenantId") Long tenantId,
                           @Param("status") com.feros.api.enums.LrStatus status,
+                          @Param("clientId") Long clientId,
                           @Param("search") String search,
                           Pageable pageable);
     Optional<Lr> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);

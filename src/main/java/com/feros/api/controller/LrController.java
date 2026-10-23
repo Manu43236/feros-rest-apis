@@ -45,9 +45,10 @@ public class LrController {
             @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false)    String search,
-            @RequestParam(required = false)    LrStatus status) {
+            @RequestParam(required = false)    LrStatus status,
+            @RequestParam(required = false)    Long clientId) {
         return ResponseEntity.ok(ApiResponse.success(
-                "LRs fetched successfully", lrService.getAllLrs(page, size, search, status)));
+                "LRs fetched successfully", lrService.getAllLrs(page, size, search, status, clientId)));
     }
 
     @GetMapping("/{id}")
