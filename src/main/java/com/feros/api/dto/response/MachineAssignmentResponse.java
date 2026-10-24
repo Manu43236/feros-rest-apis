@@ -22,6 +22,7 @@ public class MachineAssignmentResponse {
     private Long workOrderId;
     private Long equipmentId;
     private String serialNumber;
+    private String registrationNumber;
     private String equipmentTypeName;
     private String makeName;
     private String modelName;

@@ -528,6 +528,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .workOrderId(a.getWorkOrder().getId())
                 .equipmentId(eq.getId())
                 .serialNumber(eq.getSerialNumber())
+                .registrationNumber(eq.getRegistrationNumber())
                 .equipmentTypeName(eq.getEquipmentType().getName())
                 .makeName(eq.getEquipmentType().getModel() != null ? eq.getEquipmentType().getModel().getMake().getName() : null)
                 .modelName(eq.getEquipmentType().getModel() != null ? eq.getEquipmentType().getModel().getName() : null)
