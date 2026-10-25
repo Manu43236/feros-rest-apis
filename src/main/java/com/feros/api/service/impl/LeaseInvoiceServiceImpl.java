@@ -3,6 +3,7 @@ package com.feros.api.service.impl;
 import com.feros.api.dto.request.LeaseInvoiceClientRequest;
 import com.feros.api.dto.request.LeaseInvoiceItemRequest;
 import com.feros.api.dto.request.LeaseInvoiceRequest;
+import com.feros.api.dto.response.LeaseInvoiceAnnexureResponse;
 import com.feros.api.dto.response.LeaseInvoiceItemResponse;
 import com.feros.api.dto.response.LeaseInvoicePrefillResponse;
 import com.feros.api.dto.response.LeaseInvoiceResponse;
@@ -13,6 +14,7 @@ import com.feros.api.exception.FerosException;
 import com.feros.api.repository.ClientRepository;
 import com.feros.api.repository.LeaseInvoiceRepository;
 import com.feros.api.repository.LeaseVehicleAssignmentRepository;
+import com.feros.api.repository.LeaseVehicleSessionRepository;
 import com.feros.api.repository.TenantRepository;
 import com.feros.api.repository.VehicleLeaseRepository;
 import com.feros.api.service.LeaseInvoiceService;
@@ -28,9 +30,13 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,6 +46,7 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
     private final LeaseInvoiceRepository invoiceRepository;
     private final VehicleLeaseRepository leaseRepository;
     private final LeaseVehicleAssignmentRepository assignmentRepository;
+    private final LeaseVehicleSessionRepository sessionRepository;
     private final TenantRepository tenantRepository;
     private final ClientRepository clientRepository;
     private final NumberGeneratorService numberGenerator;
@@ -243,6 +250,89 @@ public class LeaseInvoiceServiceImpl implements LeaseInvoiceService {
     @Override
     public LeaseInvoiceResponse getById(Long id) {
         return toResponse(findById(id));
+    }
+
+    // ── Annexure (day-wise / vehicle-wise / session-wise) ───────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public LeaseInvoiceAnnexureResponse getAnnexure(Long id) {
+        LeaseInvoice invoice = findById(id);
+        LocalDate periodStart = invoice.getBillingPeriodStart();
+        LocalDate periodEnd = invoice.getBillingPeriodEnd();
+
+        // Every session for the invoice's lease-vehicle assignments that falls inside the billing period.
+        List<LeaseVehicleSession> sessions = new ArrayList<>();
+        invoice.getItems().stream()
+                .map(LeaseInvoiceItem::getLeaseVehicleAssignmentId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .forEach(assignmentId -> sessionRepository
+                        .findByAssignmentIdOrderByStartTimeDesc(assignmentId).stream()
+                        .filter(s -> inPeriod(s.getStartTime().toLocalDate(), periodStart, periodEnd))
+                        .forEach(sessions::add));
+
+        // Group Lease → Date (start date) → Vehicle (reg no) → sessions, all ordered.
+        sessions.sort(Comparator
+                .comparing((LeaseVehicleSession s) -> s.getAssignment().getLease().getLeaseNumber(),
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(s -> s.getStartTime().toLocalDate())
+                .thenComparing(s -> s.getAssignment().getVehicle().getRegistrationNumber(),
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(LeaseVehicleSession::getStartTime));
+
+        Map<Long, LeaseInvoiceAnnexureResponse.LeaseGroup> leaseGroups = new LinkedHashMap<>();
+        Map<Long, Map<LocalDate, LeaseInvoiceAnnexureResponse.DayGroup>> dayGroups = new HashMap<>();
+        Map<String, LeaseInvoiceAnnexureResponse.VehicleGroup> vehicleGroups = new HashMap<>();
+
+        for (LeaseVehicleSession s : sessions) {
+            LeaseVehicleAssignment a = s.getAssignment();
+            VehicleLease lease = a.getLease();
+            LocalDate date = s.getStartTime().toLocalDate();
+            String reg = a.getVehicle().getRegistrationNumber();
+
+            LeaseInvoiceAnnexureResponse.LeaseGroup leaseGroup = leaseGroups.computeIfAbsent(
+                    lease.getId(), k -> LeaseInvoiceAnnexureResponse.LeaseGroup.builder()
+                            .leaseId(lease.getId())
+                            .leaseNumber(lease.getLeaseNumber())
+                            .days(new ArrayList<>())
+                            .build());
+
+            LeaseInvoiceAnnexureResponse.DayGroup dayGroup = dayGroups
+                    .computeIfAbsent(lease.getId(), k -> new LinkedHashMap<>())
+                    .computeIfAbsent(date, k -> {
+                        LeaseInvoiceAnnexureResponse.DayGroup g = LeaseInvoiceAnnexureResponse.DayGroup.builder()
+                                .date(date).vehicles(new ArrayList<>()).build();
+                        leaseGroup.getDays().add(g);
+                        return g;
+                    });
+
+            LeaseInvoiceAnnexureResponse.VehicleGroup vehicleGroup = vehicleGroups
+                    .computeIfAbsent(lease.getId() + "|" + date + "|" + reg, k -> {
+                        LeaseInvoiceAnnexureResponse.VehicleGroup g = LeaseInvoiceAnnexureResponse.VehicleGroup.builder()
+                                .registrationNumber(reg).sessions(new ArrayList<>()).build();
+                        dayGroup.getVehicles().add(g);
+                        return g;
+                    });
+
+            vehicleGroup.getSessions().add(LeaseInvoiceAnnexureResponse.SessionRow.builder()
+                    .divisionName(s.getDivisionName())
+                    .driverName(s.getDriverName())
+                    .startTime(s.getStartTime())
+                    .endTime(s.getEndTime())
+                    .kmDriven(s.getKmDriven())
+                    .hoursWorked(s.getHoursWorked())
+                    .build());
+        }
+
+        return LeaseInvoiceAnnexureResponse.builder()
+                .leases(new ArrayList<>(leaseGroups.values()))
+                .build();
+    }
+
+    private boolean inPeriod(LocalDate date, LocalDate start, LocalDate end) {
+        if (start != null && date.isBefore(start)) return false;
+        return end == null || !date.isAfter(end);
     }
 
     // ── Update status ─────────────────────────────────────────────────────────

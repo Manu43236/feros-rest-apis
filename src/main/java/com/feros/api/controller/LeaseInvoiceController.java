@@ -3,6 +3,7 @@ package com.feros.api.controller;
 import com.feros.api.dto.request.LeaseInvoiceClientRequest;
 import com.feros.api.dto.request.LeaseInvoiceRequest;
 import com.feros.api.dto.response.ApiResponse;
+import com.feros.api.dto.response.LeaseInvoiceAnnexureResponse;
 import com.feros.api.dto.response.LeaseInvoicePrefillResponse;
 import com.feros.api.dto.response.LeaseInvoiceResponse;
 import com.feros.api.enums.EquipmentInvoiceStatus;
@@ -81,6 +82,13 @@ public class LeaseInvoiceController {
     public ResponseEntity<ApiResponse<LeaseInvoiceResponse>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Invoice fetched",
                 invoiceService.getById(id)));
+    }
+
+    @GetMapping("/api/v1/vehicle-leases/invoices/{id}/annexure")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<LeaseInvoiceAnnexureResponse>> getAnnexure(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Annexure fetched",
+                invoiceService.getAnnexure(id)));
     }
 
     @PutMapping("/api/v1/vehicle-leases/invoices/{id}/status")

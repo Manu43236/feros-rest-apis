@@ -2,6 +2,7 @@ package com.feros.api.service;
 
 import com.feros.api.dto.request.LeaseInvoiceClientRequest;
 import com.feros.api.dto.request.LeaseInvoiceRequest;
+import com.feros.api.dto.response.LeaseInvoiceAnnexureResponse;
 import com.feros.api.dto.response.LeaseInvoicePrefillResponse;
 import com.feros.api.dto.response.LeaseInvoiceResponse;
 import com.feros.api.enums.EquipmentInvoiceStatus;
@@ -17,6 +18,7 @@ public interface LeaseInvoiceService {
     LeaseInvoiceResponse createForClient(LeaseInvoiceClientRequest request);
     List<LeaseInvoiceResponse> getByLease(Long leaseId);
     LeaseInvoiceResponse getById(Long id);
+    LeaseInvoiceAnnexureResponse getAnnexure(Long id);
     LeaseInvoiceResponse updateStatus(Long id, EquipmentInvoiceStatus status);
     void delete(Long id);
 }
