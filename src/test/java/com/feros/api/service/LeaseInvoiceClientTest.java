@@ -34,6 +34,7 @@ class LeaseInvoiceClientTest {
     @Mock LeaseInvoiceRepository invoiceRepository;
     @Mock VehicleLeaseRepository leaseRepository;
     @Mock LeaseVehicleAssignmentRepository assignmentRepository;
+    @Mock LeaseVehicleSessionRepository sessionRepository;
     @Mock TenantRepository tenantRepository;
     @Mock ClientRepository clientRepository;
     @Mock NumberGeneratorService numberGenerator;
@@ -46,7 +47,7 @@ class LeaseInvoiceClientTest {
     @BeforeEach
     void setUp() {
         service = new LeaseInvoiceServiceImpl(invoiceRepository, leaseRepository,
-                assignmentRepository, tenantRepository, clientRepository, numberGenerator);
+                assignmentRepository, sessionRepository, tenantRepository, clientRepository, numberGenerator);
     }
 
     private VehicleLease lease(Long id, String number) {
