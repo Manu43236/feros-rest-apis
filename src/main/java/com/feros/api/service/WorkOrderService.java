@@ -40,6 +40,9 @@ public interface WorkOrderService {
 
     WorkOrderResponse updateStatus(Long id, WorkOrderStatus newStatus);
 
+    // Reopen a COMPLETED work order → IN_PROGRESS (so machines can be added the auditable way)
+    WorkOrderResponse reopen(Long id);
+
     WorkOrderResponse extend(Long id, LocalDate newEndDate);
 
     MachineAssignmentResponse addMachine(Long workOrderId, MachineAssignmentRequest request);

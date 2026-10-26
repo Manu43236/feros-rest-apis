@@ -203,6 +203,18 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         return toResponse(workOrderRepository.save(wo), machineAssignmentRepository.countByWorkOrderId(id));
     }
 
+    /** Reopen a COMPLETED work order back to IN_PROGRESS so machines can be added the auditable way.
+     *  INVOICED/CANCELLED stay locked — reopening a billed or cancelled WO needs invoice handling / a new WO. */
+    @Override
+    @Transactional
+    public WorkOrderResponse reopen(Long id) {
+        WorkOrder wo = fetchWo(id);
+        if (wo.getStatus() != WorkOrderStatus.COMPLETED)
+            throw new FerosException("Only COMPLETED work orders can be reopened.", HttpStatus.BAD_REQUEST);
+        wo.setStatus(WorkOrderStatus.IN_PROGRESS);
+        return toResponse(workOrderRepository.save(wo), machineAssignmentRepository.countByWorkOrderId(id));
+    }
+
     private void validateTransition(WorkOrderStatus current, WorkOrderStatus next) {
         boolean valid = switch (current) {
             case DRAFT      -> next == WorkOrderStatus.CONFIRMED || next == WorkOrderStatus.CANCELLED;

@@ -71,6 +71,12 @@ public class WorkOrderController {
         return ResponseEntity.ok(ApiResponse.success("Status updated", workOrderService.updateStatus(id, newStatus)));
     }
 
+    @PutMapping("/{id}/reopen")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<WorkOrderResponse>> reopen(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Work order reopened", workOrderService.reopen(id)));
+    }
+
     @PutMapping("/{id}/extend")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<WorkOrderResponse>> extend(
