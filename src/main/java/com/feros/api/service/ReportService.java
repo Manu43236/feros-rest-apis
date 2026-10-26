@@ -8,6 +8,10 @@ import java.util.List;
 
 public interface ReportService {
 
+    // Equipment crew parity reports
+    List<OperatorAssignmentRow> getOperatorAssignments(LocalDate startDate, LocalDate endDate);
+    List<MachineStaffCostRow> getMachineStaffCost(LocalDate startDate, LocalDate endDate);
+
     List<VehicleMasterRow> getVehicleMaster();
 
     List<FleetStatusRow> getFleetStatus(LocalDate date);

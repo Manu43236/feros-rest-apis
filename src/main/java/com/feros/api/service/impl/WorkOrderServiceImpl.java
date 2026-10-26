@@ -17,6 +17,7 @@ import com.feros.api.service.NumberGeneratorService;
 import com.feros.api.service.WorkOrderService;
 import com.feros.api.util.NumberUtil;
 import com.feros.api.util.SecurityUtil;
+import com.feros.api.util.TimeUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +53,15 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     private final MachineConditionSurveyRepository conditionSurveyRepository;
     private final EquipmentBreakdownRepository equipmentBreakdownRepository;
     private final NumberGeneratorService numberGenerator;
+    // Crew parity (operator + cleaner, shifts, attendance) — equipment mirror of the lease crew model
+    private final com.feros.api.repository.WorkOrderShiftRepository workOrderShiftRepository;
+    private final com.feros.api.repository.MachineShiftAssignmentRepository machineShiftAssignmentRepository;
+    private final com.feros.api.repository.MachineOperatorAssignmentLogRepository machineOperatorLogRepository;
+    private final com.feros.api.repository.MachineCleanerAssignmentLogRepository machineCleanerLogRepository;
+    private final com.feros.api.repository.AttendanceRepository attendanceRepository;
+    private final com.feros.api.repository.AttendanceTypeRepository attendanceTypeRepository;
+    private final com.feros.api.repository.UserRepository userRepository;
+    private final com.feros.api.service.NotificationService notificationService;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
 
@@ -129,9 +140,11 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .breakdownPenaltyThresholdHours(req.getBreakdownPenaltyThresholdHours())
                 .workOrderType(req.getWorkOrderType() != null ? req.getWorkOrderType() : com.feros.api.enums.WorkOrderType.RENTAL)
                 .agreedJobAmount(req.getAgreedJobAmount())
-                .jobDescription(req.getJobDescription());
+                .jobDescription(req.getJobDescription())
+                .shiftDuty(Boolean.TRUE.equals(req.getShiftDuty()));
 
         WorkOrder saved = workOrderRepository.save(builder.build());
+        persistShifts(saved, req);
         return toResponse(saved, 0);
     }
 
@@ -170,8 +183,13 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         if (req.getWorkOrderType() != null) wo.setWorkOrderType(req.getWorkOrderType());
         wo.setAgreedJobAmount(req.getAgreedJobAmount());
         wo.setJobDescription(req.getJobDescription());
+        if (req.getShiftDuty() != null) wo.setShiftDuty(req.getShiftDuty());
 
-        return toResponse(workOrderRepository.save(wo), machineAssignmentRepository.countByWorkOrderId(id));
+        WorkOrder saved = workOrderRepository.save(wo);
+        // Re-defining shifts replaces the set (forward-only pay lives on the assignment snapshots,
+        // so already-worked days are unaffected by redefining the work order's shift windows).
+        if (req.getShifts() != null || req.getShiftDuty() != null) persistShifts(saved, req);
+        return toResponse(saved, machineAssignmentRepository.countByWorkOrderId(id));
     }
 
     // ── Status ────────────────────────────────────────────────────────────────
@@ -498,7 +516,79 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .workOrderType(wo.getWorkOrderType())
                 .agreedJobAmount(wo.getAgreedJobAmount())
                 .jobDescription(wo.getJobDescription())
+                .shiftDuty(wo.getShiftDuty())
+                .shifts(getShifts(wo.getId()))
                 .build();
+    }
+
+    // ── Crew: shift windows (equipment mirror of lease shift definitions) ───────
+
+    private static final int MAX_SHIFTS = 4;
+
+    /** Replace the work order's shift windows from the request. Validates count (≤4), non-overlap
+     *  (midnight-crossing allowed), and non-negative pay. Clears the set when shiftDuty is off. */
+    private void persistShifts(WorkOrder wo, WorkOrderRequest req) {
+        workOrderShiftRepository.deleteByWorkOrderId(wo.getId());
+        if (!Boolean.TRUE.equals(wo.getShiftDuty())) return;
+
+        List<com.feros.api.dto.request.WorkOrderShiftDefinitionRequest> defs = req.getShifts();
+        if (defs == null || defs.isEmpty())
+            throw new FerosException("A shift-duty work order needs at least one shift.", HttpStatus.BAD_REQUEST);
+        if (defs.size() > MAX_SHIFTS)
+            throw new FerosException("A work order can have at most " + MAX_SHIFTS + " shifts.", HttpStatus.BAD_REQUEST);
+
+        for (var d : defs) {
+            if (d.getStartTime().equals(d.getEndTime()))
+                throw new FerosException("Shift start and end time cannot be the same.", HttpStatus.BAD_REQUEST);
+            if (d.getOperatorPay() == null || d.getOperatorPay().signum() < 0)
+                throw new FerosException("Shift operator pay must be zero or more.", HttpStatus.BAD_REQUEST);
+            if (d.getCleanerPay() != null && d.getCleanerPay().signum() < 0)
+                throw new FerosException("Shift cleaner pay must be zero or more.", HttpStatus.BAD_REQUEST);
+        }
+        assertNoShiftOverlap(defs);
+
+        Tenant t = wo.getTenant();
+        for (var d : defs) {
+            workOrderShiftRepository.save(WorkOrderShift.builder()
+                    .workOrder(wo)
+                    .shiftNumber(d.getShiftNumber())
+                    .startTime(d.getStartTime())
+                    .endTime(d.getEndTime())
+                    .operatorPay(d.getOperatorPay())
+                    .cleanerPay(d.getCleanerPay())
+                    .tenant(t)
+                    .build());
+        }
+    }
+
+    /** Two shift windows overlap if their minute-of-day intervals intersect. start > end wraps midnight. */
+    private static void assertNoShiftOverlap(List<com.feros.api.dto.request.WorkOrderShiftDefinitionRequest> defs) {
+        List<int[]> intervals = new java.util.ArrayList<>();
+        for (var d : defs) {
+            int s = d.getStartTime().toSecondOfDay() / 60;
+            int e = d.getEndTime().toSecondOfDay() / 60;
+            if (s < e) intervals.add(new int[]{s, e});
+            else { intervals.add(new int[]{s, 1440}); intervals.add(new int[]{0, e}); }
+        }
+        for (int i = 0; i < intervals.size(); i++)
+            for (int j = i + 1; j < intervals.size(); j++) {
+                int[] a = intervals.get(i), b = intervals.get(j);
+                if (a[0] < b[1] && b[0] < a[1])
+                    throw new FerosException("Shift time windows cannot overlap.", HttpStatus.BAD_REQUEST);
+            }
+    }
+
+    private List<WorkOrderShiftResponse> getShifts(Long workOrderId) {
+        return workOrderShiftRepository.findByWorkOrderIdOrderByShiftNumberAsc(workOrderId).stream()
+                .map(s -> WorkOrderShiftResponse.builder()
+                        .id(s.getId())
+                        .shiftNumber(s.getShiftNumber())
+                        .startTime(s.getStartTime())
+                        .endTime(s.getEndTime())
+                        .operatorPay(s.getOperatorPay())
+                        .cleanerPay(s.getCleanerPay())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -542,6 +632,9 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .operatorStaffName(a.getOperatorStaff() != null ? a.getOperatorStaff().getUser().getName() : null)
                 .hiredOperatorName(a.getHiredOperatorName())
                 .hiredOperatorPhone(a.getHiredOperatorPhone())
+                .cleanerStaffId(a.getCleanerStaff() != null ? a.getCleanerStaff().getId() : null)
+                .cleanerStaffName(a.getCleanerStaff() != null ? a.getCleanerStaff().getUser().getName() : null)
+                .clientCleanerName(a.getClientCleanerName())
                 .activeWorkEntry(workEntryRepository
                         .findByMachineAssignmentIdAndStatus(a.getId(), WorkEntryStatus.ACTIVE)
                         .map(this::toWorkEntryResponse).orElse(null))
@@ -571,27 +664,311 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .build();
     }
 
+    @Transactional
     public MachineAssignmentResponse assignOperator(Long workOrderId, Long assignmentId, com.feros.api.dto.request.AssignOperatorRequest req) {
         MachineAssignment assignment = machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
                 .orElseThrow(() -> new FerosException("Machine assignment not found", HttpStatus.NOT_FOUND));
 
+        // Block operator change while a session is live on this machine (mirror lease).
+        if (workEntryRepository.existsByMachineAssignmentIdAndStatus(assignmentId, WorkEntryStatus.ACTIVE))
+            throw new FerosException("End the active session before changing the operator.", HttpStatus.CONFLICT);
+
+        // Close previous operator log entry
+        machineOperatorLogRepository.findByMachineAssignmentIdAndUnassignedAtIsNull(assignmentId)
+                .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
+
         assignment.setOperatorType(req.getOperatorType());
+        StaffProfile operator = null;
         if (req.getOperatorType() == null) {
             assignment.setOperatorStaff(null);
             assignment.setHiredOperatorName(null);
             assignment.setHiredOperatorPhone(null);
-        } else if (req.getOperatorType() == com.feros.api.enums.OperatorType.OWN_STAFF) {
-            StaffProfile staff = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(req.getOperatorStaffId(), tenantId())
+        } else if (req.getOperatorType() == OperatorType.OWN_STAFF) {
+            StaffProfile resolved = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(req.getOperatorStaffId(), tenantId())
                     .orElseThrow(() -> new FerosException("Staff not found", HttpStatus.NOT_FOUND));
-            assignment.setOperatorStaff(staff);
+            requireAttendanceToday(resolved);
+            assertOperatorFreeOrSwap(resolved, assignmentId, req.isSwap());
+            operator = resolved;
+            assignment.setOperatorStaff(operator);
             assignment.setHiredOperatorName(null);
             assignment.setHiredOperatorPhone(null);
-        } else {
+        } else { // HIRED — client's own operator: no gate, no payroll
             assignment.setOperatorStaff(null);
             assignment.setHiredOperatorName(req.getHiredOperatorName());
             assignment.setHiredOperatorPhone(req.getHiredOperatorPhone());
         }
-        return toAssignmentResponse(machineAssignmentRepository.save(assignment));
+        MachineAssignment saved = machineAssignmentRepository.save(assignment);
+
+        if (operator != null) {
+            machineOperatorLogRepository.save(MachineOperatorAssignmentLog.builder()
+                    .machineAssignment(saved)
+                    .operatorStaff(operator)
+                    .assignedAt(LocalDateTime.now())
+                    .assignedBy(currentUser())
+                    .tenant(tenant())
+                    .build());
+            ensureAttendance(operator, TimeUtil.today());
+            notifyCrew(operator, saved, NotificationType.EQUIPMENT_OPERATOR_ASSIGNED, "Machine Assigned to You");
+        }
+        return toAssignmentResponse(saved);
+    }
+
+    @Transactional
+    public MachineAssignmentResponse assignCleaner(Long workOrderId, Long assignmentId, com.feros.api.dto.request.AssignMachineCleanerRequest req) {
+        MachineAssignment assignment = machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
+                .orElseThrow(() -> new FerosException("Machine assignment not found", HttpStatus.NOT_FOUND));
+
+        if (workEntryRepository.existsByMachineAssignmentIdAndStatus(assignmentId, WorkEntryStatus.ACTIVE))
+            throw new FerosException("End the active session before changing the cleaner.", HttpStatus.CONFLICT);
+
+        machineCleanerLogRepository.findByMachineAssignmentIdAndUnassignedAtIsNull(assignmentId)
+                .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
+
+        StaffProfile cleaner = null;
+        if (req.getCleanerStaffId() == null) {
+            assignment.setCleanerStaff(null);
+            assignment.setClientCleanerName(req.getClientCleanerName());
+        } else {
+            StaffProfile resolved = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(req.getCleanerStaffId(), tenantId())
+                    .orElseThrow(() -> new FerosException("Cleaner not found", HttpStatus.NOT_FOUND));
+            requireAttendanceToday(resolved);
+            assertCleanerFreeOrSwap(resolved, assignmentId, req.isSwap());
+            cleaner = resolved;
+            assignment.setCleanerStaff(cleaner);
+            assignment.setClientCleanerName(null);
+        }
+        MachineAssignment saved = machineAssignmentRepository.save(assignment);
+
+        if (cleaner != null) {
+            machineCleanerLogRepository.save(MachineCleanerAssignmentLog.builder()
+                    .machineAssignment(saved)
+                    .cleanerStaff(cleaner)
+                    .assignedAt(LocalDateTime.now())
+                    .assignedBy(currentUser())
+                    .tenant(tenant())
+                    .build());
+            ensureAttendance(cleaner, TimeUtil.today());
+            notifyCrew(cleaner, saved, NotificationType.EQUIPMENT_CLEANER_ASSIGNED, "Machine Assigned to You");
+        }
+        return toAssignmentResponse(saved);
+    }
+
+    // ── Crew gates + helpers (equipment mirror of the lease crew model) ─────────
+
+    private void requireAttendanceToday(StaffProfile staff) {
+        if (!attendanceRepository.existsByUserIdAndTenantIdAndAttendanceDateAndApprovalStatusInAndIsActiveTrue(
+                staff.getUser().getId(), tenantId(), TimeUtil.today(),
+                List.of(AttendanceApprovalStatus.PENDING, AttendanceApprovalStatus.APPROVED))) {
+            throw new FerosException(staff.getUser().getName()
+                    + " has not marked attendance today and cannot be assigned.", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    /** One-machine rule (equipment-only): block if the operator is already active on a DIFFERENT
+     *  machine, or release that machine first when swap is requested. */
+    private void assertOperatorFreeOrSwap(StaffProfile operator, Long thisAssignmentId, boolean swap) {
+        machineOperatorLogRepository.findActiveByOperatorStaffId(operator.getId(), tenantId()).ifPresent(prev -> {
+            if (prev.getMachineAssignment().getId().equals(thisAssignmentId)) return;
+            if (swap) {
+                prev.setUnassignedAt(LocalDateTime.now());
+                MachineAssignment other = prev.getMachineAssignment();
+                other.setOperatorStaff(null);
+                machineAssignmentRepository.save(other);
+            } else {
+                throw new FerosException(operator.getUser().getName() + " is already assigned to "
+                        + machineLabel(prev.getMachineAssignment()) + ". Unassign them first.", HttpStatus.CONFLICT);
+            }
+        });
+    }
+
+    private void assertCleanerFreeOrSwap(StaffProfile cleaner, Long thisAssignmentId, boolean swap) {
+        machineCleanerLogRepository.findActiveByCleanerStaffId(cleaner.getId(), tenantId()).ifPresent(prev -> {
+            if (prev.getMachineAssignment().getId().equals(thisAssignmentId)) return;
+            if (swap) {
+                prev.setUnassignedAt(LocalDateTime.now());
+                MachineAssignment other = prev.getMachineAssignment();
+                other.setCleanerStaff(null);
+                machineAssignmentRepository.save(other);
+            } else {
+                throw new FerosException(cleaner.getUser().getName() + " is already assigned to "
+                        + machineLabel(prev.getMachineAssignment()) + ". Unassign them first.", HttpStatus.CONFLICT);
+            }
+        });
+    }
+
+    private static String machineLabel(MachineAssignment a) {
+        Equipment eq = a.getEquipment();
+        String reg = eq.getRegistrationNumber() != null ? eq.getRegistrationNumber() : eq.getSerialNumber();
+        return (reg != null ? reg : "machine") + " (WO " + a.getWorkOrder().getWoNumber() + ")";
+    }
+
+    /** Decision A: ensure a present attendance exists on workDate (PENDING if newly created).
+     *  Never downgrades an existing record; approval still gates payroll. No-op for client staff. */
+    private void ensureAttendance(StaffProfile staff, LocalDate workDate) {
+        if (staff == null) return;
+        Long userId = staff.getUser().getId();
+        if (attendanceRepository.findByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(userId, tenantId(), workDate).isPresent())
+            return;
+        com.feros.api.entity.master.AttendanceType present = attendanceTypeRepository.findByNameIgnoreCase("PRESENT")
+                .orElseThrow(() -> new FerosException("PRESENT attendance type not configured.", HttpStatus.NOT_FOUND));
+        attendanceRepository.save(Attendance.builder()
+                .tenant(tenant())
+                .user(staff.getUser())
+                .attendanceDate(workDate)
+                .attendanceType(present)
+                .markedBy(currentUser())
+                .markedAt(LocalDateTime.now())
+                .approvalStatus(AttendanceApprovalStatus.PENDING)
+                .isActive(true)
+                .build());
+    }
+
+    /** When a shift crew member is replaced and has no remaining shift that day, retire the present
+     *  record the shift auto-created for them — but only if still unapproved (approved = payroll truth). */
+    private void clearStrayShiftAttendance(StaffProfile old, StaffProfile neu, LocalDate date) {
+        if (old == null || (neu != null && old.getId().equals(neu.getId()))) return;
+        boolean stillOnShift =
+                !machineShiftAssignmentRepository.findByOperatorStaffIdAndWorkDate(old.getId(), date).isEmpty()
+             || !machineShiftAssignmentRepository.findByCleanerStaffIdAndWorkDate(old.getId(), date).isEmpty();
+        if (stillOnShift) return;
+        attendanceRepository.findByUserIdAndTenantIdAndAttendanceDateAndIsActiveTrue(old.getUser().getId(), tenantId(), date)
+                .filter(a -> a.getApprovalStatus() == AttendanceApprovalStatus.PENDING)
+                .ifPresent(a -> { a.setIsActive(false); attendanceRepository.save(a); });
+    }
+
+    private void notifyCrew(StaffProfile staff, MachineAssignment a, NotificationType type, String title) {
+        notificationService.sendToUser(a.getWorkOrder().getTenant(), staff.getUser(), type, title,
+                "You have been assigned to " + machineLabel(a) + ".");
+    }
+
+    private User currentUser() {
+        return userRepository.findById(SecurityUtil.getCurrentUserId()).orElse(null);
+    }
+
+    // ── Shift-based crew assignment (equipment mirror of lease assignShift) ──────
+
+    @Override
+    @Transactional
+    public MachineShiftAssignmentResponse assignMachineShift(Long workOrderId, Long assignmentId,
+                                                             com.feros.api.dto.request.MachineShiftAssignmentRequest req) {
+        MachineAssignment assignment = machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
+                .orElseThrow(() -> new FerosException("Machine assignment not found", HttpStatus.NOT_FOUND));
+        WorkOrderShift shift = workOrderShiftRepository.findById(req.getShiftId())
+                .orElseThrow(() -> new FerosException("Shift not found", HttpStatus.NOT_FOUND));
+        if (!shift.getWorkOrder().getId().equals(workOrderId))
+            throw new FerosException("Shift does not belong to this work order", HttpStatus.BAD_REQUEST);
+
+        StaffProfile operator = resolveShiftStaff(req.getOperatorStaffId(), shift, req.getWorkDate(), false);
+        StaffProfile cleaner  = resolveShiftStaff(req.getCleanerStaffId(), shift, req.getWorkDate(), true);
+
+        MachineShiftAssignment row = machineShiftAssignmentRepository
+                .findByMachineAssignmentIdAndWorkOrderShiftIdAndWorkDate(assignmentId, shift.getId(), req.getWorkDate())
+                .orElseGet(() -> MachineShiftAssignment.builder()
+                        .machineAssignment(assignment)
+                        .workOrderShift(shift)
+                        .workDate(req.getWorkDate())
+                        .tenant(tenant())
+                        .build());
+        StaffProfile oldOperator = row.getOperatorStaff();
+        StaffProfile oldCleaner  = row.getCleanerStaff();
+
+        // One-machine rule (equipment-only) for a newly-assigned person; shift↔shift via resolveShiftStaff overlap.
+        if (isChangedStaff(oldOperator, operator)) assertOperatorFreeOrSwap(operator, assignmentId, false);
+        if (isChangedStaff(oldCleaner, cleaner))   assertCleanerFreeOrSwap(cleaner, assignmentId, false);
+
+        row.setOperatorStaff(operator);
+        row.setCleanerStaff(cleaner);
+        // Snapshot the shift pay at assignment time → later pay edits are forward-only
+        row.setOperatorPaySnapshot(operator != null ? shift.getOperatorPay() : null);
+        row.setCleanerPaySnapshot(cleaner != null ? shift.getCleanerPay() : null);
+        row.setAssignedAt(LocalDateTime.now());
+        row.setAssignedBy(currentUser());
+        MachineShiftAssignment saved = machineShiftAssignmentRepository.save(row);
+
+        // Decision A: anchor attendance to the shift's start date so attendance == payroll date.
+        ensureAttendance(operator, req.getWorkDate());
+        ensureAttendance(cleaner, req.getWorkDate());
+        clearStrayShiftAttendance(oldOperator, operator, req.getWorkDate());
+        clearStrayShiftAttendance(oldCleaner, cleaner, req.getWorkDate());
+
+        if (operator != null) notifyShift(operator, saved, NotificationType.EQUIPMENT_OPERATOR_ASSIGNED);
+        if (cleaner != null)  notifyShift(cleaner, saved, NotificationType.EQUIPMENT_CLEANER_ASSIGNED);
+        return toShiftAssignmentResponse(saved);
+    }
+
+    @Override
+    public List<MachineShiftAssignmentResponse> getShiftAssignments(Long workOrderId, LocalDate from, LocalDate to) {
+        fetchWo(workOrderId);
+        return machineShiftAssignmentRepository.findByWorkOrderIdAndWorkDateBetween(workOrderId, from, to)
+                .stream().map(this::toShiftAssignmentResponse).collect(Collectors.toList());
+    }
+
+    private static boolean isChangedStaff(StaffProfile old, StaffProfile neu) {
+        return neu != null && (old == null || !old.getId().equals(neu.getId()));
+    }
+
+    /** Resolve a staff user id to a profile (null = client's own), rejecting a time-overlapping shift the
+     *  same day. isCleaner picks which side of existing rows to check. */
+    private StaffProfile resolveShiftStaff(Long staffUserId, WorkOrderShift shift, LocalDate workDate, boolean isCleaner) {
+        if (staffUserId == null) return null;
+        StaffProfile sp = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(staffUserId, tenantId())
+                .orElseThrow(() -> new FerosException((isCleaner ? "Cleaner" : "Operator") + " not found", HttpStatus.NOT_FOUND));
+        List<MachineShiftAssignment> sameDay = isCleaner
+                ? machineShiftAssignmentRepository.findByCleanerStaffIdAndWorkDate(sp.getId(), workDate)
+                : machineShiftAssignmentRepository.findByOperatorStaffIdAndWorkDate(sp.getId(), workDate);
+        for (MachineShiftAssignment other : sameDay) {
+            if (other.getWorkOrderShift().getId().equals(shift.getId())) continue;
+            if (shiftWindowsOverlap(shift, other.getWorkOrderShift()))
+                throw new FerosException(sp.getUser().getName() + " is already on an overlapping shift on "
+                        + workDate + ".", HttpStatus.CONFLICT);
+        }
+        return sp;
+    }
+
+    private static boolean shiftWindowsOverlap(WorkOrderShift a, WorkOrderShift b) {
+        List<int[]> xs = shiftIntervals(a), ys = shiftIntervals(b);
+        for (int[] x : xs) for (int[] y : ys) if (x[0] < y[1] && y[0] < x[1]) return true;
+        return false;
+    }
+
+    private static List<int[]> shiftIntervals(WorkOrderShift s) {
+        int from = s.getStartTime().toSecondOfDay() / 60, to = s.getEndTime().toSecondOfDay() / 60;
+        List<int[]> out = new java.util.ArrayList<>();
+        if (from < to) out.add(new int[]{from, to});
+        else { out.add(new int[]{from, 1440}); out.add(new int[]{0, to}); }
+        return out;
+    }
+
+    private void notifyShift(StaffProfile staff, MachineShiftAssignment a, NotificationType type) {
+        WorkOrderShift s = a.getWorkOrderShift();
+        notificationService.sendToUser(a.getMachineAssignment().getWorkOrder().getTenant(), staff.getUser(), type,
+                "Shift Assigned to You",
+                "Shift " + s.getShiftNumber() + " · " + s.getStartTime() + "–" + s.getEndTime()
+                        + " on " + machineLabel(a.getMachineAssignment()) + ", " + a.getWorkDate() + ".");
+    }
+
+    private MachineShiftAssignmentResponse toShiftAssignmentResponse(MachineShiftAssignment a) {
+        Equipment eq = a.getMachineAssignment().getEquipment();
+        return MachineShiftAssignmentResponse.builder()
+                .id(a.getId())
+                .assignmentId(a.getMachineAssignment().getId())
+                .equipmentId(eq.getId())
+                .registrationNumber(eq.getRegistrationNumber())
+                .equipmentName(eq.getEquipmentType() != null ? eq.getEquipmentType().getName() : null)
+                .shiftId(a.getWorkOrderShift().getId())
+                .shiftNumber(a.getWorkOrderShift().getShiftNumber())
+                .startTime(a.getWorkOrderShift().getStartTime())
+                .endTime(a.getWorkOrderShift().getEndTime())
+                .workDate(a.getWorkDate())
+                .operatorStaffId(a.getOperatorStaff() != null ? a.getOperatorStaff().getUser().getId() : null)
+                .operatorName(a.getOperatorStaff() != null ? a.getOperatorStaff().getUser().getName() : null)
+                .clientOperator(a.getOperatorStaff() == null)
+                .cleanerStaffId(a.getCleanerStaff() != null ? a.getCleanerStaff().getUser().getId() : null)
+                .cleanerName(a.getCleanerStaff() != null ? a.getCleanerStaff().getUser().getName() : null)
+                .clientCleaner(a.getCleanerStaff() == null)
+                .operatorPay(a.getOperatorPaySnapshot())
+                .cleanerPay(a.getCleanerPaySnapshot())
+                .build();
     }
 
     public MachineAssignmentResponse assignDivision(Long workOrderId, Long assignmentId, AssignDivisionRequest req) {

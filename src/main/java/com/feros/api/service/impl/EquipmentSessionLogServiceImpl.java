@@ -26,6 +26,18 @@ public class EquipmentSessionLogServiceImpl implements EquipmentSessionLogServic
 
     private final EquipmentSessionLogRepository sessionLogRepo;
     private final MachineAssignmentRepository assignmentRepo;
+    private final com.feros.api.repository.MachineShiftAssignmentRepository machineShiftAssignmentRepo;
+
+    /** The machine this operator is on today: standing operator assignment first, else today's shift crew
+     *  (shift-duty work orders). Null when neither. Equipment mirror of lease crew resolution. */
+    private MachineAssignment resolveTodayAssignment(Long userId, Long tenantId, LocalDate today) {
+        List<MachineAssignment> standing = assignmentRepo.findActiveByOperatorUserId(userId, tenantId, today);
+        if (!standing.isEmpty()) return standing.get(0);
+        return machineShiftAssignmentRepo.findByOperatorUserIdAndWorkDate(userId, today).stream()
+                .findFirst()
+                .map(com.feros.api.entity.MachineShiftAssignment::getMachineAssignment)
+                .orElse(null);
+    }
 
     @Override
     public OperatorTodayResponse getToday() {
@@ -33,8 +45,7 @@ public class EquipmentSessionLogServiceImpl implements EquipmentSessionLogServic
         LocalDate today = LocalDate.now();
 
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        List<MachineAssignment> assignments = assignmentRepo.findActiveByOperatorUserId(userId, tenantId, today);
-        MachineAssignment assignment = assignments.isEmpty() ? null : assignments.get(0);
+        MachineAssignment assignment = resolveTodayAssignment(userId, tenantId, today);
 
         List<EquipmentSessionLog> sessions = sessionLogRepo
                 .findByOperatorUserIdAndSessionDateOrderByStartTimeDesc(userId, today);
@@ -91,10 +102,9 @@ public class EquipmentSessionLogServiceImpl implements EquipmentSessionLogServic
         LocalDate today = LocalDate.now();
 
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        MachineAssignment assignment = assignmentRepo
-                .findActiveByOperatorUserId(userId, tenantId, today)
-                .stream().findFirst()
-                .orElseThrow(() -> new FerosException("No active machine assignment found for today", HttpStatus.BAD_REQUEST));
+        MachineAssignment assignment = resolveTodayAssignment(userId, tenantId, today);
+        if (assignment == null)
+            throw new FerosException("No active machine assignment found for today", HttpStatus.BAD_REQUEST);
 
         EquipmentSessionLog log = EquipmentSessionLog.builder()
                 .machineAssignment(assignment)

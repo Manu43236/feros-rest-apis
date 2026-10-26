@@ -1,7 +1,10 @@
 package com.feros.api.service;
 
 import com.feros.api.dto.request.AssignDivisionRequest;
+import com.feros.api.dto.request.AssignMachineCleanerRequest;
 import com.feros.api.dto.request.AssignOperatorRequest;
+import com.feros.api.dto.request.MachineShiftAssignmentRequest;
+import com.feros.api.dto.response.MachineShiftAssignmentResponse;
 import com.feros.api.dto.request.DailyLogRequest;
 import com.feros.api.dto.request.MachineAssignmentRequest;
 import com.feros.api.dto.request.MachineConditionSurveyRequest;
@@ -44,6 +47,14 @@ public interface WorkOrderService {
     void closeMachineAssignment(Long workOrderId, Long assignmentId, LocalDate endDate, AssignmentEndReason reason);
 
     MachineAssignmentResponse assignOperator(Long workOrderId, Long assignmentId, AssignOperatorRequest request);
+
+    // Crew parity — standing cleaner (mirror of operator)
+    MachineAssignmentResponse assignCleaner(Long workOrderId, Long assignmentId, AssignMachineCleanerRequest request);
+
+    // Crew parity — shift-based assignment (mirror of lease shift assignment)
+    MachineShiftAssignmentResponse assignMachineShift(Long workOrderId, Long assignmentId, MachineShiftAssignmentRequest request);
+
+    List<MachineShiftAssignmentResponse> getShiftAssignments(Long workOrderId, LocalDate from, LocalDate to);
 
     MachineAssignmentResponse assignDivision(Long workOrderId, Long assignmentId, AssignDivisionRequest request);
 

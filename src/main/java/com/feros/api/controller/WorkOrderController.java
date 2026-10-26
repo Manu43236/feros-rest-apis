@@ -97,6 +97,33 @@ public class WorkOrderController {
         return ResponseEntity.ok(ApiResponse.success("Operator assigned", workOrderService.assignOperator(id, assignmentId, request)));
     }
 
+    @PutMapping("/{id}/machines/{assignmentId}/cleaner")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<MachineAssignmentResponse>> assignCleaner(
+            @PathVariable Long id,
+            @PathVariable Long assignmentId,
+            @RequestBody com.feros.api.dto.request.AssignMachineCleanerRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Cleaner assigned", workOrderService.assignCleaner(id, assignmentId, request)));
+    }
+
+    @PutMapping("/{id}/machines/{assignmentId}/shift-assignments")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<com.feros.api.dto.response.MachineShiftAssignmentResponse>> assignShift(
+            @PathVariable Long id,
+            @PathVariable Long assignmentId,
+            @Valid @RequestBody com.feros.api.dto.request.MachineShiftAssignmentRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Shift assigned", workOrderService.assignMachineShift(id, assignmentId, request)));
+    }
+
+    @GetMapping("/{id}/shift-assignments")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<com.feros.api.dto.response.MachineShiftAssignmentResponse>>> getShiftAssignments(
+            @PathVariable Long id,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success("Shift assignments", workOrderService.getShiftAssignments(id, from, to)));
+    }
+
     @PutMapping("/{id}/machines/{assignmentId}/attachment")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<MachineAssignmentResponse>> setAttachment(

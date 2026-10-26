@@ -61,6 +61,15 @@ public class MachineAssignment extends BaseEntity {
     @Column(name = "hired_operator_phone")
     private String hiredOperatorPhone;
 
+    // Standing cleaner on this machine (non-shift). Mirror of operator fields above.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cleaner_staff_id")
+    private StaffProfile cleanerStaff;
+
+    // Client's own cleaner (free-text, no payroll) — mirror of hiredOperatorName.
+    @Column(name = "client_cleaner_name")
+    private String clientCleanerName;
+
     @Column(name = "division_id")
     private Long divisionId;
 

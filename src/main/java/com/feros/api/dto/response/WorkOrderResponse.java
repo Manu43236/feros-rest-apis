@@ -7,6 +7,7 @@ import lombok.Getter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Builder
@@ -47,4 +48,8 @@ public class WorkOrderResponse {
     private WorkOrderType workOrderType;
     private BigDecimal agreedJobAmount;
     private String jobDescription;
+
+    // Shift-duty work order + its shift windows (empty when not shift-duty)
+    private Boolean shiftDuty;
+    private List<WorkOrderShiftResponse> shifts;
 }

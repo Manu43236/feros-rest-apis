@@ -8,6 +8,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Getter
 @Setter
@@ -47,4 +48,9 @@ public class WorkOrderRequest {
     private WorkOrderType workOrderType;
     private BigDecimal agreedJobAmount;
     private String jobDescription;
+
+    // Shift-duty work order: when true, work runs in the defined shift windows below (crew + pay per shift)
+    private Boolean shiftDuty;
+    // Shift windows (1..4) — required when shiftDuty is true; replaces the set on update
+    private List<WorkOrderShiftDefinitionRequest> shifts;
 }

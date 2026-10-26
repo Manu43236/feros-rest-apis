@@ -63,6 +63,7 @@ public class PayrollServiceImpl implements PayrollService {
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final com.feros.api.service.StaffVehicleDayResolver staffVehicleDayResolver;
     private final com.feros.api.service.LeaseShiftPayResolver leaseShiftPayResolver;
+    private final com.feros.api.service.MachineShiftPayResolver machineShiftPayResolver;
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PayrollServiceImpl.class);
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     private final TenantHolidayRepository tenantHolidayRepository;
@@ -268,13 +269,20 @@ public class PayrollServiceImpl implements PayrollService {
             BigDecimal shiftEffectiveDays = BigDecimal.ZERO;
             com.feros.api.service.LeaseShiftPayResolver.Context shiftCtx = leaseShiftPayResolver
                     .buildContext(tenantId, request.getPayCycleStartDate(), request.getPayCycleEndDate());
+            // Equipment machine shifts replace the daily rate the same way lease shifts do (100% parity).
+            com.feros.api.service.MachineShiftPayResolver.Context machineShiftCtx = machineShiftPayResolver
+                    .buildContext(tenantId, request.getPayCycleStartDate(), request.getPayCycleEndDate());
             for (com.feros.api.entity.Attendance a : attendanceList) {
                 String t = a.getAttendanceType().getName().toLowerCase();
                 if (!t.contains("present") && !t.contains("half")) continue;
-                if (!leaseShiftPayResolver.isShiftDay(shiftCtx, request.getUserId(), a.getAttendanceDate())) continue;
+                boolean leaseDay   = leaseShiftPayResolver.isShiftDay(shiftCtx, request.getUserId(), a.getAttendanceDate());
+                boolean machineDay = machineShiftPayResolver.isShiftDay(machineShiftCtx, request.getUserId(), a.getAttendanceDate());
+                if (!leaseDay && !machineDay) continue;
                 BigDecimal factor = t.contains("half") ? new BigDecimal("0.5") : BigDecimal.ONE;
-                shiftPaySum = shiftPaySum.add(
-                        leaseShiftPayResolver.shiftPay(shiftCtx, request.getUserId(), a.getAttendanceDate()).multiply(factor));
+                BigDecimal dayPay = BigDecimal.ZERO;
+                if (leaseDay)   dayPay = dayPay.add(leaseShiftPayResolver.shiftPay(shiftCtx, request.getUserId(), a.getAttendanceDate()));
+                if (machineDay) dayPay = dayPay.add(machineShiftPayResolver.shiftPay(machineShiftCtx, request.getUserId(), a.getAttendanceDate()));
+                shiftPaySum = shiftPaySum.add(dayPay.multiply(factor));
                 shiftEffectiveDays = shiftEffectiveDays.add(factor);
             }
             shiftPaySum = shiftPaySum.setScale(2, RoundingMode.HALF_UP);

@@ -75,6 +75,101 @@ public class ReportServiceImpl implements ReportService {
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     private final com.feros.api.repository.LeaseCleanerAssignmentLogRepository leaseCleanerAssignmentLogRepository;
     private final UserRepository userRepository;
+    private final com.feros.api.repository.MachineShiftAssignmentRepository machineShiftAssignmentRepository;
+    private final com.feros.api.repository.MachineOperatorAssignmentLogRepository machineOperatorLogRepository;
+    private final com.feros.api.repository.MachineCleanerAssignmentLogRepository machineCleanerLogRepository;
+
+    // ── Equipment crew parity reports ───────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OperatorAssignmentRow> getOperatorAssignments(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        java.time.LocalDateTime from = startDate.atStartOfDay();
+        java.time.LocalDateTime to = endDate.atTime(23, 59, 59);
+        List<OperatorAssignmentRow> rows = new java.util.ArrayList<>();
+
+        // Shift crew — one row per operator/cleaner per shift per day
+        for (com.feros.api.entity.MachineShiftAssignment a : machineShiftAssignmentRepository
+                .findOverlappingByTenantId(tenantId, startDate, endDate)) {
+            com.feros.api.entity.Equipment eq = a.getMachineAssignment().getEquipment();
+            com.feros.api.entity.WorkOrder wo = a.getMachineAssignment().getWorkOrder();
+            String shiftLabel = "Shift " + a.getWorkOrderShift().getShiftNumber() + " · "
+                    + a.getWorkOrderShift().getStartTime() + "–" + a.getWorkOrderShift().getEndTime();
+            if (a.getOperatorStaff() != null)
+                rows.add(crewRow(a.getOperatorStaff().getUser().getName(), "Operator", eq, wo,
+                        shiftLabel, a.getWorkDate(), a.getWorkDate(), a.getOperatorPaySnapshot()));
+            if (a.getCleanerStaff() != null)
+                rows.add(crewRow(a.getCleanerStaff().getUser().getName(), "Cleaner", eq, wo,
+                        shiftLabel, a.getWorkDate(), a.getWorkDate(), a.getCleanerPaySnapshot()));
+        }
+        // Standing operators
+        for (com.feros.api.entity.MachineOperatorAssignmentLog l : machineOperatorLogRepository
+                .findOverlappingByTenantId(tenantId, from, to)) {
+            rows.add(crewRow(l.getOperatorStaff().getUser().getName(), "Operator",
+                    l.getMachineAssignment().getEquipment(), l.getMachineAssignment().getWorkOrder(),
+                    "Standing", l.getAssignedAt().toLocalDate(),
+                    l.getUnassignedAt() != null ? l.getUnassignedAt().toLocalDate() : null, null));
+        }
+        // Standing cleaners
+        for (com.feros.api.entity.MachineCleanerAssignmentLog l : machineCleanerLogRepository
+                .findOverlappingByTenantId(tenantId, from, to)) {
+            rows.add(crewRow(l.getCleanerStaff().getUser().getName(), "Cleaner",
+                    l.getMachineAssignment().getEquipment(), l.getMachineAssignment().getWorkOrder(),
+                    "Standing", l.getAssignedAt().toLocalDate(),
+                    l.getUnassignedAt() != null ? l.getUnassignedAt().toLocalDate() : null, null));
+        }
+        rows.sort(java.util.Comparator.comparing(OperatorAssignmentRow::getFromDate,
+                java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())));
+        return rows;
+    }
+
+    private static OperatorAssignmentRow crewRow(String staff, String role,
+            com.feros.api.entity.Equipment eq, com.feros.api.entity.WorkOrder wo, String type,
+            LocalDate fromD, LocalDate toD, java.math.BigDecimal pay) {
+        return OperatorAssignmentRow.builder()
+                .staffName(staff).role(role)
+                .machine(eq.getRegistrationNumber() != null ? eq.getRegistrationNumber() : eq.getSerialNumber())
+                .equipmentType(eq.getEquipmentType() != null ? eq.getEquipmentType().getName() : null)
+                .workOrderNumber(wo.getWoNumber())
+                .clientName(wo.getClient() != null ? wo.getClient().getClientName() : null)
+                .assignmentType(type).fromDate(fromD).toDate(toD).pay(pay)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MachineStaffCostRow> getMachineStaffCost(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        // machineAssignmentId → accumulator
+        Map<Long, java.math.BigDecimal[]> opCl = new java.util.LinkedHashMap<>();
+        Map<Long, com.feros.api.entity.MachineAssignment> machines = new java.util.HashMap<>();
+        for (com.feros.api.entity.MachineShiftAssignment a : machineShiftAssignmentRepository
+                .findOverlappingByTenantId(tenantId, startDate, endDate)) {
+            Long key = a.getMachineAssignment().getId();
+            machines.putIfAbsent(key, a.getMachineAssignment());
+            java.math.BigDecimal[] acc = opCl.computeIfAbsent(key,
+                    k -> new java.math.BigDecimal[]{java.math.BigDecimal.ZERO, java.math.BigDecimal.ZERO});
+            if (a.getOperatorStaff() != null && a.getOperatorPaySnapshot() != null)
+                acc[0] = acc[0].add(a.getOperatorPaySnapshot());
+            if (a.getCleanerStaff() != null && a.getCleanerPaySnapshot() != null)
+                acc[1] = acc[1].add(a.getCleanerPaySnapshot());
+        }
+        List<MachineStaffCostRow> rows = new java.util.ArrayList<>();
+        for (Map.Entry<Long, java.math.BigDecimal[]> e : opCl.entrySet()) {
+            com.feros.api.entity.MachineAssignment ma = machines.get(e.getKey());
+            com.feros.api.entity.Equipment eq = ma.getEquipment();
+            java.math.BigDecimal op = e.getValue()[0], cl = e.getValue()[1];
+            rows.add(MachineStaffCostRow.builder()
+                    .machine(eq.getRegistrationNumber() != null ? eq.getRegistrationNumber() : eq.getSerialNumber())
+                    .equipmentType(eq.getEquipmentType() != null ? eq.getEquipmentType().getName() : null)
+                    .workOrderNumber(ma.getWorkOrder().getWoNumber())
+                    .clientName(ma.getWorkOrder().getClient() != null ? ma.getWorkOrder().getClient().getClientName() : null)
+                    .operatorCost(op).cleanerCost(cl).totalCost(op.add(cl))
+                    .build());
+        }
+        return rows;
+    }
 
     // ── 0. Vehicle Master ──────────────────────────────────────────────────────
 

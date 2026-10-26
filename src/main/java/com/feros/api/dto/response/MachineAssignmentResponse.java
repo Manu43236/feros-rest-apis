@@ -35,6 +35,10 @@ public class MachineAssignmentResponse {
     private String operatorStaffName;
     private String hiredOperatorName;
     private String hiredOperatorPhone;
+    // Standing cleaner (non-shift) — mirror of operator fields
+    private Long cleanerStaffId;
+    private String cleanerStaffName;
+    private String clientCleanerName;
     private WorkEntryResponse activeWorkEntry;
     private Long divisionId;
     private String divisionName;

@@ -28,6 +28,61 @@ public class ReportController {
 
     private static final String DATE_FORMAT = "yyyy-MM-dd";
 
+    // ── Equipment crew: operator/cleaner assignments ───────────────────────────
+
+    @GetMapping("/equipment/operator-assignments")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF','SUPERVISOR')")
+    public ResponseEntity<ApiResponse<List<OperatorAssignmentRow>>> getOperatorAssignments(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Operator assignments fetched",
+                reportService.getOperatorAssignments(startDate, endDate)));
+    }
+
+    @GetMapping("/equipment/operator-assignments/export")
+    public ResponseEntity<byte[]> exportOperatorAssignments(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<OperatorAssignmentRow> rows = reportService.getOperatorAssignments(startDate, endDate);
+        String[] headers = {"Staff", "Role", "Machine", "Equipment Type", "Work Order", "Client", "Type", "From", "To", "Pay"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getStaffName()), safe(r.getRole()), safe(r.getMachine()), safe(r.getEquipmentType()),
+                safe(r.getWorkOrderNumber()), safe(r.getClientName()), safe(r.getAssignmentType()),
+                r.getFromDate() != null ? r.getFromDate().toString() : "—",
+                r.getToDate() != null ? r.getToDate().toString() : "Active",
+                r.getPay() != null ? r.getPay().toPlainString() : "—",
+        }).toList();
+        return export("operator-assignments", "Operator / Cleaner Assignments", headers, data, format);
+    }
+
+    // ── Equipment crew: machine staff cost ─────────────────────────────────────
+
+    @GetMapping("/equipment/machine-staff-cost")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<List<MachineStaffCostRow>>> getMachineStaffCost(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Machine staff cost fetched",
+                reportService.getMachineStaffCost(startDate, endDate)));
+    }
+
+    @GetMapping("/equipment/machine-staff-cost/export")
+    public ResponseEntity<byte[]> exportMachineStaffCost(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<MachineStaffCostRow> rows = reportService.getMachineStaffCost(startDate, endDate);
+        String[] headers = {"Machine", "Equipment Type", "Work Order", "Client", "Operator Cost", "Cleaner Cost", "Total"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getMachine()), safe(r.getEquipmentType()), safe(r.getWorkOrderNumber()), safe(r.getClientName()),
+                r.getOperatorCost() != null ? r.getOperatorCost().toPlainString() : "0",
+                r.getCleanerCost() != null ? r.getCleanerCost().toPlainString() : "0",
+                r.getTotalCost() != null ? r.getTotalCost().toPlainString() : "0",
+        }).toList();
+        return export("machine-staff-cost", "Machine Staff Cost", headers, data, format);
+    }
+
     // ── Vehicle Master ────────────────────────────────────────────────────────
 
     @GetMapping("/vehicles/master")

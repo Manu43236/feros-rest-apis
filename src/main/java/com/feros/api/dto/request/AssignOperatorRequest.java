@@ -8,7 +8,8 @@ import lombok.Setter;
 @Setter
 public class AssignOperatorRequest {
     private OperatorType operatorType; // null = remove operator
-    private Long operatorStaffId;      // for OWN_STAFF
+    private Long operatorStaffId;      // for OWN_STAFF (user id)
     private String hiredOperatorName;  // for HIRED
     private String hiredOperatorPhone; // for HIRED (optional)
+    private boolean swap;              // release the staff from their current machine first
 }

@@ -115,4 +115,10 @@ public class WorkOrder extends BaseEntity {
 
     @Column(name = "job_description", columnDefinition = "TEXT")
     private String jobDescription;
+
+    // Shift-duty work order: work runs in defined shift windows (see WorkOrderShift); crew + pay are
+    // per-shift. Equipment mirror of VehicleLease.shiftDuty. Null/false = standing (non-shift) crew.
+    @Column(name = "shift_duty")
+    @Builder.Default
+    private Boolean shiftDuty = false;
 }
