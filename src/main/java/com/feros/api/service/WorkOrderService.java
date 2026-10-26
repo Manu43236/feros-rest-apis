@@ -27,7 +27,7 @@ import java.util.List;
 
 public interface WorkOrderService {
 
-    Page<WorkOrderResponse> getAll(int page, int size, WorkOrderStatus status, Long clientId);
+    Page<WorkOrderResponse> getAll(int page, int size, WorkOrderStatus status, Long clientId, String search);
 
     WorkOrderDetailResponse getById(Long id);
 

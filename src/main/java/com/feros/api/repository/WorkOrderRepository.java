@@ -15,10 +15,14 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
     @Query("SELECT w FROM WorkOrder w WHERE w.tenant.id = :tenantId AND w.isActive = true " +
            "AND (:status IS NULL OR w.status = :status) " +
-           "AND (:clientId IS NULL OR w.client.id = :clientId)")
+           "AND (:clientId IS NULL OR w.client.id = :clientId) " +
+           "AND (:search IS NULL OR LOWER(w.woNumber) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "     OR LOWER(w.client.clientName) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "     OR LOWER(w.site) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<WorkOrder> findAllPaged(@Param("tenantId") Long tenantId,
                                  @Param("status") WorkOrderStatus status,
                                  @Param("clientId") Long clientId,
+                                 @Param("search") String search,
                                  Pageable pageable);
 
     Optional<WorkOrder> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);

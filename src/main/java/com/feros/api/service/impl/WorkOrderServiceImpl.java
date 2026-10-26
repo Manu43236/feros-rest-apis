@@ -67,9 +67,10 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     // ── List ──────────────────────────────────────────────────────────────────
 
     @Override
-    public Page<WorkOrderResponse> getAll(int page, int size, WorkOrderStatus status, Long clientId) {
+    public Page<WorkOrderResponse> getAll(int page, int size, WorkOrderStatus status, Long clientId, String search) {
+        String q = (search != null && !search.isBlank()) ? search.trim() : null;
         return workOrderRepository
-                .findAllPaged(tenantId(), status, clientId, PageRequest.of(page, size))
+                .findAllPaged(tenantId(), status, clientId, q, PageRequest.of(page, size))
                 .map(wo -> toResponse(wo, machineAssignmentRepository.countByWorkOrderId(wo.getId())));
     }
 

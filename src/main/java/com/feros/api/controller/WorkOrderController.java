@@ -38,9 +38,10 @@ public class WorkOrderController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) WorkOrderStatus status,
-            @RequestParam(required = false) Long clientId) {
+            @RequestParam(required = false) Long clientId,
+            @RequestParam(required = false) String search) {
         return ResponseEntity.ok(ApiResponse.success("Work orders fetched",
-                workOrderService.getAll(page, size, status, clientId)));
+                workOrderService.getAll(page, size, status, clientId, search)));
     }
 
     @GetMapping("/{id}")
