@@ -48,6 +48,7 @@ class PayrollCalculationTest {
     @Mock private VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     @Mock private StaffVehicleDayResolver staffVehicleDayResolver;
     @Mock private LeaseShiftPayResolver leaseShiftPayResolver;
+    @Mock private com.feros.api.service.MachineShiftPayResolver machineShiftPayResolver;
     @Mock private LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     @Mock private TenantHolidayRepository tenantHolidayRepository;
     @Mock private NotificationService notificationService;
@@ -65,7 +66,7 @@ class PayrollCalculationTest {
             payrollRepository, payrollDeductionRepository, salaryAdvanceRepository,
             tenantRepository, userRepository, attendanceRepository,
             deductionTypeRepository, staffProfileRepository,
-            vehicleStaffAssignmentRepository, staffVehicleDayResolver, leaseShiftPayResolver, leaseDriverAssignmentLogRepository,
+            vehicleStaffAssignmentRepository, staffVehicleDayResolver, leaseShiftPayResolver, machineShiftPayResolver, leaseDriverAssignmentLogRepository,
             tenantHolidayRepository,
             notificationService, transactionManager, numberGenerator
         );
@@ -227,6 +228,9 @@ class PayrollCalculationTest {
         lenient().when(leaseShiftPayResolver.buildContext(anyLong(), any(), any()))
             .thenReturn(new LeaseShiftPayResolver.Context(java.util.Map.of()));
         lenient().when(leaseShiftPayResolver.isShiftDay(any(), anyLong(), any())).thenReturn(false);
+        lenient().when(machineShiftPayResolver.buildContext(anyLong(), any(), any()))
+            .thenReturn(new com.feros.api.service.MachineShiftPayResolver.Context(java.util.Map.of()));
+        lenient().when(machineShiftPayResolver.isShiftDay(any(), anyLong(), any())).thenReturn(false);
 
         Tenant tenant = new Tenant();
         tenant.setId(TENANT_ID);
