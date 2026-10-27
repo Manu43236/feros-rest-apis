@@ -1025,12 +1025,19 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .startMeter(req.getStartMeter())
                 .divisionName(assignment.getDivisionName()); // snapshot at start time
 
+        // An operator is mandatory to start a session — no silent operator-less sessions.
         if (req.getOperatorType() == OperatorType.OWN_STAFF) {
+            if (req.getOperatorStaffId() == null)
+                throw new FerosException("Assign an operator before starting a session.", HttpStatus.BAD_REQUEST);
             StaffProfile staff = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(req.getOperatorStaffId(), tenantId())
                     .orElseThrow(() -> new FerosException("Staff not found", HttpStatus.NOT_FOUND));
             builder.operatorStaff(staff);
-        } else {
+        } else if (req.getOperatorType() == OperatorType.HIRED) {
+            if (req.getHiredOperatorName() == null || req.getHiredOperatorName().isBlank())
+                throw new FerosException("Enter the hired operator's name before starting a session.", HttpStatus.BAD_REQUEST);
             builder.hiredOperatorName(req.getHiredOperatorName());
+        } else {
+            throw new FerosException("Assign an operator before starting a session.", HttpStatus.BAD_REQUEST);
         }
 
         WorkEntryResponse response = toWorkEntryResponse(workEntryRepository.save(builder.build()));
