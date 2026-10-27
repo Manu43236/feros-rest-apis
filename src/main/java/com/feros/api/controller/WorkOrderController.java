@@ -239,7 +239,7 @@ public class WorkOrderController {
     // ── KAN-19 Amendments ─────────────────────────────────────────────────────
 
     @GetMapping("/{id}/amendments")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<WoAmendmentResponse>>> getAmendments(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Amendments fetched", workOrderService.getAmendments(id)));
     }
