@@ -640,11 +640,11 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .endReason(a.getEndReason())
                 .isActive(a.getIsActive())
                 .operatorType(a.getOperatorType())
-                .operatorStaffId(a.getOperatorStaff() != null ? a.getOperatorStaff().getId() : null)
+                .operatorStaffId(a.getOperatorStaff() != null ? a.getOperatorStaff().getUser().getId() : null)
                 .operatorStaffName(a.getOperatorStaff() != null ? a.getOperatorStaff().getUser().getName() : null)
                 .hiredOperatorName(a.getHiredOperatorName())
                 .hiredOperatorPhone(a.getHiredOperatorPhone())
-                .cleanerStaffId(a.getCleanerStaff() != null ? a.getCleanerStaff().getId() : null)
+                .cleanerStaffId(a.getCleanerStaff() != null ? a.getCleanerStaff().getUser().getId() : null)
                 .cleanerStaffName(a.getCleanerStaff() != null ? a.getCleanerStaff().getUser().getName() : null)
                 .clientCleanerName(a.getClientCleanerName())
                 .activeWorkEntry(workEntryRepository
