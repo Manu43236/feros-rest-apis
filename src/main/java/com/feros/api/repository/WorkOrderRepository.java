@@ -18,7 +18,8 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
            "AND (:clientId IS NULL OR w.client.id = :clientId) " +
            "AND (:search IS NULL OR LOWER(w.woNumber) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "     OR LOWER(w.client.clientName) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "     OR LOWER(w.site) LIKE LOWER(CONCAT('%', :search, '%')))")
+           "     OR LOWER(w.site) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "ORDER BY w.id DESC")
     Page<WorkOrder> findAllPaged(@Param("tenantId") Long tenantId,
                                  @Param("status") WorkOrderStatus status,
                                  @Param("clientId") Long clientId,
