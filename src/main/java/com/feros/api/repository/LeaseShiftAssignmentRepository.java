@@ -65,4 +65,9 @@ public interface LeaseShiftAssignmentRepository extends JpaRepository<LeaseShift
             @Param("tenantId") Long tenantId,
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
+
+    // Future shift rows for ONE vehicle assignment — dropped on per-vehicle close so a
+    // closed vehicle can never pin its driver/cleaner or block their reassignment.
+    List<LeaseShiftAssignment> findByLeaseVehicleAssignmentIdAndWorkDateGreaterThanEqual(
+            Long leaseVehicleAssignmentId, LocalDate workDate);
 }

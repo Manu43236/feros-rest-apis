@@ -796,6 +796,13 @@ public class VehicleLeaseServiceImpl implements VehicleLeaseService {
         leaseCleanerLogRepository.findByLeaseVehicleAssignmentIdAndUnassignedAtIsNull(assignmentId)
                 .ifPresent(log -> log.setUnassignedAt(LocalDateTime.now()));
 
+        // Shift-duty leases: drop this vehicle's shift assignments from today forward so the
+        // closed vehicle can never pin its driver/cleaner or block reassignment. Past days
+        // stay for payroll. Mirrors the whole-lease close (updateStatus → CLOSED).
+        leaseShiftAssignmentRepository.deleteAll(
+                leaseShiftAssignmentRepository.findByLeaseVehicleAssignmentIdAndWorkDateGreaterThanEqual(
+                        assignmentId, LocalDate.now()));
+
         assignment.setIsActive(false);
         assignment.setEndDate(LocalDate.now());
         assignment.setOdometerAtEnd(odometerAtEnd);
