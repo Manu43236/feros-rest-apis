@@ -24,10 +24,12 @@ public class MachineShiftAssignmentResponse {
     private Long operatorStaffId;     // null = client's operator
     private String operatorName;
     private boolean clientOperator;
+    private String clientOperatorName;
 
     private Long cleanerStaffId;      // null = client's cleaner
     private String cleanerName;
     private boolean clientCleaner;
+    private String clientCleanerName;
 
     private BigDecimal operatorPay;
     private BigDecimal cleanerPay;

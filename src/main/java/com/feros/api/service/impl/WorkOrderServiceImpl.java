@@ -889,7 +889,9 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         if (isChangedStaff(oldCleaner, cleaner))   assertCleanerFreeOrSwap(cleaner, assignmentId, false);
 
         row.setOperatorStaff(operator);
+        row.setClientOperatorName(operator == null ? req.getClientOperatorName() : null);
         row.setCleanerStaff(cleaner);
+        row.setClientCleanerName(cleaner == null ? req.getClientCleanerName() : null);
         // Snapshot the shift pay at assignment time → later pay edits are forward-only
         row.setOperatorPaySnapshot(operator != null ? shift.getOperatorPay() : null);
         row.setCleanerPaySnapshot(cleaner != null ? shift.getCleanerPay() : null);
@@ -975,9 +977,11 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .operatorStaffId(a.getOperatorStaff() != null ? a.getOperatorStaff().getUser().getId() : null)
                 .operatorName(a.getOperatorStaff() != null ? a.getOperatorStaff().getUser().getName() : null)
                 .clientOperator(a.getOperatorStaff() == null)
+                .clientOperatorName(a.getClientOperatorName())
                 .cleanerStaffId(a.getCleanerStaff() != null ? a.getCleanerStaff().getUser().getId() : null)
                 .cleanerName(a.getCleanerStaff() != null ? a.getCleanerStaff().getUser().getName() : null)
                 .clientCleaner(a.getCleanerStaff() == null)
+                .clientCleanerName(a.getClientCleanerName())
                 .operatorPay(a.getOperatorPaySnapshot())
                 .cleanerPay(a.getCleanerPaySnapshot())
                 .build();
@@ -1025,7 +1029,6 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .startMeter(req.getStartMeter())
                 .divisionName(assignment.getDivisionName()); // snapshot at start time
 
-        // An operator is mandatory to start a session — no silent operator-less sessions.
         if (req.getOperatorType() == OperatorType.OWN_STAFF) {
             if (req.getOperatorStaffId() == null)
                 throw new FerosException("Assign an operator before starting a session.", HttpStatus.BAD_REQUEST);
@@ -1036,9 +1039,10 @@ public class WorkOrderServiceImpl implements WorkOrderService {
             if (req.getHiredOperatorName() == null || req.getHiredOperatorName().isBlank())
                 throw new FerosException("Enter the hired operator's name before starting a session.", HttpStatus.BAD_REQUEST);
             builder.hiredOperatorName(req.getHiredOperatorName());
-        } else {
+        } else if (req.getOperatorType() != OperatorType.CLIENT_PROVIDED) {
             throw new FerosException("Assign an operator before starting a session.", HttpStatus.BAD_REQUEST);
         }
+        // CLIENT_PROVIDED: client's operator runs the machine — no staff or name required
 
         WorkEntryResponse response = toWorkEntryResponse(workEntryRepository.save(builder.build()));
         Equipment eq = assignment.getEquipment();

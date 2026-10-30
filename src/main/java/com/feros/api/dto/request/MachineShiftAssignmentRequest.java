@@ -21,7 +21,9 @@ public class MachineShiftAssignmentRequest {
 
     // null = client's operator
     private Long operatorStaffId;
+    private String clientOperatorName;
 
     // null = client's cleaner
     private Long cleanerStaffId;
+    private String clientCleanerName;
 }

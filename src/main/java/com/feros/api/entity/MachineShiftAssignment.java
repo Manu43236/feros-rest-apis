@@ -45,10 +45,16 @@ public class MachineShiftAssignment extends BaseEntity {
     @JoinColumn(name = "operator_staff_id")
     private StaffProfile operatorStaff;
 
+    @Column(name = "client_operator_name", length = 100)
+    private String clientOperatorName;
+
     // null = client's cleaner (no payroll)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cleaner_staff_id")
     private StaffProfile cleanerStaff;
+
+    @Column(name = "client_cleaner_name", length = 100)
+    private String clientCleanerName;
 
     // Snapshotted from WorkOrderShift at assignment time → forward-only pay edits
     @Column(name = "operator_pay_snapshot", precision = 12, scale = 2)
