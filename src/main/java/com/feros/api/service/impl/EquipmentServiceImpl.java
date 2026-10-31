@@ -26,6 +26,7 @@ import com.feros.api.entity.EquipmentMeterReading;
 import com.feros.api.entity.MachineAssignment;
 import com.feros.api.entity.Tenant;
 import com.feros.api.entity.WorkOrder;
+import com.feros.api.enums.OperatorType;
 import com.feros.api.entity.master.EquipmentType;
 import com.feros.api.enums.EquipmentBreakdownStatus;
 import com.feros.api.enums.EquipmentOwnershipType;
@@ -755,6 +756,17 @@ public class EquipmentServiceImpl implements EquipmentService {
         var type = e.getEquipmentType();
         var model = type.getModel();
         var make = model.getMake();
+        // Current crew = operator/cleaner on the machine's active WO assignment (own staff or client's).
+        // ponytail: one lookup per machine; batch if the equipment list ever grows large.
+        MachineAssignment active = machineAssignmentRepository.findFirstByEquipmentIdAndIsActiveTrue(e.getId()).orElse(null);
+        String operatorName = null, cleanerName = null;
+        if (active != null) {
+            operatorName = active.getOperatorStaff() != null ? active.getOperatorStaff().getUser().getName()
+                    : active.getHiredOperatorName() != null ? active.getHiredOperatorName()
+                    : (active.getOperatorType() != null && active.getOperatorType() != OperatorType.OWN_STAFF ? "Client's operator" : null);
+            cleanerName = active.getCleanerStaff() != null ? active.getCleanerStaff().getUser().getName()
+                    : active.getClientCleanerName();
+        }
         return EquipmentResponse.builder()
                 .id(e.getId())
                 .equipmentTypeId(type.getId())
@@ -789,6 +801,8 @@ public class EquipmentServiceImpl implements EquipmentService {
                 .isActive(e.getIsActive())
                 .monthlyDepreciation(e.getMonthlyDepreciation())
                 .notes(e.getNotes())
+                .currentOperatorName(operatorName)
+                .currentCleanerName(cleanerName)
                 .createdAt(e.getCreatedAt())
                 .updatedAt(e.getUpdatedAt())
                 .build();

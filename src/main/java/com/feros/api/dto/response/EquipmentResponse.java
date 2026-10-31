@@ -58,6 +58,10 @@ public class EquipmentResponse {
     private BigDecimal monthlyDepreciation;
     private String notes;
 
+    // Current crew on the machine's active work-order assignment (mirrors vehicle currentDriver/cleaner).
+    private String currentOperatorName;
+    private String currentCleanerName;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
