@@ -57,6 +57,9 @@ public interface WorkOrderService {
     // Crew parity — shift-based assignment (mirror of lease shift assignment)
     MachineShiftAssignmentResponse assignMachineShift(Long workOrderId, Long assignmentId, MachineShiftAssignmentRequest request);
 
+    // Whole-shift clear — removes the operator AND cleaner for one shift/day (deletes the row).
+    void clearMachineShift(Long workOrderId, Long assignmentId, Long shiftId, LocalDate workDate);
+
     List<MachineShiftAssignmentResponse> getShiftAssignments(Long workOrderId, LocalDate from, LocalDate to);
 
     MachineAssignmentResponse assignDivision(Long workOrderId, Long assignmentId, AssignDivisionRequest request);

@@ -121,6 +121,17 @@ public class WorkOrderController {
         return ResponseEntity.ok(ApiResponse.success("Shift assigned", workOrderService.assignMachineShift(id, assignmentId, request)));
     }
 
+    @DeleteMapping("/{id}/machines/{assignmentId}/shift-assignments")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR')")
+    public ResponseEntity<ApiResponse<Void>> clearShift(
+            @PathVariable Long id,
+            @PathVariable Long assignmentId,
+            @RequestParam Long shiftId,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate workDate) {
+        workOrderService.clearMachineShift(id, assignmentId, shiftId, workDate);
+        return ResponseEntity.ok(ApiResponse.success("Shift crew cleared", null));
+    }
+
     @GetMapping("/{id}/shift-assignments")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF', 'SUPERVISOR')")
     public ResponseEntity<ApiResponse<List<com.feros.api.dto.response.MachineShiftAssignmentResponse>>> getShiftAssignments(

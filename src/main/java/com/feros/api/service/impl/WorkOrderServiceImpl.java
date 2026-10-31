@@ -911,6 +911,23 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     }
 
     @Override
+    @Transactional
+    public void clearMachineShift(Long workOrderId, Long assignmentId, Long shiftId, LocalDate workDate) {
+        machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
+                .orElseThrow(() -> new FerosException("Machine assignment not found", HttpStatus.NOT_FOUND));
+        machineShiftAssignmentRepository
+                .findByMachineAssignmentIdAndWorkOrderShiftIdAndWorkDate(assignmentId, shiftId, workDate)
+                .ifPresent(row -> {
+                    StaffProfile op = row.getOperatorStaff();
+                    StaffProfile cl = row.getCleanerStaff();
+                    machineShiftAssignmentRepository.delete(row);
+                    // Drop auto-created PENDING attendance if they no longer have any shift that day.
+                    clearStrayShiftAttendance(op, null, workDate);
+                    clearStrayShiftAttendance(cl, null, workDate);
+                });
+    }
+
+    @Override
     public List<MachineShiftAssignmentResponse> getShiftAssignments(Long workOrderId, LocalDate from, LocalDate to) {
         fetchWo(workOrderId);
         return machineShiftAssignmentRepository.findByWorkOrderIdAndWorkDateBetween(workOrderId, from, to)
