@@ -1029,20 +1029,20 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .startMeter(req.getStartMeter())
                 .divisionName(assignment.getDivisionName()); // snapshot at start time
 
+        // An operator type is mandatory, but the operator may be our staff OR the client's own.
+        // OWN_STAFF needs a staff member; a client/external operator just carries an optional name.
+        if (req.getOperatorType() == null)
+            throw new FerosException("Select an operator before starting a session.", HttpStatus.BAD_REQUEST);
         if (req.getOperatorType() == OperatorType.OWN_STAFF) {
             if (req.getOperatorStaffId() == null)
                 throw new FerosException("Assign an operator before starting a session.", HttpStatus.BAD_REQUEST);
             StaffProfile staff = staffProfileRepository.findByUserIdAndTenantIdAndIsActiveTrue(req.getOperatorStaffId(), tenantId())
                     .orElseThrow(() -> new FerosException("Staff not found", HttpStatus.NOT_FOUND));
             builder.operatorStaff(staff);
-        } else if (req.getOperatorType() == OperatorType.HIRED) {
-            if (req.getHiredOperatorName() == null || req.getHiredOperatorName().isBlank())
-                throw new FerosException("Enter the hired operator's name before starting a session.", HttpStatus.BAD_REQUEST);
+        } else {
+            // CLIENT_PROVIDED / HIRED — client's own or external operator; name optional, no payroll.
             builder.hiredOperatorName(req.getHiredOperatorName());
-        } else if (req.getOperatorType() != OperatorType.CLIENT_PROVIDED) {
-            throw new FerosException("Assign an operator before starting a session.", HttpStatus.BAD_REQUEST);
         }
-        // CLIENT_PROVIDED: client's operator runs the machine — no staff or name required
 
         WorkEntryResponse response = toWorkEntryResponse(workEntryRepository.save(builder.build()));
         Equipment eq = assignment.getEquipment();
