@@ -40,7 +40,8 @@ public class MachineShiftAssignment extends BaseEntity {
     @Column(name = "work_date", nullable = false)
     private LocalDate workDate;
 
-    // null = client's operator (no payroll)
+    // operatorStaff null + clientOperator true = client's own (no payroll);
+    // operatorStaff null + clientOperator false/null = no operator assigned on this shift.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "operator_staff_id")
     private StaffProfile operatorStaff;
@@ -48,13 +49,20 @@ public class MachineShiftAssignment extends BaseEntity {
     @Column(name = "client_operator_name", length = 100)
     private String clientOperatorName;
 
-    // null = client's cleaner (no payroll)
+    // Distinguishes "client's own operator" from "unassigned" when operatorStaff is null.
+    @Column(name = "client_operator")
+    private Boolean clientOperator;
+
+    // operatorStaff null + clientCleaner true = client's own; null/false = no cleaner assigned.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cleaner_staff_id")
     private StaffProfile cleanerStaff;
 
     @Column(name = "client_cleaner_name", length = 100)
     private String clientCleanerName;
+
+    @Column(name = "client_cleaner")
+    private Boolean clientCleaner;
 
     // Snapshotted from WorkOrderShift at assignment time → forward-only pay edits
     @Column(name = "operator_pay_snapshot", precision = 12, scale = 2)

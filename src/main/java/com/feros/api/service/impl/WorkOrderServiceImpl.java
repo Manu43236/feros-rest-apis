@@ -888,10 +888,15 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         if (isChangedStaff(oldOperator, operator)) assertOperatorFreeOrSwap(operator, assignmentId, false);
         if (isChangedStaff(oldCleaner, cleaner))   assertCleanerFreeOrSwap(cleaner, assignmentId, false);
 
+        // Three states each: own staff / client's own (clientOperator flag) / unassigned (neither).
+        boolean opClient = operator == null && req.isClientOperator();
+        boolean clClient = cleaner == null && req.isClientCleaner();
         row.setOperatorStaff(operator);
-        row.setClientOperatorName(operator == null ? req.getClientOperatorName() : null);
+        row.setClientOperator(opClient);
+        row.setClientOperatorName(opClient ? req.getClientOperatorName() : null);
         row.setCleanerStaff(cleaner);
-        row.setClientCleanerName(cleaner == null ? req.getClientCleanerName() : null);
+        row.setClientCleaner(clClient);
+        row.setClientCleanerName(clClient ? req.getClientCleanerName() : null);
         // Snapshot the shift pay at assignment time → later pay edits are forward-only
         row.setOperatorPaySnapshot(operator != null ? shift.getOperatorPay() : null);
         row.setCleanerPaySnapshot(cleaner != null ? shift.getCleanerPay() : null);
@@ -993,11 +998,15 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .workDate(a.getWorkDate())
                 .operatorStaffId(a.getOperatorStaff() != null ? a.getOperatorStaff().getUser().getId() : null)
                 .operatorName(a.getOperatorStaff() != null ? a.getOperatorStaff().getUser().getName() : null)
-                .clientOperator(a.getOperatorStaff() == null)
+                // Stored flag distinguishes client vs unassigned; old rows (null flag) fall back to
+                // "no staff = client" to preserve prior behaviour.
+                .clientOperator(a.getOperatorStaff() == null
+                        && (a.getClientOperator() != null ? a.getClientOperator() : true))
                 .clientOperatorName(a.getClientOperatorName())
                 .cleanerStaffId(a.getCleanerStaff() != null ? a.getCleanerStaff().getUser().getId() : null)
                 .cleanerName(a.getCleanerStaff() != null ? a.getCleanerStaff().getUser().getName() : null)
-                .clientCleaner(a.getCleanerStaff() == null)
+                .clientCleaner(a.getCleanerStaff() == null
+                        && (a.getClientCleaner() != null ? a.getClientCleaner() : true))
                 .clientCleanerName(a.getClientCleanerName())
                 .operatorPay(a.getOperatorPaySnapshot())
                 .cleanerPay(a.getCleanerPaySnapshot())

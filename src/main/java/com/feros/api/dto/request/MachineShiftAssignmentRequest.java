@@ -19,11 +19,14 @@ public class MachineShiftAssignmentRequest {
     @NotNull(message = "Work date is required")
     private LocalDate workDate;
 
-    // null = client's operator
+    // Operator: staffId set = own staff; staffId null + clientOperator true = client's own;
+    // staffId null + clientOperator false/absent = unassign the operator on this shift.
     private Long operatorStaffId;
     private String clientOperatorName;
+    private boolean clientOperator;
 
-    // null = client's cleaner
+    // Cleaner: same three states as operator.
     private Long cleanerStaffId;
     private String clientCleanerName;
+    private boolean clientCleaner;
 }
