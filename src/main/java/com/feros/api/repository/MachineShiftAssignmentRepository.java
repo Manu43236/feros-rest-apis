@@ -61,6 +61,17 @@ public interface MachineShiftAssignmentRepository extends JpaRepository<MachineS
     List<MachineShiftAssignment> findByOperatorUserIdAndWorkDate(
             @Param("userId") Long userId, @Param("date") LocalDate date);
 
+    // Cleaner's shift crew rows for a given day — attendance machine resolution.
+    @Query("""
+        SELECT a FROM MachineShiftAssignment a
+        JOIN FETCH a.machineAssignment ma
+        JOIN FETCH ma.equipment
+        WHERE a.cleanerStaff.user.id = :userId AND a.workDate = :date
+        ORDER BY a.workOrderShift.shiftNumber ASC
+        """)
+    List<MachineShiftAssignment> findByCleanerUserIdAndWorkDate(
+            @Param("userId") Long userId, @Param("date") LocalDate date);
+
     // Tenant-wide range load for the machine-day resolver + shift-pay resolver.
     @Query("""
         SELECT a FROM MachineShiftAssignment a

@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -53,6 +54,9 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
     private final com.feros.api.repository.LeaseCleanerAssignmentLogRepository leaseCleanerAssignmentLogRepository;
     private final com.feros.api.repository.LeaseShiftAssignmentRepository leaseShiftAssignmentRepository;
+    private final com.feros.api.repository.MachineOperatorAssignmentLogRepository machineOperatorAssignmentLogRepository;
+    private final com.feros.api.repository.MachineCleanerAssignmentLogRepository machineCleanerAssignmentLogRepository;
+    private final com.feros.api.repository.MachineShiftAssignmentRepository machineShiftAssignmentRepository;
 
     private Long getCurrentTenantId() {
         return SecurityUtil.getCurrentTenantId();
@@ -597,6 +601,29 @@ public class AttendanceServiceImpl implements AttendanceService {
         return mapToTripProofResponse(tripProofRepository.save(proof));
     }
 
+    /** Equipment reg/serial the user is on for a date — operator/cleaner standing log first,
+     *  then shift-duty crew (shift WOs keep crew only in MachineShiftAssignment). Null if on no machine. */
+    private String resolveMachineForUser(Long userId, Long tenantId, LocalDate date) {
+        LocalDateTime from = date.atStartOfDay(), to = date.atTime(23, 59, 59);
+        String m = machineOperatorAssignmentLogRepository
+                .findOverlappingByOperatorUserId(userId, tenantId, from, to).stream().findFirst()
+                .map(l -> equipmentLabel(l.getMachineAssignment().getEquipment())).orElse(null);
+        if (m == null) m = machineCleanerAssignmentLogRepository
+                .findOverlappingByCleanerUserId(userId, tenantId, from, to).stream().findFirst()
+                .map(l -> equipmentLabel(l.getMachineAssignment().getEquipment())).orElse(null);
+        if (m == null) m = machineShiftAssignmentRepository
+                .findByOperatorUserIdAndWorkDate(userId, date).stream().findFirst()
+                .map(s -> equipmentLabel(s.getMachineAssignment().getEquipment())).orElse(null);
+        if (m == null) m = machineShiftAssignmentRepository
+                .findByCleanerUserIdAndWorkDate(userId, date).stream().findFirst()
+                .map(s -> equipmentLabel(s.getMachineAssignment().getEquipment())).orElse(null);
+        return m;
+    }
+
+    private static String equipmentLabel(com.feros.api.entity.Equipment eq) {
+        return eq.getRegistrationNumber() != null ? eq.getRegistrationNumber() : eq.getSerialNumber();
+    }
+
     // ===================== MAPPERS =====================
     private AttendanceResponse mapToResponse(Attendance a) {
         return mapToResponse(a, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
@@ -665,6 +692,7 @@ public class AttendanceServiceImpl implements AttendanceService {
         return AttendanceResponse.builder()
                 // Only label when the shown vehicle IS the shift's vehicle — never pin a shift label
                 // onto a vehicle resolved from a VSA/order/standing-lease source.
+                .assignedMachineNumber(resolveMachineForUser(a.getUser().getId(), a.getTenant().getId(), a.getAttendanceDate()))
                 .shiftLabel(shift != null && shift.vehicleReg().equals(assignedVehicleNumber) ? shift.label() : null)
                 .id(a.getId())
                 .userId(a.getUser().getId())
