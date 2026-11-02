@@ -449,6 +449,9 @@ public class ReportServiceImpl implements ReportService {
                     add.accept(sa.getCleanerStaff(), sa.getWorkDate());
                 });
 
+        // Per-(user, date) equipment + machine-shift label for operators/cleaners on equipment.
+        Map<String, String[]> equipByUserDate = buildEquipmentByUserDate(tenantId, startDate, endDate);
+
         return records.stream().map(a -> {
             Double hoursWorked = null;
             if (a.getMarkedAt() != null && a.getMarkedOutAt() != null) {
@@ -456,14 +459,16 @@ public class ReportServiceImpl implements ReportService {
                 hoursWorked = Math.round(minutes / 60.0 * 100.0) / 100.0;
             }
             String shiftLabel = shiftLabelByUserDate.get(a.getUser().getId() + ":" + a.getAttendanceDate());
+            String[] equip = equipByUserDate.get(a.getUser().getId() + ":" + a.getAttendanceDate());
             boolean onLease = shiftLabel != null || leaseMap.containsKey(a.getUser().getId());
             return AttendanceDailyRow.builder()
                     .employeeId(a.getUser().getId())
                     .employeeName(a.getUser().getName())
                     .role(primaryRole(a.getUser()))
                     .vehicleRegistrationNumber(resolveVehicleForDate(userAssignments, leaseMap, leaseHolderByVehicle, leaseCleanerHolderByVehicle, shiftCtx, a.getUser().getId(), tenantId, a.getAttendanceDate()))
+                    .equipmentRegistrationNumber(equip != null ? equip[0] : null)
                     .isLease(onLease)
-                    .shiftLabel(shiftLabel)
+                    .shiftLabel(shiftLabel != null ? shiftLabel : (equip != null ? equip[1] : null))
                     .attendanceDate(a.getAttendanceDate())
                     .attendanceType(a.getAttendanceType().getName())
                     .markedAt(a.getMarkedAt())
@@ -474,6 +479,47 @@ public class ReportServiceImpl implements ReportService {
                     .remarks(a.getRemarks())
                     .build();
         }).toList();
+    }
+
+    /** "userId:date" → [equipmentLabel, machineShiftLabel|null] for operators/cleaners on equipment.
+     *  Standing logs win over shift (same precedence as AttendanceServiceImpl.resolveMachineForUser). */
+    private Map<String, String[]> buildEquipmentByUserDate(Long tenantId, LocalDate startDate, LocalDate endDate) {
+        Map<String, String[]> m = new HashMap<>();
+        // Machine-shift crew — single workDate, carries a shift label
+        for (com.feros.api.entity.MachineShiftAssignment a : machineShiftAssignmentRepository
+                .findOverlappingByTenantId(tenantId, startDate, endDate)) {
+            var s = a.getWorkOrderShift();
+            String label = equipLabel(a.getMachineAssignment().getEquipment());
+            String shift = "Shift " + s.getShiftNumber()
+                    + " (" + String.format("%02d:%02d", s.getStartTime().getHour(), s.getStartTime().getMinute())
+                    + "–" + String.format("%02d:%02d", s.getEndTime().getHour(), s.getEndTime().getMinute()) + ")";
+            if (a.getOperatorStaff() != null && a.getOperatorStaff().getUser() != null)
+                m.put(a.getOperatorStaff().getUser().getId() + ":" + a.getWorkDate(), new String[]{label, shift});
+            if (a.getCleanerStaff() != null && a.getCleanerStaff().getUser() != null)
+                m.put(a.getCleanerStaff().getUser().getId() + ":" + a.getWorkDate(), new String[]{label, shift});
+        }
+        // Standing operators/cleaners — no shift label; overwrite shift (logs win)
+        java.time.LocalDateTime from = startDate.atStartOfDay(), to = endDate.atTime(23, 59, 59);
+        for (com.feros.api.entity.MachineOperatorAssignmentLog l : machineOperatorLogRepository.findOverlappingByTenantId(tenantId, from, to))
+            putStandingEquip(m, l.getOperatorStaff(), l.getMachineAssignment().getEquipment(), l.getAssignedAt(), l.getUnassignedAt(), startDate, endDate);
+        for (com.feros.api.entity.MachineCleanerAssignmentLog l : machineCleanerLogRepository.findOverlappingByTenantId(tenantId, from, to))
+            putStandingEquip(m, l.getCleanerStaff(), l.getMachineAssignment().getEquipment(), l.getAssignedAt(), l.getUnassignedAt(), startDate, endDate);
+        return m;
+    }
+
+    private static void putStandingEquip(Map<String, String[]> m, com.feros.api.entity.StaffProfile sp,
+            com.feros.api.entity.Equipment eq, java.time.LocalDateTime assignedAt,
+            java.time.LocalDateTime unassignedAt, LocalDate startDate, LocalDate endDate) {
+        if (sp == null || sp.getUser() == null) return;
+        String label = equipLabel(eq);
+        LocalDate d = assignedAt.toLocalDate().isAfter(startDate) ? assignedAt.toLocalDate() : startDate;
+        LocalDate end = unassignedAt != null && unassignedAt.toLocalDate().isBefore(endDate) ? unassignedAt.toLocalDate() : endDate;
+        for (; !d.isAfter(end); d = d.plusDays(1))
+            m.put(sp.getUser().getId() + ":" + d, new String[]{label, null});
+    }
+
+    private static String equipLabel(com.feros.api.entity.Equipment eq) {
+        return eq.getRegistrationNumber() != null ? eq.getRegistrationNumber() : eq.getSerialNumber();
     }
 
     // ── 8. Attendance Monthly Summary ─────────────────────────────────────────────
