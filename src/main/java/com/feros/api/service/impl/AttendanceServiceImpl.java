@@ -304,6 +304,12 @@ public class AttendanceServiceImpl implements AttendanceService {
                 + "–" + String.format("%02d:%02d", s.getEndTime().getHour(), s.getEndTime().getMinute()) + ")";
     }
 
+    private static String shiftLabel(com.feros.api.entity.WorkOrderShift s) {
+        return "Shift " + s.getShiftNumber()
+                + " (" + String.format("%02d:%02d", s.getStartTime().getHour(), s.getStartTime().getMinute())
+                + "–" + String.format("%02d:%02d", s.getEndTime().getHour(), s.getEndTime().getMinute()) + ")";
+    }
+
     private static void mergeShift(Map<Long, ShiftInfo> m, Long userId, String reg, String label) {
         m.merge(userId, new ShiftInfo(reg, label),
                 (old, add) -> new ShiftInfo(old.vehicleReg(), old.label() + ", " + add.label()));
@@ -603,7 +609,11 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     /** Equipment reg/serial the user is on for a date — operator/cleaner standing log first,
      *  then shift-duty crew (shift WOs keep crew only in MachineShiftAssignment). Null if on no machine. */
-    private String resolveMachineForUser(Long userId, Long tenantId, LocalDate date) {
+    /** Equipment label + optional shift label. shiftLabel is non-null only when the machine
+     *  came from a MachineShiftAssignment (standing operator/cleaner logs have no shift). */
+    private record MachineInfo(String label, String shiftLabel) {}
+
+    private MachineInfo resolveMachineForUser(Long userId, Long tenantId, LocalDate date) {
         LocalDateTime from = date.atStartOfDay(), to = date.atTime(23, 59, 59);
         String m = machineOperatorAssignmentLogRepository
                 .findOverlappingByOperatorUserId(userId, tenantId, from, to).stream().findFirst()
@@ -611,13 +621,16 @@ public class AttendanceServiceImpl implements AttendanceService {
         if (m == null) m = machineCleanerAssignmentLogRepository
                 .findOverlappingByCleanerUserId(userId, tenantId, from, to).stream().findFirst()
                 .map(l -> equipmentLabel(l.getMachineAssignment().getEquipment())).orElse(null);
-        if (m == null) m = machineShiftAssignmentRepository
-                .findByOperatorUserIdAndWorkDate(userId, date).stream().findFirst()
-                .map(s -> equipmentLabel(s.getMachineAssignment().getEquipment())).orElse(null);
-        if (m == null) m = machineShiftAssignmentRepository
-                .findByCleanerUserIdAndWorkDate(userId, date).stream().findFirst()
-                .map(s -> equipmentLabel(s.getMachineAssignment().getEquipment())).orElse(null);
-        return m;
+        if (m != null) return new MachineInfo(m, null);
+
+        com.feros.api.entity.MachineShiftAssignment ms = machineShiftAssignmentRepository
+                .findByOperatorUserIdAndWorkDate(userId, date).stream().findFirst().orElse(null);
+        if (ms == null) ms = machineShiftAssignmentRepository
+                .findByCleanerUserIdAndWorkDate(userId, date).stream().findFirst().orElse(null);
+        if (ms != null) return new MachineInfo(
+                equipmentLabel(ms.getMachineAssignment().getEquipment()),
+                shiftLabel(ms.getWorkOrderShift()));
+        return new MachineInfo(null, null);
     }
 
     private static String equipmentLabel(com.feros.api.entity.Equipment eq) {
@@ -689,11 +702,13 @@ public class AttendanceServiceImpl implements AttendanceService {
             assignedVehicleNumber = shift.vehicleReg();
         }
 
+        // Shift label belongs to whatever is shown: vehicle if present (web: vehicle ?? machine),
+        // else the machine's shift. Vehicle label only pins when the shown vehicle IS the shift's vehicle.
+        MachineInfo machine = resolveMachineForUser(a.getUser().getId(), a.getTenant().getId(), a.getAttendanceDate());
+        String vehicleShiftLabel = shift != null && shift.vehicleReg().equals(assignedVehicleNumber) ? shift.label() : null;
         return AttendanceResponse.builder()
-                // Only label when the shown vehicle IS the shift's vehicle — never pin a shift label
-                // onto a vehicle resolved from a VSA/order/standing-lease source.
-                .assignedMachineNumber(resolveMachineForUser(a.getUser().getId(), a.getTenant().getId(), a.getAttendanceDate()))
-                .shiftLabel(shift != null && shift.vehicleReg().equals(assignedVehicleNumber) ? shift.label() : null)
+                .assignedMachineNumber(machine.label())
+                .shiftLabel(assignedVehicleNumber != null ? vehicleShiftLabel : machine.shiftLabel())
                 .id(a.getId())
                 .userId(a.getUser().getId())
                 .userName(a.getUser().getName())
