@@ -78,6 +78,7 @@ public class ReportServiceImpl implements ReportService {
     private final com.feros.api.repository.MachineShiftAssignmentRepository machineShiftAssignmentRepository;
     private final com.feros.api.repository.MachineOperatorAssignmentLogRepository machineOperatorLogRepository;
     private final com.feros.api.repository.MachineCleanerAssignmentLogRepository machineCleanerLogRepository;
+    private final com.feros.api.repository.EquipmentRepository equipmentRepository;
 
     // ── Equipment crew parity reports ───────────────────────────────────────────
 
@@ -2986,6 +2987,73 @@ public class ReportServiceImpl implements ReportService {
                 .empty(empty)
                 .rows(rows)
                 .build();
+    }
+
+    // ── Daily Machine Attendance (equipment crew: operator + cleaner) ───────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public DailyMachineAttendanceReport getDailyMachineAttendance(LocalDate date) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        List<com.feros.api.entity.Equipment> machines = equipmentRepository.findByTenantId(tenantId).stream()
+                .filter(e -> Boolean.TRUE.equals(e.getIsActive()))
+                .toList();
+
+        Map<String, String> operatorByMachine = new HashMap<>();
+        Map<String, String> cleanerByMachine = new HashMap<>();
+
+        // Shift crew — per-shift labelled "S{n} <name>", merged across shifts (operator + cleaner independently)
+        machineShiftAssignmentRepository.findOverlappingByTenantId(tenantId, date, date).stream()
+                .sorted(Comparator.comparingInt(a -> a.getWorkOrderShift().getShiftNumber()))
+                .forEach(a -> {
+                    String reg = equipLabel(a.getMachineAssignment().getEquipment());
+                    int sn = a.getWorkOrderShift().getShiftNumber();
+                    String op = crewName(a.getOperatorStaff(), a.getClientOperatorName());
+                    String cl = crewName(a.getCleanerStaff(), a.getClientCleanerName());
+                    if (op != null) operatorByMachine.merge(reg, "S" + sn + " " + op, (o, n) -> o + "\n" + n);
+                    if (cl != null) cleanerByMachine.merge(reg, "S" + sn + " " + cl, (o, n) -> o + "\n" + n);
+                });
+
+        // Standing crew — plain name; logs win (override shift), same precedence as the register
+        java.time.LocalDateTime from = date.atStartOfDay(), to = date.atTime(23, 59, 59);
+        for (com.feros.api.entity.MachineOperatorAssignmentLog l : machineOperatorLogRepository.findOverlappingByTenantId(tenantId, from, to))
+            if (l.getOperatorStaff() != null && l.getOperatorStaff().getUser() != null)
+                operatorByMachine.put(equipLabel(l.getMachineAssignment().getEquipment()), l.getOperatorStaff().getUser().getName());
+        for (com.feros.api.entity.MachineCleanerAssignmentLog l : machineCleanerLogRepository.findOverlappingByTenantId(tenantId, from, to))
+            if (l.getCleanerStaff() != null && l.getCleanerStaff().getUser() != null)
+                cleanerByMachine.put(equipLabel(l.getMachineAssignment().getEquipment()), l.getCleanerStaff().getUser().getName());
+
+        List<DailyMachineAttendanceRow> rows = machines.stream().map(m -> {
+            String reg = equipLabel(m);
+            return DailyMachineAttendanceRow.builder()
+                    .registrationNumber(reg)
+                    .equipmentType(m.getEquipmentType() != null ? m.getEquipmentType().getName() : "—")
+                    .operatorName(operatorByMachine.getOrDefault(reg, "—"))
+                    .cleanerName(cleanerByMachine.getOrDefault(reg, "—"))
+                    .build();
+        }).sorted(Comparator.comparing(r -> r.getRegistrationNumber() == null ? "" : r.getRegistrationNumber().toUpperCase())).toList();
+
+        int operators = (int) rows.stream().filter(r -> !"—".equals(r.getOperatorName())).count();
+        int cleaners = (int) rows.stream().filter(r -> !"—".equals(r.getCleanerName())).count();
+        int empty = (int) rows.stream().filter(r -> "—".equals(r.getOperatorName()) && "—".equals(r.getCleanerName())).count();
+
+        return DailyMachineAttendanceReport.builder()
+                .date(date)
+                .totalMachines(machines.size())
+                .operators(operators)
+                .cleaners(cleaners)
+                .unassigned(machines.size() - operators)
+                .empty(empty)
+                .rows(rows)
+                .build();
+    }
+
+    /** Own-staff name, else client-provided crew name tagged "(Client)", else null. */
+    private static String crewName(com.feros.api.entity.StaffProfile sp, String clientName) {
+        if (sp != null && sp.getUser() != null) return sp.getUser().getName();
+        if (clientName != null && !clientName.isBlank()) return clientName + " (Client)";
+        return null;
     }
 
     // ── Trip Summary ─────────────────────────────────────────────────────────

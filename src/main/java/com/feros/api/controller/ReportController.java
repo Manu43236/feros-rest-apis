@@ -1742,6 +1742,17 @@ public class ReportController {
                 reportService.getDailyFleetAttendance(reportDate, scope)));
     }
 
+    // ── Daily Machine Attendance (equipment crew: operator + cleaner) ─────────
+
+    @GetMapping("/equipment/daily-machine-attendance")
+    public ResponseEntity<ApiResponse<DailyMachineAttendanceReport>> getDailyMachineAttendance(
+            @RequestParam(required = false) @DateTimeFormat(pattern = DATE_FORMAT) LocalDate date) {
+        LocalDate reportDate = date != null ? date : TimeUtil.today();
+        return ResponseEntity.ok(ApiResponse.success(
+                "Daily machine attendance fetched",
+                reportService.getDailyMachineAttendance(reportDate)));
+    }
+
     // ── Trip Summary ─────────────────────────────────────────────────────────
 
     @GetMapping("/trips/summary")
