@@ -53,6 +53,10 @@ public class SparePartsTransaction {
     @JoinColumn(name = "service_part_id")
     private ServicePart servicePart;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "equipment_service_part_id")
+    private EquipmentServicePart equipmentServicePart;
+
     @Column(name = "supplier_name")
     private String supplierName;
 

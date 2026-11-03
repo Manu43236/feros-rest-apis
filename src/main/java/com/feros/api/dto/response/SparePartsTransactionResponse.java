@@ -5,6 +5,7 @@ import com.feros.api.enums.StockTransactionType;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
@@ -25,7 +26,10 @@ public class SparePartsTransactionResponse {
     private Long servicePartId;
     private String serviceNumber;
     private String vehicleRegistrationNumber;
+    private String equipmentName;
     private String supplierName;
+    private String invoiceNo;
+    private LocalDate invoiceDate;
     private String notes;
     private Long createdById;
     private String createdByName;

@@ -32,6 +32,7 @@ public class EquipmentServicePartServiceImpl implements EquipmentServicePartServ
     private final SparePartsInventoryRepository inventoryRepository;
     private final SparePartsTransactionRepository transactionRepository;
     private final UserRepository userRepository;
+    private final TenantSettingsRepository tenantSettingsRepository;
 
     private Long tenantId() { return SecurityUtil.getCurrentTenantId(); }
 
@@ -55,13 +56,59 @@ public class EquipmentServicePartServiceImpl implements EquipmentServicePartServ
             task = taskRepository.findById(request.getTaskId()).orElse(null);
         }
 
+        User user = currentUser();
+
+        // Mirror the vehicle flow: if requireSparePartApproval is off, auto-approve + issue immediately.
+        com.feros.api.entity.master.TenantSettings settings =
+                tenantSettingsRepository.findByTenantId(tid).orElse(null);
+        boolean autoApprove = settings == null || !Boolean.TRUE.equals(settings.getRequireSparePartApproval());
+
+        if (autoApprove) {
+            SparePartsInventory inv = inventoryRepository.findByTenantIdAndSparePartId(tid, part.getId())
+                    .orElseThrow(() -> new FerosException("No inventory record for this part", HttpStatus.NOT_FOUND));
+            if (inv.getQuantity() < request.getQuantityRequested())
+                throw new FerosException("Insufficient stock. Only " + inv.getQuantity() + " "
+                        + part.getName() + " available.", HttpStatus.BAD_REQUEST);
+
+            EquipmentServicePart esp = EquipmentServicePart.builder()
+                    .service(service).serviceTask(task).sparePart(part)
+                    .quantityRequested(request.getQuantityRequested())
+                    .quantityApproved(request.getQuantityRequested())
+                    .status(ServicePartStatus.APPROVED)
+                    .requestedBy(user).approvedBy(user).approvedAt(LocalDateTime.now())
+                    .isActive(true)
+                    .build();
+            esp = partRepository.save(esp);
+
+            inv.setQuantity(inv.getQuantity() - request.getQuantityRequested());
+            inv.setLastUpdated(LocalDateTime.now());
+            inventoryRepository.save(inv);
+
+            BigDecimal unitCost = transactionRepository
+                    .findTopByTenantIdAndSparePartIdAndReferenceTypeOrderByCreatedAtDesc(
+                            tid, part.getId(), StockReferenceType.PURCHASE)
+                    .map(SparePartsTransaction::getUnitCost).orElse(BigDecimal.ZERO);
+            transactionRepository.save(SparePartsTransaction.builder()
+                    .tenant(service.getTenant()).sparePart(part)
+                    .transactionType(StockTransactionType.OUT)
+                    .quantity(request.getQuantityRequested())
+                    .unitCost(unitCost)
+                    .totalCost(unitCost.multiply(BigDecimal.valueOf(request.getQuantityRequested())))
+                    .referenceType(StockReferenceType.SERVICE)
+                    .equipmentServicePart(esp)
+                    .notes("Auto-approved for equipment service: " + service.getServiceNumber())
+                    .createdBy(user).build());
+
+            return toResponse(esp);
+        }
+
         EquipmentServicePart esp = EquipmentServicePart.builder()
                 .service(service)
                 .serviceTask(task)
                 .sparePart(part)
                 .quantityRequested(request.getQuantityRequested())
                 .status(ServicePartStatus.REQUESTED)
-                .requestedBy(currentUser())
+                .requestedBy(user)
                 .isActive(true)
                 .build();
         return toResponse(partRepository.save(esp));
@@ -135,6 +182,7 @@ public class EquipmentServicePartServiceImpl implements EquipmentServicePartServ
                     .unitCost(unitCost)
                     .totalCost(unitCost.multiply(BigDecimal.valueOf(qty)))
                     .referenceType(StockReferenceType.SERVICE)
+                    .equipmentServicePart(esp)
                     .notes("Used in equipment service: " + esp.getService().getServiceNumber())
                     .createdBy(approver)
                     .build();

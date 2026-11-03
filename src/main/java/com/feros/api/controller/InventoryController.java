@@ -80,6 +80,14 @@ public class InventoryController {
         return ResponseEntity.ok(ApiResponse.success("Stock recorded successfully", null));
     }
 
+    @PutMapping("/stock/{sparePartId}/adjust")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> adjustStock(@PathVariable Long sparePartId,
+                                                         @Valid @RequestBody StockAdjustRequest request) {
+        inventoryService.adjustStock(sparePartId, request);
+        return ResponseEntity.ok(ApiResponse.success("Stock adjusted successfully", null));
+    }
+
     @PostMapping("/stock-in/bulk-invoice")
     @PreAuthorize("hasAnyRole('ADMIN', 'STORE_KEEPER')")
     public ResponseEntity<ApiResponse<BulkInvoiceStockInResponse>> bulkInvoiceStockIn(@Valid @RequestBody BulkInvoiceStockInRequest request) {

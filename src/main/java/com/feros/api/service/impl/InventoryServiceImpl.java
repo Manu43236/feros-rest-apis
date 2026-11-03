@@ -166,7 +166,47 @@ public class InventoryServiceImpl implements InventoryService {
                 .totalCost(totalCost)
                 .referenceType(StockReferenceType.PURCHASE)
                 .supplierName(request.getSupplierName())
+                .invoiceNo(request.getInvoiceNo())
+                .invoiceDate(request.getInvoiceDate())
                 .notes(request.getNotes())
+                .createdBy(user)
+                .build();
+        transactionRepository.save(tx);
+    }
+
+    @Override
+    @Transactional
+    public void adjustStock(Long sparePartId, StockAdjustRequest request) {
+        Long tenantId = getTenantId();
+        Tenant tenant = getTenant();
+        User user = getCurrentUser();
+
+        SparePart part = sparePartRepository.findByIdAndTenantIdAndIsActiveTrue(sparePartId, tenantId)
+                .orElseThrow(() -> new FerosException("Spare part not found", HttpStatus.NOT_FOUND));
+
+        SparePartsInventory inv = inventoryRepository.findByTenantIdAndSparePartId(tenantId, part.getId())
+                .orElseGet(() -> SparePartsInventory.builder().tenant(tenant).sparePart(part).quantity(0).build());
+
+        int oldQty = inv.getQuantity();
+        int newQty = request.getNewQuantity();
+        int delta = newQty - oldQty;
+
+        inv.setQuantity(newQty);
+        inv.setLastUpdated(TimeUtil.nowIst());
+        inventoryRepository.save(inv);
+
+        // Audit trail — record the correction as an ADJUSTMENT (never silently mutate)
+        BigDecimal unitCost = request.getUnitCost() != null ? request.getUnitCost() : BigDecimal.ZERO;
+        SparePartsTransaction tx = SparePartsTransaction.builder()
+                .tenant(tenant)
+                .sparePart(part)
+                .transactionType(delta >= 0 ? StockTransactionType.IN : StockTransactionType.OUT)
+                .quantity(Math.abs(delta))
+                .unitCost(unitCost)
+                .totalCost(unitCost.multiply(BigDecimal.valueOf(Math.abs(delta))))
+                .referenceType(StockReferenceType.ADJUSTMENT)
+                .notes("Admin adjustment: " + oldQty + " → " + newQty
+                        + (request.getReason() != null ? " — " + request.getReason() : ""))
                 .createdBy(user)
                 .build();
         transactionRepository.save(tx);
@@ -750,6 +790,10 @@ public class InventoryServiceImpl implements InventoryService {
 
     private SparePartsTransactionResponse toTransactionResponse(SparePartsTransaction tx) {
         ServicePart sp = tx.getServicePart();
+        EquipmentServicePart esp = tx.getEquipmentServicePart();
+        String serviceNumber = sp != null ? sp.getService().getServiceNumber()
+                : esp != null ? esp.getService().getServiceNumber() : null;
+        String equipmentName = esp != null ? esp.getService().getEquipment().getRegistrationNumber() : null;
         return SparePartsTransactionResponse.builder()
                 .id(tx.getId())
                 .sparePartId(tx.getSparePart().getId())
@@ -761,9 +805,12 @@ public class InventoryServiceImpl implements InventoryService {
                 .totalCost(tx.getTotalCost())
                 .referenceType(tx.getReferenceType())
                 .servicePartId(sp != null ? sp.getId() : null)
-                .serviceNumber(sp != null ? sp.getService().getServiceNumber() : null)
+                .serviceNumber(serviceNumber)
                 .vehicleRegistrationNumber(sp != null ? sp.getService().getVehicle().getRegistrationNumber() : null)
+                .equipmentName(equipmentName)
                 .supplierName(tx.getSupplierName())
+                .invoiceNo(tx.getInvoiceNo())
+                .invoiceDate(tx.getInvoiceDate())
                 .notes(tx.getNotes())
                 .createdById(tx.getCreatedBy().getId())
                 .createdByName(tx.getCreatedBy().getName())

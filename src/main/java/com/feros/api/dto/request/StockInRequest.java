@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -22,5 +23,7 @@ public class StockInRequest {
 
     private BigDecimal unitCost;
     private String supplierName;
+    private String invoiceNo;
+    private LocalDate invoiceDate;
     private String notes;
 }

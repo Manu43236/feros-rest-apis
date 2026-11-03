@@ -347,7 +347,7 @@ public class EquipmentController {
     // ── Service Parts (shared spare-parts inventory) ──────────────────────────
 
     @PostMapping("/{id}/services/{serviceId}/parts")
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICE_STAFF','SERVICE_MANAGER','TECHNICIAN')")
     public ResponseEntity<ApiResponse<EquipmentServicePartResponse>> requestPart(
             @PathVariable Long id, @PathVariable Long serviceId, @Valid @RequestBody ServicePartRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Part requested",
