@@ -200,6 +200,13 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         WorkOrder wo = fetchWo(id);
         validateTransition(wo.getStatus(), newStatus);
         wo.setStatus(newStatus);
+        // Finishing the job releases machine + crew: cascade-close every still-active assignment.
+        if (newStatus == WorkOrderStatus.COMPLETED || newStatus == WorkOrderStatus.CANCELLED) {
+            LocalDate today = LocalDate.now();
+            machineAssignmentRepository.findByWorkOrderIdOrderByStartDateAsc(id).stream()
+                    .filter(a -> Boolean.TRUE.equals(a.getIsActive()))
+                    .forEach(a -> releaseAssignment(a, today, AssignmentEndReason.COMPLETED));
+        }
         return toResponse(workOrderRepository.save(wo), machineAssignmentRepository.countByWorkOrderId(id));
     }
 
@@ -286,7 +293,13 @@ public class WorkOrderServiceImpl implements WorkOrderService {
             throw new FerosException("Work order not found", HttpStatus.NOT_FOUND);
         MachineAssignment assignment = machineAssignmentRepository.findByIdAndWorkOrderId(assignmentId, workOrderId)
                 .orElseThrow(() -> new FerosException("Assignment not found", HttpStatus.NOT_FOUND));
-        assignment.setEndDate(endDate != null ? endDate : LocalDate.now());
+        releaseAssignment(assignment, endDate != null ? endDate : LocalDate.now(), reason);
+    }
+
+    /** Close an assignment and release its machine + crew: deactivate, free the equipment, and
+     *  unassign the open operator/cleaner logs so the one-machine lock on them is lifted. */
+    private void releaseAssignment(MachineAssignment assignment, LocalDate endDate, AssignmentEndReason reason) {
+        assignment.setEndDate(endDate);
         assignment.setEndReason(reason);
         assignment.setIsActive(false);
         machineAssignmentRepository.save(assignment);
@@ -294,6 +307,12 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         Equipment eq = assignment.getEquipment();
         eq.setWorkStatus(EquipmentWorkStatus.AVAILABLE);
         equipmentRepository.save(eq);
+
+        LocalDateTime now = LocalDateTime.now();
+        machineOperatorLogRepository.findByMachineAssignmentIdAndUnassignedAtIsNull(assignment.getId())
+                .ifPresent(log -> log.setUnassignedAt(now));
+        machineCleanerLogRepository.findByMachineAssignmentIdAndUnassignedAtIsNull(assignment.getId())
+                .ifPresent(log -> log.setUnassignedAt(now));
     }
 
     // ── Daily Logs ────────────────────────────────────────────────────────────
