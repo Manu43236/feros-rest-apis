@@ -56,6 +56,10 @@ public class VehicleTyreFitting extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private TyreRemovalReason removalReason;
 
+    // Free-text "purpose" captured when removalReason == OTHER
+    @Column(name = "removal_reason_detail", columnDefinition = "TEXT")
+    private String removalReasonDetail;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "removed_by_user_id")
     private User removedBy;

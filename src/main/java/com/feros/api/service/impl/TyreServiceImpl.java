@@ -368,6 +368,7 @@ public class TyreServiceImpl implements TyreService {
         fitting.setRemovedAtKm(removedKm);
         fitting.setRemovedDate(request.getRemovedDate() != null ? request.getRemovedDate() : TimeUtil.today());
         fitting.setRemovalReason(request.getRemovalReason());
+        fitting.setRemovalReasonDetail(request.getRemovalReasonDetail());
         fitting.setRemovedBy(removedBy);
         fitting.setNotes(request.getNotes() != null ? request.getNotes() : fitting.getNotes());
 
@@ -776,6 +777,7 @@ public class TyreServiceImpl implements TyreService {
                 .removedAtKm(f.getRemovedAtKm())
                 .removedDate(f.getRemovedDate())
                 .removalReason(f.getRemovalReason())
+                .removalReasonDetail(f.getRemovalReasonDetail())
                 .removedById(f.getRemovedBy() != null ? f.getRemovedBy().getId() : null)
                 .removedByName(f.getRemovedBy() != null ? f.getRemovedBy().getName() : null)
                 .rotationLogId(f.getRotationLog() != null ? f.getRotationLog().getId() : null)

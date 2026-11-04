@@ -30,6 +30,7 @@ public class TyreFittingResponse {
     private BigDecimal removedAtKm;
     private LocalDate removedDate;
     private TyreRemovalReason removalReason;
+    private String removalReasonDetail;
     private Long removedById;
     private String removedByName;
     private Long rotationLogId;

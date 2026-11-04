@@ -11,6 +11,7 @@ public class TyreRemoveRequest {
     private BigDecimal removedAtKm;
     private LocalDate removedDate;
     private TyreRemovalReason removalReason;
+    private String removalReasonDetail;
     private String notes;
     private String retreaderName;
     private LocalDate expectedReturnDate;
