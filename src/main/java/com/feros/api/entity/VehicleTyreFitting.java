@@ -67,6 +67,10 @@ public class VehicleTyreFitting extends BaseEntity {
     @Column(name = "km_driven", insertable = false, updatable = false, precision = 12, scale = 2)
     private BigDecimal kmDriven;
 
+    // Repair cost booked when this fitting was removed for PUNCTURE / DAMAGE
+    @Column(name = "repair_cost", precision = 12, scale = 2)
+    private BigDecimal repairCost;
+
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 

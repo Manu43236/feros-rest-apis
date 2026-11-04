@@ -12,6 +12,7 @@ import com.feros.api.enums.ServiceTriggeredBy;
 import com.feros.api.enums.OrderPaymentStatus;
 import com.feros.api.enums.InvoiceStatus;
 import com.feros.api.enums.StockTransactionType;
+import com.feros.api.enums.TyreStatus;
 import com.feros.api.enums.TripScope;
 import com.feros.api.entity.Client;
 import com.feros.api.entity.Vehicle;
@@ -2481,6 +2482,87 @@ public class ReportServiceImpl implements ReportService {
                     .movements(movements)
                     .build();
         }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TyreCostPerKmRow> getTyreCostPerKm() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return tyreRepository.findByTenantIdAndIsActiveTrueOrderByIdDesc(tenantId).stream()
+                .map(t -> {
+                    double purchase  = t.getPurchaseCost() != null ? t.getPurchaseCost().doubleValue() : 0;
+                    double retread   = t.getTotalRetreadingCost() != null ? t.getTotalRetreadingCost().doubleValue() : 0;
+                    double repair    = t.getTotalRepairCost() != null ? t.getTotalRepairCost().doubleValue() : 0;
+                    double lifetime  = t.getTotalLifetimeKm() != null ? t.getTotalLifetimeKm().doubleValue() : 0;
+                    double atPurch   = t.getKmAtPurchase() != null ? t.getKmAtPurchase().doubleValue() : 0;
+                    double effective = purchase + retread + repair;
+                    double billable  = Math.max(0, lifetime - atPurch);
+                    Double costPerKm = (billable > 0 && effective > 0)
+                            ? Math.round(effective / billable * 100.0) / 100.0 : null;
+                    return TyreCostPerKmRow.builder()
+                            .tyreId(t.getId())
+                            .serialNumber(t.getSerialNumber())
+                            .brand(t.getBrand())
+                            .size(t.getSize())
+                            .tyreType(t.getTyreType() != null ? t.getTyreType().name() : "—")
+                            .status(t.getStatus() != null ? t.getStatus().name() : "—")
+                            .purchaseCost(purchase)
+                            .totalRetreadingCost(retread)
+                            .totalRepairCost(repair)
+                            .effectiveCost(effective)
+                            .billableKm(billable)
+                            .costPerKm(costPerKm)
+                            .build();
+                })
+                // Most expensive per km first; tyres with no cost/km yet sink to the bottom
+                .sorted(Comparator.comparingDouble((TyreCostPerKmRow r) ->
+                        r.getCostPerKm() != null ? r.getCostPerKm() : -1).reversed())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TyreReplacementRow> getTyreReplacementProjection() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        // Current fitting per tyre → live km using the vehicle's current odometer
+        Map<Long, VehicleTyreFitting> activeFittings = vehicleTyreFittingRepository
+                .findAllActiveFittingsByTenantId(tenantId).stream()
+                .collect(Collectors.toMap(f -> f.getTyre().getId(), f -> f, (a, b) -> a));
+
+        return tyreRepository.findByTenantIdAndStatusAndIsActiveTrueOrderByIdDesc(tenantId, TyreStatus.FITTED).stream()
+                .filter(t -> t.getMaxLifetimeKm() != null && t.getMaxLifetimeKm().doubleValue() > 0)
+                .map(t -> {
+                    VehicleTyreFitting fitting = activeFittings.get(t.getId());
+                    double lifetime = t.getTotalLifetimeKm() != null ? t.getTotalLifetimeKm().doubleValue() : 0;
+                    // Add in-progress km since the current fitting if the odometer is ahead
+                    if (fitting != null && fitting.getVehicle().getCurrentOdometerReading() != null
+                            && fitting.getFittedAtKm() != null) {
+                        double inProgress = fitting.getVehicle().getCurrentOdometerReading().doubleValue()
+                                - fitting.getFittedAtKm().doubleValue();
+                        if (inProgress > 0) lifetime += inProgress;
+                    }
+                    double maxKm = t.getMaxLifetimeKm().doubleValue();
+                    double remaining = Math.max(0, maxKm - lifetime);
+                    double pctUsed = Math.min(100.0, lifetime / maxKm * 100);
+                    String urgency = pctUsed >= 90 ? "HIGH" : pctUsed >= 75 ? "MEDIUM" : "LOW";
+                    return TyreReplacementRow.builder()
+                            .tyreId(t.getId())
+                            .serialNumber(t.getSerialNumber())
+                            .brand(t.getBrand())
+                            .size(t.getSize())
+                            .vehicleRegistration(fitting != null ? fitting.getVehicle().getRegistrationNumber() : "—")
+                            .positionCode(fitting != null && fitting.getPosition() != null ? fitting.getPosition().getPositionCode() : "—")
+                            .fittedDate(fitting != null ? fitting.getFittedDate() : null)
+                            .totalLifetimeKm(Math.round(lifetime * 10.0) / 10.0)
+                            .maxLifetimeKm(maxKm)
+                            .remainingKm(Math.round(remaining * 10.0) / 10.0)
+                            .percentLifeUsed(Math.round(pctUsed * 10.0) / 10.0)
+                            .urgency(urgency)
+                            .build();
+                })
+                .sorted(Comparator.comparingDouble(TyreReplacementRow::getPercentLifeUsed).reversed())
+                .toList();
     }
 
     // ── Payroll Reports ────────────────────────────────────────────────────────

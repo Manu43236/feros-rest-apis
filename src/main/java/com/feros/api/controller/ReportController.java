@@ -1542,6 +1542,45 @@ public class ReportController {
                 "Tyre Rotation Log — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── Tyre: Cost per KM ─────────────────────────────────────────────────────
+
+    @GetMapping("/tyres/cost-per-km")
+    public ResponseEntity<ApiResponse<List<TyreCostPerKmRow>>> getTyreCostPerKm() {
+        return ResponseEntity.ok(ApiResponse.success("Tyre cost per km fetched", reportService.getTyreCostPerKm()));
+    }
+
+    @GetMapping("/tyres/cost-per-km/export")
+    public ResponseEntity<byte[]> exportTyreCostPerKm(@RequestParam(defaultValue = "csv") String format) {
+        List<TyreCostPerKmRow> rows = reportService.getTyreCostPerKm();
+        String[] headers = {"Serial No.", "Brand", "Size", "Type", "Status", "Purchase Cost", "Retread Cost", "Repair Cost", "Effective Cost", "Billable KM", "Cost / KM"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getSerialNumber(), r.getBrand(), r.getSize(), r.getTyreType(), r.getStatus(),
+                String.valueOf(r.getPurchaseCost()), String.valueOf(r.getTotalRetreadingCost()),
+                String.valueOf(r.getTotalRepairCost()), String.valueOf(r.getEffectiveCost()),
+                String.valueOf(r.getBillableKm()), safe(r.getCostPerKm())
+        }).toList();
+        return export("tyre-cost-per-km", "Tyre Cost per KM", headers, data, format);
+    }
+
+    // ── Tyre: Replacement Forecast ────────────────────────────────────────────
+
+    @GetMapping("/tyres/replacement-forecast")
+    public ResponseEntity<ApiResponse<List<TyreReplacementRow>>> getTyreReplacementForecast() {
+        return ResponseEntity.ok(ApiResponse.success("Tyre replacement forecast fetched", reportService.getTyreReplacementProjection()));
+    }
+
+    @GetMapping("/tyres/replacement-forecast/export")
+    public ResponseEntity<byte[]> exportTyreReplacementForecast(@RequestParam(defaultValue = "csv") String format) {
+        List<TyreReplacementRow> rows = reportService.getTyreReplacementProjection();
+        String[] headers = {"Serial No.", "Brand", "Size", "Vehicle", "Position", "Fitted Date", "Lifetime KM", "Max KM", "Remaining KM", "% Used", "Urgency"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getSerialNumber(), r.getBrand(), r.getSize(), r.getVehicleRegistration(), r.getPositionCode(),
+                safe(r.getFittedDate()), String.valueOf(r.getTotalLifetimeKm()), String.valueOf(r.getMaxLifetimeKm()),
+                String.valueOf(r.getRemainingKm()), r.getPercentLifeUsed() + "%", r.getUrgency()
+        }).toList();
+        return export("tyre-replacement-forecast", "Tyre Replacement Forecast", headers, data, format);
+    }
+
     // ── Payroll Reports ────────────────────────────────────────────────────────
 
     @GetMapping("/payroll/summary")

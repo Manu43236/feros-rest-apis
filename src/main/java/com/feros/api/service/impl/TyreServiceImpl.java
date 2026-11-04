@@ -4,6 +4,7 @@ import com.feros.api.util.TimeUtil;
 import com.feros.api.dto.request.*;
 import com.feros.api.dto.response.*;
 import com.feros.api.entity.*;
+import com.feros.api.enums.TyrePositionType;
 import com.feros.api.enums.TyrePurchaseCondition;
 import com.feros.api.enums.TyreRemovalReason;
 import com.feros.api.enums.TyreStatus;
@@ -240,12 +241,14 @@ public class TyreServiceImpl implements TyreService {
 
     @Override
     public List<TyrePositionResponse> getPositionsForVehicle(Long vehicleId) {
+        getVehicle(vehicleId, SecurityUtil.getCurrentTenantId()); // ownership check
         return positionRepository.findByVehicleIdAndIsActiveTrueOrderByDisplayOrderAsc(vehicleId)
                 .stream().map(p -> toPositionResponse(p, null)).toList();
     }
 
     @Override
     public List<TyrePositionResponse> getCurrentPositionsForVehicle(Long vehicleId) {
+        getVehicle(vehicleId, SecurityUtil.getCurrentTenantId()); // ownership check
         List<VehicleTyrePosition> positions = positionRepository
                 .findByVehicleIdAndIsActiveTrueOrderByDisplayOrderAsc(vehicleId);
 
@@ -322,7 +325,7 @@ public class TyreServiceImpl implements TyreService {
                 .vehicle(vehicle)
                 .tyre(tyre)
                 .position(position)
-                .fittedAtKm(request.getFittedAtKm() != null ? request.getFittedAtKm() : java.math.BigDecimal.ZERO)
+                .fittedAtKm(resolveKm(request.getFittedAtKm(), vehicle))
                 .fittedDate(request.getFittedDate() != null ? request.getFittedDate() : TimeUtil.today())
                 .fittedBy(fittedBy)
                 .notes(request.getNotes())
@@ -361,18 +364,26 @@ public class TyreServiceImpl implements TyreService {
 
         User removedBy = getUser(userId);
 
-        fitting.setRemovedAtKm(request.getRemovedAtKm());
+        BigDecimal removedKm = resolveKm(request.getRemovedAtKm(), fitting.getVehicle());
+        fitting.setRemovedAtKm(removedKm);
         fitting.setRemovedDate(request.getRemovedDate() != null ? request.getRemovedDate() : TimeUtil.today());
         fitting.setRemovalReason(request.getRemovalReason());
         fitting.setRemovedBy(removedBy);
         fitting.setNotes(request.getNotes() != null ? request.getNotes() : fitting.getNotes());
 
+        // Book repair cost for puncture/damage removals (tyre returns to stock repaired)
+        if (request.getRepairCost() != null
+                && (request.getRemovalReason() == TyreRemovalReason.PUNCTURE
+                    || request.getRemovalReason() == TyreRemovalReason.DAMAGE)) {
+            fitting.setRepairCost(request.getRepairCost());
+        }
+
         fittingRepository.save(fitting);
 
-        // Accumulate km on tyre
+        // Accumulate km on tyre (spare positions never touch the road)
         Tyre tyre = fitting.getTyre();
-        if (request.getRemovedAtKm() != null && fitting.getFittedAtKm() != null) {
-            BigDecimal km = request.getRemovedAtKm().subtract(fitting.getFittedAtKm());
+        if (accruesKm(fitting) && fitting.getFittedAtKm() != null) {
+            BigDecimal km = removedKm.subtract(fitting.getFittedAtKm());
             if (km.compareTo(BigDecimal.ZERO) > 0) {
                 tyre.setTotalLifetimeKm(tyre.getTotalLifetimeKm().add(km));
             }
@@ -385,10 +396,16 @@ public class TyreServiceImpl implements TyreService {
             tyre.setRetreadCount(tyre.getRetreadCount() + 1);
             tyre.setRetreaderName(request.getRetreaderName());
             tyre.setExpectedReturnDate(request.getExpectedReturnDate());
-        } else if (reason == TyreRemovalReason.SCRAP) {
+        } else if (reason == TyreRemovalReason.SCRAP || reason == TyreRemovalReason.WORN) {
             tyre.setStatus(TyreStatus.SCRAPPED);
         } else {
             tyre.setStatus(TyreStatus.IN_STOCK);
+        }
+
+        // Accumulate repair cost on the tyre (feeds cost-per-km)
+        if (fitting.getRepairCost() != null) {
+            BigDecimal base = tyre.getTotalRepairCost() != null ? tyre.getTotalRepairCost() : BigDecimal.ZERO;
+            tyre.setTotalRepairCost(base.add(fitting.getRepairCost()));
         }
         tyreRepository.save(tyre);
 
@@ -397,12 +414,14 @@ public class TyreServiceImpl implements TyreService {
 
     @Override
     public List<TyreFittingResponse> getFittingHistory(Long vehicleId) {
+        getVehicle(vehicleId, SecurityUtil.getCurrentTenantId()); // ownership check
         return fittingRepository.findByVehicleIdAndIsActiveTrueOrderByFittedDateDescIdDesc(vehicleId)
                 .stream().map(this::toFittingResponse).toList();
     }
 
     @Override
     public List<TyreFittingResponse> getTyreHistory(Long tyreId) {
+        findTyre(tyreId, SecurityUtil.getCurrentTenantId()); // ownership check
         return fittingRepository.findByTyreIdAndIsActiveTrueOrderByFittedDateDescIdDesc(tyreId)
                 .stream().map(this::toFittingResponse).toList();
     }
@@ -432,12 +451,18 @@ public class TyreServiceImpl implements TyreService {
             }
         }
 
+        BigDecimal odometerKm = request.getOdometerKm() != null
+                ? request.getOdometerKm() : vehicle.getCurrentOdometerReading();
+        if (odometerKm == null) {
+            throw new FerosException("Odometer reading is required for rotation", HttpStatus.BAD_REQUEST);
+        }
+
         // Create rotation log header
         TyreRotationLog rotationLog = TyreRotationLog.builder()
                 .tenant(tenant)
                 .vehicle(vehicle)
                 .rotationDate(request.getRotationDate() != null ? request.getRotationDate() : TimeUtil.today())
-                .odometerKm(request.getOdometerKm())
+                .odometerKm(odometerKm)
                 .performedBy(performedBy)
                 .notes(request.getNotes())
                 .isActive(true)
@@ -456,16 +481,16 @@ public class TyreServiceImpl implements TyreService {
                     .findByPositionIdAndRemovedDateIsNullAndIsActiveTrue(fromPos.getId())
                     .orElseThrow(() -> new FerosException("No active fitting found for position: " + fromPos.getPositionCode(), HttpStatus.NOT_FOUND));
 
-            oldFitting.setRemovedAtKm(request.getOdometerKm());
+            oldFitting.setRemovedAtKm(odometerKm);
             oldFitting.setRemovedDate(request.getRotationDate() != null ? request.getRotationDate() : TimeUtil.today());
             oldFitting.setRemovalReason(TyreRemovalReason.ROTATION);
             oldFitting.setRemovedBy(performedBy);
             oldFitting.setRotationLog(rotationLog);
             fittingRepository.save(oldFitting);
 
-            // Accumulate km on tyre
-            if (oldFitting.getFittedAtKm() != null) {
-                BigDecimal km = request.getOdometerKm().subtract(oldFitting.getFittedAtKm());
+            // Accumulate km on tyre (spare positions never touch the road)
+            if (accruesKm(oldFitting) && oldFitting.getFittedAtKm() != null) {
+                BigDecimal km = odometerKm.subtract(oldFitting.getFittedAtKm());
                 if (km.compareTo(BigDecimal.ZERO) > 0) {
                     tyre.setTotalLifetimeKm(tyre.getTotalLifetimeKm().add(km));
                 }
@@ -477,7 +502,7 @@ public class TyreServiceImpl implements TyreService {
                     .vehicle(vehicle)
                     .tyre(tyre)
                     .position(toPos)
-                    .fittedAtKm(request.getOdometerKm())
+                    .fittedAtKm(odometerKm)
                     .fittedDate(request.getRotationDate() != null ? request.getRotationDate() : TimeUtil.today())
                     .fittedBy(performedBy)
                     .rotationLog(rotationLog)
@@ -502,13 +527,14 @@ public class TyreServiceImpl implements TyreService {
                 Arrays.asList(RoleName.ADMIN, RoleName.SUPERVISOR),
                 com.feros.api.enums.NotificationType.TYRE_ROTATION,
                 "Tyre Rotation Performed",
-                "Tyre rotation performed on " + vehicle.getRegistrationNumber() + " — " + items.size() + " tyre(s) rotated at " + String.format("%,.0f", request.getOdometerKm()) + " km");
+                "Tyre rotation performed on " + vehicle.getRegistrationNumber() + " — " + items.size() + " tyre(s) rotated at " + String.format("%,.0f", odometerKm) + " km");
 
         return toRotationLogResponse(rotationLog, items);
     }
 
     @Override
     public List<TyreRotationLogResponse> getRotationHistory(Long vehicleId) {
+        getVehicle(vehicleId, SecurityUtil.getCurrentTenantId()); // ownership check
         return rotationLogRepository.findByVehicleIdAndIsActiveTrueOrderByRotationDateDescIdDesc(vehicleId)
                 .stream().map(log -> {
                     List<TyreRotationItem> items = rotationItemRepository.findByRotationLogIdOrderById(log.getId());
@@ -637,6 +663,18 @@ public class TyreServiceImpl implements TyreService {
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
     }
 
+    /** Use the provided km if present, else the vehicle's current odometer, else ZERO. */
+    private BigDecimal resolveKm(BigDecimal provided, Vehicle vehicle) {
+        if (provided != null) return provided;
+        BigDecimal odometer = vehicle.getCurrentOdometerReading();
+        return odometer != null ? odometer : BigDecimal.ZERO;
+    }
+
+    /** Spare-position tyres do not touch the road, so they must not accrue running km. */
+    private boolean accruesKm(VehicleTyreFitting fitting) {
+        return fitting.getPosition().getPositionType() != TyrePositionType.SPARE;
+    }
+
     private BigDecimal effectiveTotalKm(Tyre tyre, VehicleTyreFitting fitting) {
         if (fitting == null) return tyre.getTotalLifetimeKm();
         BigDecimal currentOdometer = fitting.getVehicle().getCurrentOdometerReading();
@@ -674,6 +712,7 @@ public class TyreServiceImpl implements TyreService {
                 .purchaseCondition(tyre.getPurchaseCondition())
                 .kmAtPurchase(tyre.getKmAtPurchase())
                 .totalRetreadingCost(tyre.getTotalRetreadingCost())
+                .totalRepairCost(tyre.getTotalRepairCost())
                 .scrapReason(tyre.getScrapReason())
                 .scrapDate(tyre.getScrapDate())
                 .supplierName(tyre.getSupplierName())

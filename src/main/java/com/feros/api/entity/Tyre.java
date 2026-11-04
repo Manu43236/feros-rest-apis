@@ -99,6 +99,11 @@ public class Tyre extends BaseEntity {
     @Column(name = "total_retreading_cost", precision = 12, scale = 2)
     private BigDecimal totalRetreadingCost = BigDecimal.ZERO;
 
+    // Cumulative puncture/damage repair cost across the tyre's life
+    @Builder.Default
+    @Column(name = "total_repair_cost", precision = 12, scale = 2)
+    private BigDecimal totalRepairCost = BigDecimal.ZERO;
+
     // Reason and date when directly scrapped (without vehicle removal)
     @Column(name = "scrap_reason")
     private String scrapReason;

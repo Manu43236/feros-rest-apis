@@ -116,10 +116,20 @@ public class TyreRequestServiceImpl implements TyreRequestService {
         User approvedBy = userRepository.findById(userId)
                 .orElseThrow(() -> new FerosException("User not found", HttpStatus.NOT_FOUND));
 
-        // Auto-select the oldest IN_STOCK tyre (FIFO)
-        Tyre issuedTyre = tyreRepository.findFirstByTenantIdAndStatusAndIsActiveTrueOrderByIdAsc(
-                        tenantId, TyreStatus.IN_STOCK)
-                .orElseThrow(() -> new FerosException("No tyres available in stock", HttpStatus.BAD_REQUEST));
+        // Use the store keeper's chosen tyre, else fall back to the oldest IN_STOCK (FIFO)
+        Tyre issuedTyre;
+        if (request != null && request.getTyreId() != null) {
+            issuedTyre = tyreRepository.findById(request.getTyreId())
+                    .filter(t -> t.getTenant().getId().equals(tenantId) && Boolean.TRUE.equals(t.getIsActive()))
+                    .orElseThrow(() -> new FerosException("Selected tyre not found", HttpStatus.NOT_FOUND));
+            if (issuedTyre.getStatus() != TyreStatus.IN_STOCK) {
+                throw new FerosException("Selected tyre is not available (status: " + issuedTyre.getStatus() + ")", HttpStatus.CONFLICT);
+            }
+        } else {
+            issuedTyre = tyreRepository.findFirstByTenantIdAndStatusAndIsActiveTrueOrderByIdAsc(
+                            tenantId, TyreStatus.IN_STOCK)
+                    .orElseThrow(() -> new FerosException("No tyres available in stock", HttpStatus.BAD_REQUEST));
+        }
 
         // Create the fitting via TyreService — handles all validations + notifications
         TyreFitRequest fitRequest = new TyreFitRequest();

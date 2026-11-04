@@ -106,6 +106,8 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
     List<TyreLifeRow> getTyreLifeReport();
     List<TyreRequestRow> getTyreRequests(LocalDate startDate, LocalDate endDate);
     List<TyreRotationRow> getTyreRotationLog(LocalDate startDate, LocalDate endDate);
+    List<TyreCostPerKmRow> getTyreCostPerKm();
+    List<TyreReplacementRow> getTyreReplacementProjection();
 
     // ── Payroll Reports ────────────────────────────────────────────────────────
     VehiclePayrollCostResponse getVehiclePayrollCost(Long vehicleId, String role, LocalDate startDate, LocalDate endDate);

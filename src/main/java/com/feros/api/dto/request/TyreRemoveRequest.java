@@ -14,4 +14,5 @@ public class TyreRemoveRequest {
     private String notes;
     private String retreaderName;
     private LocalDate expectedReturnDate;
+    private BigDecimal repairCost;
 }

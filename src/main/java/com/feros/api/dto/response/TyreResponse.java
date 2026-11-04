@@ -41,6 +41,7 @@ public class TyreResponse {
     private BigDecimal kmAtPurchase;
     // Retread cost tracking
     private BigDecimal totalRetreadingCost;
+    private BigDecimal totalRepairCost;
     // Scrap info (populated when directly scrapped)
     private String scrapReason;
     private LocalDate scrapDate;
