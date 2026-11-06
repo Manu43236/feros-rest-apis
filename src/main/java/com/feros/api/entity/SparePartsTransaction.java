@@ -57,6 +57,11 @@ public class SparePartsTransaction {
     @JoinColumn(name = "equipment_service_part_id")
     private EquipmentServicePart equipmentServicePart;
 
+    // Vehicle this stock was issued against (e.g. DEF/consumable top-up). Nullable — only set for CONSUMABLE issues.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehicle_id")
+    private Vehicle vehicle;
+
     @Column(name = "supplier_name")
     private String supplierName;
 
