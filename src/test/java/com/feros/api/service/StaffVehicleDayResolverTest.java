@@ -60,7 +60,8 @@ class StaffVehicleDayResolverTest {
 
         var ctx = new StaffVehicleDayResolver.Context(
                 Map.of(UID, List.of(vsa)),
-                Map.of(UID, ts5428),   // collapsed lease vehicle for Ramana = phantom TS5428
+                List.of(span(UID, ts5428, DATE.minusDays(5), null)), // phantom lease span on TS5428
+                List.of(),
                 Map.of(2L, UID),       // TS5428 held by Ramana
                 Map.of(), NO_SHIFT);
 
@@ -72,8 +73,27 @@ class StaffVehicleDayResolverTest {
     @DisplayName("pure-lease driver (no VSA) → falls back to the lease vehicle")
     void pureLease_returnsLeaseVehicle() {
         Vehicle ts5428 = vehicle(2L, "AP39TS5428");
-        var ctx = new StaffVehicleDayResolver.Context(Map.of(), Map.of(UID, ts5428), Map.of(2L, UID), Map.of(), NO_SHIFT);
+        var ctx = new StaffVehicleDayResolver.Context(
+                Map.of(), List.of(span(UID, ts5428, DATE.minusDays(5), null)), List.of(),
+                Map.of(2L, UID), Map.of(), NO_SHIFT);
         assertThat(resolver.resolve(ctx, UID, T, DATE)).isEqualTo(ts5428);
+    }
+
+    @Test
+    @DisplayName("shared lease vehicle: another driver took it LATER in the period → this driver still resolves for his own day")
+    void sharedLeaseVehicle_perDayHolderWins() {
+        Vehicle shared = vehicle(2L, "AP31TH0056");
+        // Bora holds it on DATE; another driver takes it the next day (later assignedAt). The old
+        // period-wide collapse dropped Bora entirely; the per-day resolver must still return it for DATE.
+        var ctx = new StaffVehicleDayResolver.Context(
+                Map.of(),
+                List.of(
+                        span(UID, shared, DATE, DATE),                 // Bora: this day
+                        span(200L, shared, DATE.plusDays(1), null)),   // other driver: next day onward
+                List.of(), Map.of(2L, 200L), Map.of(), NO_SHIFT);
+        assertThat(resolver.resolve(ctx, UID, T, DATE)).isEqualTo(shared);
+        // And on the handover day, the later-assigned driver wins.
+        assertThat(resolver.resolve(ctx, UID, T, DATE.minusDays(1))).isNull();
     }
 
     @Test
@@ -85,7 +105,7 @@ class StaffVehicleDayResolverTest {
         OrderStaffAllocation osa = OrderStaffAllocation.builder().vehicleAllocation(ova).build();
         when(orderStaffAllocationRepository.findActiveOnDateForUser(UID, T, DATE)).thenReturn(List.of(osa));
 
-        var ctx = new StaffVehicleDayResolver.Context(Map.of(), Map.of(), Map.of(), Map.of(), NO_SHIFT);
+        var ctx = new StaffVehicleDayResolver.Context(Map.of(), List.of(), List.of(), Map.of(), Map.of(), NO_SHIFT);
         assertThat(resolver.resolve(ctx, UID, T, DATE)).isEqualTo(ord);
     }
 
@@ -97,7 +117,7 @@ class StaffVehicleDayResolverTest {
         VehicleStaffAssignment theirs = vsa(driver(200L), a, DATE.minusDays(1), null); // later assignedFrom
 
         var ctx = new StaffVehicleDayResolver.Context(
-                Map.of(UID, List.of(mine), 200L, List.of(theirs)), Map.of(), Map.of(), Map.of(), NO_SHIFT);
+                Map.of(UID, List.of(mine), 200L, List.of(theirs)), List.of(), List.of(), Map.of(), Map.of(), NO_SHIFT);
         assertThat(resolver.resolve(ctx, UID, T, DATE)).isNull();
     }
 
@@ -107,23 +127,25 @@ class StaffVehicleDayResolverTest {
         Vehicle a = vehicle(1L, "A");
         VehicleStaffAssignment mine = vsa(driver(UID), a, DATE.minusDays(5), null);
         var ctx = new StaffVehicleDayResolver.Context(
-                Map.of(UID, List.of(mine)), Map.of(), Map.of(1L, 999L), Map.of(), NO_SHIFT); // A held by user 999
+                Map.of(UID, List.of(mine)), List.of(), List.of(), Map.of(1L, 999L), Map.of(), NO_SHIFT); // A held by user 999
         assertThat(resolver.resolve(ctx, UID, T, DATE)).isNull();
     }
 
     @Test
     @DisplayName("nothing covers the day → null (no vehicle allowance)")
     void nothing_returnsNull() {
-        var ctx = new StaffVehicleDayResolver.Context(Map.of(), Map.of(), Map.of(), Map.of(), NO_SHIFT);
+        var ctx = new StaffVehicleDayResolver.Context(Map.of(), List.of(), List.of(), Map.of(), Map.of(), NO_SHIFT);
         assertThat(resolver.resolve(ctx, UID, T, DATE)).isNull();
     }
 
     @Test
-    @DisplayName("pure-lease CLEANER (no VSA) → falls back to the lease vehicle (4th Context map)")
+    @DisplayName("pure-lease CLEANER (no VSA) → falls back to the lease vehicle (cleaner spans)")
     void pureLeaseCleaner_returnsLeaseVehicle() {
         Vehicle ts5428 = vehicle(2L, "AP39TS5428");
-        // cleaner's lease vehicle is merged into leaseVehicleByUser; cleaner holder map drives displacement
-        var ctx = new StaffVehicleDayResolver.Context(Map.of(), Map.of(UID, ts5428), Map.of(), Map.of(2L, UID), NO_SHIFT);
+        // cleaner's lease vehicle lives in cleanerSpans; cleaner holder map drives displacement
+        var ctx = new StaffVehicleDayResolver.Context(
+                Map.of(), List.of(), List.of(span(UID, ts5428, DATE.minusDays(5), null)),
+                Map.of(), Map.of(2L, UID), NO_SHIFT);
         assertThat(resolver.resolve(ctx, UID, T, DATE)).isEqualTo(ts5428);
     }
 
@@ -134,11 +156,15 @@ class StaffVehicleDayResolverTest {
         VehicleStaffAssignment mine = vsa(cleaner(UID), a, DATE.minusDays(5), null);
         // A held (via lease cleaner log) by user 999 → cleaner holder map, not the driver one
         var ctx = new StaffVehicleDayResolver.Context(
-                Map.of(UID, List.of(mine)), Map.of(), Map.of(), Map.of(1L, 999L), NO_SHIFT);
+                Map.of(UID, List.of(mine)), List.of(), List.of(), Map.of(), Map.of(1L, 999L), NO_SHIFT);
         assertThat(resolver.resolve(ctx, UID, T, DATE)).isNull();
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
+
+    private static StaffVehicleDayResolver.LeaseSpan span(Long userId, Vehicle v, LocalDate from, LocalDate to) {
+        return new StaffVehicleDayResolver.LeaseSpan(userId, v.getId(), v, from, to, from.atStartOfDay());
+    }
 
     private static User cleaner(Long id) {
         Role r = new Role();

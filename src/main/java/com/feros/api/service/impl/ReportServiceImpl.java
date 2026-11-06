@@ -18,6 +18,7 @@ import com.feros.api.entity.Client;
 import com.feros.api.entity.Vehicle;
 import com.feros.api.repository.*;
 import com.feros.api.service.ReportService;
+import com.feros.api.service.StaffVehicleDayResolver;
 import com.feros.api.exception.FerosException;
 import com.feros.api.util.SecurityUtil;
 import com.feros.api.util.TimeUtil;
@@ -429,7 +430,14 @@ public class ReportServiceImpl implements ReportService {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         List<Attendance> records = attendanceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
         Map<Long, List<VehicleStaffAssignment>> userAssignments = buildUserAssignmentMap(tenantId, startDate, endDate);
-        Map<Long, String> leaseMap = buildLeaseDriverMap(tenantId, startDate, endDate);
+        List<StaffVehicleDayResolver.LeaseSpan> leaseDriverSpans = buildLeaseDriverSpans(tenantId, startDate, endDate);
+        List<StaffVehicleDayResolver.LeaseSpan> leaseCleanerSpans = buildLeaseCleanerSpans(tenantId, startDate, endDate);
+        // Every user who holds a lease anywhere in the period (span-based, so shared-vehicle drivers
+        // are all included — the old collapsed map dropped all but each vehicle's last holder).
+        java.util.Set<Long> leaseUserIds = java.util.stream.Stream
+                .concat(leaseDriverSpans.stream(), leaseCleanerSpans.stream())
+                .map(StaffVehicleDayResolver.LeaseSpan::userId)
+                .collect(Collectors.toSet());
         Map<Long, Long> leaseHolderByVehicle = buildLeaseHolderByVehicle(tenantId, startDate, endDate);
         Map<Long, Long> leaseCleanerHolderByVehicle = buildLeaseCleanerHolderByVehicle(tenantId, startDate, endDate);
         com.feros.api.service.LeaseShiftPayResolver.Context shiftCtx = leaseShiftPayResolver.buildContext(tenantId, startDate, endDate);
@@ -462,12 +470,12 @@ public class ReportServiceImpl implements ReportService {
             }
             String shiftLabel = shiftLabelByUserDate.get(a.getUser().getId() + ":" + a.getAttendanceDate());
             String[] equip = equipByUserDate.get(a.getUser().getId() + ":" + a.getAttendanceDate());
-            boolean onLease = shiftLabel != null || leaseMap.containsKey(a.getUser().getId());
+            boolean onLease = shiftLabel != null || leaseUserIds.contains(a.getUser().getId());
             return AttendanceDailyRow.builder()
                     .employeeId(a.getUser().getId())
                     .employeeName(a.getUser().getName())
                     .role(primaryRole(a.getUser()))
-                    .vehicleRegistrationNumber(resolveVehicleForDate(userAssignments, leaseMap, leaseHolderByVehicle, leaseCleanerHolderByVehicle, shiftCtx, a.getUser().getId(), tenantId, a.getAttendanceDate()))
+                    .vehicleRegistrationNumber(resolveVehicleForDate(userAssignments, leaseDriverSpans, leaseCleanerSpans, leaseHolderByVehicle, leaseCleanerHolderByVehicle, shiftCtx, a.getUser().getId(), tenantId, a.getAttendanceDate()))
                     .equipmentRegistrationNumber(equip != null ? equip[0] : null)
                     .isLease(onLease)
                     .shiftLabel(shiftLabel != null ? shiftLabel : (equip != null ? equip[1] : null))
@@ -1106,8 +1114,58 @@ public class ReportServiceImpl implements ReportService {
                         l -> l.getCleanerStaff().getUser().getId()));
     }
 
+    // Every driver lease log flattened to its date window — NOT collapsed, so a vehicle shared by
+    // several drivers in the period resolves per day (see leaseHeldVehicle), instead of only to its
+    // last holder. Mirrors StaffVehicleDayResolver.buildContext so payslip == attendance.
+    private List<StaffVehicleDayResolver.LeaseSpan> buildLeaseDriverSpans(Long tenantId, LocalDate startDate, LocalDate endDate) {
+        return leaseDriverAssignmentLogRepository
+                .findOverlappingByTenantId(tenantId, startDate.atStartOfDay(), endDate.atTime(23, 59, 59))
+                .stream()
+                .filter(l -> l.getDriverStaff() != null && l.getDriverStaff().getUser() != null)
+                .map(l -> new StaffVehicleDayResolver.LeaseSpan(
+                        l.getDriverStaff().getUser().getId(),
+                        l.getLeaseVehicleAssignment().getVehicle().getId(),
+                        l.getLeaseVehicleAssignment().getVehicle(),
+                        l.getAssignedAt().toLocalDate(),
+                        l.getUnassignedAt() != null ? l.getUnassignedAt().toLocalDate() : null,
+                        l.getAssignedAt()))
+                .toList();
+    }
+
+    private List<StaffVehicleDayResolver.LeaseSpan> buildLeaseCleanerSpans(Long tenantId, LocalDate startDate, LocalDate endDate) {
+        return leaseCleanerAssignmentLogRepository
+                .findOverlappingByTenantId(tenantId, startDate.atStartOfDay(), endDate.atTime(23, 59, 59))
+                .stream()
+                .filter(l -> l.getCleanerStaff() != null && l.getCleanerStaff().getUser() != null)
+                .map(l -> new StaffVehicleDayResolver.LeaseSpan(
+                        l.getCleanerStaff().getUser().getId(),
+                        l.getLeaseVehicleAssignment().getVehicle().getId(),
+                        l.getLeaseVehicleAssignment().getVehicle(),
+                        l.getAssignedAt().toLocalDate(),
+                        l.getUnassignedAt() != null ? l.getUnassignedAt().toLocalDate() : null,
+                        l.getAssignedAt()))
+                .toList();
+    }
+
+    /** The lease vehicle this user actually holds on {@code date}: among spans covering the day, the
+     *  latest-assigned per vehicle decides the holder (handover day → incoming driver wins); the user
+     *  gets their latest-assigned held vehicle. Verbatim mirror of StaffVehicleDayResolver.leaseHeldVehicle. */
+    private Vehicle leaseHeldVehicle(List<StaffVehicleDayResolver.LeaseSpan> spans, Long userId, LocalDate date) {
+        Map<Long, StaffVehicleDayResolver.LeaseSpan> holderByVehicle = spans.stream()
+                .filter(s -> !s.from().isAfter(date) && (s.to() == null || !s.to().isBefore(date)))
+                .collect(Collectors.toMap(
+                        StaffVehicleDayResolver.LeaseSpan::vehicleId, s -> s,
+                        (a, b) -> a.assignedAt().isAfter(b.assignedAt()) ? a : b));
+        return holderByVehicle.values().stream()
+                .filter(s -> s.userId().equals(userId))
+                .max(Comparator.comparing(StaffVehicleDayResolver.LeaseSpan::assignedAt))
+                .map(StaffVehicleDayResolver.LeaseSpan::vehicle)
+                .orElse(null);
+    }
+
     private String resolveVehicleForDate(Map<Long, List<VehicleStaffAssignment>> userAssignments,
-                                         Map<Long, String> leaseMap,
+                                         List<StaffVehicleDayResolver.LeaseSpan> leaseDriverSpans,
+                                         List<StaffVehicleDayResolver.LeaseSpan> leaseCleanerSpans,
                                          Map<Long, Long> leaseHolderByVehicle,
                                          Map<Long, Long> leaseCleanerHolderByVehicle,
                                          com.feros.api.service.LeaseShiftPayResolver.Context shiftCtx,
@@ -1160,9 +1218,11 @@ public class ReportServiceImpl implements ReportService {
                 .map(sa -> sa.getVehicleAllocation().getVehicle().getRegistrationNumber())
                 .orElse(null);
         if (fromOrder != null) return fromOrder;
-        // ponytail: fallback 2 — driver assigned via standing lease log, not VSA
-        String fromLease = leaseMap.get(userId);
-        if (fromLease != null) return fromLease;
+        // fallback 2 — driver assigned via standing lease log, not VSA. Date-aware: the vehicle this
+        // user actually holds on `date` (shared/rotated lease vehicles resolve per day, not collapsed).
+        Vehicle leaseVeh = leaseHeldVehicle(leaseDriverSpans, userId, date);
+        if (leaseVeh == null) leaseVeh = leaseHeldVehicle(leaseCleanerSpans, userId, date);
+        if (leaseVeh != null) return leaseVeh.getRegistrationNumber();
         // fallback 3 — shift-duty lease: date-exact shift assignment (no VSA, no standing log)
         com.feros.api.entity.Vehicle shiftVeh = leaseShiftPayResolver.vehicle(shiftCtx, userId, date);
         return shiftVeh != null ? shiftVeh.getRegistrationNumber() : "—";
@@ -2998,7 +3058,8 @@ public class ReportServiceImpl implements ReportService {
                 .toList();
 
         Map<Long, List<VehicleStaffAssignment>> userAssignments = buildUserAssignmentMap(tenantId, date, date);
-        Map<Long, String> leaseMap = buildLeaseDriverMap(tenantId, date, date);
+        List<StaffVehicleDayResolver.LeaseSpan> leaseDriverSpans = buildLeaseDriverSpans(tenantId, date, date);
+        List<StaffVehicleDayResolver.LeaseSpan> leaseCleanerSpans = buildLeaseCleanerSpans(tenantId, date, date);
         Map<Long, Long> leaseHolderByVehicle = buildLeaseHolderByVehicle(tenantId, date, date);
         Map<Long, Long> leaseCleanerHolderByVehicle = buildLeaseCleanerHolderByVehicle(tenantId, date, date);
         com.feros.api.service.LeaseShiftPayResolver.Context shiftCtx = leaseShiftPayResolver.buildContext(tenantId, date, date);
@@ -3007,7 +3068,7 @@ public class ReportServiceImpl implements ReportService {
         Map<String, String> vehicleDriverMap  = new HashMap<>();
         Map<String, String> vehicleCleanerMap = new HashMap<>();
         for (Attendance att : presentRecords) {
-            String reg = resolveVehicleForDate(userAssignments, leaseMap, leaseHolderByVehicle, leaseCleanerHolderByVehicle, shiftCtx, att.getUser().getId(), tenantId, date);
+            String reg = resolveVehicleForDate(userAssignments, leaseDriverSpans, leaseCleanerSpans, leaseHolderByVehicle, leaseCleanerHolderByVehicle, shiftCtx, att.getUser().getId(), tenantId, date);
             if ("—".equals(reg)) continue;
             String role = primaryRole(att.getUser());
             if ("DRIVER".equals(role))       vehicleDriverMap.put(reg,  att.getUser().getName());

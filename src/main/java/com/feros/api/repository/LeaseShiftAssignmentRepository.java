@@ -66,6 +66,32 @@ public interface LeaseShiftAssignmentRepository extends JpaRepository<LeaseShift
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 
+    // Per-shift rows for ONE staff member over a pay cycle — payslip annexure (one row per shift,
+    // with its own timing + snapshotted pay). Driver + cleaner variants since a user is one or other.
+    @Query("""
+        SELECT a FROM LeaseShiftAssignment a
+        JOIN FETCH a.leaseShift s
+        JOIN FETCH a.leaseVehicleAssignment lva
+        JOIN FETCH lva.vehicle
+        WHERE a.driverStaff.id = :staffId
+          AND a.workDate BETWEEN :from AND :to
+        ORDER BY a.workDate ASC, s.shiftNumber ASC
+        """)
+    List<LeaseShiftAssignment> findByDriverStaffIdAndWorkDateBetween(
+            @Param("staffId") Long staffId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("""
+        SELECT a FROM LeaseShiftAssignment a
+        JOIN FETCH a.leaseShift s
+        JOIN FETCH a.leaseVehicleAssignment lva
+        JOIN FETCH lva.vehicle
+        WHERE a.cleanerStaff.id = :staffId
+          AND a.workDate BETWEEN :from AND :to
+        ORDER BY a.workDate ASC, s.shiftNumber ASC
+        """)
+    List<LeaseShiftAssignment> findByCleanerStaffIdAndWorkDateBetween(
+            @Param("staffId") Long staffId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
     // Future shift rows for ONE vehicle assignment — dropped on per-vehicle close so a
     // closed vehicle can never pin its driver/cleaner or block their reassignment.
     List<LeaseShiftAssignment> findByLeaseVehicleAssignmentIdAndWorkDateGreaterThanEqual(

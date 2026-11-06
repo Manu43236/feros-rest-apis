@@ -219,7 +219,7 @@ class PayrollCalculationTest {
         // vehicle allowance, so resolve to no vehicle (₹0 allowance) — same net as before.
         lenient().when(staffVehicleDayResolver.buildContext(anyLong(), any(), any()))
             .thenReturn(new StaffVehicleDayResolver.Context(
-                java.util.Map.of(), java.util.Map.of(), java.util.Map.of(), java.util.Map.of(),
+                java.util.Map.of(), java.util.List.of(), java.util.List.of(), java.util.Map.of(), java.util.Map.of(),
                 new LeaseShiftPayResolver.Context(java.util.Map.of())));
         lenient().when(staffVehicleDayResolver.resolve(any(), anyLong(), anyLong(), any()))
             .thenReturn(null);

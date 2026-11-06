@@ -37,6 +37,7 @@ public class PayslipPdfService {
     private final AttendanceRepository attendanceRepository;
     private final VehicleStaffAssignmentRepository vehicleStaffAssignmentRepository;
     private final LeaseDriverAssignmentLogRepository leaseDriverAssignmentLogRepository;
+    private final com.feros.api.repository.LeaseShiftAssignmentRepository leaseShiftAssignmentRepository;
     private final com.feros.api.service.StaffVehicleDayResolver staffVehicleDayResolver;
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PayslipPdfService.class);
 
@@ -64,6 +65,7 @@ public class PayslipPdfService {
 
     private static final DateTimeFormatter DATE_FMT  = DateTimeFormatter.ofPattern("dd MMM yyyy");
     private static final DateTimeFormatter MONTH_FMT = DateTimeFormatter.ofPattern("MMMM yyyy");
+    private static final DateTimeFormatter TIME_FMT  = DateTimeFormatter.ofPattern("HH:mm");
 
     private static class WatermarkHelper extends PdfPageEventHelper {
         private final byte[] logoBytes;
@@ -316,6 +318,18 @@ public class PayslipPdfService {
                     boolean isCleaner = payroll.getUser().getRoles().stream()
                             .anyMatch(r -> r.getName() == com.feros.api.enums.RoleName.CLEANER);
 
+                    // Shift-lease rows (one per shift, with timing + snapshotted pay) keyed by day.
+                    Long annexStaffId = profile != null ? profile.getId() : null;
+                    java.util.Map<java.time.LocalDate, java.util.List<com.feros.api.entity.LeaseShiftAssignment>> shiftsByDate =
+                            annexStaffId == null ? java.util.Map.of()
+                            : (isCleaner
+                                ? leaseShiftAssignmentRepository.findByCleanerStaffIdAndWorkDateBetween(
+                                        annexStaffId, payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate())
+                                : leaseShiftAssignmentRepository.findByDriverStaffIdAndWorkDateBetween(
+                                        annexStaffId, payroll.getPayCycleStartDate(), payroll.getPayCycleEndDate()))
+                                .stream().collect(java.util.stream.Collectors.groupingBy(
+                                        com.feros.api.entity.LeaseShiftAssignment::getWorkDate));
+
                     doc.newPage();
                     doc.add(sectionLabel("DAILY EARNINGS ANNEXURE"));
 
@@ -327,8 +341,37 @@ public class PayslipPdfService {
                         java.time.LocalDate date = record.getAttendanceDate();
                         boolean isHalf = record.getAttendanceType().getName().toLowerCase().contains("half");
                         BigDecimal factor = isHalf ? new BigDecimal("0.5") : BigDecimal.ONE;
-                        BigDecimal desPay = payroll.getDailyRate().multiply(factor).setScale(2, RoundingMode.HALF_UP);
 
+                        java.util.List<com.feros.api.entity.LeaseShiftAssignment> dayShifts = shiftsByDate.get(date);
+                        if (dayShifts != null && !dayShifts.isEmpty()) {
+                            // Shift-lease day: shift pay REPLACES the daily rate (exactly as payroll computes it).
+                            // One row per shift with its own timing + snapshot pay; vehicle allowance added once/day.
+                            com.feros.api.entity.Vehicle allowVeh = staffVehicleDayResolver.resolve(
+                                    vehCtx, payroll.getUser().getId(), tenantId, date);
+                            BigDecimal dayVehPay = VehiclePayResolver.vehiclePayForDay(allowVeh, isCleaner, factor);
+                            boolean firstOfDay = true;
+                            for (com.feros.api.entity.LeaseShiftAssignment sa : dayShifts) {
+                                com.feros.api.entity.LeaseShift sh = sa.getLeaseShift();
+                                BigDecimal snap = isCleaner ? sa.getCleanerPaySnapshot() : sa.getDriverPaySnapshot();
+                                BigDecimal shiftPay = (snap != null ? snap : BigDecimal.ZERO)
+                                        .multiply(factor).setScale(2, RoundingMode.HALF_UP);
+                                com.feros.api.entity.Vehicle shVeh = sa.getLeaseVehicleAssignment().getVehicle();
+                                String vehLabel = (shVeh != null ? shVeh.getRegistrationNumber() : "—")
+                                        + "  Shift " + sh.getShiftNumber()
+                                        + " (" + sh.getStartTime().format(TIME_FMT) + "-" + sh.getEndTime().format(TIME_FMT) + ")";
+                                BigDecimal vehPay = firstOfDay ? dayVehPay : BigDecimal.ZERO;
+                                addAnnexureRow(annexure, isHalf,
+                                        firstOfDay ? date.format(DATE_FMT) : "",
+                                        vehLabel,
+                                        fmt(shiftPay),
+                                        vehPay.compareTo(BigDecimal.ZERO) > 0 ? fmt(vehPay) : "—",
+                                        fmt(shiftPay.add(vehPay)));
+                                firstOfDay = false;
+                            }
+                            continue;
+                        }
+
+                        BigDecimal desPay = payroll.getDailyRate().multiply(factor).setScale(2, RoundingMode.HALF_UP);
                         com.feros.api.entity.Vehicle vehicle = staffVehicleDayResolver.resolve(
                                 vehCtx, payroll.getUser().getId(), tenantId, date);
                         String vehicleNo = vehicle != null ? vehicle.getRegistrationNumber() : "—";

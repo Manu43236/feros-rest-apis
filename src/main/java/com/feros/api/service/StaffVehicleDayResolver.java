@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -40,11 +41,18 @@ public class StaffVehicleDayResolver {
     private final OrderStaffAllocationRepository orderStaffAllocationRepository;
     private final LeaseShiftPayResolver leaseShiftPayResolver;
 
-    /** Tenant-wide maps, built once per run and reused for every (user, date) resolution.
-     *  {@code leaseVehicleByUser} covers both lease drivers and lease cleaners (userIds never collide);
+    /** One lease log, flattened to the date window it covers. {@code to} is null while still
+     *  assigned. {@code assignedAt} breaks the handover-day tie (latest assignment wins the day). */
+    public record LeaseSpan(Long userId, Long vehicleId, Vehicle vehicle,
+                            LocalDate from, LocalDate to, LocalDateTime assignedAt) {}
+
+    /** Tenant-wide data, built once per run and reused for every (user, date) resolution.
+     *  {@code driverSpans}/{@code cleanerSpans} keep every lease log (NOT collapsed) so a vehicle
+     *  shared by several drivers in the period resolves per day instead of only to its last holder;
      *  holder maps are kept per-role so a cleaner's VSA is only displaced by the lease <em>cleaner</em>. */
     public record Context(Map<Long, List<VehicleStaffAssignment>> userAssignments,
-                          Map<Long, Vehicle> leaseVehicleByUser,
+                          List<LeaseSpan> driverSpans,
+                          List<LeaseSpan> cleanerSpans,
                           Map<Long, Long> leaseHolderByVehicle,
                           Map<Long, Long> leaseCleanerHolderByVehicle,
                           LeaseShiftPayResolver.Context shiftCtx) {}
@@ -72,24 +80,20 @@ public class StaffVehicleDayResolver {
                         l -> l.getLeaseVehicleAssignment().getVehicle().getId(),
                         l -> l.getDriverStaff().getUser().getId()));
 
-        // userId → their latest lease vehicle (mirrors buildLeaseDriverMap: latest driver per vehicle,
-        // then latest vehicle per driver), but keeps the Vehicle instead of the reg string.
-        Map<Long, Vehicle> leaseVehicleByUser = logs.stream()
-                .collect(Collectors.toMap(
-                        l -> l.getLeaseVehicleAssignment().getVehicle().getId(),
-                        l -> l,
-                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
-                .values().stream()
-                .collect(Collectors.toMap(
-                        l -> l.getDriverStaff().getUser().getId(),
-                        l -> l,
-                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
-                .values().stream()
-                .collect(Collectors.toMap(
-                        l -> l.getDriverStaff().getUser().getId(),
-                        l -> l.getLeaseVehicleAssignment().getVehicle()));
+        // Every driver lease log, flattened to its date window — NOT collapsed. resolve() picks the
+        // span covering the resolution date, so a vehicle shared by several drivers in the period is
+        // resolved per day instead of only to its last holder (the old collapse dropped the rest).
+        List<LeaseSpan> driverSpans = logs.stream()
+                .map(l -> new LeaseSpan(
+                        l.getDriverStaff().getUser().getId(),
+                        l.getLeaseVehicleAssignment().getVehicle().getId(),
+                        l.getLeaseVehicleAssignment().getVehicle(),
+                        l.getAssignedAt().toLocalDate(),
+                        l.getUnassignedAt() != null ? l.getUnassignedAt().toLocalDate() : null,
+                        l.getAssignedAt()))
+                .toList();
 
-        // Same three maps for lease cleaners — a lease vehicle never gets a VSA row, so the cleaner's
+        // Same for lease cleaners — a lease vehicle never gets a VSA row, so the cleaner's
         // attendance/payroll vehicle must resolve from here exactly like the driver's.
         List<LeaseCleanerAssignmentLog> cleanerLogs = leaseCleanerAssignmentLogRepository
                 .findOverlappingByTenantId(tenantId, startDate.atStartOfDay(), endDate.atTime(23, 59, 59))
@@ -107,28 +111,22 @@ public class StaffVehicleDayResolver {
                         l -> l.getLeaseVehicleAssignment().getVehicle().getId(),
                         l -> l.getCleanerStaff().getUser().getId()));
 
-        // Merge each lease cleaner's latest vehicle into leaseVehicleByUser (userIds never collide
-        // with lease drivers — a given user is one or the other).
-        cleanerLogs.stream()
-                .collect(Collectors.toMap(
-                        l -> l.getLeaseVehicleAssignment().getVehicle().getId(),
-                        l -> l,
-                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
-                .values().stream()
-                .collect(Collectors.toMap(
-                        l -> l.getCleanerStaff().getUser().getId(),
-                        l -> l,
-                        (a, b) -> a.getAssignedAt().isAfter(b.getAssignedAt()) ? a : b))
-                .values()
-                .forEach(l -> leaseVehicleByUser.putIfAbsent(
+        List<LeaseSpan> cleanerSpans = cleanerLogs.stream()
+                .map(l -> new LeaseSpan(
                         l.getCleanerStaff().getUser().getId(),
-                        l.getLeaseVehicleAssignment().getVehicle()));
+                        l.getLeaseVehicleAssignment().getVehicle().getId(),
+                        l.getLeaseVehicleAssignment().getVehicle(),
+                        l.getAssignedAt().toLocalDate(),
+                        l.getUnassignedAt() != null ? l.getUnassignedAt().toLocalDate() : null,
+                        l.getAssignedAt()))
+                .toList();
 
         // Shift-duty leases have no VSA and no standing lease log — the shift assignment is the only
         // record placing the person on a vehicle for the day (date-exact, night shift on start date).
         LeaseShiftPayResolver.Context shiftCtx = leaseShiftPayResolver.buildContext(tenantId, startDate, endDate);
 
-        return new Context(userAssignments, leaseVehicleByUser, leaseHolderByVehicle, leaseCleanerHolderByVehicle, shiftCtx);
+        return new Context(userAssignments, driverSpans, cleanerSpans,
+                leaseHolderByVehicle, leaseCleanerHolderByVehicle, shiftCtx);
     }
 
     /** The vehicle this user was on for {@code date}, or null (== "—"). Verbatim port of
@@ -175,11 +173,31 @@ public class StaffVehicleDayResolver {
                 .map(sa -> sa.getVehicleAllocation().getVehicle())
                 .orElse(null);
         if (fromOrder != null) return fromOrder;
-        // fallback 2 — assigned via standing lease log, not VSA
-        Vehicle fromLease = ctx.leaseVehicleByUser().get(userId);
+        // fallback 2 — assigned via standing lease log, not VSA. Date-aware: the vehicle this user
+        // actually holds on `date` (shared/rotated lease vehicles resolve per day, never collapsed).
+        Vehicle fromLease = leaseHeldVehicle(ctx.driverSpans(), userId, date);
+        if (fromLease == null) fromLease = leaseHeldVehicle(ctx.cleanerSpans(), userId, date);
         if (fromLease != null) return fromLease;
         // fallback 3 — shift-duty lease: date-exact shift assignment
         return leaseShiftPayResolver.vehicle(ctx.shiftCtx(), userId, date);
+    }
+
+    /** The lease vehicle this user actually holds on {@code date}. Among all spans covering the day,
+     *  the latest-assigned one per vehicle decides that vehicle's holder (handover day → the incoming
+     *  driver wins); the user gets their latest-assigned vehicle among those they hold. This is the
+     *  per-day equivalent of the single-day attendance screen, and replaces the period-wide collapse
+     *  that kept only each vehicle's last holder and dropped every other driver to "—". */
+    private Vehicle leaseHeldVehicle(List<LeaseSpan> spans, Long userId, LocalDate date) {
+        Map<Long, LeaseSpan> holderByVehicle = spans.stream()
+                .filter(s -> !s.from().isAfter(date) && (s.to() == null || !s.to().isBefore(date)))
+                .collect(Collectors.toMap(
+                        LeaseSpan::vehicleId, s -> s,
+                        (a, b) -> a.assignedAt().isAfter(b.assignedAt()) ? a : b));
+        return holderByVehicle.values().stream()
+                .filter(s -> s.userId().equals(userId))
+                .max(Comparator.comparing(LeaseSpan::assignedAt))
+                .map(LeaseSpan::vehicle)
+                .orElse(null);
     }
 
     /** Verbatim copy of ReportServiceImpl.primaryRole so resolution logic is byte-for-byte identical. */
