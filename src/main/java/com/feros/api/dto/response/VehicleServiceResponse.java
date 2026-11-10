@@ -34,6 +34,7 @@ public class VehicleServiceResponse {
     private Integer dueAtOdometer;
     private LocalDate serviceDate;
     private LocalDate completedDate;
+    private LocalDateTime completedAt;
     private Integer odometer;
     private String notes;
     private BigDecimal totalCost;

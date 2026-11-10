@@ -318,6 +318,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
 
         vs.setStatus(ServiceStatus.COMPLETED);
         vs.setCompletedDate(request.getCompletedDate());
+        vs.setCompletedAt(TimeUtil.nowIst());
         if (request.getOdometer() != null) vs.setOdometer(request.getOdometer());
         if (request.getCompletedCost() != null) vs.setCompletedCost(request.getCompletedCost());
 
@@ -796,6 +797,7 @@ public class VehicleMaintenanceServiceImpl implements VehicleMaintenanceService 
                 .dueAtOdometer(vs.getDueAtOdometer())
                 .serviceDate(vs.getServiceDate())
                 .completedDate(vs.getCompletedDate())
+                .completedAt(vs.getCompletedAt())
                 .odometer(vs.getOdometer())
                 .notes(vs.getNotes())
                 .totalCost(totalCost)

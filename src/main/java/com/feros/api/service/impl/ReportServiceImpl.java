@@ -413,13 +413,59 @@ public class ReportServiceImpl implements ReportService {
                         .completedDate(s.getCompletedDate())
                         .serviceType(s.getServiceType().name())
                         .triggeredBy(s.getTriggeredBy().name())
+                        .reason(resolveServiceReason(s))
                         .taskCount(s.getTasks() != null ? s.getTasks().size() : 0)
                         .totalCost(s.getTotalCost())
                         .status(s.getStatus().name())
                         .vendorName(s.getVendorName())
                         .nextServiceDueOdometer(s.getDueAtOdometer())
+                        .raisedAt(s.getCreatedAt())
+                        .startedAt(s.getStartedAt())
+                        .completedAt(s.getCompletedAt())
+                        .durationLabel(resolveServiceDuration(s))
                         .build())
                 .toList();
+    }
+
+    // Reason = breakdown reason text when breakdown-triggered, else free-text notes. (lazy breakdown
+    // load is fine at report scale; fetch-join if it ever shows in slow logs)
+    private String resolveServiceReason(com.feros.api.entity.VehicleService s) {
+        if (s.getBreakdown() != null && s.getBreakdown().getReason() != null
+                && !s.getBreakdown().getReason().isBlank()) {
+            return s.getBreakdown().getReason();
+        }
+        return s.getNotes() != null && !s.getNotes().isBlank() ? s.getNotes() : null;
+    }
+
+    // Flow duration. Prefer true Started→Completed (hour-level, forward-looking). When startedAt is
+    // missing (back-dated / direct OPEN→Complete), fall back to a day-level Raised→Completed estimate
+    // marked with "~". Returns null when not completed or no end timestamp exists.
+    private String resolveServiceDuration(com.feros.api.entity.VehicleService s) {
+        java.time.LocalDateTime end = s.getCompletedAt();
+        if (end == null && s.getCompletedDate() != null) {
+            end = s.getCompletedDate().atTime(java.time.LocalTime.NOON); // historical: no completion time stored
+        }
+        if (end == null) return null; // not completed
+
+        if (s.getStartedAt() != null && s.getCompletedAt() != null) {
+            return formatDuration(java.time.Duration.between(s.getStartedAt(), s.getCompletedAt()), false);
+        }
+        if (s.getCreatedAt() != null) {
+            return formatDuration(java.time.Duration.between(s.getCreatedAt(), end), true);
+        }
+        return null;
+    }
+
+    public static String formatDuration(java.time.Duration d, boolean estimate) {
+        if (d.isNegative()) d = java.time.Duration.ZERO;
+        long days = d.toDays();
+        long hours = d.toHoursPart();
+        long mins = d.toMinutesPart();
+        String label;
+        if (days > 0) label = hours > 0 ? days + "d " + hours + "h" : days + "d";
+        else if (hours > 0) label = mins > 0 ? hours + "h " + mins + "m" : hours + "h";
+        else label = mins + "m";
+        return estimate ? "~" + label : label;
     }
 
     // ── 7. Attendance Daily Register ──────────────────────────────────────────────

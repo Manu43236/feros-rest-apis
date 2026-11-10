@@ -265,15 +265,17 @@ public class ReportController {
             @RequestParam(defaultValue = "csv") String format) {
         List<MaintenanceServiceRow> rows = reportService.getMaintenanceService(startDate, endDate);
         String[] headers = {"Vehicle No.", "Type", "Service No.", "Service Date", "Completed Date",
-                "Service Type", "Triggered By", "Tasks", "Total Cost (₹)", "Status", "Vendor", "Next Due KM"};
+                "Service Type", "Triggered By", "Reason", "Tasks", "Total Cost (₹)", "Status", "Vendor",
+                "Next Due KM", "Raised At", "Started At", "Completed At", "Duration"};
         List<String[]> data = rows.stream().map(r -> new String[]{
                 r.getRegistrationNumber(), r.getVehicleType(),
                 safe(r.getServiceNumber()),
                 r.getServiceDate() != null ? r.getServiceDate().toString() : "—",
                 r.getCompletedDate() != null ? r.getCompletedDate().toString() : "—",
-                r.getServiceType(), r.getTriggeredBy(), String.valueOf(r.getTaskCount()),
+                r.getServiceType(), r.getTriggeredBy(), safe(r.getReason()), String.valueOf(r.getTaskCount()),
                 safe(r.getTotalCost()), r.getStatus(), safe(r.getVendorName()),
-                r.getNextServiceDueOdometer() != null ? r.getNextServiceDueOdometer().toString() : "—"
+                r.getNextServiceDueOdometer() != null ? r.getNextServiceDueOdometer().toString() : "—",
+                dt(r.getRaisedAt()), dt(r.getStartedAt()), dt(r.getCompletedAt()), safe(r.getDurationLabel())
         }).toList();
         return export("maintenance-service-" + startDate + "-" + endDate,
                 "Maintenance & Service — " + startDate + " to " + endDate, headers, data, format);
@@ -1823,6 +1825,13 @@ public class ReportController {
 
     private String safe(Object val) {
         return val != null ? val.toString() : "—";
+    }
+
+    private static final java.time.format.DateTimeFormatter EXPORT_DT =
+            java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
+
+    private String dt(java.time.LocalDateTime val) {
+        return val != null ? val.format(EXPORT_DT) : "—";
     }
 
     /** Vehicle cell for the daily register export — tags lease vehicles and appends the shift window. */

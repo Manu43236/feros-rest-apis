@@ -92,6 +92,9 @@ public class VehicleService extends BaseEntity {
     @Column(name = "completed_date")
     private LocalDate completedDate;
 
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
     @Column(name = "odometer")
     private Integer odometer;
 
