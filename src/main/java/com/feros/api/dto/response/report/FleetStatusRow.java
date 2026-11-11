@@ -13,4 +13,6 @@ public class FleetStatusRow {
     private String currentStatus;
     /** "BREAKDOWN" or "GENERAL" — only set when currentStatus is IN_REPAIR */
     private String inRepairType;
+    /** "INTER_STATE" or "INTRA_STATE" — vehicle operation scope, null if unset */
+    private String tripScope;
 }

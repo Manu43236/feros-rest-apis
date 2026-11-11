@@ -278,6 +278,7 @@ public class ReportServiceImpl implements ReportService {
                             .vehicleBodyType(btName)
                             .currentStatus(status)
                             .inRepairType("IN_REPAIR".equals(status) ? inRepairTypeByVehicle.get(v.getId()) : null)
+                            .tripScope(v.getTripScope() != null ? v.getTripScope().name() : null)
                             .build();
                 })
                 .toList();
