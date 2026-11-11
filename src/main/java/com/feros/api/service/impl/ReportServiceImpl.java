@@ -386,7 +386,11 @@ public class ReportServiceImpl implements ReportService {
                                     ? d.getVehicle().getVehicleType().getName() : "—")
                             .documentType(d.getDocumentType().getName())
                             .documentNumber(d.getDocumentNumber())
+                            .issueDate(d.getIssueDate())
                             .expiryDate(d.getExpiryDate())
+                            .issuerName(d.getIssuerName())
+                            .cost(d.getCost())
+                            .paidOn(d.getPaidOn())
                             .daysLeft(daysLeft)
                             .expiryStatus(status)
                             .build();
