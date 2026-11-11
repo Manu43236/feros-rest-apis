@@ -41,6 +41,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ReportServiceImpl implements ReportService {
 
+    // Vehicle reports are grouped by body type (Tipper, DCM…), then by wheeler/tyre count, then reg no.
+    private static final Comparator<Vehicle> BY_VEHICLE_TYPE = Comparator
+            .comparing((Vehicle v) -> v.getVehicleBodyType() != null ? v.getVehicleBodyType().getName() : null,
+                    Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+            .thenComparing(v -> v.getVehicleType() != null ? v.getVehicleType().getTyreCount() : null,
+                    Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(v -> v.getRegistrationNumber() != null ? v.getRegistrationNumber() : "",
+                    String.CASE_INSENSITIVE_ORDER);
+
     private final com.feros.api.service.LeaseShiftPayResolver leaseShiftPayResolver;
     private final com.feros.api.repository.LeaseShiftAssignmentRepository leaseShiftAssignmentRepository;
     private final VehicleRepository vehicleRepository;
@@ -195,7 +204,7 @@ public class ReportServiceImpl implements ReportService {
                         )
                 ));
 
-        return vehicles.stream().map(v -> {
+        return vehicles.stream().sorted(BY_VEHICLE_TYPE).map(v -> {
             Map<String, VehicleDocument> docs = docsByVehicle.getOrDefault(v.getId(), Map.of());
 
             VehicleDocument nationalPermit = docs.get("National Permit");
@@ -257,6 +266,7 @@ public class ReportServiceImpl implements ReportService {
                         (a, b) -> a // keep first if multiple active services
                 ));
         return vehicleRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+                .sorted(BY_VEHICLE_TYPE)
                 .map(v -> {
                     String status = v.getCurrentStatus() != null ? v.getCurrentStatus().getStatusType().name() : "UNKNOWN";
                     String vtName = v.getVehicleType() != null ? v.getVehicleType().getName() : "—";
@@ -291,7 +301,7 @@ public class ReportServiceImpl implements ReportService {
         Map<Long, List<VehicleMeterReading>> readingsByVehicle = readings.stream()
                 .collect(Collectors.groupingBy(m -> m.getVehicle().getId()));
 
-        return vehicles.stream().map(v -> {
+        return vehicles.stream().sorted(BY_VEHICLE_TYPE).map(v -> {
             List<VehicleFuelLog> vLogs = logsByVehicle.getOrDefault(v.getId(), List.of());
             List<VehicleMeterReading> vReadings = readingsByVehicle.getOrDefault(v.getId(), List.of());
 
@@ -342,6 +352,8 @@ public class ReportServiceImpl implements ReportService {
     public List<BreakdownReportRow> getBreakdowns(LocalDate startDate, LocalDate endDate) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         return breakdownRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate).stream()
+                .sorted(Comparator.comparing(VehicleBreakdown::getVehicle, BY_VEHICLE_TYPE)
+                        .thenComparing(VehicleBreakdown::getBreakdownDate, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(b -> {
                     Long daysLost = null;
                     if (b.getResolvedAt() != null) {
@@ -376,6 +388,8 @@ public class ReportServiceImpl implements ReportService {
 
         return documentRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
                 .filter(d -> d.getExpiryDate() != null)
+                .sorted(Comparator.comparing(VehicleDocument::getVehicle, BY_VEHICLE_TYPE)
+                        .thenComparing(VehicleDocument::getExpiryDate, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(d -> {
                     long daysLeft = ChronoUnit.DAYS.between(today, d.getExpiryDate());
                     String status = daysLeft < 0 ? "RED" : daysLeft <= days ? "AMBER" : "GREEN";
@@ -395,7 +409,6 @@ public class ReportServiceImpl implements ReportService {
                             .expiryStatus(status)
                             .build();
                 })
-                .sorted(Comparator.comparingLong(DocumentExpiryRow::getDaysLeft))
                 .toList();
     }
 
@@ -407,6 +420,8 @@ public class ReportServiceImpl implements ReportService {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         return vehicleServiceRepository.findByTenantIdAndServiceDateBetweenAndIsActiveTrue(tenantId, startDate, endDate)
                 .stream()
+                .sorted(Comparator.comparing(VehicleService::getVehicle, BY_VEHICLE_TYPE)
+                        .thenComparing(VehicleService::getServiceDate, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(s -> MaintenanceServiceRow.builder()
                         .vehicleId(s.getVehicle().getId())
                         .registrationNumber(s.getVehicle().getRegistrationNumber())
