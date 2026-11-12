@@ -23,6 +23,8 @@ public class LrRegisterRow {
     private String toCity;
     private String toState;
     private String materialType;
+    private BigDecimal freightRate;
+    private String freightRateType;
     private BigDecimal allocatedWeight;
     private BigDecimal loadedWeight;
     private BigDecimal deliveredWeight;

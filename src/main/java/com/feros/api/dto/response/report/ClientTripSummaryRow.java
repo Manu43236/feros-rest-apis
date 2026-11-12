@@ -14,6 +14,8 @@ public class ClientTripSummaryRow {
     private int completedTrips;
     private int inTransitTrips;
     private int cancelledTrips;
+    private int completedInvoiceCount;
+    private int pendingInvoiceCount;
     private BigDecimal totalAllocatedWeight;
     private BigDecimal totalLoadedWeight;
     private BigDecimal totalDeliveredWeight;

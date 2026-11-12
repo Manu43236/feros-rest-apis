@@ -738,6 +738,8 @@ public class ReportServiceImpl implements ReportService {
                 .toCity(l.getOrder().getDestinationCity() != null ? l.getOrder().getDestinationCity().getName() : "—")
                 .toState(l.getOrder().getDestinationState() != null ? l.getOrder().getDestinationState().getName() : "—")
                 .materialType(l.getOrder().getMaterialType() != null ? l.getOrder().getMaterialType().getName() : "—")
+                .freightRate(l.getOrder().getFreightRate())
+                .freightRateType(l.getOrder().getFreightRateType() != null ? l.getOrder().getFreightRateType().name() : "—")
                 .allocatedWeight(l.getAllocatedWeight())
                 .loadedWeight(l.getLoadedWeight())
                 .deliveredWeight(l.getDeliveredWeight())
@@ -1063,9 +1065,21 @@ public class ReportServiceImpl implements ReportService {
         Map<Long, List<Lr>> byClient = lrs.stream()
                 .collect(Collectors.groupingBy(l -> l.getOrder().getClient().getId()));
 
+        // invoices raised in the same period, grouped by client → completed (PAID) vs pending (issued, unpaid)
+        Map<Long, int[]> invoiceCountsByClient = new java.util.HashMap<>();
+        for (Invoice inv : invoiceRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate)) {
+            if (inv.getClient() == null) continue;
+            int[] counts = invoiceCountsByClient.computeIfAbsent(inv.getClient().getId(), k -> new int[2]);
+            if (inv.getInvoiceStatus() == InvoiceStatus.PAID) counts[0]++;
+            else if (inv.getInvoiceStatus() == InvoiceStatus.SENT
+                    || inv.getInvoiceStatus() == InvoiceStatus.PARTIALLY_PAID
+                    || inv.getInvoiceStatus() == InvoiceStatus.OVERDUE) counts[1]++;
+        }
+
         return byClient.entrySet().stream().map(entry -> {
             List<Lr> cLrs = entry.getValue();
             Client client = cLrs.get(0).getOrder().getClient();
+            int[] invCounts = invoiceCountsByClient.getOrDefault(client.getId(), new int[2]);
 
             return ClientTripSummaryRow.builder()
                     .clientId(client.getId())
@@ -1074,6 +1088,8 @@ public class ReportServiceImpl implements ReportService {
                     .completedTrips((int) cLrs.stream().filter(l -> l.getLrStatus() == LrStatus.DELIVERED).count())
                     .inTransitTrips((int) cLrs.stream().filter(l -> l.getLrStatus() == LrStatus.IN_TRANSIT).count())
                     .cancelledTrips((int) cLrs.stream().filter(l -> l.getLrStatus() == LrStatus.CANCELLED).count())
+                    .completedInvoiceCount(invCounts[0])
+                    .pendingInvoiceCount(invCounts[1])
                     .totalAllocatedWeight(cLrs.stream().map(Lr::getAllocatedWeight).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
                     .totalLoadedWeight(cLrs.stream().map(Lr::getLoadedWeight).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
                     .totalDeliveredWeight(cLrs.stream().map(Lr::getDeliveredWeight).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
@@ -3342,6 +3358,7 @@ public class ReportServiceImpl implements ReportService {
                     .lrNumber(lr.getLrNumber())
                     .lrCreatedAt(lr.getCreatedAt())
                     .registrationNumber(vehicle != null ? vehicle.getRegistrationNumber() : "—")
+                    .vehicleScope(vehicle != null && vehicle.getTripScope() != null ? vehicle.getTripScope().name() : "—")
                     .vehicleAssignedAt(alloc != null ? alloc.getCreatedAt() : null)
                     .tripStartTime(tripStart)
                     .tripEndTime(deliveredAt)

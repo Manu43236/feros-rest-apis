@@ -367,13 +367,14 @@ public class ReportController {
             @RequestParam(defaultValue = "csv") String format) {
         List<LrRegisterRow> rows = reportService.getLrRegister(startDate, endDate, clientId);
         String[] headers = {"LR No.", "LR Date", "Order No.", "Client", "Vehicle", "Driver", "Cleaner",
-                "From City", "From State", "To City", "To State", "Material",
+                "From City", "From State", "To City", "To State", "Material", "Rate / Qty",
                 "Alloc. Wt (kg)", "Loaded Wt (kg)", "Delivered Wt (kg)", "Variance (kg)", "Overloaded",
                 "Loaded At", "Delivered At", "E-Way Bill No.", "E-Way Date", "E-Way Valid Upto", "Invoiced", "Status", "Remarks"};
         List<String[]> data = rows.stream().map(r -> new String[]{
                 r.getLrNumber(), r.getLrDate().toString(), r.getOrderNumber(), r.getClientName(),
                 r.getVehicleRegistrationNumber(), r.getDriverName(), r.getCleanerName(),
                 r.getFromCity(), r.getFromState(), r.getToCity(), r.getToState(), r.getMaterialType(),
+                rateQty(r.getFreightRate(), r.getFreightRateType()),
                 safe(r.getAllocatedWeight()), safe(r.getLoadedWeight()), safe(r.getDeliveredWeight()),
                 safe(r.getWeightVariance()), r.getIsOverloaded() != null && r.getIsOverloaded() ? "Yes" : "No",
                 r.getLoadedAt() != null ? r.getLoadedAt().toString() : "—",
@@ -712,11 +713,13 @@ public class ReportController {
             @RequestParam(defaultValue = "csv") String format) {
         List<ClientTripSummaryRow> rows = reportService.getClientTripSummary(startDate, endDate);
         String[] headers = {"Client", "Total Trips", "Completed", "In Transit", "Cancelled",
+                "Invoices Completed", "Invoices Pending",
                 "Total Alloc. Wt (kg)", "Total Loaded Wt (kg)", "Total Delivered Wt (kg)"};
         List<String[]> data = rows.stream().map(r -> new String[]{
                 r.getClientName(),
                 String.valueOf(r.getTotalTrips()), String.valueOf(r.getCompletedTrips()),
                 String.valueOf(r.getInTransitTrips()), String.valueOf(r.getCancelledTrips()),
+                String.valueOf(r.getCompletedInvoiceCount()), String.valueOf(r.getPendingInvoiceCount()),
                 safe(r.getTotalAllocatedWeight()), safe(r.getTotalLoadedWeight()), safe(r.getTotalDeliveredWeight())
         }).toList();
         return export("client-trip-summary-" + startDate + "-" + endDate,
@@ -1855,6 +1858,13 @@ public class ReportController {
 
     private String safe(Object val) {
         return val != null ? val.toString() : "—";
+    }
+
+    // "500 / Ton" style freight rate per quantity
+    private String rateQty(java.math.BigDecimal rate, String rateType) {
+        if (rate == null) return "—";
+        String basis = rateType == null || "—".equals(rateType) ? "" : " / " + rateType.replace("PER_", "").replace('_', ' ');
+        return rate.stripTrailingZeros().toPlainString() + basis;
     }
 
     private static final java.time.format.DateTimeFormatter EXPORT_DT =

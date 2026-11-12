@@ -15,6 +15,7 @@ public class TripSummaryRow {
     private String lrNumber;
     private LocalDateTime lrCreatedAt;
     private String registrationNumber;
+    private String vehicleScope;
     private LocalDateTime vehicleAssignedAt;
     private LocalDateTime tripStartTime;
     private LocalDateTime tripEndTime;
