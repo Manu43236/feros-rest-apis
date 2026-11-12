@@ -116,6 +116,7 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
     List<SalaryRegisterRow> getSalaryRegister(LocalDate startDate, LocalDate endDate);
     List<AdvanceRegisterRow> getAdvanceRegister(LocalDate startDate, LocalDate endDate);
     List<PayrollByRoleRow> getPayrollByRole(LocalDate startDate, LocalDate endDate);
+    PayrollDifferenceResponse getPayrollDifference(LocalDate startDate, LocalDate endDate);
     List<PayrollYtdRow> getPayrollYtd(int year);
 
     // ── Mechanic Performance ───────────────────────────────────────────────────

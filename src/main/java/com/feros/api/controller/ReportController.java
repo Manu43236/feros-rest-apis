@@ -1711,6 +1711,36 @@ public class ReportController {
                 "Payroll by Role — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    @GetMapping("/payroll/difference")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<ApiResponse<PayrollDifferenceResponse>> getPayrollDifference(
+            @RequestParam String startDate, @RequestParam String endDate) {
+        return ResponseEntity.ok(ApiResponse.success("OK",
+                reportService.getPayrollDifference(LocalDate.parse(startDate), LocalDate.parse(endDate))));
+    }
+
+    @GetMapping("/payroll/difference/export")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
+    public ResponseEntity<byte[]> exportPayrollDifference(
+            @RequestParam String startDate, @RequestParam String endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        PayrollDifferenceResponse res = reportService.getPayrollDifference(
+                LocalDate.parse(startDate), LocalDate.parse(endDate));
+        String[] headers = {"Employee", "Role", "Gross (₹)", "Vehicle Cost (₹)", "Difference (₹)",
+                "Trip Bonus (₹)", "Overtime (₹)", "Other (₹)"};
+        List<String[]> data = new java.util.ArrayList<>(res.getRows().stream().map(r -> new String[]{
+                safe(r.getEmployeeName()), safe(r.getRole()), safe(r.getGrossPay()),
+                safe(r.getVehicleCost()), safe(r.getDifference()), safe(r.getTripBonus()),
+                safe(r.getOvertimePay()), safe(r.getOtherPay())
+        }).toList());
+        data.add(new String[]{"TOTAL", "", safe(res.getTotalGross()), safe(res.getTotalVehicleCost()),
+                safe(res.getTotalDifference()), safe(res.getTotalTripBonus()),
+                safe(res.getTotalOvertime()), safe(res.getTotalOther())});
+        return export("payroll-difference-" + startDate + "-" + endDate,
+                "Payroll Difference (By Role vs Vehicle Cost) — " + startDate + " to " + endDate,
+                headers, data, format);
+    }
+
     @GetMapping("/payroll/ytd")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OFFICE_STAFF')")
     public ResponseEntity<ApiResponse<List<PayrollYtdRow>>> getPayrollYtd(
