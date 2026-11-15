@@ -17,4 +17,5 @@ public class OrderClientSummaryRow {
     private BigDecimal totalWeight;
     private BigDecimal totalWeightFulfilled;
     private BigDecimal totalFreightAmount;
+    private BigDecimal balance;   // outstanding across the client's orders
 }

@@ -12,5 +12,7 @@ public interface OrderPaymentRepository extends JpaRepository<OrderPayment, Long
 
     List<OrderPayment> findByOrderIdAndIsActiveTrueOrderByTxnDateAscIdAsc(Long orderId);
 
+    List<OrderPayment> findByOrderIdInAndIsActiveTrue(List<Long> orderIds);
+
     Optional<OrderPayment> findByIdAndTenantIdAndIsActiveTrue(Long id, Long tenantId);
 }

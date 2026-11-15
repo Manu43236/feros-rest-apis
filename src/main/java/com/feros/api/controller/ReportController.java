@@ -550,12 +550,13 @@ public class ReportController {
             @RequestParam(defaultValue = "csv") String format) {
         List<OrderClientSummaryRow> rows = reportService.getOrderClientSummary(startDate, endDate);
         String[] headers = {"Client", "Total Orders", "Completed", "In Progress", "Cancelled",
-                "Total Wt (kg)", "Fulfilled Wt (kg)", "Total Freight"};
+                "Total Wt (kg)", "Fulfilled Wt (kg)", "Total Freight", "Balance"};
         List<String[]> data = rows.stream().map(r -> new String[]{
                 r.getClientName(), String.valueOf(r.getTotalOrders()),
                 String.valueOf(r.getCompletedOrders()), String.valueOf(r.getInProgressOrders()),
                 String.valueOf(r.getCancelledOrders()),
-                safe(r.getTotalWeight()), safe(r.getTotalWeightFulfilled()), safe(r.getTotalFreightAmount())
+                safe(r.getTotalWeight()), safe(r.getTotalWeightFulfilled()), safe(r.getTotalFreightAmount()),
+                safe(r.getBalance())
         }).toList();
         return export("order-client-summary-" + startDate + "-" + endDate,
                 "Order Client Summary — " + startDate + " to " + endDate, headers, data, format);

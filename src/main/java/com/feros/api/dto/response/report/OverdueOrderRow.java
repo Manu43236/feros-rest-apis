@@ -21,4 +21,5 @@ public class OverdueOrderRow {
     private BigDecimal totalWeight;
     private BigDecimal totalWeightFulfilled;
     private String orderStatus;
+    private BigDecimal balance;   // balance pending (order value − received − deductions)
 }

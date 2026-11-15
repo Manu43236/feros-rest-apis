@@ -62,6 +62,7 @@ public class ReportServiceImpl implements ReportService {
     private final AttendanceRepository attendanceRepository;
     private final LrRepository lrRepository;
     private final OrderRepository orderRepository;
+    private final com.feros.api.repository.OrderPaymentRepository orderPaymentRepository;
     private final InvoiceRepository invoiceRepository;
     private final InvoicePaymentRepository invoicePaymentRepository;
     private final InvoiceCreditNoteRepository invoiceCreditNoteRepository;
@@ -810,6 +811,30 @@ public class ReportServiceImpl implements ReportService {
 
     // ── 14. Order Register ────────────────────────────────────────────────────────
 
+    /** orderId → [advance, received(=advance+payment), deductions] from the settlement ledger. */
+    private Map<Long, BigDecimal[]> ledgerByOrder(List<Long> orderIds) {
+        Map<Long, BigDecimal[]> m = new java.util.HashMap<>();
+        if (orderIds.isEmpty()) return m;
+        for (com.feros.api.entity.OrderPayment p : orderPaymentRepository.findByOrderIdInAndIsActiveTrue(orderIds)) {
+            BigDecimal[] acc = m.computeIfAbsent(p.getOrder().getId(),
+                    k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO});
+            BigDecimal amt = p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO;
+            switch (p.getType()) {
+                case ADVANCE -> { acc[0] = acc[0].add(amt); acc[1] = acc[1].add(amt); }
+                case PAYMENT -> acc[1] = acc[1].add(amt);
+                case DEDUCTION -> acc[2] = acc[2].add(amt);
+            }
+        }
+        return m;
+    }
+
+    /** Balance pending for an order = value − received − deductions. value = persisted totalFreightAmount. */
+    private static BigDecimal orderBalance(com.feros.api.entity.Order o, BigDecimal[] ledger) {
+        BigDecimal value = o.getTotalFreightAmount() != null ? o.getTotalFreightAmount() : BigDecimal.ZERO;
+        if (ledger == null) return value;
+        return value.subtract(ledger[1]).subtract(ledger[2]);
+    }
+
     @Override
     @Transactional(readOnly = true)
     public List<OrderRegisterRow> getOrderRegister(LocalDate startDate, LocalDate endDate, String status) {
@@ -818,7 +843,15 @@ public class ReportServiceImpl implements ReportService {
                 ? orderRepository.findByTenantIdAndDateRangeAndStatus(tenantId, startDate, endDate, OrderStatus.valueOf(status))
                 : orderRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
 
-        return orders.stream().map(o -> OrderRegisterRow.builder()
+        List<Long> ids = orders.stream().map(com.feros.api.entity.Order::getId).toList();
+        Map<Long, BigDecimal[]> ledger = ledgerByOrder(ids);
+        java.util.Set<Long> invoiced = ids.isEmpty()
+                ? java.util.Set.of()
+                : new java.util.HashSet<>(invoiceLrRepository.findInvoicedOrderIds(ids));
+
+        return orders.stream().map(o -> {
+            BigDecimal[] led = ledger.get(o.getId());
+            return OrderRegisterRow.builder()
                 .orderId(o.getId())
                 .orderNumber(o.getOrderNumber())
                 .orderDate(o.getOrderDate())
@@ -836,11 +869,15 @@ public class ReportServiceImpl implements ReportService {
                 .totalFreightAmount(o.getTotalFreightAmount())
                 .orderStatus(o.getOrderStatus() != null ? o.getOrderStatus().name() : "—")
                 .orderPaymentStatus(o.getOrderPaymentStatus() != null ? o.getOrderPaymentStatus().name() : "—")
+                .invoiceStatus(invoiced.contains(o.getId()) ? "INVOICED" : "NOT_INVOICED")
+                .advanceReceived(led != null ? led[0] : BigDecimal.ZERO)
+                .balance(orderBalance(o, led))
                 .vehicleCount(orderVehicleAllocationRepository.countByOrderIdAndIsActiveTrue(o.getId()))
                 .durationDays(o.getExpectedDeliveryDate() != null
                         ? (int) ChronoUnit.DAYS.between(o.getOrderDate(), o.getExpectedDeliveryDate())
                         : null)
-                .build()).toList();
+                .build();
+        }).toList();
     }
 
     // ── 15. Open Orders ───────────────────────────────────────────────────────────
@@ -883,9 +920,10 @@ public class ReportServiceImpl implements ReportService {
     @Transactional(readOnly = true)
     public List<OrderClientSummaryRow> getOrderClientSummary(LocalDate startDate, LocalDate endDate) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
-        Map<Long, List<com.feros.api.entity.Order>> byClient = orderRepository
-                .findByTenantIdAndDateRange(tenantId, startDate, endDate).stream()
+        List<com.feros.api.entity.Order> all = orderRepository.findByTenantIdAndDateRange(tenantId, startDate, endDate);
+        Map<Long, List<com.feros.api.entity.Order>> byClient = all.stream()
                 .collect(Collectors.groupingBy(o -> o.getClient().getId()));
+        Map<Long, BigDecimal[]> ledger = ledgerByOrder(all.stream().map(com.feros.api.entity.Order::getId).toList());
 
         return byClient.entrySet().stream().map(entry -> {
             List<com.feros.api.entity.Order> orders = entry.getValue();
@@ -900,6 +938,10 @@ public class ReportServiceImpl implements ReportService {
                     .totalWeight(orders.stream().map(com.feros.api.entity.Order::getTotalWeight).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
                     .totalWeightFulfilled(orders.stream().map(com.feros.api.entity.Order::getTotalWeightFulfilled).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
                     .totalFreightAmount(orders.stream().map(com.feros.api.entity.Order::getTotalFreightAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add))
+                    .balance(orders.stream()
+                            .filter(o -> o.getOrderStatus() != OrderStatus.CANCELLED)
+                            .map(o -> orderBalance(o, ledger.get(o.getId())))
+                            .reduce(BigDecimal.ZERO, BigDecimal::add))
                     .build();
         }).sorted(Comparator.comparing(OrderClientSummaryRow::getClientName)).toList();
     }
@@ -912,13 +954,14 @@ public class ReportServiceImpl implements ReportService {
         Long tenantId = SecurityUtil.getCurrentTenantId();
         LocalDate today = TimeUtil.today();
 
-        return orderRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+        List<com.feros.api.entity.Order> overdue = orderRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
                 .filter(o -> OPEN_STATUSES.contains(o.getOrderStatus()))
                 .filter(o -> o.getExpectedDeliveryDate() != null)
-                .filter(o -> {
-                    long days = java.time.temporal.ChronoUnit.DAYS.between(o.getExpectedDeliveryDate(), today);
-                    return days >= thresholdDays;
-                })
+                .filter(o -> java.time.temporal.ChronoUnit.DAYS.between(o.getExpectedDeliveryDate(), today) >= thresholdDays)
+                .toList();
+        Map<Long, BigDecimal[]> ledger = ledgerByOrder(overdue.stream().map(com.feros.api.entity.Order::getId).toList());
+
+        return overdue.stream()
                 .map(o -> {
                     long daysOverdue = java.time.temporal.ChronoUnit.DAYS.between(o.getExpectedDeliveryDate(), today);
                     return OverdueOrderRow.builder()
@@ -934,6 +977,7 @@ public class ReportServiceImpl implements ReportService {
                             .totalWeight(o.getTotalWeight())
                             .totalWeightFulfilled(o.getTotalWeightFulfilled())
                             .orderStatus(o.getOrderStatus() != null ? o.getOrderStatus().name() : "—")
+                            .balance(orderBalance(o, ledger.get(o.getId())))
                             .build();
                 })
                 .sorted(Comparator.comparingLong(OverdueOrderRow::getDaysOverdue).reversed())
