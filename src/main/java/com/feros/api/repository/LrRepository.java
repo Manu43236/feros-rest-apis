@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,6 +50,15 @@ public interface LrRepository extends JpaRepository<Lr, Long> {
 
     @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true AND FUNCTION('DATE', l.loadedAt) = :date")
     List<Lr> findByTenantIdAndLoadedAtDate(@Param("tenantId") Long tenantId, @Param("date") LocalDate date);
+
+    // Historical fleet status: LRs whose trip was in progress on a given day
+    // (loaded on/before end of day, not yet delivered before start of day).
+    @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true " +
+           "AND l.loadedAt IS NOT NULL AND l.loadedAt <= :endOfDay " +
+           "AND (l.deliveredAt IS NULL OR l.deliveredAt >= :startOfDay)")
+    List<Lr> findOnTripBetween(@Param("tenantId") Long tenantId,
+                               @Param("startOfDay") LocalDateTime startOfDay,
+                               @Param("endOfDay") LocalDateTime endOfDay);
 
     @Query("SELECT l FROM Lr l WHERE l.tenant.id = :tenantId AND l.isActive = true AND FUNCTION('DATE', l.deliveredAt) = :date")
     List<Lr> findByTenantIdAndDeliveredAtDate(@Param("tenantId") Long tenantId, @Param("date") LocalDate date);

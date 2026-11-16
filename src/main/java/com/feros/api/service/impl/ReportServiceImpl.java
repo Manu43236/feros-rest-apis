@@ -258,6 +258,13 @@ public class ReportServiceImpl implements ReportService {
     @Transactional(readOnly = true)
     public List<FleetStatusRow> getFleetStatus(LocalDate date) {
         Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        // Past date → reconstruct each vehicle's status for that day from dated events.
+        // Today (or null/future) → live current-status snapshot (unchanged behaviour below).
+        if (date != null && date.isBefore(TimeUtil.today())) {
+            return reconstructFleetStatus(tenantId, date);
+        }
+
         // build vehicleId → inRepairType map from active services
         Map<Long, String> inRepairTypeByVehicle = vehicleServiceRepository
                 .findByTenantIdAndIsActiveTrueAndStatusIn(tenantId, List.of(ServiceStatus.OPEN, ServiceStatus.IN_PROGRESS))
@@ -280,6 +287,73 @@ public class ReportServiceImpl implements ReportService {
                             .vehicleBodyType(btName)
                             .currentStatus(status)
                             .inRepairType("IN_REPAIR".equals(status) ? inRepairTypeByVehicle.get(v.getId()) : null)
+                            .tripScope(v.getTripScope() != null ? v.getTripScope().name() : null)
+                            .build();
+                })
+                .toList();
+    }
+
+    // Rebuild fleet status for a PAST day from dated event tables (no per-day snapshot is stored).
+    // ponytail: "Assigned" has no date history → those days fall into AVAILABLE; vehicles deactivated
+    // since the date are excluded (uses today's active fleet). Upgrade to a daily snapshot table only
+    // if either approximation starts misleading the numbers.
+    // Precedence: Breakdown > In Service (IN_REPAIR) > On Trip > On Lease > Available.
+    private List<FleetStatusRow> reconstructFleetStatus(Long tenantId, LocalDate date) {
+        LocalDateTime startOfDay = date.atStartOfDay();
+        LocalDateTime endOfDay = date.atTime(23, 59, 59);
+
+        // On trip: an LR whose trip was in progress that day.
+        java.util.Set<Long> onTrip = lrRepository.findOnTripBetween(tenantId, startOfDay, endOfDay).stream()
+                .map(l -> l.getVehicleAllocation().getVehicle().getId())
+                .collect(Collectors.toSet());
+
+        // In service that day, split by trigger (breakdown-repair vs general maintenance).
+        Map<Long, String> inRepairTypeByVehicle = new HashMap<>();
+        for (VehicleService s : vehicleServiceRepository.findActiveOn(tenantId, date)) {
+            inRepairTypeByVehicle.merge(s.getVehicle().getId(),
+                    s.getTriggeredBy() == ServiceTriggeredBy.BREAKDOWN ? "BREAKDOWN" : "GENERAL",
+                    (a, b) -> "BREAKDOWN".equals(a) ? a : b); // breakdown-repair wins if both exist
+        }
+
+        // Open breakdowns that day (a breakdown already in repair is handled by IN_REPAIR above).
+        java.util.Set<Long> breakdown = breakdownRepository.findActiveOn(tenantId, startOfDay, endOfDay).stream()
+                .map(b -> b.getVehicle().getId())
+                .collect(Collectors.toSet());
+
+        // On lease: standing driver/cleaner lease holders + non-closed shift-lease vehicles.
+        java.util.Set<Long> leased = new java.util.HashSet<>(buildLeaseHolderByVehicle(tenantId, date, date).keySet());
+        leased.addAll(buildLeaseCleanerHolderByVehicle(tenantId, date, date).keySet());
+        leaseShiftAssignmentRepository.findOverlappingByTenantId(tenantId, date, date).stream()
+                .filter(a -> a.getLeaseVehicleAssignment().getLease().getStatus() != com.feros.api.enums.LeaseStatus.CLOSED)
+                .forEach(a -> leased.add(a.getLeaseVehicleAssignment().getVehicle().getId()));
+
+        return vehicleRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
+                .sorted(BY_VEHICLE_TYPE)
+                .map(v -> {
+                    Long id = v.getId();
+                    String status;
+                    String inRepairType = null;
+                    if (breakdown.contains(id) && !inRepairTypeByVehicle.containsKey(id)) {
+                        status = "BREAKDOWN";
+                    } else if (inRepairTypeByVehicle.containsKey(id)) {
+                        status = "IN_REPAIR";
+                        inRepairType = inRepairTypeByVehicle.get(id);
+                    } else if (onTrip.contains(id)) {
+                        status = "ON_TRIP";
+                    } else if (leased.contains(id)) {
+                        status = "ON_LEASE";
+                    } else {
+                        status = "AVAILABLE";
+                    }
+                    String vtName = v.getVehicleType() != null ? v.getVehicleType().getName() : "—";
+                    String btName = v.getVehicleBodyType() != null ? v.getVehicleBodyType().getName() : vtName;
+                    return FleetStatusRow.builder()
+                            .vehicleId(id)
+                            .registrationNumber(v.getRegistrationNumber())
+                            .vehicleType(vtName)
+                            .vehicleBodyType(btName)
+                            .currentStatus(status)
+                            .inRepairType(inRepairType)
                             .tripScope(v.getTripScope() != null ? v.getTripScope().name() : null)
                             .build();
                 })

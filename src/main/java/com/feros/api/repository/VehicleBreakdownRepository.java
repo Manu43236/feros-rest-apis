@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,4 +34,12 @@ public interface VehicleBreakdownRepository extends JpaRepository<VehicleBreakdo
     List<VehicleBreakdown> findByTenantIdAndDateRange(@Param("tenantId") Long tenantId,
                                                        @Param("from") LocalDate from,
                                                        @Param("to") LocalDate to);
+
+    // Historical fleet status: breakdowns that were open on a given day
+    // (started on/before end of day, not resolved before start of day).
+    @Query("SELECT b FROM VehicleBreakdown b WHERE b.tenant.id = :tenantId AND b.isActive = true " +
+           "AND b.breakdownDate <= :endOfDay AND (b.resolvedAt IS NULL OR b.resolvedAt >= :startOfDay)")
+    List<VehicleBreakdown> findActiveOn(@Param("tenantId") Long tenantId,
+                                        @Param("startOfDay") LocalDateTime startOfDay,
+                                        @Param("endOfDay") LocalDateTime endOfDay);
 }

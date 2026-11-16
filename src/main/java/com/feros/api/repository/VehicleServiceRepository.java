@@ -35,6 +35,13 @@ public interface VehicleServiceRepository extends JpaRepository<VehicleService, 
 
     List<VehicleService> findByTenantIdAndIsActiveTrueAndStatusIn(Long tenantId, List<ServiceStatus> statuses);
 
+    // Historical fleet status: services in progress on a given day
+    // (started on/before the day, not completed before it).
+    @Query("SELECT s FROM VehicleService s WHERE s.tenant.id = :tenantId AND s.isActive = true " +
+           "AND s.serviceDate IS NOT NULL AND s.serviceDate <= :date " +
+           "AND (s.completedDate IS NULL OR s.completedDate >= :date)")
+    List<VehicleService> findActiveOn(@Param("tenantId") Long tenantId, @Param("date") LocalDate date);
+
     // Find open/in-progress services with due_at_odometer within alert range of current reading
     @Query("SELECT s FROM VehicleService s WHERE s.vehicle.id = :vehicleId AND s.isActive = true " +
            "AND s.status IN ('OPEN','IN_PROGRESS') AND s.dueAtOdometer IS NOT NULL " +
