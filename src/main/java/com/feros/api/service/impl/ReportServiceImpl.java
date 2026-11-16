@@ -3195,6 +3195,76 @@ public class ReportServiceImpl implements ReportService {
                 .toList();
     }
 
+    // ── Role-wise Staff Statistics ──────────────────────────────────────────────
+    @Override
+    @Transactional(readOnly = true)
+    public StaffRoleStatsResponse getStaffRoleStats() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDate today = TimeUtil.today();
+        java.time.YearMonth thisMonth = java.time.YearMonth.from(today);
+        java.time.YearMonth prevMonth = thisMonth.minusMonths(1);
+        LocalDateTime monthStart = thisMonth.atDay(1).atStartOfDay();  // also = end of previous month
+
+        List<StaffProfile> profiles = staffProfileRepository.findDirectoryByTenantId(tenantId);
+
+        // role -> running stat (keyed by joined role label so multi-role staff count once)
+        Map<String, int[]> byRole = new java.util.LinkedHashMap<>();  // [added, deactivated, prevTotal]
+        List<StaffDirectoryRow> newJoiners = new java.util.ArrayList<>();
+
+        for (StaffProfile sp : profiles) {
+            User u = sp.getUser();
+            String role = u.getRoles().stream().map(r -> r.getName().name()).sorted()
+                    .collect(Collectors.joining(", "));
+            if (role.isBlank()) role = "—";
+            int[] s = byRole.computeIfAbsent(role, k -> new int[3]);
+
+            LocalDateTime createdAt = sp.getCreatedAt();
+            boolean active = Boolean.TRUE.equals(u.getIsActive());
+            // deactivation instant: explicit column, else fall back to last update
+            LocalDateTime deactivatedAt = !active
+                    ? (u.getDeactivatedAt() != null ? u.getDeactivatedAt() : u.getUpdatedAt())
+                    : null;
+
+            if (createdAt != null && !createdAt.isBefore(monthStart)) s[0]++;          // added this month
+            if (deactivatedAt != null && !deactivatedAt.isBefore(monthStart)) s[1]++;   // deactivated this month
+            // headcount as of end of previous month: existed by then and not yet deactivated
+            boolean existedByPrevEnd = createdAt != null && createdAt.isBefore(monthStart);
+            boolean goneByPrevEnd = deactivatedAt != null && deactivatedAt.isBefore(monthStart);
+            if (existedByPrevEnd && !goneByPrevEnd) s[2]++;
+
+            // new joiners list (by HR joining date, else record creation date)
+            LocalDate joined = sp.getJoiningDate() != null ? sp.getJoiningDate()
+                    : (createdAt != null ? createdAt.toLocalDate() : null);
+            if (joined != null && java.time.YearMonth.from(joined).equals(thisMonth)) {
+                newJoiners.add(StaffDirectoryRow.builder()
+                        .staffId(sp.getId())
+                        .name(u.getName())
+                        .role(role)
+                        .designation(sp.getDesignation() != null ? sp.getDesignation().getName() : "—")
+                        .joiningDate(joined.toString())
+                        .build());
+            }
+        }
+
+        List<StaffRoleStatRow> roleStats = byRole.entrySet().stream()
+                .map(e -> StaffRoleStatRow.builder()
+                        .role(e.getKey())
+                        .addedThisMonth(e.getValue()[0])
+                        .deactivatedThisMonth(e.getValue()[1])
+                        .totalPreviousMonth(e.getValue()[2])
+                        .build())
+                .sorted(Comparator.comparing(StaffRoleStatRow::getRole, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        newJoiners.sort(Comparator.comparing(StaffDirectoryRow::getName, String.CASE_INSENSITIVE_ORDER));
+
+        return StaffRoleStatsResponse.builder()
+                .currentMonthLabel(thisMonth.toString())
+                .previousMonthLabel(prevMonth.toString())
+                .roleStats(roleStats)
+                .newJoiners(newJoiners)
+                .build();
+    }
+
     private Map<Long, StaffProfile> buildProfileMap(Long tenantId) {
         return staffProfileRepository.findByTenantIdAndIsActiveTrue(tenantId).stream()
                 .collect(Collectors.toMap(p -> p.getUser().getId(), p -> p, (a, b) -> a));

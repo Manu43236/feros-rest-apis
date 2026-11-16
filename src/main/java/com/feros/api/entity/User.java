@@ -49,6 +49,11 @@ public class User extends BaseEntity {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    // Set when isActive flips to false; cleared on reactivation. Null for rows
+    // deactivated before this column existed — reports fall back to updatedAt.
+    @Column(name = "deactivated_at")
+    private LocalDateTime deactivatedAt;
+
     @Builder.Default
     @Column(name = "failed_login_attempts", nullable = false)
     private int failedLoginAttempts = 0;

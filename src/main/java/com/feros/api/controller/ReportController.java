@@ -1094,6 +1094,28 @@ public class ReportController {
         return export("staff-directory", "Staff Directory", headers, data, format);
     }
 
+    // ── Role-wise Staff Statistics ───────────────────────────────────────────────
+
+    @GetMapping("/staff/role-stats")
+    public ResponseEntity<ApiResponse<StaffRoleStatsResponse>> getStaffRoleStats() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Staff role statistics fetched", reportService.getStaffRoleStats()));
+    }
+
+    @GetMapping("/staff/role-stats/export")
+    public ResponseEntity<byte[]> exportStaffRoleStats(
+            @RequestParam(defaultValue = "csv") String format) {
+        StaffRoleStatsResponse res = reportService.getStaffRoleStats();
+        String[] headers = {"Role", "Added (" + res.getCurrentMonthLabel() + ")",
+                "Deactivated (" + res.getCurrentMonthLabel() + ")",
+                "Total (" + res.getPreviousMonthLabel() + ")"};
+        List<String[]> data = res.getRoleStats().stream().map(r -> new String[]{
+                r.getRole(), String.valueOf(r.getAddedThisMonth()),
+                String.valueOf(r.getDeactivatedThisMonth()), String.valueOf(r.getTotalPreviousMonth())
+        }).toList();
+        return export("staff-role-stats", "Staff Role Statistics", headers, data, format);
+    }
+
     // ── Document Cost Summary ─────────────────────────────────────────────────
 
     @GetMapping("/expenses/documents")

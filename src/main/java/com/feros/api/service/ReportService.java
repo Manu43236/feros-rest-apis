@@ -125,6 +125,9 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
     // ── Staff Directory ────────────────────────────────────────────────────────
     List<StaffDirectoryRow> getStaffDirectory();
 
+    // ── Role-wise Staff Statistics ──────────────────────────────────────────────
+    StaffRoleStatsResponse getStaffRoleStats();
+
     // ── Daily Fleet Attendance ─────────────────────────────────────────────────
     DailyFleetAttendanceReport getDailyFleetAttendance(LocalDate date, TripScope scope);
 

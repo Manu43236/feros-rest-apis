@@ -237,6 +237,7 @@ public class UserServiceImpl implements UserService {
                     HttpStatus.CONFLICT);
         }
         user.setIsActive(false);
+        user.setDeactivatedAt(TimeUtil.nowIst());
         userRepository.save(user);
     }
 
@@ -256,6 +257,7 @@ public class UserServiceImpl implements UserService {
                     HttpStatus.CONFLICT);
         }
         user.setIsActive(request.getIsActive());
+        user.setDeactivatedAt(Boolean.FALSE.equals(request.getIsActive()) ? TimeUtil.nowIst() : null);
         User updated = userRepository.save(user);
         return mapToResponse(updated, null);
     }
