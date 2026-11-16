@@ -2376,6 +2376,154 @@ public class ReportServiceImpl implements ReportService {
         }).sorted(Comparator.comparing(TripPnlRow::getLrDate).reversed()).toList();
     }
 
+    // ── Category P&L — rolls the per-vehicle P&L up to (tyre type × body type) ──────
+    // Same revenue/expense sources as getVehiclePnl, but: maintenance is split into Spares
+    // (parts) vs Service (labour), Salaries is the lease-aware per-vehicle payroll
+    // (computeStaffVehicleDayCosts — the SAME truth the payslip/attendance use), and Others
+    // folds tyre purchase + document costs. Vehicles with expenses but no revenue still show.
+    @Override
+    @Transactional(readOnly = true)
+    public List<CategoryPnlRow> getCategoryPnl(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+
+        // Revenue by vehicle (by LR date)
+        List<InvoiceLr> invoiceLrs = invoiceLrRepository.findByTenantIdAndLrDateRange(tenantId, startDate, endDate);
+        Map<Long, BigDecimal> revenueByVehicle = invoiceLrs.stream()
+                .filter(il -> il.getLr().getVehicleAllocation() != null && il.getLr().getVehicleAllocation().getVehicle() != null)
+                .collect(Collectors.groupingBy(il -> il.getLr().getVehicleAllocation().getVehicle().getId(),
+                        Collectors.reducing(BigDecimal.ZERO,
+                                il -> il.getTotalAmount() != null ? il.getTotalAmount() : BigDecimal.ZERO, BigDecimal::add)));
+
+        // Trip expenses by vehicle
+        List<LrTripExpense> expenses = tripExpenseRepository.findByTenantIdAndLrDateRange(tenantId, startDate, endDate);
+        Map<Long, BigDecimal> itemTotalById = buildItemTotalMap(expenses);
+        Map<Long, BigDecimal> tripExpByVehicle = expenses.stream()
+                .filter(e -> e.getLr().getVehicleAllocation() != null && e.getLr().getVehicleAllocation().getVehicle() != null)
+                .collect(Collectors.groupingBy(e -> e.getLr().getVehicleAllocation().getVehicle().getId(),
+                        Collectors.reducing(BigDecimal.ZERO, e -> tripTotal(e, itemTotalById), BigDecimal::add)));
+
+        // Diesel (fuel) by vehicle
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(LocalTime.MAX);
+        Map<Long, BigDecimal> fuelByVehicle = fuelLogRepository.findByTenantIdAndDateRange(tenantId, start, end).stream()
+                .collect(Collectors.groupingBy(l -> l.getVehicle().getId(),
+                        Collectors.reducing(BigDecimal.ZERO, l -> l.getTotalCost() != null ? l.getTotalCost() : BigDecimal.ZERO, BigDecimal::add)));
+
+        // Maintenance split: Spares (parts) vs Service (labour)
+        List<VehicleService> maintServices = vehicleServiceRepository.findForMaintenanceCostReport(tenantId, startDate, endDate);
+        List<Long> maintServiceIds = maintServices.stream().map(VehicleService::getId).toList();
+        List<ServicePart> maintParts = servicePartRepository.findByServiceIdIn(maintServiceIds);
+        List<Long> maintPartIds = maintParts.stream().map(ServicePart::getId).toList();
+        Map<Long, BigDecimal> maintTxCostByPartId = maintPartIds.isEmpty()
+                ? Map.of()
+                : sparePartsTransactionRepository.findByServicePart_IdIn(maintPartIds).stream()
+                        .filter(tx -> tx.getTotalCost() != null)
+                        .collect(Collectors.toMap(tx -> tx.getServicePart().getId(),
+                                SparePartsTransaction::getTotalCost, BigDecimal::add));
+        Map<Long, BigDecimal> partsCostByServiceId = maintParts.stream()
+                .collect(Collectors.toMap(sp -> sp.getService().getId(),
+                        sp -> maintTxCostByPartId.getOrDefault(sp.getId(), BigDecimal.ZERO), BigDecimal::add));
+        Map<Long, BigDecimal> sparesByVehicle = maintServices.stream()
+                .collect(Collectors.groupingBy(s -> s.getVehicle().getId(),
+                        Collectors.reducing(BigDecimal.ZERO,
+                                s -> partsCostByServiceId.getOrDefault(s.getId(), BigDecimal.ZERO), BigDecimal::add)));
+        Map<Long, BigDecimal> serviceByVehicle = maintServices.stream()
+                .collect(Collectors.groupingBy(s -> s.getVehicle().getId(),
+                        Collectors.reducing(BigDecimal.ZERO,
+                                s -> s.getTotalCost() != null ? s.getTotalCost() : BigDecimal.ZERO, BigDecimal::add)));
+
+        // Document cost by vehicle (part of Others)
+        Map<Long, BigDecimal> docByVehicle = documentRepository.findByTenantIdAndPaidOnBetween(tenantId, startDate, endDate).stream()
+                .collect(Collectors.groupingBy(d -> d.getVehicle().getId(),
+                        Collectors.reducing(BigDecimal.ZERO, d -> d.getCost() != null ? d.getCost() : BigDecimal.ZERO, BigDecimal::add)));
+
+        // Tyre purchase cost by vehicle (part of Others) — attributed to the first fitting vehicle
+        List<com.feros.api.entity.Tyre> catTyres = tyreRepository.findByTenantIdAndPurchaseDateBetweenAndIsActiveTrue(tenantId, startDate, endDate);
+        Map<Long, BigDecimal> tyreCostByVehicle = new java.util.HashMap<>();
+        if (!catTyres.isEmpty()) {
+            List<Long> catTyreIds = catTyres.stream().map(com.feros.api.entity.Tyre::getId).toList();
+            List<VehicleTyreFitting> catFittings = vehicleTyreFittingRepository
+                    .findByTyreIdInAndIsActiveTrueOrderByFittedDateAscIdAsc(catTyreIds);
+            Map<Long, VehicleTyreFitting> firstFittingByTyreId = new LinkedHashMap<>();
+            for (VehicleTyreFitting f : catFittings) firstFittingByTyreId.putIfAbsent(f.getTyre().getId(), f);
+            for (com.feros.api.entity.Tyre t : catTyres) {
+                VehicleTyreFitting fitting = firstFittingByTyreId.get(t.getId());
+                if (fitting != null) {
+                    BigDecimal cost = t.getPurchaseCost() != null ? t.getPurchaseCost() : BigDecimal.ZERO;
+                    tyreCostByVehicle.merge(fitting.getVehicle().getId(), cost, BigDecimal::add);
+                }
+            }
+        }
+
+        // Salaries by vehicle — lease-aware (VSA → order → lease → shift), same truth as payslip
+        Map<Long, BigDecimal> salaryByVehicle = computeStaffVehicleDayCosts(tenantId, "ALL", startDate, endDate).stream()
+                .collect(Collectors.groupingBy(StaffVehicleDayCost::vehicleId,
+                        Collectors.reducing(BigDecimal.ZERO, StaffVehicleDayCost::dailyPay, BigDecimal::add)));
+
+        // Union of every vehicle that touched any bucket, then resolve its type/body type
+        Set<Long> allVehicleIds = new java.util.HashSet<>();
+        allVehicleIds.addAll(revenueByVehicle.keySet());
+        allVehicleIds.addAll(tripExpByVehicle.keySet());
+        allVehicleIds.addAll(fuelByVehicle.keySet());
+        allVehicleIds.addAll(sparesByVehicle.keySet());
+        allVehicleIds.addAll(serviceByVehicle.keySet());
+        allVehicleIds.addAll(docByVehicle.keySet());
+        allVehicleIds.addAll(tyreCostByVehicle.keySet());
+        allVehicleIds.addAll(salaryByVehicle.keySet());
+        if (allVehicleIds.isEmpty()) return List.of();
+        Map<Long, Vehicle> vehicleById = vehicleRepository.findByTenantId(tenantId).stream()
+                .filter(v -> allVehicleIds.contains(v.getId()))
+                .collect(Collectors.toMap(Vehicle::getId, v -> v));
+
+        class Acc {
+            String tyreType; String vehicleType; Integer tyreCount; int count;
+            BigDecimal revenue = BigDecimal.ZERO, diesel = BigDecimal.ZERO, salaries = BigDecimal.ZERO,
+                    spares = BigDecimal.ZERO, service = BigDecimal.ZERO, tripExp = BigDecimal.ZERO, others = BigDecimal.ZERO;
+        }
+        Map<String, Acc> byCategory = new LinkedHashMap<>();
+        for (Vehicle v : vehicleById.values()) {
+            String tyreType = v.getVehicleType() != null ? v.getVehicleType().getName() : "—";
+            String vType = v.getVehicleBodyType() != null ? v.getVehicleBodyType().getName() : "—";
+            Integer tc = v.getVehicleType() != null ? v.getVehicleType().getTyreCount() : null;
+            Acc a = byCategory.computeIfAbsent(tyreType + "||" + vType, k -> {
+                Acc x = new Acc(); x.tyreType = tyreType; x.vehicleType = vType; x.tyreCount = tc; return x;
+            });
+            Long id = v.getId();
+            a.count++;
+            a.revenue = a.revenue.add(revenueByVehicle.getOrDefault(id, BigDecimal.ZERO));
+            a.diesel = a.diesel.add(fuelByVehicle.getOrDefault(id, BigDecimal.ZERO));
+            a.salaries = a.salaries.add(salaryByVehicle.getOrDefault(id, BigDecimal.ZERO));
+            a.spares = a.spares.add(sparesByVehicle.getOrDefault(id, BigDecimal.ZERO));
+            a.service = a.service.add(serviceByVehicle.getOrDefault(id, BigDecimal.ZERO));
+            a.tripExp = a.tripExp.add(tripExpByVehicle.getOrDefault(id, BigDecimal.ZERO));
+            a.others = a.others.add(tyreCostByVehicle.getOrDefault(id, BigDecimal.ZERO))
+                    .add(docByVehicle.getOrDefault(id, BigDecimal.ZERO));
+        }
+
+        return byCategory.values().stream().map(a -> {
+            BigDecimal totalExp = a.diesel.add(a.salaries).add(a.spares).add(a.service).add(a.tripExp).add(a.others);
+            return CategoryPnlRow.builder()
+                    .tyreType(a.tyreType)
+                    .vehicleType(a.vehicleType)
+                    .tyreCount(a.tyreCount)
+                    .vehicleCount(a.count)
+                    .revenue(a.revenue)
+                    .diesel(a.diesel)
+                    .salaries(a.salaries)
+                    .spares(a.spares)
+                    .service(a.service)
+                    .tripExpenses(a.tripExp)
+                    .others(a.others)
+                    .totalExpenses(totalExp)
+                    .netPnl(a.revenue.subtract(totalExp))
+                    .build();
+        }).sorted(Comparator.comparing((CategoryPnlRow r) -> r.getTyreCount(),
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(r -> r.getVehicleType() != null ? r.getVehicleType() : "",
+                        String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
     // ── P&L Helpers ───────────────────────────────────────────────────────────────
 
     private List<InvoicePayment> paymentsForInvoiceLrs(Long tenantId, List<InvoiceLr> invoiceLrs) {

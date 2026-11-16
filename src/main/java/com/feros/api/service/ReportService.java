@@ -92,6 +92,8 @@ List<FuelMileageRow> getFuelMileage(LocalDate startDate, LocalDate endDate);
 
     List<TripPnlRow> getTripPnl(LocalDate startDate, LocalDate endDate);
 
+    List<CategoryPnlRow> getCategoryPnl(LocalDate startDate, LocalDate endDate);
+
     // ── Inventory Reports ──────────────────────────────────────────────────────
     List<StockSummaryRow> getStockSummary();
     List<StockInwardRow> getStockInward(LocalDate startDate, LocalDate endDate);

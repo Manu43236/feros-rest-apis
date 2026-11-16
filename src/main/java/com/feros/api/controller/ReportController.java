@@ -1304,6 +1304,35 @@ public class ReportController {
                 "P&L Per Route — " + startDate + " to " + endDate, headers, data, format);
     }
 
+    // ── P&L by Vehicle Category (tyre type × body type) ───────────────────────
+
+    @GetMapping("/pnl/category")
+    public ResponseEntity<ApiResponse<List<CategoryPnlRow>>> getCategoryPnl(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Category P&L fetched", reportService.getCategoryPnl(startDate, endDate)));
+    }
+
+    @GetMapping("/pnl/category/export")
+    public ResponseEntity<byte[]> exportCategoryPnl(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<CategoryPnlRow> rows = reportService.getCategoryPnl(startDate, endDate);
+        String[] headers = {"Tyre Type", "Vehicle Type", "Vehicles", "Revenue (₹)",
+                "Diesel (₹)", "Salaries (₹)", "Spares (₹)", "Service (₹)", "Trip Exp (₹)", "Others (₹)",
+                "Total Exp (₹)", "Profit & Loss (₹)"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                r.getTyreType(), r.getVehicleType(), String.valueOf(r.getVehicleCount()),
+                safe(r.getRevenue()), safe(r.getDiesel()), safe(r.getSalaries()), safe(r.getSpares()),
+                safe(r.getService()), safe(r.getTripExpenses()), safe(r.getOthers()),
+                safe(r.getTotalExpenses()), safe(r.getNetPnl())
+        }).toList();
+        return export("category-pnl-" + startDate + "-" + endDate,
+                "P&L by Vehicle Category — " + startDate + " to " + endDate, headers, data, format);
+    }
+
     // ── Inventory: Stock Summary ──────────────────────────────────────────────
 
     @GetMapping("/inventory/stock-summary")
