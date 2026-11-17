@@ -1462,10 +1462,13 @@ public class ReportController {
     @GetMapping("/tyres/inventory/export")
     public ResponseEntity<byte[]> exportTyreInventory(@RequestParam(defaultValue = "csv") String format) {
         List<TyreInventoryRow> rows = reportService.getTyreInventory();
-        String[] headers = {"Serial No.", "Brand", "Size", "Type", "Ply", "Purchase Date", "Cost", "Status", "Lifetime KM", "Max KM", "% Used", "Retrds", "Expiry", "Fitted On", "Position"};
+        String[] headers = {"Serial No.", "Brand", "Size", "Type", "Ply", "Purchase Date", "Cost", "Status", "Condition", "Lifetime KM", "Max KM", "% Used", "Retrds", "Expiry", "Fitted On", "Position"};
         List<String[]> data = rows.stream().map(r -> new String[]{
                 r.getSerialNumber(), r.getBrand(), r.getSize(), r.getTyreType(), safe(r.getPlyRating()),
                 safe(r.getPurchaseDate()), safe(r.getPurchaseCost()), r.getStatus(),
+                // real-state condition: ever-retreaded wins, then second-hand, else new
+                (r.getRetreadCount() > 0 || "RETREADED".equals(r.getPurchaseCondition())) ? "Retreaded"
+                        : "SECOND_HAND".equals(r.getPurchaseCondition()) ? "Second Hand" : "New",
                 String.valueOf(r.getTotalLifetimeKm()), String.valueOf(r.getMaxLifetimeKm()),
                 r.getPercentLifeUsed() + "%", String.valueOf(r.getRetreadCount()),
                 safe(r.getExpiryDate()), safe(r.getFittedOnVehicle()), safe(r.getFittedPosition())

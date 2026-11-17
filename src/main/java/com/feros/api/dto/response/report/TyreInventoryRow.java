@@ -16,6 +16,7 @@ public class TyreInventoryRow {
     private LocalDate purchaseDate;
     private BigDecimal purchaseCost;
     private String status; // IN_STOCK / FITTED / RETREADING / SCRAPPED / DISPOSED
+    private String purchaseCondition; // NEW / SECOND_HAND / RETREADED (bought-as; real-state derived client-side via retreadCount)
     private double totalLifetimeKm;
     private double maxLifetimeKm;
     private double percentLifeUsed;

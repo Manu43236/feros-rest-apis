@@ -2753,6 +2753,7 @@ public class ReportServiceImpl implements ReportService {
                     .purchaseDate(t.getPurchaseDate())
                     .purchaseCost(t.getPurchaseCost())
                     .status(t.getStatus() != null ? t.getStatus().name() : "—")
+                    .purchaseCondition(t.getPurchaseCondition() != null ? t.getPurchaseCondition().name() : "NEW")
                     .totalLifetimeKm(lifetimeKm)
                     .maxLifetimeKm(maxKm)
                     .percentLifeUsed(Math.round(pctUsed * 10.0) / 10.0)
