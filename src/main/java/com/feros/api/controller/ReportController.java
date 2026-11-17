@@ -1534,9 +1534,11 @@ public class ReportController {
     @GetMapping("/tyres/life/export")
     public ResponseEntity<byte[]> exportTyreLifeReport(@RequestParam(defaultValue = "csv") String format) {
         List<TyreLifeRow> rows = reportService.getTyreLifeReport();
-        String[] headers = {"Serial No.", "Brand", "Size", "Type", "Lifetime KM", "Max KM", "% Used", "Retreads", "Status"};
+        String[] headers = {"Serial No.", "Brand", "Size", "Type", "Fitted On", "Lifetime KM", "Max KM", "% Used", "Retreads", "Status"};
         List<String[]> data = rows.stream().map(r -> new String[]{
                 r.getSerialNumber(), r.getBrand(), r.getSize(), r.getTyreType(),
+                r.getFittedVehicleRegistration() == null ? "In stock"
+                        : r.getFittedVehicleRegistration() + (r.getFittedPosition() != null ? " · " + r.getFittedPosition() : ""),
                 String.valueOf(r.getTotalLifetimeKm()), String.valueOf(r.getMaxLifetimeKm()),
                 r.getPercentLifeUsed() + "%", String.valueOf(r.getRetreadCount()), r.getStatus()
         }).toList();

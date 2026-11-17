@@ -2812,11 +2812,21 @@ public class ReportServiceImpl implements ReportService {
     @Transactional(readOnly = true)
     public List<TyreLifeRow> getTyreLifeReport() {
         Long tenantId = SecurityUtil.getCurrentTenantId();
+        // tyreId -> current (not-removed) fitting, loaded once to avoid N+1
+        Map<Long, VehicleTyreFitting> fittingByTyre = vehicleTyreFittingRepository
+                .findAllActiveFittingsByTenantId(tenantId).stream()
+                .filter(f -> f.getRemovedDate() == null && f.getTyre() != null)
+                .collect(Collectors.toMap(f -> f.getTyre().getId(), f -> f, (a, b) -> a));
         return tyreRepository.findByTenantIdAndIsActiveTrueOrderByIdDesc(tenantId).stream()
                 .map(t -> {
                     double lifetimeKm = t.getTotalLifetimeKm() != null ? t.getTotalLifetimeKm().doubleValue() : 0;
                     double maxKm = t.getMaxLifetimeKm() != null ? t.getMaxLifetimeKm().doubleValue() : 0;
                     double pctUsed = maxKm > 0 ? Math.min(100.0, lifetimeKm / maxKm * 100) : 0;
+                    VehicleTyreFitting fitting = fittingByTyre.get(t.getId());
+                    String fittedReg = fitting != null && fitting.getVehicle() != null
+                            ? fitting.getVehicle().getRegistrationNumber() : null;
+                    String fittedPos = fitting != null && fitting.getPosition() != null
+                            ? fitting.getPosition().getPositionCode() : null;
                     return TyreLifeRow.builder()
                             .tyreId(t.getId())
                             .serialNumber(t.getSerialNumber())
@@ -2828,6 +2838,8 @@ public class ReportServiceImpl implements ReportService {
                             .percentLifeUsed(Math.round(pctUsed * 10.0) / 10.0)
                             .retreadCount(t.getRetreadCount() != null ? t.getRetreadCount() : 0)
                             .status(t.getStatus() != null ? t.getStatus().name() : "—")
+                            .fittedVehicleRegistration(fittedReg)
+                            .fittedPosition(fittedPos)
                             .build();
                 })
                 .sorted(Comparator.comparingDouble(TyreLifeRow::getPercentLifeUsed).reversed())
