@@ -1,6 +1,7 @@
 package com.feros.api.controller;
 
 import com.feros.api.dto.request.DocumentRequest;
+import com.feros.api.dto.request.UpdateDocumentRequest;
 import com.feros.api.dto.request.StaffProfileRequest;
 import com.feros.api.dto.response.ApiResponse;
 import com.feros.api.dto.response.DocumentResponse;
@@ -69,6 +70,16 @@ public class StaffProfileController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Document added successfully",
                 staffProfileService.addStaffDocument(userId, request)));
+    }
+
+    @PutMapping("/documents/{documentId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<DocumentResponse>> updateStaffDocument(
+            @PathVariable Long documentId,
+            @RequestBody UpdateDocumentRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Document updated successfully",
+                staffProfileService.updateStaffDocument(documentId, request)));
     }
 
     @PutMapping("/documents/{documentId}/verify")

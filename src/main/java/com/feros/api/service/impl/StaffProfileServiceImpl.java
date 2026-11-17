@@ -5,6 +5,7 @@ import com.feros.api.dto.request.DocumentRequest;
 import com.feros.api.dto.request.StaffProfileRequest;
 import com.feros.api.dto.request.UpdateDocumentRequest;
 import com.feros.api.dto.response.DocumentResponse;
+import com.feros.api.dto.response.DocumentListRow;
 import com.feros.api.dto.response.DriverDocsResponse;
 import com.feros.api.dto.response.StaffProfileResponse;
 import com.feros.api.dto.response.VehicleImageResponse;
@@ -21,6 +22,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -186,6 +190,22 @@ public class StaffProfileServiceImpl implements StaffProfileService {
     }
 
     @Override
+    @Transactional
+    public DocumentResponse updateStaffDocument(Long documentId, UpdateDocumentRequest request) {
+        StaffDocument doc = staffDocumentRepository
+                .findByIdAndTenantIdAndIsActiveTrue(documentId, getCurrentTenantId())
+                .orElseThrow(() -> new FerosException("Document not found", HttpStatus.NOT_FOUND));
+
+        if (request.getDocumentNumber() != null) doc.setDocumentNumber(request.getDocumentNumber());
+        if (request.getIssueDate()      != null) doc.setIssueDate(request.getIssueDate());
+        if (request.getExpiryDate()     != null) doc.setExpiryDate(request.getExpiryDate());
+        if (request.getFileUrl()        != null) doc.setFileUrl(request.getFileUrl());
+        if (request.getRemarks()        != null) doc.setRemarks(request.getRemarks());
+
+        return mapToDocumentResponse(staffDocumentRepository.save(doc));
+    }
+
+    @Override
     public List<DocumentResponse> getStaffDocuments(Long userId) {
         return staffDocumentRepository
                 .findByUserIdAndTenantIdAndIsActiveTrue(userId, getCurrentTenantId())
@@ -272,6 +292,86 @@ public class StaffProfileServiceImpl implements StaffProfileService {
         return vehicleDocumentRepository
                 .findByVehicleIdAndTenantIdAndIsActiveTrue(vehicleId, getCurrentTenantId())
                 .stream().map(this::mapToDocumentResponse).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DocumentListRow> getDocumentList(String entity, String status, String query, int withinDays) {
+        Long tenantId = getCurrentTenantId();
+        LocalDate today = TimeUtil.today();
+        String wantEntity = entity == null ? "ALL" : entity.toUpperCase();
+        String wantStatus = status == null ? "ALL" : status.toUpperCase();
+        String q = query == null ? "" : query.trim().toLowerCase();
+
+        List<DocumentListRow> rows = new ArrayList<>();
+
+        if (!"STAFF".equals(wantEntity)) {
+            for (VehicleDocument d : vehicleDocumentRepository.findByTenantIdAndIsActiveTrue(tenantId)) {
+                rows.add(DocumentListRow.builder()
+                        .documentId(d.getId())
+                        .entityType("VEHICLE")
+                        .ownerId(d.getVehicle().getId())
+                        .ownerName(d.getVehicle().getRegistrationNumber())
+                        .ownerSubtitle(d.getVehicle().getVehicleType() != null
+                                ? d.getVehicle().getVehicleType().getName() : null)
+                        .documentTypeId(d.getDocumentType().getId())
+                        .documentTypeName(d.getDocumentType().getName())
+                        .documentNumber(d.getDocumentNumber())
+                        .issueDate(d.getIssueDate())
+                        .expiryDate(d.getExpiryDate())
+                        .fileUrl(d.getFileUrl())
+                        .daysLeft(d.getExpiryDate() != null ? ChronoUnit.DAYS.between(today, d.getExpiryDate()) : null)
+                        .status(statusOf(d.getExpiryDate(), today, withinDays))
+                        .build());
+            }
+        }
+
+        if (!"VEHICLE".equals(wantEntity)) {
+            for (StaffDocument d : staffDocumentRepository.findByTenantIdAndIsActiveTrue(tenantId)) {
+                String role = d.getUser().getRoles().stream().findFirst()
+                        .map(r -> r.getName() != null ? r.getName().name() : null).orElse(null);
+                rows.add(DocumentListRow.builder()
+                        .documentId(d.getId())
+                        .entityType("STAFF")
+                        .ownerId(d.getUser().getId())
+                        .ownerName(d.getUser().getName())
+                        .ownerSubtitle(role)
+                        .documentTypeId(d.getDocumentType().getId())
+                        .documentTypeName(d.getDocumentType().getName())
+                        .documentNumber(d.getDocumentNumber())
+                        .issueDate(d.getIssueDate())
+                        .expiryDate(d.getExpiryDate())
+                        .fileUrl(d.getFileUrl())
+                        .daysLeft(d.getExpiryDate() != null ? ChronoUnit.DAYS.between(today, d.getExpiryDate()) : null)
+                        .status(statusOf(d.getExpiryDate(), today, withinDays))
+                        .build());
+            }
+        }
+
+        return rows.stream()
+                .filter(r -> "ALL".equals(wantStatus) || wantStatus.equals(r.getStatus()))
+                .filter(r -> q.isEmpty()
+                        || (r.getOwnerName() != null && r.getOwnerName().toLowerCase().contains(q))
+                        || (r.getDocumentNumber() != null && r.getDocumentNumber().toLowerCase().contains(q)))
+                .sorted(Comparator.comparingInt((DocumentListRow r) -> statusRank(r.getStatus()))
+                        .thenComparing(r -> r.getDaysLeft() == null ? Long.MAX_VALUE : r.getDaysLeft())
+                        .thenComparing(r -> r.getOwnerName() == null ? "" : r.getOwnerName()))
+                .toList();
+    }
+
+    private String statusOf(LocalDate expiry, LocalDate today, int withinDays) {
+        if (expiry == null) return "ACTIVE";
+        if (expiry.isBefore(today)) return "EXPIRED";
+        if (!expiry.isAfter(today.plusDays(withinDays))) return "EXPIRING";
+        return "ACTIVE";
+    }
+
+    private int statusRank(String status) {
+        return switch (status) {
+            case "EXPIRED" -> 0;
+            case "EXPIRING" -> 1;
+            default -> 2;
+        };
     }
 
     @Override

@@ -4,6 +4,7 @@ import com.feros.api.dto.request.DocumentRequest;
 import com.feros.api.dto.request.StaffProfileRequest;
 import com.feros.api.dto.request.UpdateDocumentRequest;
 import com.feros.api.dto.response.DocumentResponse;
+import com.feros.api.dto.response.DocumentListRow;
 import com.feros.api.dto.response.DriverDocsResponse;
 import com.feros.api.dto.response.StaffProfileResponse;
 import com.feros.api.dto.response.VehicleImageResponse;
@@ -17,8 +18,11 @@ public interface StaffProfileService {
     List<StaffProfileResponse> getAllProfiles(boolean equipmentOnly);
 
     DocumentResponse addStaffDocument(Long userId, DocumentRequest request);
+    DocumentResponse updateStaffDocument(Long documentId, UpdateDocumentRequest request);
     List<DocumentResponse> getStaffDocuments(Long userId);
     DocumentResponse verifyStaffDocument(Long documentId);
+
+    List<DocumentListRow> getDocumentList(String entity, String status, String query, int withinDays);
 
     DocumentResponse addVehicleDocument(Long vehicleId, DocumentRequest request);
     DocumentResponse updateVehicleDocument(Long documentId, UpdateDocumentRequest request);
