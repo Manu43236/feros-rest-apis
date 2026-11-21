@@ -83,6 +83,244 @@ public class ReportController {
         return export("machine-staff-cost", "Machine Staff Cost", headers, data, format);
     }
 
+    // ══ Equipment mirrors of the vehicle report set ════════════════════════════
+
+    @GetMapping("/equipment/master")
+    public ResponseEntity<ApiResponse<List<EquipmentMasterRow>>> getEquipmentMaster() {
+        return ResponseEntity.ok(ApiResponse.success("Equipment master fetched", reportService.getEquipmentMaster()));
+    }
+
+    @GetMapping("/equipment/master/export")
+    public ResponseEntity<byte[]> exportEquipmentMaster(@RequestParam(defaultValue = "csv") String format) {
+        List<EquipmentMasterRow> rows = reportService.getEquipmentMaster();
+        String[] headers = {"Serial No.", "Reg No.", "Make", "Model", "Type", "Fuel", "Ownership", "Status",
+                "Meter", "Current Reading", "Mfg Year", "Tank Cap. (L)", "Chassis No.", "Engine No.",
+                "Financed", "Financer", "Finance From", "Finance To", "Hired From", "Hire Start", "Hire End",
+                "Hire Rate", "Rate Unit"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getSerialNumber()), safe(r.getRegistrationNumber()), safe(r.getMake()), safe(r.getModel()),
+                safe(r.getEquipmentType()), safe(r.getFuelType()), safe(r.getOwnershipType()), safe(r.getWorkStatus()),
+                safe(r.getMeterType()), safe(r.getCurrentMeterReading()), safe(r.getManufactureYear()),
+                safe(r.getFuelTankCapacity()), safe(r.getChassisNumber()), safe(r.getEngineNumber()),
+                Boolean.TRUE.equals(r.getIsFinanced()) ? "Yes" : "No", safe(r.getFinancerName()),
+                safe(r.getFinanceFrom()), safe(r.getFinanceTo()), safe(r.getHiredFrom()),
+                safe(r.getHireStartDate()), safe(r.getHireEndDate()), safe(r.getHireRate()), safe(r.getHireRateUnit()),
+        }).toList();
+        return export("equipment-master", "Equipment Master", headers, data, format);
+    }
+
+    @GetMapping("/equipment/fleet-status")
+    public ResponseEntity<ApiResponse<List<EquipmentFleetStatusRow>>> getEquipmentFleetStatus() {
+        return ResponseEntity.ok(ApiResponse.success("Equipment fleet status fetched",
+                reportService.getEquipmentFleetStatus()));
+    }
+
+    @GetMapping("/equipment/fleet-status/export")
+    public ResponseEntity<byte[]> exportEquipmentFleetStatus(@RequestParam(defaultValue = "csv") String format) {
+        List<EquipmentFleetStatusRow> rows = reportService.getEquipmentFleetStatus();
+        String[] headers = {"Serial No.", "Reg No.", "Type", "Make", "Model", "Status",
+                "Current Reading", "Meter", "Work Order", "Client", "Site"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getSerialNumber()), safe(r.getRegistrationNumber()), safe(r.getEquipmentType()),
+                safe(r.getMake()), safe(r.getModel()), safe(r.getWorkStatus()), safe(r.getCurrentMeterReading()),
+                safe(r.getMeterType()), safe(r.getWorkOrderNumber()), safe(r.getClientName()), safe(r.getSite()),
+        }).toList();
+        return export("equipment-fleet-status", "Equipment Fleet Status", headers, data, format);
+    }
+
+    @GetMapping("/equipment/fuel-hmr")
+    public ResponseEntity<ApiResponse<List<EquipmentFuelHmrRow>>> getEquipmentFuelHmr(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Equipment fuel & HMR fetched",
+                reportService.getEquipmentFuelHmr(startDate, endDate)));
+    }
+
+    @GetMapping("/equipment/fuel-hmr/export")
+    public ResponseEntity<byte[]> exportEquipmentFuelHmr(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<EquipmentFuelHmrRow> rows = reportService.getEquipmentFuelHmr(startDate, endDate);
+        String[] headers = {"Serial No.", "Reg No.", "Type", "Meter", "Fills", "Total Litres",
+                "Total Fuel Cost", "Opening HMR", "Closing HMR", "Hours Run", "Litres / Hour"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getSerialNumber()), safe(r.getRegistrationNumber()), safe(r.getEquipmentType()),
+                safe(r.getMeterType()), safe(r.getFillCount()), safe(r.getTotalLitresFilled()),
+                safe(r.getTotalFuelCost()), safe(r.getOpeningHmr()), safe(r.getClosingHmr()),
+                safe(r.getTotalHours()), safe(r.getLitresPerHour()),
+        }).toList();
+        return export("equipment-fuel-hmr", "Equipment Fuel & HMR", headers, data, format);
+    }
+
+    @GetMapping("/equipment/breakdowns")
+    public ResponseEntity<ApiResponse<List<EquipmentBreakdownRow>>> getEquipmentBreakdowns(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Equipment breakdowns fetched",
+                reportService.getEquipmentBreakdowns(startDate, endDate)));
+    }
+
+    @GetMapping("/equipment/breakdowns/export")
+    public ResponseEntity<byte[]> exportEquipmentBreakdowns(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<EquipmentBreakdownRow> rows = reportService.getEquipmentBreakdowns(startDate, endDate);
+        String[] headers = {"Serial No.", "Reg No.", "Type", "Date", "Location", "Reason",
+                "Status", "Days Lost", "Reported By", "Work Order"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getSerialNumber()), safe(r.getRegistrationNumber()), safe(r.getEquipmentType()),
+                safe(r.getBreakdownDate()), safe(r.getLocation()), safe(r.getReason()), safe(r.getStatus()),
+                safe(r.getDaysLost()), safe(r.getReportedBy()), safe(r.getWorkOrderNumber()),
+        }).toList();
+        return export("equipment-breakdowns", "Equipment Breakdowns", headers, data, format);
+    }
+
+    @GetMapping("/equipment/document-expiry")
+    public ResponseEntity<ApiResponse<List<EquipmentDocumentExpiryRow>>> getEquipmentDocumentExpiry(
+            @RequestParam(defaultValue = "90") int days) {
+        return ResponseEntity.ok(ApiResponse.success("Equipment document expiry fetched",
+                reportService.getEquipmentDocumentExpiry(days)));
+    }
+
+    @GetMapping("/equipment/document-expiry/export")
+    public ResponseEntity<byte[]> exportEquipmentDocumentExpiry(
+            @RequestParam(defaultValue = "90") int days,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<EquipmentDocumentExpiryRow> rows = reportService.getEquipmentDocumentExpiry(days);
+        String[] headers = {"Serial No.", "Reg No.", "Type", "Document", "Doc No.", "Issue Date",
+                "Expiry Date", "Issuer", "Cost", "Paid On", "Days Left", "Status"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getSerialNumber()), safe(r.getRegistrationNumber()), safe(r.getEquipmentType()),
+                safe(r.getDocumentType()), safe(r.getDocumentNumber()), safe(r.getIssueDate()),
+                safe(r.getExpiryDate()), safe(r.getIssuerName()), safe(r.getCost()), safe(r.getPaidOn()),
+                safe(r.getDaysLeft()), safe(r.getExpiryStatus()),
+        }).toList();
+        return export("equipment-document-expiry", "Equipment Document Expiry", headers, data, format);
+    }
+
+    @GetMapping("/equipment/maintenance-service")
+    public ResponseEntity<ApiResponse<List<EquipmentMaintenanceRow>>> getEquipmentMaintenance(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Equipment maintenance fetched",
+                reportService.getEquipmentMaintenance(startDate, endDate)));
+    }
+
+    @GetMapping("/equipment/maintenance-service/export")
+    public ResponseEntity<byte[]> exportEquipmentMaintenance(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<EquipmentMaintenanceRow> rows = reportService.getEquipmentMaintenance(startDate, endDate);
+        String[] headers = {"Serial No.", "Reg No.", "Type", "Service No.", "Service Date", "Completed",
+                "Service Type", "Triggered By", "Reason", "Tasks", "Total Cost", "Status", "Vendor",
+                "HMR at Service", "Due at HMR", "Downtime (hrs)"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getSerialNumber()), safe(r.getRegistrationNumber()), safe(r.getEquipmentType()),
+                safe(r.getServiceNumber()), safe(r.getServiceDate()), safe(r.getCompletedDate()),
+                safe(r.getServiceType()), safe(r.getTriggeredBy()), safe(r.getReason()), safe(r.getTaskCount()),
+                safe(r.getTotalCost()), safe(r.getStatus()), safe(r.getVendorName()), safe(r.getHmrAtService()),
+                safe(r.getDueAtHmr()), safe(r.getDowntimeHours()),
+        }).toList();
+        return export("equipment-maintenance", "Equipment Maintenance & Service", headers, data, format);
+    }
+
+    // ══ Work-order POV reports ══════════════════════════════════════════════════
+
+    @GetMapping("/work-orders/register")
+    public ResponseEntity<ApiResponse<List<WorkOrderRegisterRow>>> getWorkOrderRegister() {
+        return ResponseEntity.ok(ApiResponse.success("Work order register fetched", reportService.getWorkOrderRegister()));
+    }
+
+    @GetMapping("/work-orders/register/export")
+    public ResponseEntity<byte[]> exportWorkOrderRegister(@RequestParam(defaultValue = "csv") String format) {
+        List<WorkOrderRegisterRow> rows = reportService.getWorkOrderRegister();
+        String[] headers = {"WO No.", "Client", "Site", "Type", "Status", "Start", "End", "Machines",
+                "Mobilization", "Demobilization", "Agreed Amount", "GST %", "Retention %", "TDS %",
+                "Billing Cycle (mo)", "Days Left", "Overdue"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getWoNumber()), safe(r.getClientName()), safe(r.getSite()), safe(r.getWorkOrderType()),
+                safe(r.getStatus()), safe(r.getStartDate()), safe(r.getEndDate()), safe(r.getMachineCount()),
+                safe(r.getMobilizationCharge()), safe(r.getDemobilizationCharge()), safe(r.getAgreedJobAmount()),
+                safe(r.getGstPercent()), safe(r.getRetentionPercent()), safe(r.getTdsPercent()),
+                safe(r.getBillingCycleMonths()), safe(r.getDaysRemaining()),
+                Boolean.TRUE.equals(r.getOverdue()) ? "Yes" : "No",
+        }).toList();
+        return export("work-order-register", "Work Order Register", headers, data, format);
+    }
+
+    @GetMapping("/work-orders/utilization")
+    public ResponseEntity<ApiResponse<List<WorkOrderUtilizationRow>>> getWorkOrderUtilization(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Work order utilization fetched",
+                reportService.getWorkOrderUtilization(startDate, endDate)));
+    }
+
+    @GetMapping("/work-orders/utilization/export")
+    public ResponseEntity<byte[]> exportWorkOrderUtilization(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<WorkOrderUtilizationRow> rows = reportService.getWorkOrderUtilization(startDate, endDate);
+        String[] headers = {"WO No.", "Client", "Days Logged", "Working Hrs", "Idle Hrs", "Standby Hrs",
+                "Breakdown Hrs", "Total Hrs", "Utilization %", "Penalty Threshold (hrs)", "Penalty Breached"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getWoNumber()), safe(r.getClientName()), safe(r.getDaysLogged()),
+                safe(r.getWorkingHours()), safe(r.getIdleHours()), safe(r.getStandbyHours()),
+                safe(r.getBreakdownHours()), safe(r.getTotalHours()), safe(r.getUtilizationPct()),
+                safe(r.getPenaltyThresholdHours()), Boolean.TRUE.equals(r.getPenaltyBreached()) ? "Yes" : "No",
+        }).toList();
+        return export("work-order-utilization", "Work Order Utilization", headers, data, format);
+    }
+
+    @GetMapping("/work-orders/receivables")
+    public ResponseEntity<ApiResponse<List<WorkOrderReceivableRow>>> getWorkOrderReceivables() {
+        return ResponseEntity.ok(ApiResponse.success("Work order receivables fetched",
+                reportService.getWorkOrderReceivables()));
+    }
+
+    @GetMapping("/work-orders/receivables/export")
+    public ResponseEntity<byte[]> exportWorkOrderReceivables(@RequestParam(defaultValue = "csv") String format) {
+        List<WorkOrderReceivableRow> rows = reportService.getWorkOrderReceivables();
+        String[] headers = {"WO No.", "Client", "Invoices", "Gross Billed", "Received", "Retention Held",
+                "Advances", "Balance Due", "Oldest Due", "Days Overdue", "Aging"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getWoNumber()), safe(r.getClientName()), safe(r.getInvoiceCount()),
+                safe(r.getGrossBilled()), safe(r.getTotalReceived()), safe(r.getRetentionHeld()),
+                safe(r.getTotalAdvances()), safe(r.getBalanceDue()), safe(r.getOldestUnpaidDueDate()),
+                safe(r.getDaysOverdue()), safe(r.getAgingBucket()),
+        }).toList();
+        return export("work-order-receivables", "Work Order Receivables", headers, data, format);
+    }
+
+    @GetMapping("/work-orders/daily-register")
+    public ResponseEntity<ApiResponse<List<DailyMachineRegisterRow>>> getDailyMachineRegister(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate) {
+        return ResponseEntity.ok(ApiResponse.success("Daily machine register fetched",
+                reportService.getDailyMachineRegister(startDate, endDate)));
+    }
+
+    @GetMapping("/work-orders/daily-register/export")
+    public ResponseEntity<byte[]> exportDailyMachineRegister(
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate startDate,
+            @RequestParam @DateTimeFormat(pattern = DATE_FORMAT) LocalDate endDate,
+            @RequestParam(defaultValue = "csv") String format) {
+        List<DailyMachineRegisterRow> rows = reportService.getDailyMachineRegister(startDate, endDate);
+        String[] headers = {"Date", "Machine", "Type", "WO No.", "Client", "Status", "Start HMR", "End HMR",
+                "Hours Worked", "Working", "Idle", "Standby", "Breakdown", "Fuel (L)", "Idle Reason"};
+        List<String[]> data = rows.stream().map(r -> new String[]{
+                safe(r.getLogDate()), safe(r.getMachine()), safe(r.getEquipmentType()), safe(r.getWoNumber()),
+                safe(r.getClientName()), safe(r.getStatus()), safe(r.getStartHourMeter()), safe(r.getEndHourMeter()),
+                safe(r.getHoursWorked()), safe(r.getWorkingHours()), safe(r.getIdleHours()), safe(r.getStandbyHours()),
+                safe(r.getBreakdownHours()), safe(r.getFuelConsumed()), safe(r.getIdleReason()),
+        }).toList();
+        return export("daily-machine-register", "Daily Machine Register", headers, data, format);
+    }
+
     // ── Vehicle Master ────────────────────────────────────────────────────────
 
     @GetMapping("/vehicles/master")

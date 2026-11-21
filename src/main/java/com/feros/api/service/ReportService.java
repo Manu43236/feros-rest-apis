@@ -12,6 +12,20 @@ public interface ReportService {
     List<OperatorAssignmentRow> getOperatorAssignments(LocalDate startDate, LocalDate endDate);
     List<MachineStaffCostRow> getMachineStaffCost(LocalDate startDate, LocalDate endDate);
 
+    // Equipment mirrors of the vehicle report set
+    List<EquipmentMasterRow> getEquipmentMaster();
+    List<EquipmentFleetStatusRow> getEquipmentFleetStatus();
+    List<EquipmentFuelHmrRow> getEquipmentFuelHmr(LocalDate startDate, LocalDate endDate);
+    List<EquipmentBreakdownRow> getEquipmentBreakdowns(LocalDate startDate, LocalDate endDate);
+    List<EquipmentDocumentExpiryRow> getEquipmentDocumentExpiry(int days);
+    List<EquipmentMaintenanceRow> getEquipmentMaintenance(LocalDate startDate, LocalDate endDate);
+
+    // Work-order POV reports
+    List<WorkOrderRegisterRow> getWorkOrderRegister();
+    List<WorkOrderUtilizationRow> getWorkOrderUtilization(LocalDate startDate, LocalDate endDate);
+    List<WorkOrderReceivableRow> getWorkOrderReceivables();
+    List<DailyMachineRegisterRow> getDailyMachineRegister(LocalDate startDate, LocalDate endDate);
+
     List<VehicleMasterRow> getVehicleMaster();
 
     List<FleetStatusRow> getFleetStatus(LocalDate date);

@@ -92,6 +92,16 @@ public class ReportServiceImpl implements ReportService {
     private final com.feros.api.repository.MachineOperatorAssignmentLogRepository machineOperatorLogRepository;
     private final com.feros.api.repository.MachineCleanerAssignmentLogRepository machineCleanerLogRepository;
     private final com.feros.api.repository.EquipmentRepository equipmentRepository;
+    private final com.feros.api.repository.EquipmentBreakdownRepository equipmentBreakdownRepository;
+    private final com.feros.api.repository.EquipmentServiceRepository equipmentServiceRepository;
+    private final com.feros.api.repository.EquipmentFuelLogRepository equipmentFuelLogRepository;
+    private final com.feros.api.repository.EquipmentMeterReadingRepository equipmentMeterReadingRepository;
+    private final com.feros.api.repository.EquipmentDocumentRepository equipmentDocumentRepository;
+    private final com.feros.api.repository.MachineAssignmentRepository machineAssignmentRepository;
+    private final com.feros.api.repository.WorkOrderRepository workOrderRepository;
+    private final com.feros.api.repository.EquipmentDailyLogRepository equipmentDailyLogRepository;
+    private final com.feros.api.repository.EquipmentInvoiceRepository equipmentInvoiceRepository;
+    private final com.feros.api.service.EquipmentReceivablesService equipmentReceivablesService;
 
     // ── Equipment crew parity reports ───────────────────────────────────────────
 
@@ -562,6 +572,444 @@ public class ReportServiceImpl implements ReportService {
         else if (hours > 0) label = mins > 0 ? hours + "h " + mins + "m" : hours + "h";
         else label = mins + "m";
         return estimate ? "~" + label : label;
+    }
+
+    // ══ Equipment mirrors of the vehicle report set ════════════════════════════
+    // Equipment identity = serial no. (owned) or registration no. (rented). Sorted by
+    // equipment-type name then that label. Date-range reports filter in-memory: fine at
+    // report scale. ponytail: add repo-level date queries only if these show in slow logs.
+
+    private static final java.util.Comparator<com.feros.api.entity.Equipment> BY_EQUIP_TYPE =
+            java.util.Comparator.comparing(
+                    (com.feros.api.entity.Equipment e) -> e.getEquipmentType() != null ? e.getEquipmentType().getName() : "~",
+                    String.CASE_INSENSITIVE_ORDER)
+                    .thenComparing(ReportServiceImpl::equipIdentity, String.CASE_INSENSITIVE_ORDER);
+
+    private static String equipIdentity(com.feros.api.entity.Equipment e) {
+        if (e.getRegistrationNumber() != null && !e.getRegistrationNumber().isBlank()) return e.getRegistrationNumber();
+        return e.getSerialNumber() != null ? e.getSerialNumber() : "";
+    }
+
+    private static String equipTypeName(com.feros.api.entity.Equipment e) {
+        return e.getEquipmentType() != null ? e.getEquipmentType().getName() : "—";
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EquipmentMasterRow> getEquipmentMaster() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return equipmentRepository.findByTenantId(tenantId).stream()
+                .filter(e -> Boolean.TRUE.equals(e.getIsActive()))
+                .sorted(BY_EQUIP_TYPE)
+                .map(e -> {
+                    var type = e.getEquipmentType();
+                    var model = type != null ? type.getModel() : null;
+                    var make = model != null ? model.getMake() : null;
+                    return EquipmentMasterRow.builder()
+                            .equipmentId(e.getId())
+                            .serialNumber(e.getSerialNumber())
+                            .registrationNumber(e.getRegistrationNumber())
+                            .make(make != null ? make.getName() : null)
+                            .model(model != null ? model.getName() : null)
+                            .equipmentType(type != null ? type.getName() : null)
+                            .fuelType(e.getFuelType())
+                            .ownershipType(e.getOwnershipType() != null ? e.getOwnershipType().name() : null)
+                            .workStatus(e.getWorkStatus() != null ? e.getWorkStatus().name() : null)
+                            .meterType(e.getMeterType() != null ? e.getMeterType().name() : null)
+                            .currentMeterReading(e.getCurrentMeterReading())
+                            .manufactureYear(e.getManufactureYear())
+                            .fuelTankCapacity(e.getFuelTankCapacity())
+                            .chassisNumber(e.getChassisNumber())
+                            .engineNumber(e.getEngineNumber())
+                            .isFinanced(e.getIsFinanced())
+                            .financerName(e.getFinancerName())
+                            .financeFrom(e.getFinanceStartDate())
+                            .financeTo(e.getFinanceEndDate())
+                            .hiredFrom(e.getHiredFrom())
+                            .hireStartDate(e.getHireStartDate())
+                            .hireEndDate(e.getHireEndDate())
+                            .hireRate(e.getHireRate())
+                            .hireRateUnit(e.getHireRateUnit() != null ? e.getHireRateUnit().name() : null)
+                            .build();
+                })
+                .toList();
+    }
+
+    // Live snapshot of each machine's work status + the work order it is currently deployed on.
+    // ponytail: live-only (reads Equipment.workStatus). Past-date reconstruction is a later add,
+    // mirroring how vehicle fleet-status gained historical support as its own enhancement.
+    @Override
+    @Transactional(readOnly = true)
+    public List<EquipmentFleetStatusRow> getEquipmentFleetStatus() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return equipmentRepository.findByTenantId(tenantId).stream()
+                .filter(e -> Boolean.TRUE.equals(e.getIsActive()))
+                .sorted(BY_EQUIP_TYPE)
+                .map(e -> {
+                    var type = e.getEquipmentType();
+                    var model = type != null ? type.getModel() : null;
+                    var make = model != null ? model.getMake() : null;
+                    String woNumber = null, clientName = null, site = null;
+                    var active = machineAssignmentRepository.findFirstByEquipmentIdAndIsActiveTrue(e.getId());
+                    if (active.isPresent() && active.get().getWorkOrder() != null) {
+                        var wo = active.get().getWorkOrder();
+                        woNumber = wo.getWoNumber();
+                        clientName = wo.getClient() != null ? wo.getClient().getClientName() : null;
+                        site = wo.getSite();
+                    }
+                    return EquipmentFleetStatusRow.builder()
+                            .equipmentId(e.getId())
+                            .serialNumber(e.getSerialNumber())
+                            .registrationNumber(e.getRegistrationNumber())
+                            .equipmentType(type != null ? type.getName() : "—")
+                            .make(make != null ? make.getName() : null)
+                            .model(model != null ? model.getName() : null)
+                            .workStatus(e.getWorkStatus() != null ? e.getWorkStatus().name() : "UNKNOWN")
+                            .currentMeterReading(e.getCurrentMeterReading())
+                            .meterType(e.getMeterType() != null ? e.getMeterType().name() : null)
+                            .workOrderNumber(woNumber)
+                            .clientName(clientName)
+                            .site(site)
+                            .build();
+                })
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EquipmentFuelHmrRow> getEquipmentFuelHmr(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(LocalTime.MAX);
+
+        return equipmentRepository.findByTenantId(tenantId).stream()
+                .filter(e -> Boolean.TRUE.equals(e.getIsActive()))
+                .sorted(BY_EQUIP_TYPE)
+                .map(e -> {
+                    List<com.feros.api.entity.EquipmentFuelLog> logs = equipmentFuelLogRepository
+                            .findByEquipmentIdAndTenantIdOrderByFillDateDescIdDesc(e.getId(), tenantId).stream()
+                            .filter(f -> f.getFillDate() != null
+                                    && !f.getFillDate().isBefore(startDate) && !f.getFillDate().isAfter(endDate))
+                            .toList();
+                    List<com.feros.api.entity.EquipmentMeterReading> readings = equipmentMeterReadingRepository
+                            .findByEquipmentIdAndTenantIdOrderByReadingDateDescIdDesc(e.getId(), tenantId).stream()
+                            .filter(m -> m.getReadingDate() != null
+                                    && !m.getReadingDate().isBefore(start) && !m.getReadingDate().isAfter(end))
+                            .toList();
+
+                    BigDecimal totalLitres = logs.stream()
+                            .map(com.feros.api.entity.EquipmentFuelLog::getLitresFilled)
+                            .filter(java.util.Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal totalCost = logs.stream()
+                            .map(com.feros.api.entity.EquipmentFuelLog::getTotalCost)
+                            .filter(java.util.Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    // HMR span from both fuel-fill readings and dedicated meter readings in the window.
+                    java.util.stream.Stream<BigDecimal> hmrPoints = java.util.stream.Stream.concat(
+                            logs.stream().map(com.feros.api.entity.EquipmentFuelLog::getHmrAtFill),
+                            readings.stream().map(com.feros.api.entity.EquipmentMeterReading::getReadingValue))
+                            .filter(java.util.Objects::nonNull);
+                    List<BigDecimal> hmrs = hmrPoints.toList();
+                    BigDecimal openHmr = hmrs.stream().min(Comparator.naturalOrder()).orElse(null);
+                    BigDecimal closeHmr = hmrs.stream().max(Comparator.naturalOrder()).orElse(null);
+                    BigDecimal totalHours = (openHmr != null && closeHmr != null)
+                            ? closeHmr.subtract(openHmr).max(BigDecimal.ZERO) : null;
+
+                    BigDecimal lph = null;
+                    if (totalHours != null && totalHours.compareTo(BigDecimal.ZERO) > 0
+                            && totalLitres.compareTo(BigDecimal.ZERO) > 0) {
+                        lph = totalLitres.divide(totalHours, 2, RoundingMode.HALF_UP);
+                    }
+
+                    return EquipmentFuelHmrRow.builder()
+                            .equipmentId(e.getId())
+                            .serialNumber(e.getSerialNumber())
+                            .registrationNumber(e.getRegistrationNumber())
+                            .equipmentType(equipTypeName(e))
+                            .meterType(e.getMeterType() != null ? e.getMeterType().name() : null)
+                            .fillCount(logs.size())
+                            .totalLitresFilled(totalLitres)
+                            .totalFuelCost(totalCost)
+                            .openingHmr(openHmr)
+                            .closingHmr(closeHmr)
+                            .totalHours(totalHours)
+                            .litresPerHour(lph)
+                            .build();
+                })
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EquipmentBreakdownRow> getEquipmentBreakdowns(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(LocalTime.MAX);
+        return equipmentBreakdownRepository.findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(tenantId).stream()
+                .filter(b -> b.getBreakdownDate() != null
+                        && !b.getBreakdownDate().isBefore(start) && !b.getBreakdownDate().isAfter(end))
+                .sorted(Comparator.comparing(com.feros.api.entity.EquipmentBreakdown::getEquipment, BY_EQUIP_TYPE)
+                        .thenComparing(com.feros.api.entity.EquipmentBreakdown::getBreakdownDate,
+                                Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(b -> {
+                    Long daysLost = null;
+                    if (b.getResolvedAt() != null) {
+                        daysLost = Math.max(0L, ChronoUnit.DAYS.between(
+                                b.getBreakdownDate().toLocalDate(), b.getResolvedAt().toLocalDate()));
+                    }
+                    var e = b.getEquipment();
+                    return EquipmentBreakdownRow.builder()
+                            .equipmentId(e.getId())
+                            .serialNumber(e.getSerialNumber())
+                            .registrationNumber(e.getRegistrationNumber())
+                            .equipmentType(equipTypeName(e))
+                            .breakdownDate(b.getBreakdownDate().toLocalDate())
+                            .location(b.getLocation())
+                            .reason(b.getReason())
+                            .status(b.getStatus() != null ? b.getStatus().name() : null)
+                            .daysLost(daysLost)
+                            .reportedBy(b.getReportedBy() != null ? b.getReportedBy().getName() : "—")
+                            .workOrderNumber(b.getWorkOrder() != null ? b.getWorkOrder().getWoNumber() : null)
+                            .build();
+                })
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EquipmentDocumentExpiryRow> getEquipmentDocumentExpiry(int days) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDate today = TimeUtil.today();
+        // Repo cutoff finder uses a fixed window; pull a wide window then classify client-side so the
+        // GREEN bucket (valid, beyond cutoff) is also present, matching the vehicle report's behaviour.
+        return equipmentDocumentRepository
+                .findByTenantIdAndIsActiveTrueAndExpiryDateLessThanEqualOrderByExpiryDateAsc(
+                        tenantId, today.plusYears(50)).stream()
+                .filter(d -> d.getExpiryDate() != null)
+                .sorted(Comparator.comparing(com.feros.api.entity.EquipmentDocument::getEquipment, BY_EQUIP_TYPE)
+                        .thenComparing(com.feros.api.entity.EquipmentDocument::getExpiryDate,
+                                Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(d -> {
+                    long daysLeft = ChronoUnit.DAYS.between(today, d.getExpiryDate());
+                    String status = daysLeft < 0 ? "RED" : daysLeft <= days ? "AMBER" : "GREEN";
+                    var e = d.getEquipment();
+                    return EquipmentDocumentExpiryRow.builder()
+                            .equipmentId(e.getId())
+                            .serialNumber(e.getSerialNumber())
+                            .registrationNumber(e.getRegistrationNumber())
+                            .equipmentType(equipTypeName(e))
+                            .documentType(d.getDocumentType() != null ? d.getDocumentType().getName() : null)
+                            .documentNumber(d.getDocumentNumber())
+                            .issueDate(d.getIssueDate())
+                            .expiryDate(d.getExpiryDate())
+                            .issuerName(d.getIssuerName())
+                            .cost(d.getCost())
+                            .paidOn(d.getPaidOn())
+                            .daysLeft(daysLeft)
+                            .expiryStatus(status)
+                            .build();
+                })
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EquipmentMaintenanceRow> getEquipmentMaintenance(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        return equipmentServiceRepository.findByTenantIdAndIsActiveTrueOrderByCreatedAtDesc(tenantId).stream()
+                .filter(s -> s.getServiceDate() != null
+                        && !s.getServiceDate().isBefore(startDate) && !s.getServiceDate().isAfter(endDate))
+                .sorted(Comparator.comparing(com.feros.api.entity.EquipmentServiceRecord::getEquipment, BY_EQUIP_TYPE)
+                        .thenComparing(com.feros.api.entity.EquipmentServiceRecord::getServiceDate,
+                                Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(s -> {
+                    var e = s.getEquipment();
+                    return EquipmentMaintenanceRow.builder()
+                            .equipmentId(e.getId())
+                            .serialNumber(e.getSerialNumber())
+                            .registrationNumber(e.getRegistrationNumber())
+                            .equipmentType(equipTypeName(e))
+                            .serviceNumber(s.getServiceNumber())
+                            .serviceDate(s.getServiceDate())
+                            .completedDate(s.getCompletedDate())
+                            .serviceType(s.getServiceType() != null ? s.getServiceType().name() : null)
+                            .triggeredBy(s.getTriggeredBy() != null ? s.getTriggeredBy().name() : null)
+                            .reason(s.getNotes() != null && !s.getNotes().isBlank() ? s.getNotes() : null)
+                            .taskCount(s.getTasks() != null ? s.getTasks().size() : 0)
+                            .totalCost(s.getTotalCost())
+                            .status(s.getStatus() != null ? s.getStatus().name() : null)
+                            .vendorName(s.getVendorName())
+                            .hmrAtService(s.getHmrAtService())
+                            .dueAtHmr(s.getDueAtHmr())
+                            .downtimeHours(s.getDowntimeHours())
+                            .build();
+                })
+                .toList();
+    }
+
+    // ══ Work-order POV reports ══════════════════════════════════════════════════
+    // Per-WO daily-log / invoice fan-out runs one query per work order. ponytail: fine at
+    // report scale; batch with an IN-query only if a tenant's WO count makes it show in slow logs.
+
+    private static final java.util.Set<com.feros.api.enums.WorkOrderStatus> WO_TERMINAL = java.util.Set.of(
+            com.feros.api.enums.WorkOrderStatus.COMPLETED,
+            com.feros.api.enums.WorkOrderStatus.INVOICED,
+            com.feros.api.enums.WorkOrderStatus.CANCELLED);
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WorkOrderRegisterRow> getWorkOrderRegister() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDate today = TimeUtil.today();
+        return workOrderRepository.findByTenant_IdAndIsActiveTrueOrderByStartDateDesc(tenantId).stream()
+                .map(w -> {
+                    boolean terminal = WO_TERMINAL.contains(w.getStatus());
+                    Long daysRemaining = (!terminal && w.getEndDate() != null)
+                            ? ChronoUnit.DAYS.between(today, w.getEndDate()) : null;
+                    return WorkOrderRegisterRow.builder()
+                            .woId(w.getId())
+                            .woNumber(w.getWoNumber())
+                            .clientName(w.getClient() != null ? w.getClient().getClientName() : null)
+                            .site(w.getSite())
+                            .workOrderType(w.getWorkOrderType() != null ? w.getWorkOrderType().name() : null)
+                            .status(w.getStatus() != null ? w.getStatus().name() : null)
+                            .startDate(w.getStartDate())
+                            .endDate(w.getEndDate())
+                            .machineCount((int) machineAssignmentRepository.countByWorkOrderId(w.getId()))
+                            .mobilizationCharge(w.getMobilizationCharge())
+                            .demobilizationCharge(w.getDemobilizationCharge())
+                            .agreedJobAmount(w.getAgreedJobAmount())
+                            .gstPercent(w.getGstPercent())
+                            .retentionPercent(w.getRetentionPercent())
+                            .tdsPercent(w.getTdsPercent())
+                            .billingCycleMonths(w.getBillingCycleMonths())
+                            .daysRemaining(daysRemaining)
+                            .overdue(daysRemaining != null && daysRemaining < 0)
+                            .build();
+                })
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WorkOrderUtilizationRow> getWorkOrderUtilization(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<WorkOrderUtilizationRow> rows = new java.util.ArrayList<>();
+        for (var w : workOrderRepository.findByTenant_IdAndIsActiveTrueOrderByStartDateDesc(tenantId)) {
+            var logs = equipmentDailyLogRepository.findByWorkOrderIdAndLogDateBetween(w.getId(), startDate, endDate);
+            if (logs.isEmpty()) continue; // only WOs with activity in the window
+            BigDecimal working = sumField(logs, com.feros.api.entity.EquipmentDailyLog::getWorkingHours);
+            BigDecimal idle = sumField(logs, com.feros.api.entity.EquipmentDailyLog::getIdleHours);
+            BigDecimal standby = sumField(logs, com.feros.api.entity.EquipmentDailyLog::getStandbyHours);
+            BigDecimal breakdown = sumField(logs, com.feros.api.entity.EquipmentDailyLog::getBreakdownHours);
+            BigDecimal total = working.add(idle).add(standby).add(breakdown);
+            BigDecimal util = total.compareTo(BigDecimal.ZERO) > 0
+                    ? working.multiply(BigDecimal.valueOf(100)).divide(total, 1, RoundingMode.HALF_UP) : null;
+            Integer threshold = w.getBreakdownPenaltyThresholdHours();
+            boolean breached = threshold != null && breakdown.compareTo(BigDecimal.valueOf(threshold)) > 0;
+            rows.add(WorkOrderUtilizationRow.builder()
+                    .woId(w.getId())
+                    .woNumber(w.getWoNumber())
+                    .clientName(w.getClient() != null ? w.getClient().getClientName() : null)
+                    .daysLogged(logs.size())
+                    .workingHours(working).idleHours(idle).standbyHours(standby).breakdownHours(breakdown)
+                    .totalHours(total)
+                    .utilizationPct(util)
+                    .penaltyThresholdHours(threshold)
+                    .penaltyBreached(breached)
+                    .build());
+        }
+        return rows;
+    }
+
+    private static BigDecimal sumField(List<com.feros.api.entity.EquipmentDailyLog> logs,
+                                       java.util.function.Function<com.feros.api.entity.EquipmentDailyLog, BigDecimal> f) {
+        return logs.stream().map(f).filter(java.util.Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    // Reuses EquipmentReceivablesService.getSummary per WO for money figures (identical to the per-WO
+    // receivables drawer — single source of truth) + a second invoice read for due-date aging.
+    @Override
+    @Transactional(readOnly = true)
+    public List<WorkOrderReceivableRow> getWorkOrderReceivables() {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        LocalDate today = TimeUtil.today();
+        List<WorkOrderReceivableRow> rows = new java.util.ArrayList<>();
+        for (var w : workOrderRepository.findByTenant_IdAndIsActiveTrueOrderByStartDateDesc(tenantId)) {
+            var summary = equipmentReceivablesService.getSummary(w.getId());
+            if (summary.getInvoices() == null || summary.getInvoices().isEmpty()) continue; // only billed WOs
+
+            // Oldest unpaid invoice due date (SENT / PARTIALLY_PAID carry an outstanding balance).
+            LocalDate oldestDue = equipmentInvoiceRepository.findByWorkOrderViaItems(tenantId, w.getId()).stream()
+                    .filter(i -> i.getStatus() == com.feros.api.enums.EquipmentInvoiceStatus.SENT
+                            || i.getStatus() == com.feros.api.enums.EquipmentInvoiceStatus.PARTIALLY_PAID)
+                    .map(com.feros.api.entity.EquipmentInvoice::getDueDate)
+                    .filter(java.util.Objects::nonNull)
+                    .min(Comparator.naturalOrder())
+                    .orElse(null);
+            Long daysOverdue = (oldestDue != null && today.isAfter(oldestDue))
+                    ? ChronoUnit.DAYS.between(oldestDue, today) : null;
+
+            rows.add(WorkOrderReceivableRow.builder()
+                    .woId(w.getId())
+                    .woNumber(w.getWoNumber())
+                    .clientName(w.getClient() != null ? w.getClient().getClientName() : null)
+                    .invoiceCount(summary.getInvoices().size())
+                    .grossBilled(summary.getGrossBilled())
+                    .totalReceived(summary.getTotalReceived())
+                    .retentionHeld(summary.getRetentionHeld())
+                    .totalAdvances(summary.getTotalAdvances())
+                    .balanceDue(summary.getBalanceDue())
+                    .oldestUnpaidDueDate(oldestDue)
+                    .daysOverdue(daysOverdue)
+                    .agingBucket(agingBucket(daysOverdue))
+                    .build());
+        }
+        return rows;
+    }
+
+    private static String agingBucket(Long daysOverdue) {
+        if (daysOverdue == null || daysOverdue <= 0) return "CURRENT";
+        if (daysOverdue <= 30) return "0-30";
+        if (daysOverdue <= 60) return "31-60";
+        if (daysOverdue <= 90) return "61-90";
+        return "90+";
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DailyMachineRegisterRow> getDailyMachineRegister(LocalDate startDate, LocalDate endDate) {
+        Long tenantId = SecurityUtil.getCurrentTenantId();
+        List<DailyMachineRegisterRow> rows = new java.util.ArrayList<>();
+        for (var w : workOrderRepository.findByTenant_IdAndIsActiveTrueOrderByStartDateDesc(tenantId)) {
+            String woNumber = w.getWoNumber();
+            String clientName = w.getClient() != null ? w.getClient().getClientName() : null;
+            for (var log : equipmentDailyLogRepository.findByWorkOrderIdAndLogDateBetween(w.getId(), startDate, endDate)) {
+                var eq = log.getMachineAssignment() != null ? log.getMachineAssignment().getEquipment() : null;
+                rows.add(DailyMachineRegisterRow.builder()
+                        .logDate(log.getLogDate())
+                        .machine(eq != null ? equipIdentity(eq) : "—")
+                        .equipmentType(eq != null ? equipTypeName(eq) : "—")
+                        .woNumber(woNumber)
+                        .clientName(clientName)
+                        .status(log.getStatus() != null ? log.getStatus().name() : null)
+                        .startHourMeter(log.getStartHourMeter())
+                        .endHourMeter(log.getEndHourMeter())
+                        .hoursWorked(log.getHoursWorked())
+                        .workingHours(log.getWorkingHours())
+                        .idleHours(log.getIdleHours())
+                        .standbyHours(log.getStandbyHours())
+                        .breakdownHours(log.getBreakdownHours())
+                        .fuelConsumed(log.getFuelConsumed())
+                        .idleReason(log.getIdleReason())
+                        .build());
+            }
+        }
+        rows.sort(Comparator.comparing(DailyMachineRegisterRow::getLogDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(DailyMachineRegisterRow::getMachine, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
+        return rows;
     }
 
     // ── 7. Attendance Daily Register ──────────────────────────────────────────────

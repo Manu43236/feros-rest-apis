@@ -34,4 +34,7 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
     // For scheduler — all active IN_PROGRESS work orders across all tenants
     List<WorkOrder> findByStatusAndIsActiveTrue(WorkOrderStatus status);
+
+    // Reports — tenant-wide active work order list.
+    List<WorkOrder> findByTenant_IdAndIsActiveTrueOrderByStartDateDesc(Long tenantId);
 }
