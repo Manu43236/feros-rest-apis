@@ -62,6 +62,11 @@ public class SparePartsTransaction {
     @JoinColumn(name = "vehicle_id")
     private Vehicle vehicle;
 
+    // Originating DEF/consumable request (carries the supervisor who requested). Nullable — only set for CONSUMABLE issues.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "consumable_issue_request_id")
+    private ConsumableIssueRequest consumableIssueRequest;
+
     @Column(name = "supplier_name")
     private String supplierName;
 

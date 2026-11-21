@@ -806,8 +806,11 @@ public class InventoryServiceImpl implements InventoryService {
                 .referenceType(tx.getReferenceType())
                 .servicePartId(sp != null ? sp.getId() : null)
                 .serviceNumber(serviceNumber)
-                .vehicleRegistrationNumber(sp != null ? sp.getService().getVehicle().getRegistrationNumber() : null)
+                .vehicleRegistrationNumber(sp != null ? sp.getService().getVehicle().getRegistrationNumber()
+                        : tx.getVehicle() != null ? tx.getVehicle().getRegistrationNumber() : null)
                 .equipmentName(equipmentName)
+                .requestedByName(tx.getConsumableIssueRequest() != null
+                        ? tx.getConsumableIssueRequest().getRequestedBy().getName() : null)
                 .supplierName(tx.getSupplierName())
                 .invoiceNo(tx.getInvoiceNo())
                 .invoiceDate(tx.getInvoiceDate())

@@ -27,6 +27,7 @@ public class SparePartsTransactionResponse {
     private String serviceNumber;
     private String vehicleRegistrationNumber;
     private String equipmentName;
+    private String requestedByName;   // supervisor who raised the DEF/consumable request (CONSUMABLE only)
     private String supplierName;
     private String invoiceNo;
     private LocalDate invoiceDate;

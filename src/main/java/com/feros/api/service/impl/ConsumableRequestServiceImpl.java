@@ -145,6 +145,7 @@ public class ConsumableRequestServiceImpl implements ConsumableRequestService {
                 .tenant(req.getTenant())
                 .sparePart(part)
                 .vehicle(req.getVehicle())
+                .consumableIssueRequest(req)
                 .transactionType(StockTransactionType.OUT)
                 .quantity(quantity)
                 .unitCost(unitCost)
