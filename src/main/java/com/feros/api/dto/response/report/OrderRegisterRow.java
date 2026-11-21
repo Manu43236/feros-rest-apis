@@ -28,6 +28,7 @@ public class OrderRegisterRow {
     private String orderPaymentStatus;
     private String invoiceStatus;       // INVOICED / NOT_INVOICED
     private BigDecimal advanceReceived;  // advance received from party
+    private BigDecimal paidAmount;       // payments received (excludes advance) = received − advance
     private BigDecimal balance;          // order value − received − deductions
     private long vehicleCount;
     private Integer durationDays;

@@ -1393,6 +1393,7 @@ public class ReportServiceImpl implements ReportService {
                 .orderPaymentStatus(o.getOrderPaymentStatus() != null ? o.getOrderPaymentStatus().name() : "—")
                 .invoiceStatus(invoiced.contains(o.getId()) ? "INVOICED" : "NOT_INVOICED")
                 .advanceReceived(led != null ? led[0] : BigDecimal.ZERO)
+                .paidAmount(led != null ? led[1].subtract(led[0]) : BigDecimal.ZERO)
                 .balance(orderBalance(o, led))
                 .vehicleCount(orderVehicleAllocationRepository.countByOrderIdAndIsActiveTrue(o.getId()))
                 .durationDays(o.getExpectedDeliveryDate() != null
