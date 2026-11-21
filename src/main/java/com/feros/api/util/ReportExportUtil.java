@@ -63,11 +63,30 @@ public class ReportExportUtil {
         }
     }
 
+    // Prepend a leading "S.No" serial column to every export so each report row is numbered.
+    private static final String SERIAL_HEADER = "S.No";
+
+    private static String[] withSerialHeader(String[] headers) {
+        String[] out = new String[headers.length + 1];
+        out[0] = SERIAL_HEADER;
+        System.arraycopy(headers, 0, out, 1, headers.length);
+        return out;
+    }
+
+    private static String[] withSerialCell(String[] row, int serial) {
+        String[] out = new String[row.length + 1];
+        out[0] = String.valueOf(serial);
+        System.arraycopy(row, 0, out, 1, row.length);
+        return out;
+    }
+
     public static byte[] toCsv(String[] headers, List<String[]> rows) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream();
              CSVWriter writer = new CSVWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8))) {
-            writer.writeNext(headers);
-            rows.forEach(writer::writeNext);
+            writer.writeNext(withSerialHeader(headers));
+            for (int i = 0; i < rows.size(); i++) {
+                writer.writeNext(withSerialCell(rows.get(i), i + 1));
+            }
             writer.flush();
             return out.toByteArray();
         } catch (Exception e) {
@@ -127,14 +146,16 @@ public class ReportExportUtil {
             }
 
             // ── Table ─────────────────────────────────────────────────────────
-            PdfPTable table = new PdfPTable(headers.length);
+            // +1 column for the leading "S.No" serial index.
+            String[] serialHeaders = withSerialHeader(headers);
+            PdfPTable table = new PdfPTable(serialHeaders.length);
             table.setWidthPercentage(100f);
             table.setSpacingBefore(6f);
             table.setHeaderRows(1); // repeat the header row on every page
 
             Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Color.WHITE);
             Color headerBg = Color.decode("#1E3A5F");
-            for (String h : headers) {
+            for (String h : serialHeaders) {
                 PdfPCell cell = new PdfPCell(new Phrase(h, headerFont));
                 cell.setBackgroundColor(headerBg);
                 cell.setPadding(5f);
@@ -146,7 +167,7 @@ public class ReportExportUtil {
             Color altBg = Color.decode("#F1F5F9");
             for (int i = 0; i < rows.size(); i++) {
                 Color rowBg = (i % 2 == 0) ? Color.WHITE : altBg;
-                for (String val : rows.get(i)) {
+                for (String val : withSerialCell(rows.get(i), i + 1)) {
                     PdfPCell cell = new PdfPCell(new Phrase(val == null ? "" : val, dataFont));
                     cell.setBackgroundColor(rowBg);
                     cell.setPadding(4f);
