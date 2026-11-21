@@ -49,6 +49,12 @@ public class StaffDocument extends BaseEntity {
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
+    @Column(name = "cost", precision = 12, scale = 2)
+    private java.math.BigDecimal cost;
+
+    @Column(name = "paid_on")
+    private LocalDate paidOn;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 }

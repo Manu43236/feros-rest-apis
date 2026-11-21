@@ -183,6 +183,8 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .fileUrl(request.getFileUrl())
                 .isVerified(false)
                 .remarks(request.getRemarks())
+                .cost(request.getCost())
+                .paidOn(request.getPaidOn())
                 .isActive(true)
                 .build();
 
@@ -201,6 +203,8 @@ public class StaffProfileServiceImpl implements StaffProfileService {
         if (request.getExpiryDate()     != null) doc.setExpiryDate(request.getExpiryDate());
         if (request.getFileUrl()        != null) doc.setFileUrl(request.getFileUrl());
         if (request.getRemarks()        != null) doc.setRemarks(request.getRemarks());
+        if (request.getCost()           != null) doc.setCost(request.getCost());
+        if (request.getPaidOn()         != null) doc.setPaidOn(request.getPaidOn());
 
         return mapToDocumentResponse(staffDocumentRepository.save(doc));
     }
@@ -519,6 +523,8 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                 .fileUrl(d.getFileUrl())
                 .isVerified(d.getIsVerified())
                 .remarks(d.getRemarks())
+                .cost(d.getCost())
+                .paidOn(d.getPaidOn())
                 .createdAt(d.getCreatedAt())
                 .updatedAt(d.getUpdatedAt())
                 .build();
